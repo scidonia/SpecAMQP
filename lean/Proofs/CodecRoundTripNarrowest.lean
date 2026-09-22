@@ -57,7 +57,8 @@ namespace SpecAMQP.Proofs
 
 open SpecAMQP.Spec.Codec
 open SpecAMQP.Spec.ReadLaws
-open SpecAMQP.Generated.Oasis (EncodingDecl encodings)
+open SpecAMQP.Generated.Oasis (Category EncodingDecl encodings encodingOf)
+open SpecAMQP.Spec.Value (Constructor classify)
 open SpecAMQP.Harness (Octets)
 
 /-! ## The rule as an inequality -/
@@ -353,12 +354,35 @@ width plus the field's length — and `readVariable_canonical_le` is it composed
 inequality, through `variable_row_width` for the row's width. `readVariable_ok` is the row's read
 taken apart, which is what the other families' steps will want too.
 
-What is still open in the dispatch is the same step for the other families — the compound
-families' size and count, and the described case, whose arithmetic R4 already supplies — and the
-array case's element-constructor lookup, which is the one *genuine* `<$>` site in the codec
-(`Spec.Codec.elementDecl?`), reachable through `except_map_ok` from `Proofs/ExceptMap`. A module
-that wants those reductions must import that file, since a `@[simp]` lemma that exists is not one
-`simp` can see.
+What is landed below for the other families is the same reading-off step at their own framing —
+`readCompound_consumes` and `readArrayData_consumes`, which get the accepted size out of the
+reader's own measurement rather than out of the items' arithmetic, and `readValue_described`,
+which is the described case's one octet and two reads — together with the dispatch itself:
+`decodeValue_entry` puts `decodeValue` in the reader's own terms, `readValue_dispatch` reads the
+octet, its classification, the row the surface assigned it and the reader call that produced the
+value off an accepted buffer, and the row lemmas above it (`dataDecl_ok_mem`,
+`declInRange_category`, the four `dataDecl_category_of_*`) are what make the row's category and
+its table membership available.
+
+Three things remain, and each is named rather than assumed.
+
+**The measurement-to-advance step.** The compound and array readings report their size as the
+reader computed it — `c'.pos - start = size` — and turning that into an advance,
+`c'.pos = start + size`, needs one fact about the reader this module does not yet have: that a
+read never moves its cursor backwards. `readValue`, `readCompound`, `readArrayData`, `readItems`,
+`readElements` and `readElementsLoop` are mutually recursive, so that fact is a mutual induction
+over the cluster. It is a fact the specification can state and this repository can prove; it is
+named here because the two steps above are honest without it and would be dishonest with it
+assumed.
+
+**The fixed family's reading-off step.** `readScalarData`'s fixed half (`readFixed`) has no
+reading-off step in this module yet — its accepted size is the row's own width — and it is the
+family whose canonical comparison needs the writer's table lookup to agree with the reader's row,
+which is a table fact of the same kind as `variable_row_width`.
+
+**The per-family size comparisons.** The reading-off steps give each family's accepted numbers;
+comparing them with the canonical size the writer would produce needs the value-to-payload links,
+and for the two text families that is where the gap below bites.
 
 One fact the law needs is **not** available in this closure, and it is named rather than assumed:
 the writer's payload for `string` and `symbol` is `text.toUTF8.toList`, while the reader's payload
@@ -534,6 +558,460 @@ theorem readVariable_canonical_le (decl : EncodingDecl) (c : Cursor) (value : Va
   rw [hsub]
   exact variable_family_canonical_le length decl.width
     (variable_row_width decl hmem howner) hbound
+
+/-! ## The compound families' and the described case's reading-off steps
+
+The same three things as the variable family's, at their own framing. A compound declares a
+*size* and a *count*, and the reader checks the octets it measured against the size it read —
+so `readCompound_consumes` gets the accepted size out of that check rather than out of the
+items' arithmetic: the check *is* the measurement, and the items themselves need not be taken
+apart. The array case is the same with its constructor octet and its count ceiling inside the
+window, and its element lookup is not inverted either: the accepted size is what the check says
+regardless of which rows the constructor named.
+
+The described case takes no field at all. `readValue_described` is its reading-off step: an
+accepted described value is one prefix octet and two recursively read values, which is the
+additivity `described_canonical_le` already turns into the case's inequality. -/
+
+/-- **The shape a compound read's items take in its value.** A `list` row's value is the items
+themselves, a `map` row's is those items paired, and an `array` row's is the items under the one
+constructor octet the array declared — the three cases of `readCompound`/`readArrayData`, as a
+statement rather than as the `match` they come from. -/
+def CompoundCarries (value : Value) (items : List Value) : Prop :=
+  value = .list items ∨ value = .map (pairUp items) ∨
+    ∃ constructor : UInt8, value = .array constructor items
+
+/-- **A compound row's read, read off its own measurement.**
+
+An accepted compound decoding read a size field and a count field, both below `256 ^ width`, and
+the octets it then measured — everything after the size field, up to where the value ended — are
+exactly the `size` the field declared.
+
+The measurement is the equation the reader itself checked (`measured = size`), so the size is not
+inferred from the items: it is read off the identical quantity the reader computed. Turning that
+subtraction into an addition needs one fact about the reader which this module does not yet have
+— that a read never moves its cursor backwards (`readValue` and the loops are mutually recursive,
+so it is a mutual induction), which is also why `readItems` is not taken apart here: the items'
+values are not needed to state the framing, only to bound the body recursively later. -/
+theorem readCompound_consumes (fuel : Nat) (decl : EncodingDecl) (c : Cursor) (value : Value)
+    (c' : Cursor) (h : readCompound fuel decl c = .ok (value, c')) :
+    ∃ size count : Nat, ∃ items : List Value, ∃ start : Cursor,
+      start.pos = c.pos + decl.width ∧
+      c'.pos - start.pos = size ∧
+      size < 2 ^ (8 * decl.width) ∧
+      count < 2 ^ (8 * decl.width) ∧
+      CompoundCarries value items := by
+  obtain ⟨size, c₁, hbs⟩ : ∃ s : Nat, ∃ cc : Cursor, takeBe decl.width c = .ok (s, cc) := by
+    cases hb : takeBe decl.width c with
+    | error e =>
+      exfalso
+      simp only [readCompound, hb, except_bind_error] at h
+      exact absurd h (by simp)
+    | ok v => exact ⟨v.1, v.2, rfl⟩
+  unfold readCompound at h
+  rw [hbs] at h
+  simp only [except_bind_ok] at h
+  obtain ⟨count, c₂, hbc⟩ : ∃ n : Nat, ∃ cc : Cursor, takeBe decl.width c₁ = .ok (n, cc) := by
+    cases hb : takeBe decl.width c₁ with
+    | error e =>
+      exfalso
+      simp only [hb, except_bind_error] at h
+      exact absurd h (by simp)
+    | ok v => exact ⟨v.1, v.2, rfl⟩
+  rw [hbc] at h
+  simp only [except_bind_ok] at h
+  have hsize : size < 2 ^ (8 * decl.width) := by
+    rw [two_pow_eight_mul]
+    exact takeBe_lt decl.width c size c₁ hbs
+  have hcount : count < 2 ^ (8 * decl.width) := by
+    rw [two_pow_eight_mul]
+    exact takeBe_lt decl.width c₁ count c₂ hbc
+  have hstart : c₁.pos = c.pos + decl.width := takeBe_advances decl.width c size c₁ hbs
+  -- the count's read leaves the cursor where the measurement's window starts
+  split at h
+  · -- list
+    obtain ⟨items, c₃, hbi⟩ :
+        ∃ l : List Value, ∃ cc : Cursor, readItems fuel count c₂ = .ok (l, cc) := by
+      cases hb : readItems fuel count c₂ with
+      | error e =>
+        exfalso
+        simp only [hb, except_bind_error] at h
+        exact absurd h (by simp)
+      | ok v => exact ⟨v.1, v.2, rfl⟩
+    rw [hbi] at h
+    simp only [except_bind_ok] at h
+    split at h
+    · simp only [Except.ok.injEq, Prod.mk.injEq] at h
+      refine ⟨size, count, items, c₁, hstart, ?_, hsize, hcount, Or.inl h.1.symm⟩
+      rw [← h.2]
+      assumption
+    · simp at h
+  · -- map
+    split at h
+    · simp at h
+    · obtain ⟨items, c₃, hbi⟩ :
+          ∃ l : List Value, ∃ cc : Cursor, readItems fuel count c₂ = .ok (l, cc) := by
+        cases hb : readItems fuel count c₂ with
+        | error e =>
+          exfalso
+          simp only [hb, except_bind_error] at h
+          exact absurd h (by simp)
+        | ok v => exact ⟨v.1, v.2, rfl⟩
+      rw [hbi] at h
+      simp only [except_bind_ok] at h
+      split at h
+      · simp only [Except.ok.injEq, Prod.mk.injEq] at h
+        refine ⟨size, count, items, c₁, hstart, ?_, hsize, hcount, Or.inr (Or.inl h.1.symm)⟩
+        rw [← h.2]
+        assumption
+      · simp at h
+  · -- an owner that is not a compound form
+    simp at h
+
+/-- **An array row's read, read off its own measurement.**
+
+The same as `readCompound_consumes` with the array's own two additions inside the window: a count
+the reader refuses above `arrayElementLimit`, and one constructor octet whose row is looked up.
+Neither has to be taken apart — the accepted size is what the measurement says, whatever the
+elements turned out to be — and the count ceiling comes out of the check rather than out of the
+elements' count, so the element lookup is never inverted here. -/
+theorem readArrayData_consumes (fuel : Nat) (decl : EncodingDecl) (c : Cursor) (value : Value)
+    (c' : Cursor) (h : readArrayData fuel decl c = .ok (value, c')) :
+    ∃ size count : Nat, ∃ constructor : UInt8, ∃ items : List Value, ∃ start : Cursor,
+      start.pos = c.pos + decl.width ∧
+      c'.pos - start.pos = size ∧
+      size < 2 ^ (8 * decl.width) ∧
+      count < 2 ^ (8 * decl.width) ∧
+      count ≤ arrayElementLimit ∧
+      value = .array constructor items := by
+  cases fuel with
+  | zero =>
+    simp only [readArrayData] at h
+    exact absurd h (by simp)
+  | succ f =>
+    obtain ⟨size, c₁, hbs⟩ : ∃ s : Nat, ∃ cc : Cursor, takeBe decl.width c = .ok (s, cc) := by
+      cases hb : takeBe decl.width c with
+      | error e =>
+        exfalso
+        simp only [readArrayData, hb, except_bind_error] at h
+        exact absurd h (by simp)
+      | ok v => exact ⟨v.1, v.2, rfl⟩
+    unfold readArrayData at h
+    rw [hbs] at h
+    simp only [except_bind_ok] at h
+    obtain ⟨count, c₂, hbc⟩ : ∃ n : Nat, ∃ cc : Cursor, takeBe decl.width c₁ = .ok (n, cc) := by
+      cases hb : takeBe decl.width c₁ with
+      | error e =>
+        exfalso
+        simp only [hb, except_bind_error] at h
+        exact absurd h (by simp)
+      | ok v => exact ⟨v.1, v.2, rfl⟩
+    rw [hbc] at h
+    simp only [except_bind_ok] at h
+    have hsize : size < 2 ^ (8 * decl.width) := by
+      rw [two_pow_eight_mul]
+      exact takeBe_lt decl.width c size c₁ hbs
+    have hcount : count < 2 ^ (8 * decl.width) := by
+      rw [two_pow_eight_mul]
+      exact takeBe_lt decl.width c₁ count c₂ hbc
+    have hstart : c₁.pos = c.pos + decl.width := takeBe_advances decl.width c size c₁ hbs
+    split at h
+    · -- above the reader's ceiling
+      simp at h
+    · obtain ⟨constructor, c₃, hbu⟩ : ∃ b : UInt8, ∃ cc : Cursor, takeU8 c₂ = .ok (b, cc) := by
+        cases hb : takeU8 c₂ with
+        | error e =>
+          exfalso
+          simp only [hb, except_bind_error] at h
+          exact absurd h (by simp)
+        | ok v => exact ⟨v.1, v.2, rfl⟩
+      rw [hbu] at h
+      simp only [except_bind_ok] at h
+      obtain ⟨elementDecl, hbe⟩ : ∃ d : Option EncodingDecl, elementDecl? constructor = .ok d := by
+        cases hb : elementDecl? constructor with
+        | error e =>
+          exfalso
+          simp only [hb, except_bind_error] at h
+          exact absurd h (by simp)
+        | ok v => exact ⟨v, rfl⟩
+      rw [hbe] at h
+      simp only [except_bind_ok] at h
+      obtain ⟨items, c₅, hbl⟩ :
+          ∃ l : List Value, ∃ cc : Cursor,
+            readElements f elementDecl count c₃ = .ok (l, cc) := by
+        cases hb : readElements f elementDecl count c₃ with
+        | error e =>
+          exfalso
+          simp only [hb, except_bind_error] at h
+          exact absurd h (by simp)
+        | ok v => exact ⟨v.1, v.2, rfl⟩
+      rw [hbl] at h
+      simp only [except_bind_ok] at h
+      split at h
+      · simp only [Except.ok.injEq, Prod.mk.injEq] at h
+        refine ⟨size, count, constructor, items, c₁, hstart, ?_, hsize, hcount, ?_, h.1.symm⟩
+        · rw [← h.2]
+          assumption
+        · omega
+      · simp at h
+
+/-- **An accepted described value is one octet and two reads.**
+
+`readValue`'s descriptor case is the one branch that consults no row at all: the prefix octet
+says a described value follows, and then a descriptor and a value are read one after the other.
+This is that decomposition — the prefix octet, its one-octet advance, and the two recursive
+reads — which is the additivity `described_canonical_le` turns into the case's inequality, and
+why R4 could say a described value consults no choice rule.
+
+The classification is a *hypothesis* rather than something read out of the accepted value: the
+caller is the dispatch, which cases on the octet's classification anyway, and a statement that
+recovered it from the result would have to rule out the other five branches by showing that no
+other reader ever returns a described value — five obligations bought for no use. -/
+theorem readValue_described (fuel : Nat) (c : Cursor) (code : UInt8) (c₁ : Cursor)
+    (hbu : takeU8 c = .ok (code, c₁)) (hclass : classify code.toNat = .descriptor)
+    (value : Value) (c' : Cursor) (h : readValue (fuel + 1) c = .ok (value, c')) :
+    ∃ descriptor inner : Value, ∃ c₂ c₃ : Cursor,
+      value = .described descriptor inner ∧
+      c₁.pos = c.pos + 1 ∧
+      readValue fuel c₁ = .ok (descriptor, c₂) ∧
+      readValue fuel c₂ = .ok (inner, c₃) ∧ c₃ = c' := by
+  obtain ⟨descriptor, c₂, hbd⟩ :
+      ∃ v : Value, ∃ cc : Cursor, readValue fuel c₁ = .ok (v, cc) := by
+    unfold readValue at h
+    rw [hbu] at h
+    simp only [except_bind_ok, hclass] at h
+    cases hb : readValue fuel c₁ with
+    | error e =>
+      exfalso
+      simp only [hb, except_bind_error] at h
+      exact absurd h (by simp)
+    | ok v => exact ⟨v.1, v.2, rfl⟩
+  unfold readValue at h
+  rw [hbu] at h
+  simp only [except_bind_ok, hclass] at h
+  rw [hbd] at h
+  simp only [except_bind_ok] at h
+  obtain ⟨inner, c₃, hbv⟩ :
+      ∃ v : Value, ∃ cc : Cursor, readValue fuel c₂ = .ok (v, cc) := by
+    cases hb : readValue fuel c₂ with
+    | error e =>
+      exfalso
+      simp only [hb, except_bind_error] at h
+      exact absurd h (by simp)
+    | ok v => exact ⟨v.1, v.2, rfl⟩
+  rw [hbv] at h
+  simp only [except_bind_ok, except_pure_ok, Except.ok.injEq, Prod.mk.injEq] at h
+  have hone : c₁.pos = c.pos + 1 := by
+    simp only [takeU8] at hbu
+    split at hbu
+    · simp only [Except.ok.injEq, Prod.mk.injEq] at hbu
+      rw [← hbu.2]
+    · simp at hbu
+  exact ⟨descriptor, inner, c₂, c₃, h.1.symm, hone, hbd, hbv, h.2⟩
+
+/-! ## The dispatch: which family an accepted buffer's first octet selects
+
+The law quantifies over all values, so its proof has to read the reader's own dispatch off the
+accepted buffer: the first octet, the classification that octet's grammar gives it, and — for
+every category that consults a row — the row the declared surface assigns it. These are the two
+facts that step needs, plus the entry point that puts `decodeValue` in the reader's own terms. -/
+
+/-- **`decodeValue`'s entry point.** The decoder is `readValue` at the whole buffer, with the
+buffer's length as its fuel, and the count it reports is the cursor's final position — so an
+accepted decode is an accepted `readValue` from the buffer's start, and the count is where that
+read ended. -/
+theorem decodeValue_entry (bytes : Octets) (value : Value) (consumed : Nat)
+    (h : decodeValue bytes = .ok (value, consumed)) :
+    ∃ c : Cursor, readValue bytes.size ⟨bytes, 0⟩ = .ok (value, c) ∧ c.pos = consumed := by
+  unfold decodeValue at h
+  split at h
+  · simp only [Except.ok.injEq, Prod.mk.injEq] at h
+    exact ⟨_, by rw [← h.1]; assumption, h.2⟩
+  · simp at h
+
+/-- **The row a range check returns has the category the range gave it.** `declInRange` looks the
+octet up in the generated table and refuses a row whose category is not the range's, so an
+accepted row's category is the range's — the reason an octet's classification and the row it
+selects agree, which is what lets the reader's category dispatch be read off the octet. -/
+theorem declInRange_category {code : UInt8} {cat : Category} {w : Nat} {decl : EncodingDecl}
+    (h : declInRange code cat w = .ok decl) : decl.category = cat := by
+  unfold declInRange at h
+  split at h
+  · exact absurd h (by simp)
+  · split at h
+    · simp only [Except.ok.injEq] at h
+      rw [← h]
+      assumption
+    · exact absurd h (by simp)
+
+/-- **The row a range check returns is the row the table's lookup found.** -/
+theorem declInRange_encodingOf {code : UInt8} {cat : Category} {w : Nat} {decl : EncodingDecl}
+    (h : declInRange code cat w = .ok decl) : encodingOf code.toNat = some decl := by
+  unfold declInRange at h
+  split at h
+  · exact absurd h (by simp)
+  · split at h
+    · simp only [Except.ok.injEq] at h
+      rw [← h]
+      assumption
+    · exact absurd h (by simp)
+
+/-- **A lookup that found a row found one of the table's own.** -/
+theorem mem_of_encodingOf {code : Nat} {decl : EncodingDecl} (h : encodingOf code = some decl) :
+    decl ∈ encodings := by
+  unfold encodingOf at h
+  exact List.mem_of_find?_eq_some h
+
+/-- **A row the surface assigned is a row of the surface.** `dataDecl` refuses an octet the
+generated table assigns no encoding and otherwise returns the row `encodingOf` found, so a row it
+returns is one of the table's — the fact a table lemma about rows needs from a lookup, and the
+reason the width facts below can be decided over the table rather than stated about an opaque
+row. -/
+theorem dataDecl_ok_mem {code : UInt8} {decl : EncodingDecl} (h : dataDecl code = .ok decl) :
+    decl ∈ encodings := by
+  unfold dataDecl at h
+  split at h
+  · exact absurd h (by simp)
+  · exact absurd h (by simp)
+  all_goals exact mem_of_encodingOf (declInRange_encodingOf h)
+
+/-- **The row an octet's classification selects has that category.** With the octet's own
+classification in hand, `dataDecl` returns the range check's row, so the row's category is the
+classification's — `declInRange_category` at the range the classification names. -/
+theorem dataDecl_category_of_fixed {code : UInt8} {w : Nat} {decl : EncodingDecl}
+    (hcl : classify code.toNat = .fixed w) (h : dataDecl code = .ok decl) :
+    decl.category = .fixed := by
+  unfold dataDecl at h
+  simp only [hcl] at h
+  exact declInRange_category h
+
+/-- As `dataDecl_category_of_fixed`, for the variable range. -/
+theorem dataDecl_category_of_variable {code : UInt8} {w : Nat} {decl : EncodingDecl}
+    (hcl : classify code.toNat = .variable w) (h : dataDecl code = .ok decl) :
+    decl.category = .variable := by
+  unfold dataDecl at h
+  simp only [hcl] at h
+  exact declInRange_category h
+
+/-- As `dataDecl_category_of_fixed`, for the compound range. -/
+theorem dataDecl_category_of_compound {code : UInt8} {w : Nat} {decl : EncodingDecl}
+    (hcl : classify code.toNat = .compound w) (h : dataDecl code = .ok decl) :
+    decl.category = .compound := by
+  unfold dataDecl at h
+  simp only [hcl] at h
+  exact declInRange_category h
+
+/-- As `dataDecl_category_of_fixed`, for the array range. -/
+theorem dataDecl_category_of_array {code : UInt8} {w : Nat} {decl : EncodingDecl}
+    (hcl : classify code.toNat = .array w) (h : dataDecl code = .ok decl) :
+    decl.category = .array := by
+  unfold dataDecl at h
+  simp only [hcl] at h
+  exact declInRange_category h
+
+/-- **The reader's dispatch, read off the accepted buffer.**
+
+An accepted `readValue` read a constructor octet and classified it, and what follows is one of the
+reader's five cases: the descriptor prefix and two recursive reads, or a row of the declared
+surface with the reader its category selects. This is the inversion the law's case analysis needs
+— the octet, its classification, the row and its category membership, and the reader call that
+produced the value — and it carries the row's *membership* because every table fact about a row
+(a width, a family) is decided over `encodings`.
+
+The row branches carry the category the classification gave, through `declInRange`'s own check:
+`dataDecl` refuses a row whose category is not the range's, so the octet's classification and the
+row it selected cannot disagree. That is what lets the category dispatch below be read off the
+octet rather than assumed. -/
+theorem readValue_dispatch (fuel : Nat) (c : Cursor) (value : Value) (c' : Cursor)
+    (h0 : readValue (fuel + 1) c = .ok (value, c')) :
+    ∃ code : UInt8, ∃ c₁ : Cursor, takeU8 c = .ok (code, c₁) ∧
+      ((classify code.toNat = .descriptor ∧
+          ∃ descriptor inner : Value, ∃ c₂ c₃ : Cursor,
+            value = .described descriptor inner ∧ c₁.pos = c.pos + 1 ∧
+            readValue fuel c₁ = .ok (descriptor, c₂) ∧
+            readValue fuel c₂ = .ok (inner, c₃) ∧ c₃ = c') ∨
+        ((∃ w : Nat, classify code.toNat = .fixed w ∨ classify code.toNat = .variable w) ∧
+          ∃ decl : EncodingDecl, decl ∈ encodings ∧ dataDecl code = .ok decl ∧
+            readScalarData decl c₁ = .ok (value, c')) ∨
+        ((∃ w : Nat, classify code.toNat = .compound w) ∧
+          ∃ decl : EncodingDecl, decl ∈ encodings ∧ dataDecl code = .ok decl ∧
+            readCompound fuel decl c₁ = .ok (value, c')) ∨
+        ((∃ w : Nat, classify code.toNat = .array w) ∧
+          ∃ decl : EncodingDecl, decl ∈ encodings ∧ dataDecl code = .ok decl ∧
+            readArrayData fuel decl c₁ = .ok (value, c'))) := by
+  obtain ⟨code, c₁, hbu⟩ : ∃ b : UInt8, ∃ cc : Cursor, takeU8 c = .ok (b, cc) := by
+    cases hb : takeU8 c with
+    | error e =>
+      exfalso
+      simp only [readValue, hb, except_bind_error] at h0
+      exact absurd h0 (by simp)
+    | ok v => exact ⟨v.1, v.2, rfl⟩
+  refine ⟨code, c₁, hbu, ?_⟩
+  have h := h0
+  unfold readValue at h
+  rw [hbu] at h
+  simp only [except_bind_ok] at h
+  split at h
+  · obtain ⟨descriptor, inner, c₂, c₃, hval, hone, hbd, hbv, hc⟩ :=
+      readValue_described fuel c code c₁ hbu (by assumption) value c' h0
+    exact Or.inl ⟨by assumption, descriptor, inner, c₂, c₃, hval, hone, hbd, hbv, hc⟩
+  · exact absurd h (by simp)
+  · -- the fixed range: a row whose category is the range's, read as a scalar
+    obtain ⟨decl, hbd, hrest⟩ : ∃ d : EncodingDecl, dataDecl code = .ok d ∧
+        readScalarData d c₁ = .ok (value, c') := by
+      cases hb : dataDecl code with
+      | error e =>
+        exfalso
+        simp only [hb, except_bind_error] at h
+        exact absurd h (by simp)
+      | ok v =>
+        rw [hb] at h
+        simp only [except_bind_ok, dataDecl_category_of_fixed (code := code) (w := _)
+          (decl := v) (by assumption) hb] at h
+        exact ⟨v, rfl, h⟩
+    exact Or.inr (Or.inl ⟨⟨_, Or.inl (by assumption)⟩, decl, dataDecl_ok_mem hbd, hbd, hrest⟩)
+  · -- the variable range
+    obtain ⟨decl, hbd, hrest⟩ : ∃ d : EncodingDecl, dataDecl code = .ok d ∧
+        readScalarData d c₁ = .ok (value, c') := by
+      cases hb : dataDecl code with
+      | error e =>
+        exfalso
+        simp only [hb, except_bind_error] at h
+        exact absurd h (by simp)
+      | ok v =>
+        rw [hb] at h
+        simp only [except_bind_ok, dataDecl_category_of_variable (code := code) (w := _)
+          (decl := v) (by assumption) hb] at h
+        exact ⟨v, rfl, h⟩
+    exact Or.inr (Or.inl ⟨⟨_, Or.inr (by assumption)⟩, decl, dataDecl_ok_mem hbd, hbd, hrest⟩)
+  · -- the compound range
+    obtain ⟨decl, hbd, hrest⟩ : ∃ d : EncodingDecl, dataDecl code = .ok d ∧
+        readCompound fuel d c₁ = .ok (value, c') := by
+      cases hb : dataDecl code with
+      | error e =>
+        exfalso
+        simp only [hb, except_bind_error] at h
+        exact absurd h (by simp)
+      | ok v =>
+        rw [hb] at h
+        simp only [except_bind_ok, dataDecl_category_of_compound (code := code) (w := _)
+          (decl := v) (by assumption) hb] at h
+        exact ⟨v, rfl, h⟩
+    exact Or.inr (Or.inr (Or.inl ⟨⟨_, by assumption⟩, decl, dataDecl_ok_mem hbd, hbd, hrest⟩))
+  · -- the array range
+    obtain ⟨decl, hbd, hrest⟩ : ∃ d : EncodingDecl, dataDecl code = .ok d ∧
+        readArrayData fuel d c₁ = .ok (value, c') := by
+      cases hb : dataDecl code with
+      | error e =>
+        exfalso
+        simp only [hb, except_bind_error] at h
+        exact absurd h (by simp)
+      | ok v =>
+        rw [hb] at h
+        simp only [except_bind_ok, dataDecl_category_of_array (code := code) (w := _)
+          (decl := v) (by assumption) hb] at h
+        exact ⟨v, rfl, h⟩
+    exact Or.inr (Or.inr (Or.inr ⟨⟨_, by assumption⟩, decl, dataDecl_ok_mem hbd, hbd, hrest⟩))
 
 /-! ## The rung's claim -/
 
