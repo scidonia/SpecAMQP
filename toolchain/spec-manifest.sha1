@@ -4,7 +4,7 @@ cd53ded13c0c31f2d6bacd3d04e3195f5c091b76  lean/Spec/Codec.lean
 fdb7124d119e3a66f6ab521d7c0dc22d34ed6fd4  lean/Spec/Frame.lean
 31e43aed7900e071a7a1615d739be50f716b5b74  lean/Spec/FrameCodec.lean
 7bc0c4acbaf1fe216efdee178821f0568a170ab6  lean/Spec/Main.lean
-916ad57a083edf5bceb81b770f5ed316f4864893  lean/Spec/Message.lean
+6904cda076fb487709c650e9d618993ac8eb927c  lean/Spec/Message.lean
 9fa46bb63a4e3b09f04c9d89689b74a676356783  lean/Spec/ReadLaws.lean
 1b7bca03ee1a4384795e5ff5604c749af39edd3c  lean/Spec/Session.lean
 b6c17b2cb2a9a96960b63e69a6b4ecb651e18038  lean/Spec/SessionCodec.lean
@@ -19,7 +19,7 @@ a67c2b5be23a15b617bebef2fb595a10bb5357ca  lean/Contracts/SessionWindows.lean
 c5ee92929caed5a244bae9a85cea9d0af5e7749a  lean/Contracts/TypeSystem.lean
 0f123312d720c0282d52ceb90467270f289dc6ed  vectors/frames-negative.ndjson
 860b8160aeeff3a1c8033f86292924a99e797a9c  vectors/frames.ndjson
-7cca74d43e241ac0e5ccd93bc707403dfee7ab24  vectors/generated-exchanges.ndjson
+ccc84acbd80928c1ee75368b208ccd018d50cfc4  vectors/generated-exchanges.ndjson
 d6ce3953f0a2ffecd4c947bd66c7d4799b3b5339  vectors/generated-frames.ndjson
 b22dd480096d2126ee8d6b764e03fc0540521cdb  vectors/generated.ndjson
 14ab072c765eb10fd4303527ea027b9bdec884ae  vectors/isolation.md
