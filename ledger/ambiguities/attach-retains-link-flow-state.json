@@ -1,0 +1,25 @@
+{
+ "adopted": "The link's agreed state is retained",
+ "clauses": [
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:flow-control.3",
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:delivery-count.2"
+ ],
+ "consequences": [
+  "The vector exchange-link-attach-keeps-the-credit pins the retention rule and cites the two clauses that state the quantities involved, rather than a sentence that states the rule, because no sentence does.",
+  "A model that took a later attach's flow fields at face value would pass every clause that talks about flow, and would lose the credit a link had already agreed \u2014 which is why the vector exists and why its citation cannot be mechanical."
+ ],
+ "evidence": "The artifact's ownership sentences fix who may set each flow variable and give the sender's credit as an equation over the receiver's pair, and the link section says the flow state belongs to the link. None of them says what happens when a second attach arrives for a handle whose link is already established: the retention rule is those sentences applied to a link that already has state, which is a consequence of the reading rather than a requirement the standard states.",
+ "id": "attach-retains-link-flow-state",
+ "open": true,
+ "question": "Can an attach that does not establish a link replace the flow state that link has already agreed?",
+ "readings": [
+  {
+   "name": "The link's agreed state is retained",
+   "statement": "Adopted: the flow state belongs to the link, so an attach that does not establish the link cannot overwrite it. This is what the vector exchange-link-attach-keeps-the-credit exercises, and it is the reading the ownership sentences most naturally support \u2014 they make the state the link's, not the frame's."
+  },
+  {
+   "name": "An attach's flow fields are taken at face value for its handle",
+   "statement": "Rejected: it would let a peer reset a credit the receiver granted by re-attaching, which contradicts the ownership sentence that only the receiver sets the credit. Recorded because it is the reading a model written from the frames alone would take."
+  }
+ ]
+}
