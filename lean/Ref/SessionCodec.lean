@@ -46,7 +46,7 @@ def establishedConnection : Peer :=
 /-- Which machine answers for a step. -/
 inductive Target where
   | connection
-  | session (channel : Nat) (body : Value)
+  | session (channel : Nat) (body : Value) (payload : Octets)
   | stray
 
 /-- Whether the frame is the connection's: `open`, `close`, or a SASL performative,
@@ -61,12 +61,12 @@ def connectionLevel (body : Value) : Bool :=
   | none => false
 
 /-- The frame a step carries, decoded where it carries octets. -/
-def carried (step : ExchangeStep) : Except String (Option (Nat × Value)) := do
+def carried (step : ExchangeStep) : Except String (Option (Nat × Value × Octets)) := do
   match step.value with
   | some json =>
     let frame ← SpecAMQP.Ref.Vectors.frameOfJson json
     match frame.body with
-    | some body => return some (frame.channel, body)
+    | some body => return some (frame.channel, body, frame.payload)
     | none => return none
   | none =>
     match step.bytes with
@@ -78,17 +78,17 @@ def carried (step : ExchangeStep) : Except String (Option (Nat × Value)) := do
         | .error _ => return none
         | .ok (frame, _) =>
           match frame.body with
-          | some body => return some (frame.channel, body)
+          | some body => return some (frame.channel, body, frame.payload)
           | none => return none
 
 /-- Which machine answers for a step. -/
 def targetOf (step : ExchangeStep) : Except String Target := do
   match (← carried step) with
   | none => return .connection
-  | some (channel, body) =>
+  | some (channel, body, payload) =>
     if connectionLevel body then return .connection
     else if channel == 0 then return .stray
-    else return .session channel body
+    else return .session channel body payload
 
 /-- A connection outcome with its layer on the state name. -/
 def asConnection (outcome : StepOutcome) : StepOutcome :=
@@ -110,7 +110,7 @@ def stepOf (both : Both) (step : ExchangeStep) : Except String (StepOutcome × B
                connection has no session to delegate it to; the peer is in \
                connection:{connection.state.label}"⟩,
             { both with connection := connection })
-  | .session channel body =>
+  | .session channel body payload =>
     let (relayed, connection) ← SpecAMQP.Ref.ConnectionCodec.stepOf both.connection step
     if !relayed.admitted then
       return (asConnection relayed, { both with connection := connection })
@@ -118,7 +118,7 @@ def stepOf (both : Both) (step : ExchangeStep) : Except String (StepOutcome × B
     -- answered is discarded with it
     if connection.state == SpecAMQP.Ref.Connection.State.discard then
       return (asConnection relayed, { both with connection := connection })
-    match SpecAMQP.Ref.Session.step both.session step.send channel body with
+    match SpecAMQP.Ref.Session.step both.session step.send channel body payload with
     | .ok session =>
       let state := s!"session:{session.state.label}"
       return ({ relayed with state, detail := s!"admitted; the peer is in {state}" },

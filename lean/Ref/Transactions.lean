@@ -208,11 +208,30 @@ allocated it learns nothing new. -/
 def onDeclared (layer : Layer) (outbound : Bool) (id : Nat) : Layer :=
   if outbound then layer else layer.learned id
 
+/-- Where a transaction value arrived, which decides what it may be. The control link
+carries the declare and discharge dialogue — "they do not represent the demarcation of
+transactional work" — and "No transactional work is allowed on the control link", so a
+transfer's payload and a disposition's `state` are judged differently even where they carry
+the same composite. -/
+inductive Carrier where
+  | payload
+  | state
+deriving Repr, BEq, DecidableEq
+
+/-- The refusal for a transaction composite arriving as a message on the control link. The
+sentence names no condition, so the amqp-error family's `illegal-state` is used: "The peer
+sent a frame that is not permitted in the current state". -/
+def notTheControlDialogue (typeName : String) : Refusal :=
+  refuse preSettledCondition "illegalState"
+    s!"the control link carries the declare and discharge messages and no transactional \
+      work, and this message carries a {typeName}"
+
 /-- One transaction value, dispatched by its declared type. `settled` is the transfer's
 settlement where the value arrived in one; the outcomes do not arrive in a transfer and
-ignore it. -/
-def step (layer : Layer) (outbound : Bool) (value : Value) (settled : Bool) :
-    Except Refusal Layer := do
+ignore it. `carrier` says which frame carried the value, which is what makes the
+no-work-on-the-control-link sentence checkable. -/
+def step (layer : Layer) (carrier : Carrier) (outbound : Bool) (value : Value)
+    (settled : Bool) : Except Refusal Layer := do
   let act := actOf value
   if act == .other then return layer
   let missing := missingMandatory act.label value
@@ -240,10 +259,16 @@ def step (layer : Layer) (outbound : Bool) (value : Value) (settled : Bool) :
         | _ => false
       onDischarge layer id fail settled
   | .declared =>
-    match (valueOfField "declared" "txn-id" value).bind numberOf with
-    | some id => return onDeclared layer outbound id
-    | none => return layer
-  | .transactionalState => return layer
+    match carrier with
+    | .payload => .error (notTheControlDialogue act.label)
+    | .state =>
+      match (valueOfField "declared" "txn-id" value).bind numberOf with
+      | some id => return onDeclared layer outbound id
+      | none => return layer
+  | .transactionalState =>
+    match carrier with
+    | .payload => .error (notTheControlDialogue act.label)
+    | .state => return layer
   | .other => return layer
 
 end SpecAMQP.Ref.Transactions

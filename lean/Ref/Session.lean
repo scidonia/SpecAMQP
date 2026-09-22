@@ -1,6 +1,7 @@
 import Generated.Oasis.Fields
 import Generated.Oasis.Types
 import Ref.Connection
+import Ref.Message
 import Ref.Transactions
 
 /-!
@@ -410,6 +411,45 @@ Only the detach that releases the link counts, which is the release `detachLink`
 def Endpoint.afterLinkRelease (endpoint : Endpoint) : Endpoint :=
   { endpoint with transactions := endpoint.transactions.map Layer.retiredAll }
 
+/-! ## The transaction layer's carriers
+
+Part 4's transaction performatives travel in exactly two frames: the declare and discharge
+messages as a transfer's payload, and the outcome a coordinator answers with as a
+disposition's `state`. Both reach the layer here, and only where the session has one. -/
+
+/-- One transaction value, from the frame that carried it. -/
+def stepTransaction (endpoint : Endpoint) (carrier : Transactions.Carrier) (outbound : Bool)
+    (value : Value) (settled : Bool) : Except Refusal Endpoint := do
+  match endpoint.transactions with
+  | none => return endpoint
+  | some layer =>
+    match Transactions.step layer carrier outbound value settled with
+    | .ok layer => return { endpoint with transactions := some layer }
+    | .error reason =>
+      .error { condition := reason.condition, reasonClass := reason.reasonClass,
+               text := reason.text, place := none, closes := false }
+
+/-- The transaction layer's step for a transfer's payload: a message whose body is exactly
+one amqp-value section is what a declare or a discharge arrives in, and anything else is not
+a transaction message at all and is carried, because the message layer's business is not
+this layer's rule to invent. -/
+def stepTransactionPayload (endpoint : Endpoint) (outbound : Bool) (payload : Octets)
+    (settled : Bool) : Except Refusal Endpoint := do
+  match endpoint.transactions with
+  | none => return endpoint
+  | some _ =>
+    match Message.bodyValue Message.Policy.empty payload with
+    | .error _ => return endpoint
+    | .ok value => stepTransaction endpoint .payload outbound value settled
+
+/-- The transaction layer's step for a disposition's `state`, which is where a coordinator's
+`declared` answer arrives. -/
+def stepTransactionState (endpoint : Endpoint) (outbound : Bool) (body : Value) :
+    Except Refusal Endpoint :=
+  match valueOfField "disposition" "state" body with
+  | some state => stepTransaction endpoint .state outbound state false
+  | none => .ok endpoint
+
 /-- The handle maximum a begin announces, or the declared default where it leaves the field
 unset: `begin/field:handle-max.1` makes it the bound its partner may not attach outside. -/
 def beginHandleMax (body : Value) : Nat :=
@@ -775,7 +815,8 @@ def afterEnd (endpoint : Endpoint) (outbound : Bool) (withError : Bool) : Endpoi
     | _ => { endpoint with state := .endRcvd, incoming := none, peerBegun := true }
 
 /-- One frame the session layer answers for. -/
-def step (endpoint : Endpoint) (outbound : Bool) (channel : Nat) (body : Value) :
+def step (endpoint : Endpoint) (outbound : Bool) (channel : Nat) (body : Value)
+    (payload : Octets) :
     Except Refusal Endpoint := do
   let frame := frameOf body
   let typeName :=
@@ -848,6 +889,14 @@ def step (endpoint : Endpoint) (outbound : Bool) (channel : Nat) (body : Value) 
            | some value => numberOf value)
       return { endpoint with windows := windows }
   | .transfer =>
+    -- the deliverable this transfer belongs to, settled as `settled.4` interprets it
+    let settled :=
+      (match valueOfField "transfer" "settled" body with
+       | some .null | none => false
+       | some _ => true) ||
+        (match endpoint.delivery with
+         | some delivery => delivery.settled
+         | none => false)
     if outbound then
       if endpoint.windows.outgoing == 0 then
         .error (placed windowViolationCondition "limit"
@@ -860,6 +909,10 @@ def step (endpoint : Endpoint) (outbound : Bool) (channel : Nat) (body : Value) 
           match transferLink endpoint outbound body with
           | .ok next => pure next
           | .error reason => .error (placeLink reason)
+        let endpoint ←
+          match stepTransactionPayload endpoint outbound payload settled with
+          | .ok next => pure next
+          | .error reason => .error (placeLink reason)
         return { endpoint with
                    windows := endpoint.windows.afterSendingTransfer windowPolicy }
     else
@@ -869,6 +922,10 @@ def step (endpoint : Endpoint) (outbound : Bool) (channel : Nat) (body : Value) 
       else
         let endpoint ←
           match transferLink endpoint outbound body with
+          | .ok next => pure next
+          | .error reason => .error (placeLink reason)
+        let endpoint ←
+          match stepTransactionPayload endpoint outbound payload settled with
           | .ok next => pure next
           | .error reason => .error (placeLink reason)
         return { endpoint with
@@ -885,7 +942,10 @@ def step (endpoint : Endpoint) (outbound : Bool) (channel : Nat) (body : Value) 
   | .other =>
     if isDisposition body then
       match dispositionLink endpoint outbound body with
-      | .ok next => pure next
+      | .ok next =>
+        match stepTransactionState next outbound body with
+        | .ok next => pure next
+        | .error reason => .error (placeLink reason)
       | .error reason => .error (placeLink reason)
     else return endpoint
 
