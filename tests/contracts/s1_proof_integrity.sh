@@ -6,8 +6,9 @@
 #
 # Observable contract:
 #
-#   1. no handwritten Lean module under `lean/Spec`, `lean/Contracts` or
-#      `lean/Proofs` contains `sorry`, `admit`, `native_decide`, `partial def`,
+#   1. no handwritten Lean module under `lean/Spec`, `lean/Contracts`,
+#      `lean/Proofs`, `lean/Ref` or `lean/Harness` contains `sorry`, `admit`,
+#      `native_decide`, `partial def`,
 #      `axiom`, `unsafe`, `opaque`, `extern` or `@[implemented_by]` — and the
 #      scanner is not vacuous: a planted file containing each of those is flagged,
 #      with file and line, before the real tree is scanned;
@@ -25,7 +26,7 @@
 set -euo pipefail
 
 readonly root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-readonly scanned_dirs=(Spec Contracts Proofs)
+readonly scanned_dirs=(Spec Contracts Proofs Ref Harness)
 readonly accepted_theorem="SpecAMQP.Contracts.constructor_grammar_public"
 
 die() {
