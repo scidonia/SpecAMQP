@@ -1,5 +1,5 @@
 {
- "adopted": "A payload carrying a head section and no body is not a message, and is refused",
+ "adopted": "The list is a grammar, so a head-only payload is not a message",
  "consequences": [
   "The two artefacts diverged here and the corpus could not see it: the specification never required a body, the reference required one for any non-empty payload, and every vector stayed green because none carries a head section without a body.",
   "msg-neg-head-without-body is the isolating vector, refused under this reading and admitted under the other, so the divergence becomes a verdict rather than a note.",

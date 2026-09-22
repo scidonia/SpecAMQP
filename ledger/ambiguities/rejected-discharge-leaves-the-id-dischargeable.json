@@ -1,5 +1,5 @@
 {
- "adopted": "Whether a refused discharge leaves the transaction id dischargeable again",
+ "adopted": "The id stays live and dischargeable: the artifact's sentence says the outcome is not applied and the deliveries stay live, and says nothing about retiring the id, so the id is exactly as it was.",
  "consequences": [
   "The artifact's wording is about the deliveries rather than the id, which is why nothing is enforced here rather than because a reading was chosen.",
   "The readings differ observably on a second discharge of the same id: admitted, or refused with amqp:transaction:unknown-id."

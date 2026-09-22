@@ -1,5 +1,5 @@
 {
- "adopted": "A discharge whose fail flag is true, against an id this endpoint never allocated",
+ "adopted": "The fail=true MUST wins: the discharge completes whatever the register says, because the artifact states it without qualification and a controller whose rollback arrives after the id was retired is exactly the case the sentence exists for.",
  "consequences": [
   "txn-discharge-unknown-id-refused pins the unflagged case only; nothing in the corpus carries fail=true with an unknown id, so no vector currently distinguishes the readings.",
   "The two readings differ observably: one admits the discharge and one refuses it with amqp:transaction:unknown-id, which is a verdict a vector could pin the moment the reading is chosen."
