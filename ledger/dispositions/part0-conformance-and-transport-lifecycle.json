@@ -3,6 +3,7 @@
   "deferred:": "A real obligation the plan carries later; the suffix names the milestone, and the note names the gap that keeps it out of the carrier set.",
   "formalized:": "A Lean declaration path that carries this clause's meaning, verified present in the module it names.",
   "informative": "A statement of what a conformant implementation is rather than a rule this specification enforces: there is no wire obligation to carry.",
+  "kind": "The clause's keyword kind, `MUST` or `MUST NOT`, taken from the ledger's own clause. `class` is the conformance class the coverage gate counts; the two coincide for `MUST` and diverge for `MUST NOT`, so `kind` must be read from the clause rather than inferred from the class.",
   "superseded:": "Decided by an entry in the ambiguity register (ledger/ambiguities), whose id is the suffix.",
   "test:": "A vector id whose expectation is the clause's only observable form."
  },
@@ -37,7 +38,7 @@
   "amqp-core-overview-v1.0-os.xml#amqp:overview/section:conformance.2": {
    "clause_text": "Conformant implementations MUST NOT require the use of any extensions defined outside this document in order to interoperate with any other conformant implementation.",
    "disposition": "informative",
-   "kind": "MUST",
+   "kind": "MUST NOT",
    "note": "Part 0's conformance framework: it states what a conformant implementation is rather than a rule this specification enforces. Extension-freedom has no bearer \u2014 capabilities are opaque generated field rows (lean/Generated/Oasis/Fields.lean:106) and no layer reads them \u2014 so nothing would move if the clause changed.",
    "text_sha256": "9eb914fad554a1cae26f587a05c1d6ce97453693900716e8bd4e821e1398d3d3"
   },
@@ -79,7 +80,7 @@
   "amqp-core-overview-v1.0-os.xml#amqp:overview/section:conformance.9": {
    "clause_text": "Such implementations do not actively implement Part 3, but MUST NOT act in ways which violate the rules of this part of the specification.",
    "disposition": "informative",
-   "kind": "MUST",
+   "kind": "MUST NOT",
    "note": "Part 0's conformance framework: it states what a conformant implementation is rather than a rule this specification enforces. A negative obligation over Part 3, which the repository does not formalize as a layer: no declaration, contract or vector asserts or tests it.",
    "text_sha256": "5dcf968cef747fe12ed24bd78824a66948e478e9400207dfd90da7a105268b01"
   },
@@ -135,7 +136,7 @@
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections/doc:doc-idle-time-out.10": {
    "clause_text": "As they are a frame, they MUST NOT be sent after the \u00abclose\u00bb frame has been sent.",
    "disposition": "formalized:SpecAMQP.Spec.Connection.State.sendClass; formalized:SpecAMQP.Spec.Connection.permitsSend",
-   "kind": "MUST",
+   "kind": "MUST NOT",
    "note": "The same empty send column as connections.6, seen for empty frames: once the close is written the table admits nothing, so a frame of any shape is refused.",
    "text_sha256": "56c9bcfcb2dfee78d02b6a9f77ab263053312d576cdd206aadfedccac8956b6d"
   },
@@ -156,14 +157,14 @@
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:begin/field:desired-capabilities.1": {
    "clause_text": "The sender MUST NOT attempt to use any capability other than those it has declared in desired-capabilities field.",
    "disposition": "deferred:S4",
-   "kind": "MUST",
+   "kind": "MUST NOT",
    "note": "deferred: S4 \u2014 uncarried: no capability handling in Spec or Ref \u2014 `desired-capabilities` is only a generated field row and no layer reads capability lists, so nothing would move if the clause changed.",
    "text_sha256": "82e2369ddc4cc1918c3074d9e7414d07dff2e581a8a0b94e8faa8aec8d677f8f"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:begin/field:handle-max.1": {
    "clause_text": "A peer MUST NOT attempt to attach a link using a handle value outside the range that its partner can handle.",
    "disposition": "formalized:SpecAMQP.Spec.Session.attachLink; test:exchange-link-handle-out-of-range",
-   "kind": "MUST",
+   "kind": "MUST NOT",
    "note": "An outbound attach is bounded by the handle-max the partner's begin announced and an inbound one by this endpoint's own, so a peer cannot attach outside the range its partner can handle; the vector pins the send direction with the partner's bound of 2 and handle 5.",
    "text_sha256": "da6f184d7c737c4b681add6ab254c574ebe87701959d728247a2ed15443ac2a1"
   },
@@ -177,7 +178,7 @@
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:begin/field:remote-channel.1": {
    "clause_text": "If a session is locally initiated, the remote-channel MUST NOT be set.",
    "disposition": "formalized:SpecAMQP.Spec.Session.stepBegin",
-   "kind": "MUST",
+   "kind": "MUST NOT",
    "note": "A locally initiated begin that sets remote-channel is refused with amqp:invalid-field; no vector pins that refusal, and the Ref twin states the same rule at lean/Ref/Session.lean:673-677.",
    "text_sha256": "7fe29468c62bc3d38d18ed30536d51a57933a8303fa9a7d3fc600372c7e87d3d"
   },
@@ -191,7 +192,7 @@
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions.1": {
    "clause_text": "However, a link MUST NOT be attached to more than one session at a time.",
    "disposition": "superseded:link-uniqueness-vacuous",
-   "kind": "MUST",
+   "kind": "MUST NOT",
    "note": "A session holds one link's flow state and no reference to any other session, so a link cannot be attached to two sessions and the clause is satisfied vacuously; ledger/ambiguities/link-uniqueness-vacuous.json records the reading, and no carrier is owed for a violation the model cannot express.",
    "text_sha256": "498a314527492b0002b80cdbf2eb476fb765d4df2ba151877bd25fc61265a61e"
   },
