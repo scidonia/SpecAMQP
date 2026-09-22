@@ -170,6 +170,49 @@ theorem takeBe_lt (width : Nat) (c : Cursor) (h : c.pos + width ≤ c.data.size)
   exact Nat.lt_of_lt_of_le hbound
     (Nat.pow_le_pow_right (by decide : (0 : Nat) < 256) hlen)
 
+/-! ## The first family's consumption lemma
+
+The law needs, per family, that an accepted encoding's size is at least the canonical size.
+For the variable-width families the argument is short and it uses both lemmas above plus
+R2's and R3's rule: an accepted encoding's length field has one of the table's two widths
+(`w = 1` or `w = 4`), it carries the payload's length (`takeBe_lt` bounds that length by
+`w`), and the rule's width for that length is no wider than `w` (`widthChoice_le_of_fits`) —
+so the canonical encoding, which is the rule's field plus the same payload, is no longer than
+the accepted one, which is the accepted field plus that payload.
+
+What is *not* here is the step that reads those two facts off an accepted buffer: that its
+field's width is one of the two the table offers, and that the octets after the field are the
+payload. That is the dispatch step, and it is where the law's own quantifier over all values
+is discharged; the table it consults is data this repository exposes
+(`Spec.Codec.dataDecl`, `Generated.Oasis.encodingOf`), so a fact about it is a fact this
+repository can state rather than an assumption. -/
+
+/-- **The rule's width is no wider than the field an accepted encoding used.**
+
+If a length is carried by a field of width `w`, and `w` is one of the two widths the table
+offers, then the width the rule picks for that length is at most `w`. This is
+`widthChoice_le_of_fits` at this family's single quantity. -/
+theorem lengthWidthOf_le_of_field (length w : Nat) (hw : w = 1 ∨ w = 4)
+    (hcarries : length < 2 ^ (8 * w)) : lengthWidthOf length ≤ w := by
+  rw [lengthWidthOf_eq_widthChoice]
+  exact widthChoice_le_of_fits [length] w hw (by
+    intro q hq
+    rw [List.mem_singleton] at hq
+    subst hq
+    exact hcarries)
+
+/-- **An accepted variable-width encoding is no shorter than the canonical one.**
+
+The accepted encoding is a field of width `w` and then the payload; the canonical encoding
+is the rule's field and then the same payload. Since the rule's width is no wider than `w`,
+the canonical size is no larger — which is the inequality the law needs for this family,
+against the canonical size R2's `lengthPrefixed_canonical_size` computes. -/
+theorem variable_family_canonical_le (length w : Nat) (hw : w = 1 ∨ w = 4)
+    (hcarries : length < 2 ^ (8 * w)) :
+    lengthWidthOf length + length ≤ w + length := by
+  have := lengthWidthOf_le_of_field length w hw hcarries
+  omega
+
 /-! ## The rung's claim -/
 
 /-- **R5: the writer's encoding is no longer than anything the reader accepts.**
