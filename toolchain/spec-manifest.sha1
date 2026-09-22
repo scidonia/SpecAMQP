@@ -6,9 +6,9 @@ fdb7124d119e3a66f6ab521d7c0dc22d34ed6fd4  lean/Spec/Frame.lean
 7c2fc8950376880dfbba4beb86a052316ea8b589  lean/Spec/Main.lean
 d217340efec24e26245f21f2cfb4d04e9b140242  lean/Spec/Message.lean
 9fa46bb63a4e3b09f04c9d89689b74a676356783  lean/Spec/ReadLaws.lean
-7cfa8dcce0c773084e5c3a9ae6bd250fec01ff04  lean/Spec/Session.lean
+8a0037265d01ea579ba2f8b6965513a45799b86d  lean/Spec/Session.lean
 0d21912c7627dddca29799f8b7a224fe91907b05  lean/Spec/SessionCodec.lean
-eb32806b2ebec69c7b3994b62ba8ceb2b108382c  lean/Spec/Transactions.lean
+8bf0430ee2c8aea3c11c0d4e01eaeb9fed87cc9b  lean/Spec/Transactions.lean
 d4de8144b2390024ff98ef4bb5a6ddc34ad5d2d4  lean/Spec/Value.lean
 f5eabce0d6dcbec66bdaf79152a0b5a0e171c12d  lean/Contracts/Codec.lean
 75e98c72e8d523cfc61503f709736ec8872b2bf8  lean/Contracts/ConnectionLifecycle.lean
@@ -32,8 +32,8 @@ c876f69bb22065b406c11b423b5ffb93d4d18426  vectors/message/sections.ndjson
 8a0698b69a00e858aefea2249a89ec7c20c1aed5  vectors/messages.ndjson
 4edac54f39746f6464d5b2711111720c5b658b5e  vectors/primitives.ndjson
 2f85e410608d4b6f8e220da9a45cd27497227e4a  vectors/slice.ndjson
-01236a752f27da9487d6a8f336f060e0ffcd0cc6  vectors/txn-negative.ndjson
-c4a248de119a6a5ebd0dfcdb8aa07934486dc3b0  vectors/txn.ndjson
+5016bfabb395b8ff29564fb6c95208622dd6d652  vectors/txn-negative.ndjson
+ecac919aaaf979c4765bc027729f1934278582cf  vectors/txn.ndjson
 c80948aad7c0afaa70330570dd2624f60982d0b6  ledger/ambiguities/attach-retains-link-flow-state.json
 973e66b7a1143546319dedc4b165a4f508747c78  ledger/ambiguities/channel-zero-layering.json
 6292292dc07ef18bb452326358be8c2e0a711c77  ledger/ambiguities/compound-size-field.json
