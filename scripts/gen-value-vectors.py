@@ -189,33 +189,173 @@ def encode(value: dict) -> bytes:
     raise ValueError(f"unknown value type {kind!r}")
 
 
+def compound_element_data(width: int, kind: str, count: int, body: bytes) -> bytes:
+    """A compound element's data: the size and count fields the array's constructor
+    fixes, then the body. A count or size the declared width cannot announce is a
+    malformed vector, not a value, so it is refused here rather than written short."""
+    size = width + len(body)
+    if size >= 2 ** (8 * width) or count >= 2 ** (8 * width):
+        raise ValueError(f"a {kind} element of width {width} cannot announce "
+                         f"{count} item(s) in {len(body)} octet(s)")
+    return be(size, width) + be(count, width) + body
+
+
+def array_element_data(width: int, constructor: int, items: list[dict]) -> bytes:
+    """An array element's data where the array's own element constructor is an array:
+    its size and count in the outer array's declared width, its element constructor,
+    then its elements. The inner array has no narrowest form of its own here — the
+    outer constructor fixes it — which is what makes the forced width testable."""
+    body = b"".join(element_data(constructor, item) for item in items)
+    size = width + 1 + len(body)
+    if size >= 2 ** (8 * width) or len(items) >= 2 ** (8 * width):
+        raise ValueError(f"an array element of width {width} cannot announce "
+                         f"{len(items)} element(s) in {len(body)} octet(s)")
+    return be(size, width) + be(len(items), width) + bytes([constructor]) + body
+
+
 def element_data(constructor: int, value: dict) -> bytes:
     """Array element data, in the array's declared constructor form.
 
-    The array states its element constructor once, so each element's data is in
-    that form — not in whatever form the element would choose alone.
+    The array states its element constructor once, so each element's data is in that
+    form and only that form: the width of a size, count or length field is the array's
+    constructor's choice, never the element's own preference. Every constructor the
+    table assigns is written here explicitly — there is no fallback to the element's own
+    encoding, which would write a form the array does not declare — and a value the
+    declared form cannot carry is refused rather than written in another form.
     """
     kind = value["type"]
+    if constructor == 0x00:
+        if kind != "described":
+            raise ValueError(f"the descriptor prefix carries described values, not {kind}")
+        return encode(value["descriptor"]) + encode(value["value"])
     if constructor in (0x40, 0x41, 0x42):
         return b""
-    if constructor == 0x50 and kind == "ubyte":
+    if constructor == 0x43:
+        if kind != "uint" or value["value"] != 0:
+            raise ValueError("a uint0 element carries the value 0")
+        return b""
+    if constructor == 0x44:
+        if kind != "ulong" or value["value"] != 0:
+            raise ValueError("a ulong0 element carries the value 0")
+        return b""
+    if constructor == 0x45:
+        if kind != "list" or value["items"]:
+            raise ValueError("a list0 element carries the empty list")
+        return b""
+    if constructor == 0x50:
+        _expect(kind, "ubyte")
         return bytes([value["value"]])
-    if constructor == 0x70 and kind == "uint":
-        return be(value["value"], 4)
-    if constructor == 0x80 and kind == "ulong":
-        return be(value["value"], 8)
-    if constructor == 0x60 and kind == "ushort":
+    if constructor == 0x51:
+        _expect(kind, "byte")
+        return be(value["value"] % 2**8, 1)
+    if constructor == 0x52:
+        _expect(kind, "uint")
+        return _octet(value["value"], 0xFF, "smalluint")
+    if constructor == 0x53:
+        _expect(kind, "ulong")
+        return _octet(value["value"], 0xFF, "smallulong")
+    if constructor == 0x54:
+        _expect(kind, "int")
+        return _signed_octet(value["value"], "smallint")
+    if constructor == 0x55:
+        _expect(kind, "long")
+        return _signed_octet(value["value"], "smalllong")
+    if constructor == 0x56:
+        _expect(kind, "boolean")
+        return bytes([1 if value["value"] else 0])
+    if constructor == 0x60:
+        _expect(kind, "ushort")
         return be(value["value"], 2)
-    if constructor == 0xA1 and kind == "string":
-        payload = value["text"].encode()
-        return bytes([len(payload)]) + payload if len(payload) <= 0xFF else be(len(payload), 4) + payload
-    if constructor == 0xA3 and kind == "symbol":
-        payload = value["text"].encode()
-        return bytes([len(payload)]) + payload if len(payload) <= 0xFF else be(len(payload), 4) + payload
-    if constructor == 0xA0 and kind == "binary":
-        payload = bytes.fromhex(value["hex"])
-        return bytes([len(payload)]) + payload if len(payload) <= 0xFF else be(len(payload), 4) + payload
-    return encode(value)[1:]
+    if constructor == 0x61:
+        _expect(kind, "short")
+        return be(value["value"] % 2**16, 2)
+    if constructor == 0x70:
+        _expect(kind, "uint")
+        return be(value["value"], 4)
+    if constructor == 0x71:
+        _expect(kind, "int")
+        return be(value["value"] % 2**32, 4)
+    if constructor == 0x72:
+        return fixed("float", value["hex"], 4)
+    if constructor == 0x73:
+        _expect(kind, "char")
+        return be(value["codepoint"], 4)
+    if constructor == 0x74:
+        return fixed("decimal32", value["hex"], 4)
+    if constructor == 0x80:
+        _expect(kind, "ulong")
+        return be(value["value"], 8)
+    if constructor == 0x81:
+        _expect(kind, "long")
+        return be(value["value"] % 2**64, 8)
+    if constructor == 0x82:
+        return fixed("double", value["hex"], 8)
+    if constructor == 0x83:
+        _expect(kind, "timestamp")
+        return be(value["milliseconds"] % 2**64, 8)
+    if constructor == 0x84:
+        return fixed("decimal64", value["hex"], 8)
+    if constructor == 0x94:
+        return fixed("decimal128", value["hex"], 16)
+    if constructor == 0x98:
+        return fixed("uuid", value["hex"], 16)
+    if constructor == 0xA0:
+        _expect(kind, "binary")
+        return _length_prefixed(1, "vbin8", bytes.fromhex(value["hex"]))
+    if constructor == 0xA1:
+        _expect(kind, "string")
+        return _length_prefixed(1, "str8", value["text"].encode())
+    if constructor == 0xA3:
+        _expect(kind, "symbol")
+        return _length_prefixed(1, "sym8", value["text"].encode())
+    if constructor == 0xB0:
+        _expect(kind, "binary")
+        return _length_prefixed(4, "vbin32", bytes.fromhex(value["hex"]))
+    if constructor == 0xB1:
+        _expect(kind, "string")
+        return _length_prefixed(4, "str32", value["text"].encode())
+    if constructor == 0xB3:
+        _expect(kind, "symbol")
+        return _length_prefixed(4, "sym32", value["text"].encode())
+    if constructor in (0xC0, 0xD0):
+        _expect(kind, "list")
+        body = b"".join(encode(item) for item in value["items"])
+        return compound_element_data(1 if constructor == 0xC0 else 4, "list",
+                                     len(value["items"]), body)
+    if constructor in (0xC1, 0xD1):
+        _expect(kind, "map")
+        body = b"".join(encode(key) + encode(item) for key, item in value["pairs"])
+        return compound_element_data(1 if constructor == 0xC1 else 4, "map",
+                                     2 * len(value["pairs"]), body)
+    if constructor in (0xE0, 0xF0):
+        _expect(kind, "array")
+        inner = int(value["constructor"], 16)
+        return array_element_data(1 if constructor == 0xE0 else 4, inner, value["items"])
+    raise ValueError(f"element constructor {constructor:#04x} is not one the corpus writes")
+
+
+def _expect(kind: str, wanted: str) -> None:
+    if kind != wanted:
+        raise ValueError(f"an element of this form carries {wanted} values, not {kind}")
+
+
+def _octet(n: int, bound: int, label: str) -> bytes:
+    if not 0 <= n <= bound:
+        raise ValueError(f"a {label} element carries one octet and {n} does not fit")
+    return bytes([n])
+
+
+def _signed_octet(n: int, label: str) -> bytes:
+    if not -128 <= n <= 127:
+        raise ValueError(f"a {label} element carries one signed octet and {n} does not fit")
+    return bytes([n % 2**8])
+
+
+def _length_prefixed(width: int, label: str, payload: bytes) -> bytes:
+    if len(payload) >= 2 ** (8 * width):
+        raise ValueError(f"a {label} element carries {len(payload)} octet(s), which a "
+                         f"{width}-octet length field cannot announce")
+    return be(len(payload), width) + payload
 
 
 # ------------------------------------------------- the artifact's own examples
@@ -576,9 +716,10 @@ FRAME_MIN_DOFF = 2    # with an eight-octet header the body cannot start earlier
 AMQP_FRAME = 0x00
 SASL_FRAME = 0x01
 
-# The element constructor an array field's elements are written under. Only the
-# fixed-width forms appear here, because an array's elements are read in the array's
-# declared form and the fixed forms are the ones both artefacts read.
+# The element constructor an array field's elements are written under: the fixed forms
+# the fields of these performatives name, since an array's elements are written in the
+# array's declared form. (The element-constructor family below covers the rest of the
+# table, including the compound and array categories.)
 ARRAY_CONSTRUCTOR = {"symbol": "a3", "string": "a1", "binary": "a0",
                      "ubyte": "50", "ushort": "60", "uint": "70", "ulong": "80"}
 
@@ -854,6 +995,217 @@ def frame_corpus() -> list[dict]:
     return vectors
 
 
+# ---------------------------------------------------- element-constructor vectors
+#
+# A family of its own, next to the zero-width one above and not inside it: that family
+# is about a count the buffer cannot bound, this one is about which element forms are
+# read at all. Part 1 makes an array's element constructor a *constructor* — a
+# `format-code` or the descriptor prefix — and its `format-code` production admits all
+# four categories, so a scalar, a compound and an array are each legal element data.
+
+# Every element constructor a reader reads, with the note each vector carries. The
+# ones the corpus already had vectors for (null, the booleans, ubyte, ushort, uint,
+# ulong, byte, short, int, long, float, double and the decimals, char, timestamp, uuid,
+# binary, string, symbol) appear here too, because an array's *declared* form decides
+# how its elements are written and a construction the earlier families never exercised
+# is written here for the first time.
+ELEMENT_FORMS = [
+    (0x00, "described", "the descriptor prefix stands as the element constructor, so "
+                        "each element carries its own descriptor and value"),
+    (0x43, "uint0", "the uint zero form, whose elements carry no octets at all"),
+    (0x44, "ulong0", "the ulong zero form, whose elements carry no octets at all"),
+    (0x45, "list0", "the empty-list form, whose elements carry no octets at all"),
+    (0x52, "smalluint", "a one-octet unsigned element"),
+    (0x53, "smallulong", "a one-octet unsigned element"),
+    (0x56, "boolean", "one octet, false for 0x00 and true for anything else"),
+    (0x61, "short", "two octets of two's complement"),
+    (0x71, "int", "four octets of two's complement"),
+    (0x81, "long", "eight octets of two's complement"),
+    (0xB0, "vbin32", "a four-octet length prefix, then the payload"),
+    (0xB1, "str32", "a four-octet length prefix, then the payload"),
+    (0xB3, "sym32", "a four-octet length prefix, then the payload"),
+    (0xC0, "list8", "a compound element: its own one-octet size and count, then its items"),
+    (0xC1, "map8", "a compound element: its own one-octet size and count, then its pairs"),
+    (0xD0, "list32", "a compound element in its four-octet form"),
+    (0xD1, "map32", "a compound element in its four-octet form"),
+    (0xE0, "array8", "an array element: its own one-octet size and count, its element "
+                     "constructor, then its elements"),
+    (0xF0, "array32", "an array element in its four-octet form"),
+]
+
+
+def element_value(constructor: int, index: int) -> dict:
+    """The `index`-th element an array of this declared constructor carries."""
+    if constructor == 0x00:
+        return {"type": "described",
+                "descriptor": {"type": "symbol", "text": "element"},
+                "value": {"type": "ubyte", "value": index % 256}}
+    if constructor == 0x43:
+        return {"type": "uint", "value": 0}
+    if constructor == 0x44:
+        return {"type": "ulong", "value": 0}
+    if constructor == 0x45:
+        return {"type": "list", "items": []}
+    if constructor == 0x52:
+        return {"type": "uint", "value": index % 256}
+    if constructor == 0x53:
+        return {"type": "ulong", "value": index % 256}
+    if constructor == 0x56:
+        return {"type": "boolean", "value": index % 2 == 0}
+    if constructor == 0x61:
+        return {"type": "short", "value": index - 128}
+    if constructor == 0x71:
+        return {"type": "int", "value": index - 128}
+    if constructor == 0x81:
+        return {"type": "long", "value": index - 128}
+    if constructor == 0xB0:
+        return {"type": "binary", "hex": "ab" * (1 + index % 2)}
+    if constructor == 0xB1:
+        return {"type": "string", "text": "s" * (1 + index % 2)}
+    if constructor == 0xB3:
+        return {"type": "symbol", "text": "k" * (1 + index % 2)}
+    if constructor in (0xC0, 0xD0):
+        return {"type": "list", "items": [{"type": "ubyte", "value": index % 256}]}
+    if constructor in (0xC1, 0xD1):
+        return {"type": "map",
+                "pairs": [[{"type": "symbol", "text": "k"},
+                           {"type": "ubyte", "value": index % 256}]]}
+    if constructor in (0xE0, 0xF0):
+        return {"type": "array", "constructor": "50",
+                "items": [{"type": "ubyte", "value": index % 256}]}
+    raise ValueError(f"the corpus writes no element of constructor {constructor:#04x}")
+
+
+def element_arrays() -> list[dict]:
+    """Arrays of every element constructor, in both directions.
+
+    Counts are either side of the one-octet count boundary — 0, 1, 255 and 256
+    elements — so the array's own count field, and for a container element the
+    element's own size and count fields, are exercised where they switch width.
+    """
+    vectors: list[dict] = []
+
+    def add(name: str, value: dict, note: str) -> None:
+        octets = encode(value)
+        vectors.append({
+            "vector": f"gen-element-{name}", "kind": "encode",
+            "clauses": [ENCODINGS_CLAUSE], "bytes": octets.hex(), "value": value,
+            "note": note,
+        })
+        vectors.append({
+            "vector": f"gen-element-{name}-decode", "kind": "decode",
+            "clauses": [ENCODINGS_CLAUSE], "bytes": octets.hex(), "value": value,
+            "canonical": True, "note": f"{note} (decoding direction)",
+        })
+
+    for constructor, label, note in ELEMENT_FORMS:
+        for count in (0, 1, 255, 256):
+            value = {"type": "array", "constructor": f"{constructor:02x}",
+                     "items": [element_value(constructor, i) for i in range(count)]}
+            octets = encode(value)
+            add(f"array-{label}-{count}", value,
+                f"an array of {count} element(s) whose declared constructor is {label}: "
+                f"{note}. The array's count field is "
+                f"{'one octet' if count <= 0xFF else 'four octets'} and its element count "
+                f"{'fits' if count <= 0xFF else 'does not fit'} a one-octet count field, so "
+                f"{'array8' if octets[0] == 0xE0 else 'array32'} carries it")
+
+    # The array category, nested. An inner array has no narrowest form of its own when it
+    # is an element: the outer array's constructor fixes the width of the inner size and
+    # count fields, so these vectors pin the forced width as well as the nesting.
+    def inner(constructor: int, items: list[dict]) -> dict:
+        return {"type": "array", "constructor": f"{constructor:02x}", "items": items}
+
+    add("array8-of-array8", inner(0xE0, [
+        inner(0x50, [{"type": "ubyte", "value": 1}, {"type": "ubyte", "value": 2}]),
+        inner(0x50, [{"type": "ubyte", "value": 3}]),
+    ]), "an array whose element constructor is array8, holding two inner arrays: each "
+        "inner array is written in eight-bit form because the outer constructor declares "
+        "it, not because the inner array would choose it")
+    for count in (255, 256):
+        add(f"array32-of-array32-inner-{count}", inner(0xF0, [
+            inner(0x40, [{"type": "null"}] * count),
+        ]), f"an array of arrays in thirty-two-bit form, whose inner array declares "
+            f"{count} zero-width elements: the inner count lies "
+            f"{'at' if count == 256 else 'below'} the one-octet boundary and the inner "
+            f"array is written in the outer constructor's four-octet form regardless")
+    add("array8-of-array-compound-inner", inner(0xE0, [
+        inner(0xC0, [{"type": "list", "items": [{"type": "ubyte", "value": 1}]},
+                     {"type": "list", "items": []}]),
+    ]), "an array of arrays whose inner element constructor is itself a compound: the "
+        "inner array's elements are list8 bodies, each with its own size and count")
+    add("array8-of-list8-of-array8", inner(0xC0, [
+        {"type": "list", "items": [inner(0x40, [{"type": "null"}, {"type": "null"}])]},
+        {"type": "list", "items": []},
+    ]), "an array of compound elements nested two deep: an array whose element "
+        "constructor is list8, one of whose lists holds an array8 of nulls")
+    return vectors
+
+
+def element_rejects() -> list[dict]:
+    """The refusals the element forms now admit.
+
+    Each names the reason class both artefacts must report, because a rejection that
+    merely fails would let a truncation stand in for a size disagreement.
+    """
+    vectors: list[dict] = []
+
+    def reject(name: str, octets: bytes, reason: str, note: str) -> None:
+        vectors.append({
+            "vector": f"gen-element-{name}", "kind": "reject",
+            "clauses": [ENCODINGS_CLAUSE], "bytes": octets.hex(),
+            "expectError": {"condition": "amqp:decode-error", "endpoint": "connection",
+                            "reason": reason},
+            "note": note,
+        })
+
+    # A compound element whose size disagrees with its contents: the element's own size
+    # octet is raised by one, leaving the array's size exactly right, so the element's
+    # check is what fires rather than the array's.
+    listing = encode({"type": "list", "items": [{"type": "ubyte", "value": 7}]})
+    element = bytes([len(listing) + 1, 1]) + listing
+    array = bytes([0xE0, 2 + len(element), 1, 0xC0]) + element
+    raised = bytearray(array)
+    raised[4] = raised[4] + 1
+    reject("list8-element-bad-size", bytes(raised), "sizeMismatch",
+           "a list8 element whose size octet is one higher than its count and items "
+           "measure: the element's own check refuses it")
+
+    # A nested array element whose size disagrees, one level further in.
+    nested = bytes([0xE0, 5, 1, 0xE0, 2, 1, 0x40])
+    raised = bytearray(nested)
+    raised[4] = 3
+    reject("array8-element-bad-size", bytes(raised), "sizeMismatch",
+           "an array8 element inside an array8, its inner size octet raised by one: the "
+           "inner array's size check refuses it before the outer one is reached")
+
+    # A variable-width element whose length prefix runs past the array's size: the
+    # element declares eight payload octets where the array's size announces two, and the
+    # six extra octets are present in the buffer so what fires is the array's size
+    # measurement rather than a truncation.
+    # The payload is ASCII, so the element's own payload check has nothing to say and the
+    # array's size measurement is what fires.
+    overrun = bytes([0xE0, 8, 1, 0xB1]) + be(8, 4) + b"ab" + b"cd" * 6
+    reject("str32-element-length-over-array-size", overrun, "sizeMismatch",
+           "a str32 element declaring eight payload octets where the array's size "
+           "announces two, with the octets present in the buffer: the array measures "
+           "more than its size field declares")
+
+    # An element constructor that is not a constructor the grammar assigns: the escape
+    # octet 0x4F, and 0x46, a format code the table leaves unassigned inside the
+    # zero-data range. Both are refused before any element is read, so an array that
+    # declares no elements at all is refused too — a reader that only looked at the
+    # elements would accept the empty one.
+    for label, octet in (("escape-4f", 0x4F), ("unassigned-46", 0x46)):
+        for count in (0, 1):
+            octets = bytes([0xE0, 2 + count, count, octet]) + b"\x00" * count
+            reject(f"constructor-{label}-{count}-elements", octets, "unassigned",
+                   f"an array of {count} element(s) whose element constructor is "
+                   f"0x{octet:02X}, which no format code assigns: refused for the "
+                   f"constructor, whether or not elements follow")
+    return vectors
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", default=str(ROOT / "vectors" / "generated.ndjson"))
@@ -866,8 +1218,8 @@ def main(argv: list[str]) -> int:
     args = parser.parse_args(argv)
 
     self_check()
-    gold = golden()
-    corpus = gold + rejects(gold) + properties()
+    gold = golden() + element_arrays()
+    corpus = gold + rejects(gold) + element_rejects() + properties()
     if args.limit_properties is not None:
         props = [v for v in corpus if v["kind"] == "property"]
         corpus = [v for v in corpus if v["kind"] != "property"] + props[:args.limit_properties]

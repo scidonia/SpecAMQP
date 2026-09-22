@@ -182,8 +182,17 @@ note "no sorry, admit, native_decide, partial, axiom, opaque, unsafe or extern i
 # the specification claims is inventoried here, not only the first: a theorem proved from
 # nothing but the library and another proved through an axiom nobody looked at are
 # different claims, and the difference is only visible if each is asked.
+# The modules the probe prints from must be built first: `lake env lean` uses whatever
+# olean exists, so a probe run against a stale build reports an unknown constant and the
+# failure reads like a missing theorem rather than a missing build.
+( cd "$root/lean" && LAKE_NO_CACHE=1 lake build Contracts.Codec Contracts.FrameCodec \
+    Contracts.FrameCodecAcceptance Contracts.TypeSystem Proofs.CodecFrameLaws \
+    Proofs.CodecRoundTrip Proofs.CodecRoundTripVariable Spec.ReadLaws ) >"$tmp/axiombuild.log" 2>&1 ||
+  die "building the modules the axiom probe reads failed: $(tail -3 "$tmp/axiombuild.log")"
+
 cat >"$tmp/Axioms.lean" <<'AXIOMS'
 import Contracts.FrameCodec
+import Contracts.FrameCodecAcceptance
 import Contracts.TypeSystem
 import Proofs.CodecRoundTrip
 import Proofs.CodecRoundTripVariable
@@ -198,6 +207,11 @@ import Spec.ReadLaws
 #print axioms SpecAMQP.Proofs.go_foldr_value
 #print axioms SpecAMQP.Proofs.bigEndianFieldValue
 #print axioms SpecAMQP.Proofs.fieldValueRoundTrip
+#print axioms SpecAMQP.Contracts.accepted_frames_carry_performatives
+#print axioms SpecAMQP.Contracts.consumed_is_the_declared_size
+#print axioms SpecAMQP.Contracts.frame_round_trip_public
+#print axioms SpecAMQP.Contracts.value_round_trip_public
+#print axioms SpecAMQP.Proofs.doff_lt_of_encodeFrame_ok
 #print axioms SpecAMQP.Proofs.lengthWidthOf_narrow
 #print axioms SpecAMQP.Proofs.lengthWidthOf_wide
 #print axioms SpecAMQP.Proofs.two_pow_eight_mul
@@ -216,6 +230,11 @@ grep -q "ofReduceBool" "$tmp/axioms.log" &&
 grep -q "sorryAx" "$tmp/scan.log" && die "an accepted theorem is missing from the inventory"
 sed 's/^/     /' "$tmp/axioms.log" | grep "depends on axioms" | sed 's/^     //'
 for theorem in "$accepted_theorem" extended_header_width body_starts_after_the_header \
+               SpecAMQP.Contracts.accepted_frames_carry_performatives \
+               SpecAMQP.Contracts.consumed_is_the_declared_size \
+               SpecAMQP.Contracts.frame_round_trip_public \
+               SpecAMQP.Contracts.value_round_trip_public \
+               SpecAMQP.Proofs.doff_lt_of_encodeFrame_ok \
                SpecAMQP.Proofs.beOctets_length SpecAMQP.Proofs.go_length \
                SpecAMQP.Proofs.mod_mul_base SpecAMQP.Proofs.go_foldr_value \
                SpecAMQP.Proofs.bigEndianFieldValue SpecAMQP.Proofs.fieldValueRoundTrip \

@@ -1,0 +1,692 @@
+import Generated.Oasis.Choices
+import Generated.Oasis.Constants
+import Generated.Oasis.Fields
+import Generated.Oasis.Types
+import Ref.Frame
+
+/-!
+# The reference implementation of the connection layer
+
+Written from Part 2's connection lifecycle — the Connection State Table (picture 24),
+the Connection State Diagram (picture 23), the Frame Dispatch Table (picture 10), the
+Protocol Header Layout (picture 11) and the security section's SASL exchange — and
+independently of `Spec.Connection`: the two share no definition, so their agreement
+over the exchange corpus is evidence about the artifact rather than a tautology. This
+is a second reading of the same four pictures and the same clauses, and where the
+specification transcribes the table as two columns of *classes*, this one writes each
+row out as a record of what it admits.
+
+Three readings decide the behaviour, on the same terms as the specification's:
+
+* the table's `**` column is not its `*` column: `**` admits only frames "known a priori
+  to conform to the peer's capabilities and limitations", which before the partner's
+  `open` arrives means the a priori limits — MIN-MAX-FRAME-SIZE octets and channel 0;
+* every refusal carries the one connection-error the artifact raises for a wire-level
+  failure, read from the generated choice table, with the cause as the reason class;
+* the SASL layer's dialogue runs on the header exchange's START/HDR_SENT/HDR_EXCH path
+  and, once its outcome succeeds, the peers exchange protocol headers again for AMQP.
+
+What it does not do: it does not build the `close` frame a refused frame obliges, and
+it does not enforce the `open`'s mandatory fields.
+-/
+
+namespace SpecAMQP.Ref.Connection
+
+open SpecAMQP.Generated.Oasis
+  (ChoiceDecl FieldDecl TypeDecl choices constantValue? errorConditionsOf fieldsOf types)
+
+/-! ## The protocol header, as the layout picture draws it -/
+
+/-- A protocol header: the protocol id octet and the three version octets. The id is a
+number here rather than an enumeration, because the layout gives it one octet and the
+only question the artifact asks about it is which protocol it names. -/
+structure Header where
+  protocolId : Nat
+  major : Nat
+  minor : Nat
+  revision : Nat
+deriving Repr, BEq, DecidableEq
+
+/-- The protocol id AMQP itself is negotiated under. -/
+def amqpId : Nat := 0
+
+/-- The protocol id the SASL security layer is negotiated under. -/
+def saslId : Nat := 3
+
+/-- The protocol ids this implementation speaks. Protocol id two (TLS) is assigned by
+the artifact and not spoken here. -/
+def speaksId (protocolId : Nat) : Bool := protocolId == amqpId || protocolId == saslId
+
+/-- The protocol id's name, for a diagnostic. -/
+def idName (protocolId : Nat) : String :=
+  if protocolId == amqpId then "AMQP"
+  else if protocolId == saslId then "SASL"
+  else if protocolId == 2 then "TLS"
+  else s!"protocol id {protocolId}"
+
+/-- A `<definition>` constant as a number, by name. -/
+def constantNumber (name : String) : Option Nat :=
+  (constantValue? name).bind (fun text => text.toNat?)
+
+/-- The version the artifact states for a protocol id, read from the generated constant
+table: MAJOR/MINOR/REVISION for AMQP and SASL-MAJOR/SASL-MINOR/SASL-REVISION for SASL. -/
+def statedVersion (protocolId : Nat) : Option (Nat × Nat × Nat) :=
+  if protocolId == amqpId then
+    match constantNumber "MAJOR", constantNumber "MINOR", constantNumber "REVISION" with
+    | some a, some b, some c => some (a, b, c)
+    | _, _, _ => none
+  else if protocolId == saslId then
+    match constantNumber "SASL-MAJOR", constantNumber "SASL-MINOR",
+          constantNumber "SASL-REVISION" with
+    | some a, some b, some c => some (a, b, c)
+    | _, _, _ => none
+  else none
+
+/-- The header this implementation would send for a protocol id it speaks. -/
+def ownHeader (protocolId : Nat) : Option Header :=
+  match statedVersion protocolId with
+  | some (a, b, c) => some ⟨protocolId, a, b, c⟩
+  | none => none
+
+/-- The protocol header's width: "In total this is an 8-octet sequence." -/
+def headerWidth : Nat := 8
+
+/-- The header's magic: the layout's four octets, the ASCII letters AMQP. -/
+def magic : Octets := #[0x41, 0x4D, 0x51, 0x50]
+
+/-- A big-endian field of a buffer already known to hold it. -/
+def field (bytes : Octets) (offset width : Nat) : Nat :=
+  (bytes.extract offset (offset + width)).foldl (fun acc b => acc * 256 + b.toNat) 0
+
+/-- The header's octets. -/
+def Header.octets (header : Header) : Octets :=
+  magic ++ #[UInt8.ofNat (header.protocolId % 256), UInt8.ofNat (header.major % 256),
+             UInt8.ofNat (header.minor % 256), UInt8.ofNat (header.revision % 256)]
+
+/-- Whether a buffer starts the way a header does. -/
+def looksLikeHeader (bytes : Octets) : Bool :=
+  bytes.size ≥ 4 && bytes.extract 0 4 == magic
+
+/-! ## The state table (picture 24) -/
+
+/-- The fourteen states of the table. -/
+inductive State where
+  | start
+  | rcvHdr
+  | sndHdr
+  | bothHdr
+  | rcvOpen
+  | sndOpen
+  | pipeOpen
+  | pipeClose
+  | pipeOc
+  | open
+  | rcvClose
+  | sndClose
+  | discard
+  | done
+deriving Repr, BEq, DecidableEq
+
+/-- The table's names, which are the vocabulary the corpus uses. -/
+def State.label : State → String
+  | .start => "START"
+  | .rcvHdr => "HDR_RCVD"
+  | .sndHdr => "HDR_SENT"
+  | .bothHdr => "HDR_EXCH"
+  | .rcvOpen => "OPEN_RCVD"
+  | .sndOpen => "OPEN_SENT"
+  | .pipeOpen => "OPEN_PIPE"
+  | .pipeClose => "CLOSE_PIPE"
+  | .pipeOc => "OC_PIPE"
+  | .open => "OPENED"
+  | .rcvClose => "CLOSE_RCVD"
+  | .sndClose => "CLOSE_SENT"
+  | .discard => "DISCARDING"
+  | .done => "END"
+
+/-- The states the table names, for a lookup by name. -/
+def State.labels : List State :=
+  [.start, .rcvHdr, .sndHdr, .bothHdr, .rcvOpen, .sndOpen, .pipeOpen, .pipeClose,
+   .pipeOc, .open, .rcvClose, .sndClose, .discard, .done]
+
+/-- The state a table name denotes. -/
+def State.lookup (name : String) : Option State :=
+  State.labels.find? (fun state => state.label == name)
+
+/-- The connection action the table's third column names. -/
+inductive Action where
+  | shutWrite
+  | shutRead
+  | shutAll
+deriving Repr, BEq, DecidableEq
+
+/-- The action's name, as the table writes it. -/
+def Action.label : Action → String
+  | .shutWrite => "TCP Close for Write"
+  | .shutRead => "TCP Close for Read"
+  | .shutAll => "TCP Close"
+
+/-- One row of the table: which of the column's cases it admits on each side, and the
+action that follows.
+
+The two send cases that admit *frames* are kept apart, because they are what the table's
+`*` and `**` marks mean: `frames` is any frame, and `expected` is any frame known a
+priori to conform to the partner's capabilities and limitations — which, before the
+partner's `open`, is the a priori limit rather than whatever the partner will later
+allow. -/
+structure Row where
+  /-- The column is HDR: the protocol header, and nothing else. -/
+  sendsHeader : Bool
+  /-- The column is OPEN: the open performative, and nothing else. -/
+  sendsOpen : Bool
+  /-- The column is `*`: any frame. -/
+  sendsAny : Bool
+  /-- The column is `**`: any frame known a priori to conform. -/
+  sendsExpected : Bool
+  receivesHeader : Bool
+  receivesOpen : Bool
+  /-- The receive column is `*`: any frame. -/
+  receivesAny : Bool
+  action : Option Action
+
+/-- The table, row by row, in the order the artifact lists it. -/
+def row : State → Row
+  | .start =>
+    ⟨true, false, false, false, true, false, false, none⟩
+  | .rcvHdr =>
+    ⟨true, false, false, false, false, true, false, none⟩
+  | .sndHdr =>
+    ⟨false, true, false, false, true, false, false, none⟩
+  | .bothHdr =>
+    ⟨false, true, false, false, false, true, false, none⟩
+  | .rcvOpen =>
+    ⟨false, true, false, false, false, false, true, none⟩
+  | .sndOpen =>
+    ⟨false, false, false, true, false, true, false, none⟩
+  | .pipeOpen =>
+    ⟨false, false, false, true, true, false, false, none⟩
+  | .pipeClose =>
+    ⟨false, false, false, false, false, true, false, some .shutWrite⟩
+  | .pipeOc =>
+    ⟨false, false, false, false, true, false, false, some .shutWrite⟩
+  | .open =>
+    ⟨false, false, true, false, false, false, true, none⟩
+  | .rcvClose =>
+    ⟨false, false, true, false, false, false, false, some .shutRead⟩
+  | .sndClose =>
+    ⟨false, false, false, false, false, false, true, some .shutWrite⟩
+  | .discard =>
+    ⟨false, false, false, false, false, false, true, some .shutWrite⟩
+  | .done =>
+    ⟨false, false, false, false, false, false, false, some .shutAll⟩
+
+/-- What a step offers, from the connection layer's point of view. -/
+inductive Kind where
+  | header
+  | open
+  | close
+  | relayed
+  | saslFrame
+deriving Repr, BEq, DecidableEq
+
+/-- Whether a frame may be sent from a state: the `open` is admitted only by the OPEN
+column, and the column's frame cases admit a frame that is not the peer's own `open`,
+which is sent once, first. -/
+def maySend (state : State) (kind : Kind) : Bool :=
+  let r := row state
+  match kind with
+  | .header => r.sendsHeader
+  | .open => r.sendsOpen
+  | .saslFrame => false
+  | .close | .relayed => r.sendsAny || r.sendsExpected
+
+/-- Whether a frame may be received in a state, on the same terms. -/
+def mayReceive (state : State) (kind : Kind) : Bool :=
+  let r := row state
+  match kind with
+  | .header => false
+  | .open => r.receivesOpen
+  | .saslFrame => false
+  | .close | .relayed => r.receivesAny
+
+/-! ## Refusals -/
+
+/-- A refusal: the condition, the reason class, the prose, where it leaves the peer,
+and the octets the peer writes while refusing. -/
+structure Refusal where
+  condition : String
+  reasonClass : String
+  text : String
+  place : Option State
+  reply : List Octets
+
+/-- The condition the artifact raises for a wire-level failure: the only connection-error
+its clauses raise, out of the generated choice table. -/
+def wireCondition : String :=
+  match (errorConditionsOf "connection-error").find? (fun c => c.name == "framing-error") with
+  | some c => c.value
+  | none => "no framing-error in the connection-error choice"
+
+/-- A refusal of one class. -/
+def refuse (reasonClass text : String) : Refusal :=
+  ⟨wireCondition, reasonClass, text, none, []⟩
+
+/-- The rendered detail: what the corpus and the differential comparison read, class
+first. -/
+def Refusal.detail (refusal : Refusal) : String :=
+  s!"{refusal.reasonClass}: {refusal.text}"
+
+/-! ## The endpoint -/
+
+/-- The limits one side declares: the largest frame it accepts and the highest channel
+number it accepts. -/
+structure Bounds where
+  frames : Nat
+  channels : Nat
+deriving Repr, BEq, DecidableEq
+
+/-- The largest frame both peers must accept, from the artifact's constant. -/
+def minMaxFrameSize : Nat := (constantNumber "MIN-MAX-FRAME-SIZE").getD 0
+
+/-- What holds before any explicit negotiation: MIN-MAX-FRAME-SIZE octets and channel 0. -/
+def Bounds.aPriori : Bounds := ⟨minMaxFrameSize, 0⟩
+
+/-- Where the SASL dialogue stands. -/
+inductive Sasl where
+  | idle
+  | wantsMechanisms
+  | wantsInit
+  | wantsOutcome
+deriving Repr, BEq, DecidableEq
+
+/-- One peer's state: the table's state, the protocol id whose header exchange this is,
+the SASL dialogue's stage, which end of it this peer is, the mechanisms on offer, and
+the two sides' bounds. -/
+structure Peer where
+  state : State
+  protocolId : Nat
+  sasl : Sasl
+  announcedBy : Option Bool
+  offered : List String
+  own : Bounds
+  partner : Bounds
+deriving Repr
+
+/-- A peer that has exchanged nothing: the AMQP layer, from START. -/
+def Peer.new : Peer :=
+  ⟨.start, amqpId, .idle, none, [], Bounds.aPriori, Bounds.aPriori⟩
+
+/-! ## Reading the frames -/
+
+/-- The anchor path of a declared type, by name, so nothing here writes an
+`amqp:`-shaped symbol. -/
+def anchorOf (typeName : String) : Option String :=
+  (types.find? (fun t => t.name == typeName)).map (fun t => t.path)
+
+/-- A declared field, by name. -/
+def declaredField (typeName fieldName : String) : Option FieldDecl :=
+  match anchorOf typeName with
+  | none => none
+  | some path => (fieldsOf path).find? (fun f => f.name == fieldName)
+
+/-- A field's declared default as a number. -/
+def declaredDefault (typeName fieldName : String) : Option Nat :=
+  match declaredField typeName fieldName with
+  | some f => f.defaultValue.bind (fun text => text.toNat?)
+  | none => none
+
+/-- A choice's declared value, by the type that declares it. -/
+def declaredChoice (typeName choiceName : String) : Option String :=
+  match anchorOf typeName with
+  | none => none
+  | some path =>
+    (choices.find? (fun c => c.ownerPath == path && c.name == choiceName)).map
+      (fun c => c.value)
+
+/-- The type a described value carries, by its descriptor. -/
+def bodyType (body : Value) : Option TypeDecl :=
+  match body with
+  | .described descriptor _ =>
+    match descriptor with
+    | .ulong code =>
+      types.find? (fun t => match t.descriptor with
+        | some d => d.domain * 2 ^ 32 + d.code == code.toNat
+        | none => false)
+    | .symbol name => types.find? (fun t => t.name == name)
+    | _ => none
+  | _ => none
+
+/-- The kind a frame body is, from the declared type its descriptor names. -/
+def kindOfBody (body : Value) : Kind :=
+  match bodyType body with
+  | none => .relayed
+  | some t =>
+    if t.name == "open" then .open
+    else if t.name == "close" then .close
+    else if t.provides.contains "sasl-frame" then .saslFrame
+    else .relayed
+
+/-- A SASL performative's name, from the declared type its descriptor names. -/
+def saslName (body : Value) : String :=
+  match bodyType body with
+  | some t => t.name
+  | none => ""
+
+/-- A performative's field values in wire order. -/
+def fieldList (body : Value) : List Value :=
+  match body with
+  | .described _ (.list items) => items
+  | _ => []
+
+/-- One field's value, by the declared index; a list that stops short leaves the
+remaining fields null. -/
+def valueOfField (typeName fieldName : String) (body : Value) : Option Value :=
+  match declaredField typeName fieldName with
+  | some f => if f.index == 0 then none else (fieldList body)[f.index - 1]?
+  | none => none
+
+/-- A value's number, whichever integer width carried it. -/
+def numberOf : Value → Option Nat
+  | .ubyte n => some n.toNat
+  | .ushort n => some n.toNat
+  | .uint n => some n.toNat
+  | .ulong n => some n.toNat
+  | _ => none
+
+/-- The symbols a `multiple` field carries: one symbol is the one-element wire form. -/
+def symbolList : Value → List String
+  | .symbol s => [s]
+  | .list items =>
+    items.filterMap (fun i => match i with | .symbol s => some s | _ => none)
+  | .array _ items =>
+    items.filterMap (fun i => match i with | .symbol s => some s | _ => none)
+  | _ => []
+
+/-- An integer field, taking its declared default where the sender left it unset, and
+refusing a field that is present and is not an integer rather than substituting the
+default for it. -/
+def integerField (typeName fieldName : String) (body : Value) :
+    Except Refusal Nat :=
+  match valueOfField typeName fieldName body with
+  | none | some .null =>
+    match declaredDefault typeName fieldName with
+    | some n => .ok n
+    | none =>
+      .error (refuse "malformed" s!"{typeName}.{fieldName} is unset and the declared \
+        surface gives it no default")
+  | some v =>
+    match numberOf v with
+    | some n => .ok n
+    | none =>
+      .error (refuse "malformed" s!"{typeName}.{fieldName} is not an integer, and the \
+        artifact declares it one")
+
+/-- The bounds an `open` declares. -/
+def openBounds (body : Value) : Except Refusal Bounds := do
+  let frames ← integerField "open" "max-frame-size" body
+  let channels ← integerField "open" "channel-max" body
+  return ⟨frames, channels⟩
+
+/-- The code a successful SASL outcome carries, from the `sasl-code` choice table. -/
+def successCode : Option Nat :=
+  (declaredChoice "sasl-code" "ok").bind (fun text => text.toNat?)
+
+/-! ## Applying a step -/
+
+/-- Where a refusal leaves the peer: a refused send writes nothing and moves nothing; a
+refused receive is answered by closing, which in the AMQP layer is the error-triggered
+close the table calls DISCARDING, and in the SASL layer — where no AMQP close can be
+written because the layer is not established — is the transport being cut; and a
+violation on a connection that has already ended leaves it ended. -/
+def placeRefusal (peer : Peer) (outbound : Bool) (r : Refusal) : Refusal :=
+  match r.place with
+  | some _ => r
+  | none =>
+    if outbound then r
+    else if peer.state == State.done then { r with place := some State.done }
+    else if peer.protocolId == saslId then { r with place := some State.done }
+    else { r with place := some State.discard }
+
+/-- The bounds a frame's size and channel are measured against: the partner's for a
+send, this peer's own for a receive, and — for a send from a `**` row — the a priori
+bounds, because that column admits only what is known a priori to conform. -/
+def boundsFor (peer : Peer) (outbound : Bool) : Bounds :=
+  if outbound then
+    if (row peer.state).sendsExpected then Bounds.aPriori else peer.partner
+  else peer.own
+
+/-- The failure a header negotiation raises, with the reply the section mandates and
+the close the diagram draws to END. -/
+def headerRefusal (protocolId : Nat) (r : Refusal) : Except Refusal Refusal :=
+  match ownHeader protocolId with
+  | some header => .ok { r with place := some State.done, reply := [header.octets] }
+  | none =>
+    .error (refuse "unsupported" s!"the artifact states no version for {idName protocolId}")
+
+/-- The header at the front of a buffer, or the negotiation's refusal: width, magic,
+protocol id, version. -/
+def readHeader (bytes : Octets) : Except Refusal Header :=
+  if bytes.size < headerWidth then
+    .error (refuse "truncated" s!"a protocol header is {headerWidth} octets and only \
+      {bytes.size} are present")
+  else if bytes.extract 0 4 != magic then
+    .error (refuse "malformed" s!"these octets do not begin with the ASCII letters AMQP")
+  else
+    let protocolId := field bytes 4 1
+    if !speaksId protocolId then
+      .error (refuse "unsupported" s!"{idName protocolId} is not a protocol this peer \
+        speaks")
+    else
+      let header : Header := ⟨protocolId, field bytes 5 1, field bytes 6 1, field bytes 7 1⟩
+      match statedVersion protocolId with
+      | some (a, b, c) =>
+        if header.major == a && header.minor == b && header.revision == c then .ok header
+        else
+          .error (refuse "unsupported" s!"the header names {idName protocolId} version \
+            {header.major}.{header.minor}.{header.revision}, and this peer speaks \
+            {a}.{b}.{c}")
+      | none =>
+        .error (refuse "unsupported" s!"the artifact states no version for \
+          {idName protocolId}")
+
+/-- A refusal the frame layer raised: its reason class, and what it said after it. -/
+def fromFrame (message : String) : Refusal :=
+  let parts := message.splitOn ":"
+  ⟨wireCondition, (parts.head?.getD "").trimAscii.toString,
+   (String.intercalate ":" (parts.drop 1)).trimAscii.toString, none, []⟩
+
+/-- A peer whose header exchange has completed in the SASL layer is in that layer's
+dialogue, waiting for the server's mechanisms. -/
+def inDialogue (peer : Peer) : Peer :=
+  if peer.protocolId == saslId && peer.state == .bothHdr && peer.sasl == .idle then
+    { peer with sasl := .wantsMechanisms }
+  else peer
+
+/-- One protocol header, offered or received. -/
+def takeHeader (peer : Peer) (outbound : Bool) (header : Header) : Except Refusal Peer := do
+  if !speaksId header.protocolId then
+    .error (refuse "unsupported" s!"{idName header.protocolId} is not a protocol this \
+      peer speaks")
+  if outbound then
+    if !(row peer.state).sendsHeader then
+      .error (refuse "illegalState" s!"{peer.state.label} may not send a protocol \
+        header: the table's legal sends for that state are not HDR")
+    let next := if peer.state == .start then State.sndHdr else State.bothHdr
+    return inDialogue { peer with state := next, protocolId := header.protocolId }
+  else
+    if !(row peer.state).receivesHeader then
+      .error (refuse "illegalState" s!"{peer.state.label} may not receive a protocol \
+        header: its receive column excludes HDR")
+    if peer.state != .start && header.protocolId != peer.protocolId then
+      .error { refuse "unsupported" s!"the header names {idName header.protocolId} while \
+        this exchange is {idName peer.protocolId}: the headers do not match, and both \
+        peers close" with place := some .done }
+    let next :=
+      match peer.state with
+      | .start => State.rcvHdr
+      | .sndHdr => State.bothHdr
+      | .pipeOpen => State.sndOpen
+      | .pipeOc => State.pipeClose
+      | other => other
+    return inDialogue { peer with state := next, protocolId := header.protocolId }
+
+/-- One SASL performative. -/
+def takeSasl (peer : Peer) (outbound : Bool) (size : Nat) (body : Value) :
+    Except Refusal Peer := do
+  if size > minMaxFrameSize then
+    .error (refuse "limit" s!"a SASL frame is at most {minMaxFrameSize} octets and this \
+      one is {size}")
+  let name := saslName body
+  match peer.sasl with
+  | .wantsMechanisms =>
+    if name != "sasl-mechanisms" then
+      .error (refuse "illegalState" "the SASL dialogue is waiting for the partner's \
+        sasl-mechanisms frame")
+    let offered :=
+      symbolList ((valueOfField "sasl-mechanisms" "sasl-server-mechanisms" body).getD .null)
+    if offered.length == 0 then
+      .error (refuse "malformed" "a sasl-mechanisms frame announces no mechanism, and \
+        the artifact states that the list cannot be null or empty")
+    let advanced := { peer with sasl := Sasl.wantsInit, offered := offered, announcedBy := some outbound }
+    return advanced
+  | .wantsInit =>
+    if name != "sasl-init" then
+      .error (refuse "illegalState" "the SASL dialogue is waiting for the sasl-init \
+        that chooses one of the mechanisms")
+    let mechanism :=
+      match valueOfField "sasl-init" "mechanism" body with
+      | some (.symbol s) => s
+      | _ => ""
+    if peer.announcedBy == some outbound then
+      .error (refuse "illegalState" "the peer that announced the mechanisms is the SASL \
+        server, and the init belongs to its partner")
+    if !peer.offered.contains mechanism then
+      .error (refuse "unsupported" s!"{mechanism} is not a mechanism the partner \
+        announced: {peer.offered}")
+    return { peer with sasl := .wantsOutcome }
+  | .wantsOutcome =>
+    if name == "sasl-challenge" || name == "sasl-response" then
+      return peer
+    if name != "sasl-outcome" then
+      .error (refuse "illegalState" "the SASL dialogue is waiting for the outcome")
+    let code := (valueOfField "sasl-outcome" "code" body).bind numberOf
+    if code == successCode then
+      -- The security layer is established, and the peers MUST exchange protocol headers
+      -- again: for the AMQP layer, from the beginning.
+      return Peer.new
+    else
+      -- Authentication failed. The close-code the artifact names for this has no value
+      -- in the choice table, so the close is recorded as the state and no condition is
+      -- invented.
+      return { peer with state := State.done }
+  | .idle =>
+    .error (refuse "illegalState" "the SASL layer's dialogue has not begun")
+
+/-- The kind's name, for a diagnostic. -/
+def kindName : Kind → String
+  | .header => "protocol header"
+  | .open => "open"
+  | .close => "close"
+  | .relayed => "relayed"
+  | .saslFrame => "SASL"
+
+/-- The peer a permitted frame leaves.
+
+Only `open` and `close` move the state: everything else the dispatch table hands on, so
+the connection's state does not change because a session frame passed. A row the
+diagram draws no arrow for — an `open` received in HDR_RCVD — leaves the state and takes
+the knowledge the frame carried, which is the rule the `*` rows need anyway. -/
+def placed (peer : Peer) (outbound : Bool) (kind : Kind) (declared : Bounds) : Peer :=
+  match kind with
+  | .open =>
+    if outbound then
+      match peer.state with
+      | .sndHdr => { peer with state := .pipeOpen, own := declared }
+      | .bothHdr => { peer with state := .sndOpen, own := declared }
+      | .rcvOpen => { peer with state := .open, own := declared }
+      | _ => { peer with own := declared }
+    else
+      match peer.state with
+      | .bothHdr => { peer with state := .rcvOpen, partner := declared }
+      | .sndOpen => { peer with state := .open, partner := declared }
+      | .pipeClose => { peer with state := .sndClose, partner := declared }
+      | _ => { peer with partner := declared }
+  | .close =>
+    if outbound then
+      match peer.state with
+      | .sndOpen => { peer with state := .pipeClose }
+      | .pipeOpen => { peer with state := .pipeOc }
+      | .rcvClose => { peer with state := .done }
+      | _ => { peer with state := .sndClose }
+    else
+      match peer.state with
+      | .sndClose => { peer with state := .done }
+      | .discard => { peer with state := .done }
+      | _ => { peer with state := .rcvClose }
+  | _ => peer
+
+/-- One frame of the AMQP layer. -/
+def takeFrame (peer : Peer) (outbound : Bool) (channel size : Nat) (body : Value) :
+    Except Refusal Peer := do
+  let kind := kindOfBody body
+  if kind == .saslFrame then
+    .error (refuse "illegalState" "a SASL performative belongs to the SASL layer's \
+      dialogue, and this is the AMQP layer's exchange")
+  let allowed := if outbound then maySend peer.state kind else mayReceive peer.state kind
+  if !allowed then
+    .error (refuse "illegalState" s!"{peer.state.label} does not admit a \
+      {kindName kind} frame on the {if outbound then "send" else "receive"} side")
+  if kind == .open && channel != 0 then
+    .error (refuse "illegalState" s!"the open frame can only be sent on channel 0, and \
+      this one is on channel {channel}")
+  let bounds := boundsFor peer outbound
+  if size > bounds.frames then
+    .error (refuse "limit" s!"{size} octets exceeds the largest frame \
+      {if outbound then "the partner accepts" else "this peer accepts"}, {bounds.frames}")
+  if channel > bounds.channels then
+    .error (refuse "limit" s!"channel {channel} is above the highest channel number \
+      {bounds.channels} {if outbound then "the partner allows" else "this peer allows"}")
+  let declared ← if kind == .open then openBounds body else pure Bounds.aPriori
+  return placed peer outbound kind declared
+
+/-- One item offered to the connection layer: a chosen frame, or octets that arrived,
+which the state decides how to read. -/
+inductive Offer where
+  | header (header : Header)
+  | frame (channel : Nat) (octets : Octets) (body : Value)
+  | arrives (octets : Octets)
+
+/-- Apply one offer. A frame that arrives is read here, because whether the octets are a
+header or a frame is what the state's receive column settles. -/
+def apply (peer : Peer) (outbound : Bool) (offer : Offer) : Except Refusal Peer :=
+  let step :=
+    match offer with
+    | .header header => takeHeader peer outbound header
+    | .frame channel octets body =>
+      if peer.protocolId == saslId then takeSasl peer outbound octets.size body
+      else takeFrame peer outbound channel octets.size body
+    | .arrives octets =>
+      if outbound then
+        .error (refuse "illegalState" "a send carries a frame the encoder has already \
+          written, not octets")
+      else if (row peer.state).receivesHeader then
+        match readHeader octets with
+        | .ok header => takeHeader peer false header
+        | .error r =>
+          match headerRefusal peer.protocolId r with
+          | .ok fixed => .error fixed
+          | .error missing => .error missing
+      else if looksLikeHeader octets then
+        .error (refuse "illegalState" s!"a protocol header is not a frame of this layer, \
+          and {peer.state.label}'s receive column excludes HDR")
+      else
+        match Ref.Frame.decodeFrame octets with
+        | .error message => .error (fromFrame message)
+        | .ok (frame, used) =>
+          if peer.protocolId == saslId then takeSasl peer false used frame.body
+          else takeFrame peer false frame.channel used frame.body
+  match step with
+  | .ok next => .ok next
+  | .error r => .error (placeRefusal peer outbound r)
+
+end SpecAMQP.Ref.Connection

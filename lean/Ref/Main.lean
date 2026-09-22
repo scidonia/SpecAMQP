@@ -1,4 +1,5 @@
 import Harness.Runner
+import Ref.ConnectionCodec
 import Ref.Vectors
 
 /-!
@@ -12,6 +13,7 @@ outcome. Nothing here touches the network, a clock, or a random source.
 -/
 
 open SpecAMQP.Harness
+open SpecAMQP.Ref.ConnectionCodec
 open SpecAMQP.Ref.Vectors
 
 def main (args : List String) : IO UInt32 := do
@@ -28,7 +30,7 @@ def main (args : List String) : IO UInt32 := do
       catch e =>
         IO.eprintln s!"amqp-ref: cannot read {path}: {e}"
         return (2 : UInt32)
-    match runCorpusWith refCodec refFrameCodec text with
+    match runCorpusWith refCodec refFrameCodec refExchangeCodec text with
     | .error message =>
       IO.eprintln s!"amqp-ref: {message}"
       return (2 : UInt32)

@@ -23,10 +23,14 @@ Deliberate choices, none of which a clause fixes:
   an implementation's, not a requirement. The corpus pins these octets.
 * **Unassigned octets are rejected**, including the twelve escape octets the
   constructor grammar reserves for future formats, rather than skipped.
-* **A legal constructor this implementation cannot read yet is reported as
+* **A legal constructor this implementation cannot read is reported as
   `unsupported`**, not as `unassigned`: an octet outside the grammar and a gap in
   the reader are different facts, and conflating them would make the reader's
-  error say something false about the grammar.
+  error say something false about the grammar. The type reader reads every
+  constructor the table assigns, so it raises `unsupported` nowhere; the frame
+  layer raises it for a legal constructor that is not a frame type or not the
+  performative a body's descriptor names, and the variant stays in the taxonomy
+  for a form a later revision of the artifact could add.
 * **Arrays carry a constructor octet** rather than a resolved element type; a
   reader requires every element's data to be well formed under that constructor.
 * **Sizes count the octets that follow the size field** — count, the array
@@ -48,9 +52,21 @@ Deliberate choices, none of which a clause fixes:
   pair contributes two, exactly as Part 1's compound layout counts them. An odd
   item count is malformed — Part 1 requires an even number of items — and the size
   agreement a list needs applies unchanged.
-* **Arrays hold scalars.** An element constructor naming a compound's data form
-  (list or map) is reported as `unsupported` — legal, but a form this
-  implementation does not read yet — rather than guessed at.
+* **An array's elements are read in the array's declared constructor form**, and
+  that form is read for every constructor the grammar assigns: a scalar is its
+  width or its length prefix, the descriptor prefix `%x00` carries the element's
+  own descriptor and value, a compound carries its own size and count, and an array
+  carries its own size, count, element constructor and elements. Nothing but
+  `arrayElementLimit` bounds an array's breadth, and nothing but the octet count
+  bounds its depth.
+* **A writer writes the array's declared element form, never the element's own
+  preference**, down to the width of a size or count field: an array whose element
+  constructor is `list8` writes one-octet sizes and counts, and an array whose
+  element constructor is a narrow small integer writes one octet. Where the
+  declared form cannot carry an element — a value of another type, or a compound
+  or array whose size or count does not fit the declared width — the writer refuses
+  it by name rather than masking a field or writing a different form, so the
+  writer's domain stays inside what the reader accepts.
 -/
 
 namespace SpecAMQP.Ref
@@ -182,64 +198,43 @@ def decodeString (bytes : Octets) (kind : String) : Except DecodeError String :=
   | some s => .ok s
   | none => .error (.malformed s!"{kind} is not valid UTF-8")
 
+/-- A string or symbol payload decoded against the cursor it was taken from. The
+decoder consumes nothing — the length prefix was already taken — so it hands the
+cursor back unchanged, which is what lets a reader bind a value and a cursor in one
+`do` step rather than re-pairing them at every call site. -/
+def decodeStringAt (bytes : Octets) (kind : String) (c : Cursor) :
+    Except DecodeError (String × Cursor) :=
+  match decodeString bytes kind with
+  | .ok s => .ok (s, c)
+  | .error e => .error e
+
 /-- A one-octet two's-complement integer as a number. The narrow `smallint` and
 `smalllong` forms carry a signed octet, and both the types that use them are wider
 than the octet, so the sign must be extended rather than read as an unsigned byte. -/
 def signedOctet (n : UInt8) : Int :=
   (Int8.ofBitVec (BitVec.ofNat 8 n.toNat)).toInt
 
-/-- One array element: its constructor is given by the array, so only the element
-data follows. Scalars only — the data form of a compound element is not something
-this implementation reads yet, so an array of lists or maps is rejected as an
-unassigned constructor rather than guessed at. -/
-def readElement (constructor : UInt8) (c : Cursor) : Result Value := do
-  match constructor with
-  | 0x40 => return (.null, c)
-  | 0x41 => return (.boolean true, c)
-  | 0x42 => return (.boolean false, c)
-  | 0x50 => let (n, c) ← takeU8 c; return (.ubyte n, c)
-  | 0x51 => let (n, c) ← takeU8 c
-            return (.byte (Int8.ofBitVec (BitVec.ofNat 8 n.toNat)), c)
-  | 0x54 => let (n, c) ← takeU8 c
-            return (.int (Int32.ofBitVec
-              (BitVec.ofNat 32 (signedOctet n % 4294967296).toNat)), c)
-  | 0x55 => let (n, c) ← takeU8 c
-            return (.long (Int64.ofBitVec
-              (BitVec.ofNat 64 (signedOctet n % 18446744073709551616).toNat)), c)
-  | 0x60 => let (n, c) ← takeBeU 2 c; return (.ushort n.toUInt16, c)
-  | 0x70 => let (n, c) ← takeBeU 4 c; return (.uint n.toUInt32, c)
-  | 0x72 => let (b, c) ← takeBytes 4 c; return (.float b, c)
-  | 0x73 => let (n, c) ← takeBeU 4 c; return (.char n.toUInt32, c)
-  | 0x74 => let (b, c) ← takeBytes 4 c; return (.decimal32 b, c)
-  | 0x80 => let (n, c) ← takeBeU 8 c; return (.ulong n.toUInt64, c)
-  | 0x82 => let (b, c) ← takeBytes 8 c; return (.double b, c)
-  | 0x83 => let (n, c) ← takeBeU 8 c
-            return (.timestamp (Int64.ofBitVec (BitVec.ofNat 64 n)), c)
-  | 0x84 => let (b, c) ← takeBytes 8 c; return (.decimal64 b, c)
-  | 0x94 => let (b, c) ← takeBytes 16 c; return (.decimal128 b, c)
-  | 0x98 => let (b, c) ← takeBytes 16 c; return (.uuid b, c)
-  | 0xA0 => let (n, c) ← takeU8 c; let (b, c) ← takeBytes n.toNat c
-            return (.binary b.toList, c)
-  | 0xA1 => let (n, c) ← takeU8 c; let (b, c) ← takeBytes n.toNat c
-            let (s, c) ← match decodeString b "string" with
-                         | .ok s => .ok (s, c)
-                         | .error e => .error e
-            return (.string s, c)
-  | 0xA3 => let (n, c) ← takeU8 c; let (b, c) ← takeBytes n.toNat c
-            let (s, c) ← match decodeString b "symbol" with
-                         | .ok s => .ok (s, c)
-                         | .error e => .error e
-            return (.symbol s, c)
-  -- Legal constructors whose element-data form this implementation does not read
-  -- yet: a described value's (0x00), the zero-data forms, the fixed-width signed
-  -- forms, the wide variable forms, a compound's data, and an array's. Each names
-  -- a form the grammar admits, so calling it unassigned would be false.
-  | 0x00 | 0x43 | 0x44 | 0x45 | 0x52 | 0x53 | 0x56
-  | 0x61 | 0x71 | 0x81
-  | 0xB0 | 0xB1 | 0xB3
+/-- Whether an octet is a constructor an array element can carry: the descriptor
+prefix, or one of the format codes the table assigns.
+
+Part 1's grammar makes an array's element constructor a *constructor* — a
+`format-code` or the descriptor prefix — and its `format-code` production admits all
+four categories, so a scalar, a compound and an array are each legal as element data.
+Anything else is not a constructor the grammar assigns: an octet below `%x40`, one of
+the escapes reserved for future formats, or a format code the table leaves unassigned.
+An array is refused on this before its first element is read, which is what makes an
+array with no elements and an unassigned constructor a refusal rather than empty. -/
+def assignedConstructor (octet : UInt8) : Bool :=
+  match octet with
+  | 0x00                                                          -- the descriptor prefix
+  | 0x40 | 0x41 | 0x42 | 0x43 | 0x44 | 0x45
+  | 0x50 | 0x51 | 0x52 | 0x53 | 0x54 | 0x55 | 0x56
+  | 0x60 | 0x61 | 0x70 | 0x71 | 0x72 | 0x73 | 0x74
+  | 0x80 | 0x81 | 0x82 | 0x83 | 0x84 | 0x94 | 0x98
+  | 0xA0 | 0xA1 | 0xA3 | 0xB0 | 0xB1 | 0xB3
   | 0xC0 | 0xC1 | 0xD0 | 0xD1
-  | 0xE0 | 0xF0 => .error (.unsupported constructor)
-  | other => .error (.unassigned other)
+  | 0xE0 | 0xF0 => true
+  | _ => false
 
 mutual
 
@@ -250,10 +245,9 @@ iterator that reads a compound's items, which is what makes this reader total
 without `partial`. Callers pass the number of octets in the input: every step
 consumes at least one octet, so a well-formed encoding never exhausts it, and a
 malformed one fails on truncation rather than looping. -/
-def readValue (fuel : Nat) (c : Cursor) : Result Value :=
-  match fuel with
-  | 0 => .error (.truncated "no octets left")
-  | fuel + 1 => do
+def readValue : Nat → Cursor → Result Value
+  | 0, _ => .error (.truncated "no octets left")
+  | fuel + 1, c => do
     let (code, c) ← takeU8 c
     match code with
     | 0x00 =>                                   -- described: descriptor, then value
@@ -303,24 +297,16 @@ def readValue (fuel : Nat) (c : Cursor) : Result Value :=
     | 0xB0 => let (n, c) ← takeBeU 4 c;   let (b, c) ← takeBytes n c
               return (.binary b.toList, c)
     | 0xA1 => let (n, c) ← takeU8 c;      let (b, c) ← takeBytes n.toNat c
-              let (s, c) ← match decodeString b "string" with
-                           | .ok s => .ok (s, c)
-                           | .error e => .error e
+              let (s, c) ← decodeStringAt b "string" c
               return (.string s, c)
     | 0xB1 => let (n, c) ← takeBeU 4 c;   let (b, c) ← takeBytes n c
-              let (s, c) ← match decodeString b "string" with
-                           | .ok s => .ok (s, c)
-                           | .error e => .error e
+              let (s, c) ← decodeStringAt b "string" c
               return (.string s, c)
     | 0xA3 => let (n, c) ← takeU8 c;      let (b, c) ← takeBytes n.toNat c
-              let (s, c) ← match decodeString b "symbol" with
-                           | .ok s => .ok (s, c)
-                           | .error e => .error e
+              let (s, c) ← decodeStringAt b "symbol" c
               return (.symbol s, c)
     | 0xB3 => let (n, c) ← takeBeU 4 c;   let (b, c) ← takeBytes n c
-              let (s, c) ← match decodeString b "symbol" with
-                           | .ok s => .ok (s, c)
-                           | .error e => .error e
+              let (s, c) ← decodeStringAt b "symbol" c
               return (.symbol s, c)
     | 0xC0 => readCompound fuel 1 c
     | 0xC1 => readMap fuel 1 c
@@ -329,44 +315,56 @@ def readValue (fuel : Nat) (c : Cursor) : Result Value :=
     | 0xE0 => readArray fuel 1 c
     | 0xF0 => readArray fuel 4 c
     | other => .error (.unassigned other)
+termination_by fuel _ => (fuel, 0)
 
-/-- `count` items, each with its own constructor. Both the fuel and the item
-count decrease, so a header whose count exceeds the input fails on truncation. -/
-def readItems (fuel : Nat) (count : Nat) (c : Cursor) : Result (List Value) :=
-  match fuel, count with
-  | 0, _ => .error (.truncated "no octets left")
-  | _, 0 => .ok ([], c)
-  | fuel + 1, count + 1 => do
+/-- `count` items, each with its own constructor.
+
+Both components of the measure decrease here: the fuel, once per item, and the count.
+The pair is what makes the measure decrease at every call in this block — the item
+loop needs fuel to fall, the element loop needs a count that falls without spending
+the fuel a zero-width element must not cost, and a single Nat cannot serve both. -/
+def readItems : Nat → Nat → Cursor → Result (List Value)
+  | 0, _, _ => .error (.truncated "no octets left")
+  | _, 0, c => .ok ([], c)
+  | fuel + 1, count + 1, c => do
     let (item, c) ← readValue fuel c
     let (rest, c) ← readItems fuel count c
     return (item :: rest, c)
+termination_by fuel count _ => (fuel, count)
 
 /-- A compound list: `size`, `count`, then `count` constructed items. The size
-counts the octets that follow it, so it must agree with what was read. -/
-def readCompound (fuel width : Nat) (c : Cursor) : Result Value := do
-  let (size, c) ← takeBeU width c
-  let start := c.pos                    -- the size counts what follows it
-  let (count, c) ← takeBeU width c
-  let (items, c) ← readItems fuel count c
-  if c.pos - start != size then
-    .error (.sizeMismatch "list" size (c.pos - start))
-  else
-    return (.list items, c)
+counts the octets that follow it, so it must agree with what was read. One unit of
+fuel is spent for the header, which occupies at least two octets. -/
+def readCompound : Nat → Nat → Cursor → Result Value
+  | 0, _, _ => .error (.truncated "no octets left")
+  | fuel + 1, width, c => do
+    let (size, c) ← takeBeU width c
+    let start := c.pos                  -- the size counts what follows it
+    let (count, c) ← takeBeU width c
+    let (items, c) ← readItems fuel count c
+    if c.pos - start != size then
+      .error (.sizeMismatch "list" size (c.pos - start))
+    else
+      return (.list items, c)
+termination_by fuel _ _ => (fuel, 0)
 
 /-- A map: `size`, `count` constructed items, then the same size agreement a list
 requires. Part 1 requires an even number of items, so an odd count is malformed
 rather than a map with a dangling key. Pairs keep the order they arrived in. -/
-def readMap (fuel width : Nat) (c : Cursor) : Result Value := do
-  let (size, c) ← takeBeU width c
-  let start := c.pos                    -- the size counts what follows it
-  let (count, c) ← takeBeU width c
-  let (items, c) ← readItems fuel count c
-  if c.pos - start != size then
-    .error (.sizeMismatch "map" size (c.pos - start))
-  else
-    match pairUp items with
-    | some pairs => return (.map pairs, c)
-    | none => .error (.malformed "a map must have an even number of items")
+def readMap : Nat → Nat → Cursor → Result Value
+  | 0, _, _ => .error (.truncated "no octets left")
+  | fuel + 1, width, c => do
+    let (size, c) ← takeBeU width c
+    let start := c.pos                  -- the size counts what follows it
+    let (count, c) ← takeBeU width c
+    let (items, c) ← readItems fuel count c
+    if c.pos - start != size then
+      .error (.sizeMismatch "map" size (c.pos - start))
+    else
+      match pairUp items with
+      | some pairs => return (.map pairs, c)
+      | none => .error (.malformed "a map must have an even number of items")
+termination_by fuel _ _ => (fuel, 0)
 
 /-- Items taken two at a time, key then value: the pairing a map encoding
 requires. `none` is an odd item count, which is not a map. -/
@@ -394,11 +392,16 @@ def arrayElementLimit : Nat := 65536
 
 /-- An array: `size`, `count`, one element constructor, then `count` element data
 blocks in that constructor's form, each without its own constructor. One unit of fuel
-is spent for the array's own header, which occupies at least three octets. -/
-def readArray (fuel width : Nat) (c : Cursor) : Result Value :=
-  match fuel with
-  | 0 => .error (.truncated "no octets left")
-  | _fuel + 1 => do
+is spent for the array's own header, which occupies at least three octets.
+
+The element constructor is checked before the first element is read, so an array whose
+constructor is not a format code the grammar assigns is refused even when it declares
+no elements — the same refusal the specification's element-constructor lookup makes,
+and the reason `readElement`'s own `unassigned` clause is a second line of defence
+rather than the one an array reader reaches. -/
+def readArray : Nat → Nat → Cursor → Result Value
+  | 0, _, _ => .error (.truncated "no octets left")
+  | fuel + 1, width, c => do
     let (size, c) ← takeBeU width c
     let start := c.pos                  -- the size counts what follows it
     let (count, c) ← takeBeU width c
@@ -407,23 +410,128 @@ def readArray (fuel width : Nat) (c : Cursor) : Result Value :=
         at most {arrayElementLimit}")
     else do
       let (constructor, c) ← takeU8 c
-      let (items, c) ← readElements constructor count c
-      if c.pos - start != size then
-        .error (.sizeMismatch "array" size (c.pos - start))
-      else
-        return (.array constructor items, c)
+      if !assignedConstructor constructor then
+        .error (.unassigned constructor)
+      else do
+        let (items, c) ← readElements fuel constructor count c
+        if c.pos - start != size then
+          .error (.sizeMismatch "array" size (c.pos - start))
+        else
+          return (.array constructor items, c)
+termination_by fuel _ _ => (fuel, 0)
 
 /-- `count` array elements, each in the array's element constructor form. The count is
 what decreases here, so an element whose data occupies no octets is still an element:
-such an array is bounded by `arrayElementLimit`, not by the buffer. Scalars only, as
-`readElement` says; a container element is refused as unsupported rather than read. -/
-def readElements (constructor : UInt8) (count : Nat) (c : Cursor) : Result (List Value) :=
-  match count with
-  | 0 => .ok ([], c)
-  | count + 1 => do
-    let (item, c) ← readElement constructor c
-    let (rest, c) ← readElements constructor count c
+such an array is bounded by `arrayElementLimit`, not by the buffer. The fuel is handed
+to each element unchanged, and spent only where an element opens a container of its
+own, so an array of `count` zero-width elements reads however short the buffer is. -/
+def readElements : Nat → UInt8 → Nat → Cursor → Result (List Value)
+  | _, _, 0, c => .ok ([], c)
+  | fuel, constructor, count + 1, c => do
+    let (item, c) ← readElement fuel constructor c
+    let (rest, c) ← readElements fuel constructor count c
     return (item :: rest, c)
+termination_by fuel _ count _ => (fuel, count)
+
+/-- One array element: the data its constructor fixes, without the constructor's own
+octet, because the array states that octet once.
+
+Each category's element data is what its own encoding would carry after its
+constructor: a fixed form is its width of octets, a variable form carries its own
+length prefix, the descriptor prefix `%x00` carries the element's own descriptor and
+value, a compound form carries its own size and count, and an array form carries its
+own size, count, element constructor and elements. Only the container forms spend
+fuel, so a zero-width element costs the array nothing but its count. -/
+def readElement : Nat → UInt8 → Cursor → Result Value
+  | _, 0x40, c => .ok (.null, c)
+  | _, 0x41, c => .ok (.boolean true, c)
+  | _, 0x42, c => .ok (.boolean false, c)
+  | _, 0x43, c => .ok (.uint 0, c)
+  | _, 0x44, c => .ok (.ulong 0, c)
+  | _, 0x45, c => .ok (.list [], c)
+  | _, 0x50, c => do let (n, c) ← takeU8 c; return (.ubyte n, c)
+  | _, 0x51, c => do
+    let (n, c) ← takeU8 c
+    return (.byte (Int8.ofBitVec (BitVec.ofNat 8 n.toNat)), c)
+  | _, 0x52, c => do let (n, c) ← takeU8 c; return (.uint n.toUInt32, c)
+  | _, 0x53, c => do let (n, c) ← takeU8 c; return (.ulong n.toUInt64, c)
+  | _, 0x54, c => do
+    let (n, c) ← takeU8 c
+    return (.int (Int32.ofBitVec
+      (BitVec.ofNat 32 (signedOctet n % 4294967296).toNat)), c)
+  | _, 0x55, c => do
+    let (n, c) ← takeU8 c
+    return (.long (Int64.ofBitVec
+      (BitVec.ofNat 64 (signedOctet n % 18446744073709551616).toNat)), c)
+  | _, 0x56, c => do
+    let (octet, c) ← takeU8 c
+    return (.boolean (octet != 0x00), c)
+  | _, 0x60, c => do let (n, c) ← takeBeU 2 c; return (.ushort n.toUInt16, c)
+  | _, 0x61, c => do
+    let (n, c) ← takeBeU 2 c
+    return (.short (Int16.ofBitVec (BitVec.ofNat 16 n)), c)
+  | _, 0x70, c => do let (n, c) ← takeBeU 4 c; return (.uint n.toUInt32, c)
+  | _, 0x71, c => do
+    let (n, c) ← takeBeU 4 c
+    return (.int (Int32.ofBitVec (BitVec.ofNat 32 n)), c)
+  | _, 0x72, c => do let (b, c) ← takeBytes 4 c; return (.float b, c)
+  | _, 0x73, c => do let (n, c) ← takeBeU 4 c; return (.char n.toUInt32, c)
+  | _, 0x74, c => do let (b, c) ← takeBytes 4 c; return (.decimal32 b, c)
+  | _, 0x80, c => do let (n, c) ← takeBeU 8 c; return (.ulong n.toUInt64, c)
+  | _, 0x81, c => do
+    let (n, c) ← takeBeU 8 c
+    return (.long (Int64.ofBitVec (BitVec.ofNat 64 n)), c)
+  | _, 0x82, c => do let (b, c) ← takeBytes 8 c; return (.double b, c)
+  | _, 0x83, c => do
+    let (n, c) ← takeBeU 8 c
+    return (.timestamp (Int64.ofBitVec (BitVec.ofNat 64 n)), c)
+  | _, 0x84, c => do let (b, c) ← takeBytes 8 c; return (.decimal64 b, c)
+  | _, 0x94, c => do let (b, c) ← takeBytes 16 c; return (.decimal128 b, c)
+  | _, 0x98, c => do let (b, c) ← takeBytes 16 c; return (.uuid b, c)
+  | _, 0xA0, c => do
+    let (n, c) ← takeU8 c
+    let (b, c) ← takeBytes n.toNat c
+    return (.binary b.toList, c)
+  | _, 0xA1, c => do
+    let (n, c) ← takeU8 c
+    let (b, c) ← takeBytes n.toNat c
+    let (s, c) ← decodeStringAt b "string" c
+    return (.string s, c)
+  | _, 0xA3, c => do
+    let (n, c) ← takeU8 c
+    let (b, c) ← takeBytes n.toNat c
+    let (s, c) ← decodeStringAt b "symbol" c
+    return (.symbol s, c)
+  | _, 0xB0, c => do
+    let (n, c) ← takeBeU 4 c
+    let (b, c) ← takeBytes n c
+    return (.binary b.toList, c)
+  | _, 0xB1, c => do
+    let (n, c) ← takeBeU 4 c
+    let (b, c) ← takeBytes n c
+    let (s, c) ← decodeStringAt b "string" c
+    return (.string s, c)
+  | _, 0xB3, c => do
+    let (n, c) ← takeBeU 4 c
+    let (b, c) ← takeBytes n c
+    let (s, c) ← decodeStringAt b "symbol" c
+    return (.symbol s, c)
+  | fuel + 1, 0x00, c => do                 -- described: descriptor, then value
+    let (descriptor, c) ← readValue fuel c
+    let (value, c) ← readValue fuel c
+    return (.described descriptor value, c)
+  | fuel + 1, 0xC0, c => readCompound fuel 1 c
+  | fuel + 1, 0xC1, c => readMap fuel 1 c
+  | fuel + 1, 0xD0, c => readCompound fuel 4 c
+  | fuel + 1, 0xD1, c => readMap fuel 4 c
+  | fuel + 1, 0xE0, c => readArray fuel 1 c
+  | fuel + 1, 0xF0, c => readArray fuel 4 c
+  -- A container or described element with no fuel left: the octet count bounds the
+  -- depth of these forms, so no octets remain for one to open.
+  | 0, 0x00, _ | 0, 0xC0, _ | 0, 0xC1, _ | 0, 0xD0, _ | 0, 0xD1, _ | 0, 0xE0, _ | 0, 0xF0, _ =>
+    .error (.truncated "no octets left")
+  | _, other, _ => .error (.unassigned other)
+termination_by fuel _ _ => (fuel, 0)
 
 end
 
@@ -448,50 +556,74 @@ def variableData (narrow wide : UInt8) (payload : List UInt8) : Octets :=
   else
     #[wide] ++ u32be payload.length ++ payload.toArray
 
-/-- Variable-width element data, whose length width is the array's constructor's,
-not the element's preference: an array of `str8` elements carries one-octet
-lengths, an array of `str32` elements four-octet ones. -/
-def elementVariableData (constructor : UInt8) (payload : List UInt8) : Octets :=
-  match constructor with
-  | 0xB0 | 0xB1 | 0xB3 => u32be payload.length ++ payload.toArray
-  | _ => #[payload.length.toUInt8] ++ payload.toArray
+/-- Variable-width element data, whose length width is the array's constructor's, not
+the element's preference: an array of `str8` elements carries one-octet lengths, an
+array of `str32` elements four-octet ones. A payload whose length does not fit the
+declared width is refused rather than masked into a shorter length, which would
+announce a payload the octets do not carry. -/
+def elementVariableData (constructor : UInt8) (form : String) (payload : List UInt8) :
+    Except String Octets :=
+  if constructor == 0xB0 || constructor == 0xB1 || constructor == 0xB3 then
+    .ok (u32be payload.length ++ payload.toArray)
+  else if payload.length ≤ 255 then
+    .ok (#[payload.length.toUInt8] ++ payload.toArray)
+  else
+    .error s!"a {form} element carries {payload.length} octet(s), which a one-octet \
+      length field cannot announce"
 
-/-- A value's data octets in its own narrowest form, without a constructor octet.
-Used where an array's declared constructor does not match an element's type: such
-an element cannot be written faithfully, so it is written with empty data, which a
-reader rejects loudly rather than accepting a plausible-looking array.
+/-- A value's type in the corpus's own words: what a refusal names when the value and the
+constructor disagree. -/
+def typeName : Value → String
+  | .null => "null"
+  | .boolean _ => "boolean"
+  | .ubyte _ => "ubyte"
+  | .ushort _ => "ushort"
+  | .uint _ => "uint"
+  | .ulong _ => "ulong"
+  | .byte _ => "byte"
+  | .short _ => "short"
+  | .int _ => "int"
+  | .long _ => "long"
+  | .string _ => "string"
+  | .symbol _ => "symbol"
+  | .binary _ => "binary"
+  | .char _ => "char"
+  | .timestamp _ => "timestamp"
+  | .float _ => "float"
+  | .double _ => "double"
+  | .decimal32 _ => "decimal32"
+  | .decimal64 _ => "decimal64"
+  | .decimal128 _ => "decimal128"
+  | .uuid _ => "uuid"
+  | .list _ => "list"
+  | .map _ => "map"
+  | .array _ _ => "array"
+  | .described _ _ => "described"
 
-A compound value has no case here either: an array of compounds is outside what
-this implementation writes, so it falls to the empty data below. -/
-def dataOf (value : Value) : Octets :=
-  match value with
-  | .null => #[]
-  | .boolean _ => #[]
-  | .ubyte n => #[n]
-  | .byte n => #[(n.toBitVec.toNat % 256).toUInt8]
-  | .ushort n => u16be n.toNat
-  | .short n => u16be (n.toBitVec.toNat % 65536)
-  | .uint 0 => #[]
-  | .uint n => if n.toNat ≤ 255 then #[n.toUInt8] else u32be n.toNat
-  | .int n => u32be (n.toBitVec.toNat % 4294967296)
-  | .ulong 0 => #[]
-  | .ulong n => if n.toNat ≤ 255 then #[n.toUInt8] else u64be n.toNat
-  | .long n => u64be (n.toBitVec.toNat % 18446744073709551616)
-  | .char n => u32be n.toNat
-  | .timestamp ms => u64be (ms.toBitVec.toNat % 18446744073709551616)
-  | .float b => b
-  | .double b => b
-  | .decimal32 b => b
-  | .decimal64 b => b
-  | .decimal128 b => b
-  | .uuid b => b
-  | .binary b => (variableData 0xA0 0xB0 b).extract 1
-                   (variableData 0xA0 0xB0 b).size
-  | .string s => (variableData 0xA1 0xB1 s.toUTF8.toList).extract 1
-                   (variableData 0xA1 0xB1 s.toUTF8.toList).size
-  | .symbol s => (variableData 0xA3 0xB3 s.toUTF8.toList).extract 1
-                   (variableData 0xA3 0xB3 s.toUTF8.toList).size
-  | _ => #[]
+/-- A one-octet unsigned element, refused by name when the value does not fit the octet
+the array's declared constructor gives it: masking the value would write a different
+value, which a reader would then accept. -/
+def elementOctet (kind : String) (n : Nat) : Except String Octets :=
+  if n ≤ 255 then .ok #[n.toUInt8]
+  else .error s!"a {kind} element carries one octet and {n} does not fit"
+
+/-- A one-octet signed element, on the same terms. -/
+def elementSignedOctet (kind : String) (n : Int) : Except String Octets :=
+  if -128 ≤ n && n ≤ 127 then .ok #[(n % 256).toNat.toUInt8]
+  else .error s!"a {kind} element carries one signed octet and {n} does not fit"
+
+/-- A compound element's data: its items' octets, announced by the size and count
+fields of the width the array's constructor fixes. A count or a size the declared width
+cannot announce is refused rather than masked. -/
+def elementCompoundData (width : Nat) (kind : String) (count : Nat) (body : Octets) :
+    Except String Octets :=
+  let size := width + body.size
+  if width = 1 then
+    if size ≤ 255 && count ≤ 255 then .ok (#[size.toUInt8, count.toUInt8] ++ body)
+    else .error s!"a {kind}8 element carries {count} item(s) in {body.size} octet(s), \
+      which a one-octet size or count field cannot announce"
+  else
+    .ok (u32be size ++ u32be count ++ body)
 
 mutual
 
@@ -500,10 +632,11 @@ than a `match`: a mutual block's `termination_by` hint binds the function's
 parameters, and a body that abstracts them itself leaves the hint with nothing to
 bind.
 
-One value is refused rather than written: an array whose element count exceeds
-`arrayElementLimit`. The writer's domain has to sit inside what the reader accepts,
-and emitting octets the reader would then refuse would make this implementation's
-own output unreadable by itself. -/
+Two values are refused rather than written: an array whose element count exceeds
+`arrayElementLimit`, and an array whose declared element form cannot carry one of its
+elements. The writer's domain has to sit inside what the reader accepts, and emitting
+octets the reader would then refuse — or masking a value into a different one — would
+make this implementation's own output unreadable or untrue. -/
 def encode : Value → Except String Octets
   | .null => .ok #[0x40]
   | .boolean true => .ok #[0x41]
@@ -551,8 +684,8 @@ def encode : Value → Except String Octets
     if items.length > arrayElementLimit then
       .error s!"limit: an array of {items.length} element(s): this writer materialises \
         at most {arrayElementLimit}"
-    else
-      let body := items.foldl (fun acc item => acc ++ arrayElement constructor item) #[]
+    else do
+      let body ← arrayElementItems constructor items
       let count := items.length
       .ok (if 2 + body.size ≤ 255 && count ≤ 255 then
         #[0xE0, (2 + body.size).toUInt8, count.toUInt8, constructor] ++ body
@@ -585,44 +718,100 @@ def encodePairs : List (Value × Value) → Except String Octets
     return head ++ middle ++ tail
 termination_by pairs => sizeOf pairs
 
-/-- Array element data, written in the array's declared constructor form.
+/-- An array's elements, each in the array's declared element constructor form: what an
+array's octets carry after its size, its count and its one constructor octet. -/
+def arrayElementItems (constructor : UInt8) : List Value → Except String Octets
+  | [] => .ok #[]
+  | item :: rest => do
+    let head ← arrayElement constructor item
+    let tail ← arrayElementItems constructor rest
+    return head ++ tail
+termination_by items => sizeOf items
 
-An array states its element constructor once, so every element's data must be in
-that form: writing each element in whatever form it would choose alone produces
-an array no reader can follow, which the corpus caught. -/
-def arrayElement (constructor : UInt8) (value : Value) : Octets :=
-  match constructor, value with
-  | 0x40, _ | 0x41, _ | 0x42, _ => #[]
-  | 0x50, .ubyte n => #[n]
-  | 0x51, .byte n => #[(n.toBitVec.toNat % 256).toUInt8]
-  -- A smallint or smalllong element carries one signed octet. A value outside that
-  -- range is not masked into a different value — which a reader would accept as a
-  -- plausible-looking array — but falls to the unfaithful-data path, whose extra
-  -- octets the reader's size check rejects.
-  | 0x54, .int n =>
-    if -128 ≤ n.toInt && n.toInt ≤ 127 then #[(n.toBitVec.toNat % 256).toUInt8]
-    else dataOf value
-  | 0x55, .long n =>
-    if -128 ≤ n.toInt && n.toInt ≤ 127 then #[(n.toBitVec.toNat % 256).toUInt8]
-    else dataOf value
-  | 0x60, .ushort n => u16be n.toNat
-  | 0x70, .uint n => u32be n.toNat
-  | 0x72, .float b => b
-  | 0x73, .char n => u32be n.toNat
-  | 0x74, .decimal32 b => b
-  | 0x80, .ulong n => u64be n.toNat
-  | 0x82, .double b => b
-  | 0x83, .timestamp ms => u64be (ms.toBitVec.toNat % 18446744073709551616)
-  | 0x84, .decimal64 b => b
-  | 0x94, .decimal128 b => b
-  | 0x98, .uuid b => b
-  | 0xA0, .binary b => elementVariableData 0xA0 b
-  | 0xB0, .binary b => elementVariableData 0xB0 b
-  | 0xA1, .string s => elementVariableData 0xA1 s.toUTF8.toList
-  | 0xB1, .string s => elementVariableData 0xB1 s.toUTF8.toList
-  | 0xA3, .symbol s => elementVariableData 0xA3 s.toUTF8.toList
-  | 0xB3, .symbol s => elementVariableData 0xB3 s.toUTF8.toList
-  | _, _ => dataOf value
+/-- One array element's data, in the array's declared constructor form.
+
+An array states its element constructor once, so every element's data is in that form
+and only that form: `list8` elements carry one-octet sizes and counts, `str32` elements
+four-octet lengths, a `smalluint` element one octet, and an array element its own size,
+count, element constructor and elements. A value of another type, or a size or count the
+declared width cannot announce, is refused by name rather than written in another form —
+writing each element in whatever form it would choose alone produces an array no reader
+can follow, which the corpus caught. -/
+def arrayElement : UInt8 → Value → Except String Octets
+  | 0x00, .described descriptor value => do
+    let head ← encode descriptor
+    let tail ← encode value
+    return head ++ tail
+  | 0x40, _ => .ok #[]
+  | 0x41, _ => .ok #[]
+  | 0x42, _ => .ok #[]
+  | 0x43, .uint 0 => .ok #[]
+  | 0x44, .ulong 0 => .ok #[]
+  | 0x45, .list [] => .ok #[]
+  | 0x50, .ubyte n => .ok #[n]
+  | 0x51, .byte n => .ok #[(n.toBitVec.toNat % 256).toUInt8]
+  | 0x52, .uint n => elementOctet "smalluint" n.toNat
+  | 0x53, .ulong n => elementOctet "smallulong" n.toNat
+  | 0x54, .int n => elementSignedOctet "smallint" n.toInt
+  | 0x55, .long n => elementSignedOctet "smalllong" n.toInt
+  | 0x56, .boolean b => .ok #[if b then 1 else 0]
+  | 0x60, .ushort n => .ok (u16be n.toNat)
+  | 0x61, .short n => .ok (u16be (n.toBitVec.toNat % 65536))
+  | 0x70, .uint n => .ok (u32be n.toNat)
+  | 0x71, .int n => .ok (u32be (n.toBitVec.toNat % 4294967296))
+  | 0x72, .float b => .ok b
+  | 0x73, .char n => .ok (u32be n.toNat)
+  | 0x74, .decimal32 b => .ok b
+  | 0x80, .ulong n => .ok (u64be n.toNat)
+  | 0x81, .long n => .ok (u64be (n.toBitVec.toNat % 18446744073709551616))
+  | 0x82, .double b => .ok b
+  | 0x83, .timestamp ms => .ok (u64be (ms.toBitVec.toNat % 18446744073709551616))
+  | 0x84, .decimal64 b => .ok b
+  | 0x94, .decimal128 b => .ok b
+  | 0x98, .uuid b => .ok b
+  | 0xA0, .binary b => elementVariableData 0xA0 "vbin8" b
+  | 0xA1, .string s => elementVariableData 0xA1 "str8" s.toUTF8.toList
+  | 0xA3, .symbol s => elementVariableData 0xA3 "sym8" s.toUTF8.toList
+  | 0xB0, .binary b => elementVariableData 0xB0 "vbin32" b
+  | 0xB1, .string s => elementVariableData 0xB1 "str32" s.toUTF8.toList
+  | 0xB3, .symbol s => elementVariableData 0xB3 "sym32" s.toUTF8.toList
+  | 0xC0, .list items => do let body ← encodeAll items
+                            elementCompoundData 1 "list" items.length body
+  | 0xC1, .map pairs => do let body ← encodePairs pairs
+                           elementCompoundData 1 "map" (2 * pairs.length) body
+  | 0xD0, .list items => do let body ← encodeAll items
+                            elementCompoundData 4 "list" items.length body
+  | 0xD1, .map pairs => do let body ← encodePairs pairs
+                           elementCompoundData 4 "map" (2 * pairs.length) body
+  -- An array element carries its own size, count, element constructor and elements, in
+  -- the width the outer array's constructor fixes: the inner array's own narrowest form
+  -- is not available to it, and a count or size the declared width cannot announce is
+  -- refused rather than written wide.
+  | 0xE0, .array constructor items =>
+    if items.length > arrayElementLimit then
+      .error s!"limit: an array of {items.length} element(s): this writer materialises \
+        at most {arrayElementLimit}"
+    else do
+      let body ← arrayElementItems constructor items
+      let count := items.length
+      let size := 2 + body.size
+      if size ≤ 255 && count ≤ 255 then
+        return #[size.toUInt8, count.toUInt8, constructor] ++ body
+      else
+        .error s!"an array8 element carries {count} element(s) in {body.size} octet(s), \
+          which a one-octet size or count field cannot announce"
+  | 0xF0, .array constructor items =>
+    if items.length > arrayElementLimit then
+      .error s!"limit: an array of {items.length} element(s): this writer materialises \
+        at most {arrayElementLimit}"
+    else do
+      let body ← arrayElementItems constructor items
+      let count := items.length
+      return u32be (5 + body.size) ++ u32be count ++ #[constructor] ++ body
+  | constructor, value =>
+    .error s!"an array whose element constructor is {constructor.toNat} cannot carry a \
+      {typeName value}"
+termination_by _ value => sizeOf value
 
 end
 

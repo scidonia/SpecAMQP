@@ -58,7 +58,8 @@ eight octets, or a frame that declares more octets than the buffer holds),
 `sizeMismatch` when the declared arithmetic contradicts the octets (`SIZE` below the
 header, `DOFF` below two, `DOFF*4` past `SIZE`, or a performative that does not fit in
 the body the frame declares), `unsupported` for a frame type the artifact does not
-assign, and `malformed` for a body that is not a described type.
+assign, `limit` for a `DOFF` the one-octet field cannot carry, and `malformed` for a
+body that is not a described type.
 -/
 
 namespace SpecAMQP.Spec.Frame
@@ -83,6 +84,11 @@ def doffWord : Nat := 4
 /-- The smallest legal DOFF: with an eight-octet header the body cannot begin before
 the eighth octet, which is two four-octet words from the frame's start. -/
 def minDoff : Nat := 2
+
+/-- The width of the DOFF field in octets, the layout's byte 4: "an unsigned, 8-bit
+integer specifying a count of 4-byte words", which is where `DOFF`'s range comes from —
+the field counts words, and one octet of them is all the layout gives it. -/
+def doffOctets : Nat := 1
 
 /-- The width of the SIZE field in octets, the layout's bytes 0–3. -/
 def sizeOctets : Nat := 4
@@ -287,7 +293,13 @@ the writer adds up the header, the extended header, the performative and the pay
 and refuses when the total does not fit the four octets the layout gives it. DOFF is
 carried, because the extended header's width is what decides it, and a DOFF whose words
 do not describe the extended header actually present is refused rather than silently
-recomputed. -/
+recomputed.
+
+A DOFF the one-octet field cannot hold is refused too, and refused before the extended
+header's width is checked: writing it with `beOctets 1` would keep its low octet and drop
+the rest, which is a different frame than the one asked for — and one this module's own
+reader would then refuse, since the byte it read would put the body somewhere else. The
+writer's domain is meant to sit inside what the reader accepts. -/
 def encodeFrame (frame : Frame) : Except String Octets := do
   if frame.doff < minDoff then
     .error (refusal "sizeMismatch" s!"DOFF {frame.doff} puts the body inside the \
@@ -295,6 +307,9 @@ def encodeFrame (frame : Frame) : Except String Octets := do
   else if frame.channel > 2 ^ (8 * channelOctets) - 1 then
     .error (refusal "malformed" s!"channel {frame.channel} does not fit the \
       {channelOctets} CHANNEL octets")
+  else if frame.doff > 2 ^ (8 * doffOctets) - 1 then
+    .error (refusal "limit" s!"DOFF {frame.doff} does not fit the {doffOctets} octet the \
+      layout gives the field: the largest DOFF is {2 ^ (8 * doffOctets) - 1}")
   else if frame.extended.size != bodyStart frame.doff - headerOctets then
     .error (refusal "sizeMismatch" s!"DOFF {frame.doff} declares \
       {bodyStart frame.doff - headerOctets} extended octets and the frame carries \

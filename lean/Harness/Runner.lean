@@ -82,12 +82,16 @@ def octetsOf (json : Json) : Except String Octets := do
   return (← ofHex (← json.getObjValAs? String "bytes"))
 
 /-- The reason class a codec message leads with — `truncated`, `unassigned`,
-`unsupported`, `sizeMismatch`, `malformed` or `limit` — or `none` for a message that
-names none of them. The differential contract reads the same token from the verdict,
-so a refusal nobody can name is a failure rather than a detail. -/
+`unsupported`, `sizeMismatch`, `malformed`, `limit` or `illegalState` — or `none` for a
+message that names none of them. The differential contract reads the same token from
+the verdict, so a refusal nobody can name is a failure rather than a detail. The last
+class is the exchange corpus's: octets that are perfectly well formed and the *moment*
+that is wrong — sending `open` twice, or a frame in a state whose legal sends are `-` —
+which is a failure neither the encoder nor the decoder can see on its own. -/
 def reasonClassOf (detail : String) : Option String :=
   let head := (detail.splitOn ":").head?.getD "" |>.trimAscii.toString
-  if ["truncated", "unassigned", "unsupported", "sizeMismatch", "malformed", "limit"].contains head
+  if ["truncated", "unassigned", "unsupported", "sizeMismatch", "malformed", "limit",
+      "illegalState"].contains head
   then some head
   else none
 
@@ -107,6 +111,60 @@ def noFrameCodec : FrameCodec where
   name := "none"
   decode := fun _ => .error "this runner carries no frame codec"
   encode := fun _ => .error "this runner carries no frame codec"
+
+/-- One step of an exchange vector, as a request to the peer: which way it goes, the
+octets the vector carries, and the frame as a structure where the vector writes one.
+
+The expectation is deliberately absent. A peer is asked what it does with a step and
+the runner compares the answer, so a connection layer cannot be shaped by what the
+corpus expects of it — which is the same reason the codec comparisons happen in the
+corpus vocabulary rather than between two artefacts' internal types. -/
+structure ExchangeStep where
+  /-- `true` when the peer is asked to send this step, `false` when octets arrive. -/
+  send : Bool
+  /-- The octets the vector carries: on every receive, and on a send whose encoding is
+  what the corpus pins. -/
+  bytes : Option Octets
+  /-- The frame as a structure, on a send the vector writes that way. -/
+  value : Option Json
+
+/-- What a peer did with one step, in the corpus vocabulary: whether it took the step,
+the octets a send wrote, the state it is left in, and — on a refusal — the protocol
+condition and the class-prefixed detail. -/
+structure StepOutcome where
+  admitted : Bool
+  /-- The octets a send wrote. A peer that writes nothing on a send it admitted has
+  not produced the frame, which is a failure rather than an empty success. -/
+  bytes : Option Octets
+  /-- The state after the step, in the connection state table's own names. -/
+  state : String
+  /-- A refusal's protocol condition, from the generated choice table. -/
+  condition : Option String
+  /-- The class-prefixed detail: the reason class, then what happened. -/
+  detail : String
+deriving Repr
+
+/-- An artefact's connection layer behind the corpus interface, on the same terms as
+`Codec` and `FrameCodec`. The peer's own state is its own type — the codec translates
+into the corpus vocabulary at the boundary and nothing else crosses it — and a state
+name the peer's type does not have fails here rather than being read as some default. -/
+structure ExchangeCodec where
+  name : String
+  /-- The peer's own state. -/
+  St : Type
+  /-- The state a name from the corpus denotes. -/
+  start : String → Except String St
+  /-- Apply one step, returning what the peer did and where it now is. -/
+  step : St → ExchangeStep → Except String (StepOutcome × St)
+
+/-- The connection layer a codec-only runner carries: exchange vectors fail loudly
+instead of being read as frames, which is what a caller with no connection layer needs
+to hear. -/
+def noExchangeCodec : ExchangeCodec where
+  name := "none"
+  St := Unit
+  start := fun _ => .error "this runner carries no connection layer"
+  step := fun _ _ => .error "this runner carries no connection layer"
 
 /-- A frame object with its optional fields made explicit, so two frames are compared
 as frames rather than as JSON objects that happen to differ in which absent fields they
@@ -230,19 +288,38 @@ def runVectorWith (codec : Codec) (frames : FrameCodec) (json : Json) : Except S
         return ⟨id, kind, true, s!"decoded a frame consuming {consumed} octets"⟩
   | "frame-encode" =>
     let expected ← json.getObjVal? "frame"
-    match frames.encode expected with
-    | .error e => return ⟨id, kind, false, s!"could not encode: {e}"⟩
-    | .ok produced =>
-      let bytes ← octetsOf json
-      let declared := (expected.getObjValAs? Nat "size").toOption
-      if produced != bytes then
-        return ⟨id, kind, false,
-          s!"encoded to {toHexBrief produced}, expected {toHexBrief bytes}"⟩
-      else if declared.isSome && declared != some produced.size then
-        return ⟨id, kind, false,
-          s!"the vector declares SIZE {declared.getD 0} and the frame is {produced.size} octets"⟩
-      else
-        return ⟨id, kind, true, "encoded to the expected octets"⟩
+    match json.getObjVal? "expectError" with
+    | .ok expectation =>
+      -- The frame path's encode-direction refusal, on the value path's rule: an
+      -- `expectError` on a write means the *encoder* must refuse this value, so the
+      -- vector carries no `bytes` — there is no expected encoding, and the octets a
+      -- conforming writer must not produce are not something a vector can write down.
+      -- The verdict passes when the refusal's class is the one the vector pins, and
+      -- reports the octets that were produced when the encoder succeeded instead.
+      let pinned := (expectation.getObjValAs? String "reason").toOption
+      match frames.encode expected with
+      | .error reason =>
+        if pinned.isNone || reasonClassOf reason == pinned then
+          return ⟨id, kind, true, s!"refused, as the vector expects: {reason}"⟩
+        else
+          return ⟨id, kind, false,
+            s!"refused with {reason}, which does not name {pinned.getD ""}"⟩
+      | .ok produced =>
+        return ⟨id, kind, false, s!"expected a refusal, encoded to {toHexBrief produced}"⟩
+    | .error _ =>
+      match frames.encode expected with
+      | .error e => return ⟨id, kind, false, s!"could not encode: {e}"⟩
+      | .ok produced =>
+        let bytes ← octetsOf json
+        let declared := (expected.getObjValAs? Nat "size").toOption
+        if produced != bytes then
+          return ⟨id, kind, false,
+            s!"encoded to {toHexBrief produced}, expected {toHexBrief bytes}"⟩
+        else if declared.isSome && declared != some produced.size then
+          return ⟨id, kind, false,
+            s!"the vector declares SIZE {declared.getD 0} and the frame is {produced.size} octets"⟩
+        else
+          return ⟨id, kind, true, "encoded to the expected octets"⟩
   | "frame-reject" =>
     let bytes ← octetsOf json
     match frames.decode bytes with
@@ -255,10 +332,116 @@ frame layer means by a corpus. -/
 def runVector (codec : Codec) (json : Json) : Except String Verdict :=
   runVectorWith codec noFrameCodec json
 
-/-- Run every line with both codecs, returning the verdicts and whether all of them
-passed. -/
-def runCorpusWith (codec : Codec) (frames : FrameCodec) (text : String) :
-    Except String (List Verdict × Bool) := do
+/-- One exchange step as a request to the peer: the direction, the octets where the
+vector carries them, and the frame as a structure where it writes one. A receive that
+carries no octets is a corpus defect, because there is nothing to deliver. -/
+def exchangeStepOf (json : Json) : Except String ExchangeStep := do
+  let direction ← json.getObjValAs? String "direction"
+  let send ←
+    match direction with
+    | "send" => pure true
+    | "receive" => pure false
+    | other => .error s!"a step's direction is `send` or `receive`, not '{other}'"
+  let bytes ←
+    match (json.getObjVal? "bytes").toOption with
+    | some _ => some <$> octetsOf json
+    | none => pure none
+  if !send && bytes.isNone then
+    .error "a receive step carries the octets it delivers"
+  return ⟨send, bytes, (json.getObjVal? "value").toOption⟩
+
+/-- One step's verdict, compared in the corpus vocabulary.
+
+* an `admitted` step requires the peer to take it, to write exactly the octets the
+  vector carries when those are given and the step is a send, and to be in the state
+  the vector names — or, when it names none, the state it was in, since a step that
+  states nothing about the state is a step that leaves it alone;
+* a `refused` step requires the peer to refuse it with the named condition and the
+  named reason class.
+
+The state is checked for both statuses, because a refusal is a step the connection
+answered: a refused frame is answered with a close, which is a state the corpus can
+pin, and pretending it left the peer where it was would make the state table's
+DISCARDING row unobservable. -/
+def checkExchangeStep (id : String) (index : Nat) (step : ExchangeStep) (expect : Json)
+    (before : String) (outcome : StepOutcome) : Verdict :=
+  let name := s!"{id}#{index + 1}"
+  let wanted := (expect.getObjValAs? String "status").toOption.getD ""
+  let expectedState := (expect.getObjValAs? String "state").toOption.getD before
+  let failed (detail : String) : Verdict := ⟨name, "exchange", false, detail⟩
+  let passed (detail : String) : Verdict :=
+    if outcome.state == expectedState then ⟨name, "exchange", true, detail⟩
+    else failed s!"{detail}, but the peer is in {outcome.state} where the vector names \
+      {expectedState}"
+  if wanted == "admitted" then
+    if !outcome.admitted then
+      failed s!"the peer refused the step: {outcome.detail}"
+    else match step.bytes with
+      | some expected =>
+        if step.send then
+          match outcome.bytes with
+          | some produced =>
+            if produced == expected then passed s!"admitted; wrote {toHexBrief produced}"
+            else failed s!"wrote {toHexBrief produced}, expected {toHexBrief expected}"
+          | none => failed "the peer admitted the send and wrote nothing"
+        else
+          passed s!"admitted; received {toHexBrief expected}"
+      | none => passed s!"admitted; {outcome.detail}"
+  else if wanted == "refused" then
+    if outcome.admitted then failed s!"the peer admitted the step: {outcome.detail}"
+    else
+      let expectedCondition := (expect.getObjValAs? String "condition").toOption.getD ""
+      let expectedReason := (expect.getObjValAs? String "reason").toOption.getD ""
+      let condition := outcome.condition.getD ""
+      let reason := (reasonClassOf outcome.detail).getD ""
+      if condition != expectedCondition then
+        failed s!"refused with condition {condition}, and the vector names \
+          {expectedCondition}"
+      else if reason != expectedReason then
+        failed s!"refused as {reason}, and the vector names {expectedReason}: \
+          {outcome.detail}"
+      else
+        passed s!"refused with {expectedCondition} and {reason}: {outcome.detail}"
+  else failed s!"an expectation's status is `admitted` or `refused`, not '{wanted}'"
+
+/-- Run one exchange vector: the start state, the steps in order, and one verdict per
+step.
+
+The peer's state is carried between steps by the codec, so a corpus says "this frame,
+now" rather than restating the machine; the runner's own view of the state is the
+*name* the corpus uses, which is all a comparison needs. -/
+def runExchange (codec : ExchangeCodec) (json : Json) : Except String (List Verdict) := do
+  let id ← json.getObjValAs? String "vector"
+  let startName ← json.getObjValAs? String "start"
+  let steps ← json.getObjValAs? (Array Json) "steps"
+  if steps.size < 2 then
+    .error "an exchange is a sequence of steps, not a single one"
+  let mut state ← codec.start startName
+  let mut stateName := startName
+  let mut verdicts : List Verdict := []
+  for (stepJson, index) in steps.toList.zipIdx do
+    let step ← exchangeStepOf stepJson
+    let expect ← stepJson.getObjVal? "expect"
+    let (outcome, next) ← codec.step state step
+    verdicts := checkExchangeStep id index step expect stateName outcome :: verdicts
+    state := next
+    stateName := outcome.state
+  return verdicts.reverse
+
+/-- Run one line: an exchange yields one verdict per step, and every other kind yields
+the single verdict its codec comparison produces. -/
+def runLineWith (codec : Codec) (frames : FrameCodec) (exchange : ExchangeCodec)
+    (json : Json) : Except String (List Verdict) :=
+  match (json.getObjValAs? String "kind").toOption with
+  | some "exchange" => runExchange exchange json
+  | _ => do
+    let verdict ← runVectorWith codec frames json
+    return [verdict]
+
+/-- Run every line with all three codecs, returning the verdicts and whether all of
+them passed. -/
+def runCorpusWith (codec : Codec) (frames : FrameCodec) (exchange : ExchangeCodec)
+    (text : String) : Except String (List Verdict × Bool) := do
   let mut verdicts : List Verdict := []
   let mut allOk := true
   for (line, index) in text.splitOn "\n" |>.zipIdx do
@@ -267,15 +450,16 @@ def runCorpusWith (codec : Codec) (frames : FrameCodec) (text : String) :
     match Json.parse trimmed with
     | .error e => .error s!"line {index + 1}: not valid JSON: {e}"
     | .ok json =>
-      match runVectorWith codec frames json with
+      match runLineWith codec frames exchange json with
       | .error e => .error s!"line {index + 1}: {e}"
-      | .ok verdict =>
-        verdicts := verdict :: verdicts        -- prepend, then reverse once: a corpus
-        if !verdict.ok then allOk := false     -- of tens of thousands is not a place
+      | .ok lineVerdicts =>
+        for verdict in lineVerdicts do
+          verdicts := verdict :: verdicts      -- prepend, then reverse once: a corpus
+          if !verdict.ok then allOk := false   -- of tens of thousands is not a place
   return (verdicts.reverse, allOk)             -- for quadratic list append
 
 /-- Run every line of a value corpus. -/
 def runCorpus (codec : Codec) (text : String) : Except String (List Verdict × Bool) :=
-  runCorpusWith codec noFrameCodec text
+  runCorpusWith codec noFrameCodec noExchangeCodec text
 
 end SpecAMQP.Harness

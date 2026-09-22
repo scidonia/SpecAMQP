@@ -44,6 +44,13 @@ def minDoff : Nat := 2
 /-- Bytes 6 and 7 of an AMQP frame contain the channel number. -/
 def channelOctets : Nat := 2
 
+/-- DOFF is byte 4 of the header: "an unsigned, 8-bit integer specifying a count of
+4-byte words", so one octet of words is all the field has. -/
+def doffOctets : Nat := 1
+
+/-- The largest DOFF the one-octet field carries. -/
+def maxDoff : Nat := 2 ^ (8 * doffOctets) - 1
+
 /-- The largest channel number the two CHANNEL octets carry. -/
 def maxChannel : Nat := 65535
 
@@ -233,13 +240,18 @@ def decodeFrame (bytes : Octets) : Except String (Frame × Nat) :=
 
 DOFF is carried rather than derived, and an inconsistent one is refused: a DOFF that
 does not describe the extended header actually present would declare a body start the
-octets do not have. -/
+octets do not have. A DOFF the one-octet field cannot hold is refused as well — writing
+it would keep the low octet and drop the rest, which is a different frame than the one
+asked for, and one this module's own reader would refuse. -/
 def encodeFrame (frame : Frame) : Except String Octets :=
   if frame.doff < minDoff then
     .error (refusal "sizeMismatch" s!"DOFF {frame.doff} is below the minimum {minDoff}")
   else if frame.channel > maxChannel then
     .error (refusal "malformed" s!"channel {frame.channel} does not fit the \
       {channelOctets} CHANNEL octets")
+  else if frame.doff > maxDoff then
+    .error (refusal "limit" s!"DOFF {frame.doff} does not fit the {doffOctets} octet the \
+      layout gives the field: the largest DOFF is {maxDoff}")
   else if frame.extended.size != frame.doff * wordOctets - headerOctets then
     .error (refusal "sizeMismatch" s!"DOFF {frame.doff} implies \
       {frame.doff * wordOctets - headerOctets} extended octets and the frame carries \

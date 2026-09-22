@@ -6,25 +6,26 @@ import Contracts.FrameCodec
 # The frame layer's laws, proved
 
 `lean/Contracts/FrameCodec.lean` states three propositions about `Spec.Frame`'s decoder and
-writer. This module proves the first two outright, and proves the third from two explicit
-hypotheses — one about the value layer, which the contract itself records, and one about the
-writer's `DOFF`, which a counterexample forced and which is reported below rather than hidden
-in an assumption.
+writer, and this module proves all three. The third rests on the value layer's consumption law —
+the dependency the contract records for it — and on nothing else: the writer's `DOFF` refusal,
+added to `Spec.Frame` and `Ref.Frame` with the proofs, makes the body offset's width an
+implication of an accepted write rather than an assumption.
 
 The declarations landed here are:
 
 * `accepted_frames_carry_performatives`, discharging
   `SpecAMQP.Contracts.AcceptedFramesCarryPerformatives` — the conformance gap both artefacts
   had, closed as a claim about *every* accepted frame rather than about a branch somebody wrote;
-* `consumed_is_the_declared_size`, discharging `SpecAMQP.Contracts.ConsumedIsTheDeclaredSize`;
-* `frame_round_trip_on_encoded_frames`, which discharges
-  `SpecAMQP.Contracts.FrameRoundTripOnEncodedFrames` from `ValueConsumption` and
-  `DoffFitsTheWriter`, and `frame_round_trip`, the same claim per frame;
-* `doff_beyond_the_octet_is_not_read_back`, the negative theorem that says why the second
-  hypothesis is not removable: the writer accepts a frame whose `DOFF` its one octet cannot
-  hold, and the reader refuses the octets it wrote.
+* `consumed_is_the_declared_size`, discharging `SpecAMQP.Contracts.ConsumedIsTheDeclaredSize` —
+  the count a decoded frame reports is the `SIZE` it declares, inside the buffer it came from;
+* `frame_round_trip_on_encoded_frames`, discharging
+  `SpecAMQP.Contracts.FrameRoundTripOnEncodedFrames` from `ValueConsumption`, with
+  `frame_round_trip` the same claim per frame, `doff_lt_of_encodeFrame_ok` deriving the writer's
+  `DOFF` domain from an accepted write, and
+  `round_trip_on_encoded_values_of_consumption` showing the hypothesis is the value layer's own
+  round trip strengthened to what a value followed by more octets needs.
 
-## The two unconditional proofs
+## How the proofs work, on the decoder's own text
 
 `decodeFrame` is a `do` block whose branches all end in `Except.error` except one, so a
 statement about an *accepted* frame is a case analysis over those branches, and the case
@@ -460,7 +461,7 @@ theorem decodeFrame_eq_ok_of (bytes : Octets) (frame : Frame) (consumed : Nat)
   rw [if_pos hprov]
   rw [← hbody]
 
-/-! ## The two hypotheses the round trip rests on -/
+/-! ## The value layer's consumption law, the one hypothesis the round trip rests on -/
 
 /-- The value layer's consumption law: whatever the value layer's writer encodes for a value, its
 reader recovers that value from those octets followed by anything at all, consuming exactly the
