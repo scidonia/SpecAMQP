@@ -454,7 +454,15 @@ The four findings, in the auditor's order:
 
 Findings 1 to 3 are queued with the layer's owner, with the auditor's expected/actual evidence attached. Their vectors: 1 is committed and failing; 2 and 3 follow the same shape and are outstanding.
 
-**S3's remaining planner artifact, scoped before it is written: `lean/Contracts/ConnectionLifecycle.lean`.** What it will state, and why each is a statement rather than a restatement of the running code:
+**S3's lifecycle contract is written, and its shape is the finding: where the artifact gives prose and pictures, the honest artifact is a transcription plus an executable check, not a theorem.** `lean/Contracts/ConnectionLifecycle.lean` states one law — that negotiation is decided by the header's own octets, so two peers with the same bytes cannot disagree about whether they have agreed — and its documentation says explicitly which claims are *not* theorems and why:
+
+* **The state table's totality is executable evidence.** "For every state and every frame the table permits, the specification takes the transition it names" cannot be a theorem here, because the table is a picture: a theorem would compare the implementation against a *second hand-written transcription*, which is the one thing this design refuses — a second source of truth that can drift from the first while looking like a check. The claim is checked by the probe sweep over `tests/contracts/`, and the deviations it found are the evidence that the check is real.
+* **The refusal placement is per-case in the corpus.** Every exchange vector pins the state a refusal leaves, and a refused send and a refused receive differ in where that is. Stating it again as a theorem about the step functions would add a second description of behaviour the vectors already pin — and one written from the *code* rather than the artifact, which is how a check decays into a restatement.
+* **The window invariants belong to S4**, whose arithmetic is in flight; claiming them here would put a claim in the contract before its subject exists.
+
+The first draft of this file also carried two statements that were worse than nothing: one tapering into a tautology (`(∀ outcome, … → True) → True`) and one asserting a property of the refusal structure I had not checked. Both were removed rather than repaired, because a contract's value is that everything in it is a claim somebody would defend, and a vacuous claim spends that credibility on nothing.
+
+ What it will state, and why each is a statement rather than a restatement of the running code:
 
 * **The state machine's totality.** For every connection state and every frame it permits a send or a receive, the transition the artifact's table names is the one the specification takes; and for every state, the table's action column is what the peer does. This is the claim the state table is the normative source for, and it is the only place in the repository where that picture's content is asserted rather than used.
 * **`ConsumedIsTheDeclaredSize`'s counterpart at the connection layer**: a frame's declared size decides where the next frame begins, so a buffer of frames is walked by their own arithmetic rather than by a search.
