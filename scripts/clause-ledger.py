@@ -83,33 +83,48 @@ UNKEYED_PHRASES = re.compile(
     # messages"), and plural or variant phrasings of alternatives already above
     # ("*are* reserved", "results in" against `will result in`, "*does not* increment",
     # "will *not* be able to be resumed", "can only be", "will no longer", "takes
-    # precedence", "can be up to"). Each was measured on its own before landing, and
-    # each captures at least one statement no other alternative does; the count after
-    # the phrase is the statements it captured alone that the rest of the vocabulary
-    # did not:
+    # precedence", "can be up to"). Each was measured on its own before landing, and each
+    # captures at least one statement no other alternative does; the count after a phrase
+    # is the statements it captured alone beyond the previous vocabulary, and a shape
+    # whose unique contribution is smaller says so in brackets:
     #
-    #   it is an error ........... 5      can only be .............. 3
-    #   it is illegal ............ 3      can be up to ............. 2
-    #   will never ............... 3      takes precedence ......... 1
-    #   will be <participle> ..... 9      results in ............... 3
-    #   will not be able to ...... 3      are reserved ............. 2
-    #   will no longer ........... 2      is/are ignored .......... 2
-    #   is/are allowed ........... 1      does not <verb> ......... 22
+    #   a stated error ........... 6      can be up to ............. 2
+    #   it is illegal ............ 3      takes precedence ......... 1
+    #   will never ............... 3      if and only if ........... 1
+    #   will not be able to ...... 3      is not mandatory ......... 2
+    #   will no longer ........... 2      is ineligible ............ 1
+    #   is/are ignored ........... 2      are transitioned ......... 1
+    #   is/are allowed ........... 1      will remain .............. 2
+    #   be ignored ............... 1      is not set ............... 4 (3)
+    #   are reserved ............. 2      does not <verb> ......... 20 (19)
+    #   results in ............... 3      can only be .............. 3
+    #   will be <participle> ..... 9
+    #
+    # Together they capture 71 statements beyond the previous vocabulary, and with the
+    # declared-choice rule below the change adds 125. Of the 125, 78 state behaviour a
+    # peer must implement and 47 define or explain a symbol, which is the split a reviewer
+    # should expect: capturing the commentary is what makes the class visible, and the
+    # disposition is where the judgement is made.
     #
     # One measured alternative is deliberately absent: `is not retained` captured two
     # sentences and no others, both of which `does not <verb>` already captures — a
     # phrase with no unique contribution in this corpus is not worth its weight in the
-    # list. `does not <verb>` is the broadest shape here and the two definition terms
-    # it matches are handled by the prose guard below rather than by narrowing it to a
-    # verb list, which would trade a rule for a word list.
-    r"|\bit is an error\b|\bit is illegal\b"
+    # list. `does not <verb>` is the broadest shape here and the definition term it
+    # matches is handled by the label guard below rather than by narrowing the shape to
+    # a verb list, which would trade a rule for a word list. `is used` was measured and
+    # declined: it captures the distribution node's fallback outcome for the default
+    # outcome *and* fourteen sentences describing what a frame or a section is for, so
+    # the one statement it would close does not pay for the fourteen.
+    r"|\bis (?:an? )?(?:\w+ )?error\b|\bit is illegal\b"
     r"|\bwill never\b|\bwill not be able to\b|\bwill no longer\b"
-    r"|\b(?:is|are) (?:ignored|allowed)\b"
+    r"|\b(?:is|are) (?:ignored|allowed)\b|\bbe ignored\b"
     r"|\bdoes not \w+"
     r"|\bare reserved\b|\bresults in\b"
     r"|\bcan only be\b|\bcan be up to\b"
-    r"|\btakes precedence\b"
-    r"|\bwill be (?:discarded|deleted|chosen|cleared|applied|ignored|retained|rolled back)\b",
+    r"|\btakes precedence\b|\bif and only if\b"
+    r"|\bis not set\b|\bis not mandatory\b|\bis ineligible\b|\bare transitioned\b"
+    r"|\bwill remain\b"
+    r"|\bwill be (?:discarded|deleted|chosen|cleared|applied|retained|rolled back)\b",
     re.IGNORECASE,
 )
 
@@ -117,18 +132,19 @@ UNKEYED_PHRASES = re.compile(
 CHOICE_MEANING = "a declared choice's meaning"
 
 
-def reads_as_prose(sentence: str) -> bool:
-    """True when the sentence carries at least one ordinary lowercase word.
+def is_label_unit(unit: str) -> bool:
+    """True when a statement unit is a label rather than prose.
 
-    A phrase can match text that is not a statement: `txn-work`'s two definition terms
-    ("Delivery Sent Unsettled By Controller; Resource Does Not Settle") are title-cased
-    labels for the prose beside them, and `does not <verb>` matches them. Measured
-    against the pinned artifacts this guard excludes exactly those two units and nothing
-    the ledger already captures — no committed clause lacks a lowercase word, and a
-    guard on a trailing full stop would have excluded a legitimate statement ("…
-    remote-incoming-window is computed as follows:").
+    A definition term labels the definition beside it: `redirect`'s doc is a definition
+    list whose terms are `hostname`, `network-host`, `port` and `address`, and
+    `txn-work`'s two "Delivery Sent Unsettled By…" entries are the terms of the cases
+    below them. The definition's own prose is a statement unit in its own right (the
+    `dd`, or the `p` inside it), so nothing is lost by declining the term: measured over
+    the pinned artifacts, no clause in the ledger — keyword or keyword-free — comes from
+    a `dt` unit, and the phrase and declared-choice rules would otherwise capture seven
+    of them as statements.
     """
-    return any(word.islower() and len(word) >= 3 for word in sentence.split())
+    return unit == "dt"
 
 
 def documents_a_choice(path: str) -> bool:
@@ -433,7 +449,8 @@ def walk(
             flatten_tokens(element, drop_blocks=True, constants=constants, refs=refs)
         )
         if tokens:
-            emit_statements(tokens, stack, artifact, counters, clauses, lowercase_only, refs)
+            emit_statements(tokens, stack, artifact, counters, clauses, lowercase_only, refs,
+                            element.tag)
 
     for child in element:
         walk(child, stack, artifact, counters, clauses, lowercase_only, constants)
@@ -447,6 +464,7 @@ def emit_statements(
     clauses: list[dict],
     lowercase_only: list[dict],
     refs: list[str],
+    unit: str,
 ) -> None:
     path = anchor_path(stack)
     spans = sentence_spans(tokens)
@@ -493,11 +511,11 @@ def emit_statements(
         if sentence.startswith("The key words"):
             continue
         matched = sorted({phrase.strip().lower() for phrase in UNKEYED_PHRASES.findall(sentence)})
-        if matched and not reads_as_prose(sentence):
-            # A phrase matched a title-cased label rather than a statement, which is a
-            # definition term's text and not prose: see `reads_as_prose`.
+        if matched and is_label_unit(unit):
+            # A phrase matched a definition term's text, which labels the definition
+            # beside it rather than stating anything: see `is_label_unit`.
             matched = []
-        if not matched and documents_a_choice(path):
+        if not matched and documents_a_choice(path) and not is_label_unit(unit):
             # The artifact's only statement of what this symbolic value means.
             matched = [CHOICE_MEANING]
         if matched:
