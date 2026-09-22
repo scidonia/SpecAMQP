@@ -10,17 +10,26 @@ The header arithmetic is **proved**: it is arithmetic over definitions, and it i
 the two places a hand-written layout drifts, which is why it is proved rather than
 tested.
 
-The descriptor statement is **stated and unproved** for now. It says that every frame
-the decoder accepts carries a performative whose descriptor names a declared type with
-the frame type's role — the property that was missing in both artefacts until a mutation
-control found it, since nothing stopped a body from being an anonymous described value.
-Stating it here makes the property a claim rather than an implementation detail.
+The descriptor statement is **proved**. It says that every frame the decoder accepts
+carries a performative whose descriptor names a declared type with the frame type's role —
+the property that was missing in both artefacts until a mutation control found it, since
+nothing stopped a body from being an anonymous described value. It is now a claim about
+every accepted frame rather than a branch somebody wrote.
 
-Frame round trip is **stated and unproved**, and it *depends on* the value layer's round
-trip (`Contracts.Codec`), because a frame body is a described value: a frame law proved
-without the value law would be a law about a smaller language than the one the codec
-speaks. Recording the dependency is the point — the S1.5 ladder's rungs are what this
-sits on top of.
+Frame round trip is **proved from the value layer's consumption law**, and the condition
+is the point rather than a weakening. A frame body is a described value *followed in the
+same buffer by the payload*, so the frame layer needs the reader to consume exactly the
+value's octets out of a buffer that continues past it — a statement strictly stronger than
+the value contract's own round trip, whose buffer ends where the value does. That
+strengthening is a parameter of this file's acceptance theorem, and the proof module shows
+it implies `Contracts.RoundTripOnEncodedValues`, so the dependency is visible from both
+ends: the frame law rests on a named claim, and that claim is one this repository already
+makes. The S1.5 ladder is what this sits on top of.
+
+The proofs live in `Contracts.FrameCodecAcceptance` rather than here, because the proof
+module states its results in this file's vocabulary and a declaration here would have to
+import it back — the same split TemperMint uses between a contract and its conformance
+module.
 -/
 
 namespace SpecAMQP.Contracts
@@ -54,7 +63,8 @@ This is the statement whose absence was a conformance gap. `framing.3` requires 
 performative to be one of those defined, and both artefacts accepted a frame whose body
 was a described value with a descriptor naming nothing — well-formed octets that name no
 performative. The check now exists in both; this proposition is what makes it a claim
-about every accepted frame rather than a branch somebody wrote. -/
+about every accepted frame rather than a branch somebody wrote, and it is proved in
+`Contracts.FrameCodecAcceptance`. -/
 def AcceptedFramesCarryPerformatives : Prop :=
   ∀ (bytes : Octets) (frame : Frame) (consumed : Nat),
     decodeFrame bytes = .ok (frame, consumed) →
@@ -65,7 +75,8 @@ def AcceptedFramesCarryPerformatives : Prop :=
 /-- A decoded frame reports the octet count its `SIZE` field declares, and that count is
 the prefix of the buffer the frame occupies. Everything downstream depends on it: a frame
 whose `SIZE` disagreed with its octets would make the next frame start in the wrong place,
-which is exactly the framing error the negative vectors pin. -/
+which is exactly the framing error the negative vectors pin. Proved in
+`Contracts.FrameCodecAcceptance`. -/
 def ConsumedIsTheDeclaredSize : Prop :=
   ∀ (bytes : Octets) (frame : Frame) (consumed : Nat),
     decodeFrame bytes = .ok (frame, consumed) →
@@ -75,9 +86,10 @@ def ConsumedIsTheDeclaredSize : Prop :=
 byte for byte, consuming the whole buffer.
 
 Stated over `encodeFrame`'s own domain, like the value layer's law, so that where the
-writer refuses there is nothing to claim. It depends on the value layer's round trip,
-because the body is a described value: this is the rung that sits on top of S1.5 rather
-than a separate result. -/
+writer refuses there is nothing to claim. It depends on the value layer's consumption law,
+because the body is a described value followed by a payload in the same buffer: this is the
+rung that sits on top of S1.5 rather than a separate result, and its proof is in
+`Contracts.FrameCodecAcceptance`, conditional on exactly that law. -/
 def FrameRoundTripOnEncodedFrames : Prop :=
   ∀ (frame : Frame) (bytes : Octets),
     encodeFrame frame = .ok bytes →
