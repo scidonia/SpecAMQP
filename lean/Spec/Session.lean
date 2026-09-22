@@ -1,4 +1,6 @@
 import Spec.Connection
+import Spec.Message
+import Spec.Transactions
 
 /-!
 # The session layer (Part 2: `amqp:transport/section:sessions`)
@@ -51,6 +53,7 @@ this machine, and no vector exercises it.
 namespace SpecAMQP.Spec.Session
 
 open SpecAMQP.Generated.Oasis (TypeDecl)
+open SpecAMQP.Harness (Octets)
 open SpecAMQP.Spec.Codec (Value)
 open SpecAMQP.Spec.Connection
   (choiceValue? fieldDefault fieldValue fieldSet framingError invalidField missingMandatory
@@ -459,6 +462,18 @@ structure Session where
   senderSettleMode : Bool
   /-- The delivery a transfer is carrying, while one is in progress. -/
   delivery : Option Delivery
+  /-- The transaction layer, where this session's link is a **control link**: `some` once
+  either end's `attach` names a `coordinator` target, and `none` — which is the behaviour
+  every session has always had — where it does not.
+
+  Part 4 is explicit that the control link is what the transaction performatives travel
+  on: "The container acting as the transactional resource defines a special target that
+  functions as a transaction coordinator. The transaction controller establishes a control
+  link to this target", and "The «declare» and «discharge» messages are sent by the
+  transactional controller over the control link". So the layer's presence is a fact about
+  the link rather than a switch, and a session that never attaches to a coordinator never
+  reaches Part 4's rules — which is the regression this field exists to make impossible. -/
+  transactions : Option Transactions.Layer := none
 deriving Repr
 
 /-- The policy the two MAY-decrements of the doc's update paragraphs are subject to.
@@ -523,6 +538,36 @@ def Session.atState (state : State) : Session :=
                             peerBegun := true }
   | .discarding => { base with state := .discarding, incoming := some startChannel,
                                peerBegun := true }
+
+/-- The session an `attach` leaves, where that attach names a coordinator target: the
+control link exists, and with it the transaction layer.
+
+Part 4's two directions announce different things — "When sent by the transaction
+controller (the sending endpoint), [the capabilities field] indicates the desired
+capabilities of the coordinator. When sent by the resource (the receiving endpoint), [it
+defines] the actual capabilities of the coordinator" — so an attach this endpoint sends
+records its own announcement and an attach it receives records the partner's. A later
+attach that names no coordinator leaves the layer where it is: a session has one link, and
+Transaction-layer presence is a fact about the link rather than a switch a frame may flip
+off. -/
+def Session.withControlLink (session : Session) (outbound : Bool) (body : Value) : Session :=
+  match (fieldValue "attach" "target" body).bind Transactions.coordinatorCapabilities with
+  | none => session
+  | some capabilities =>
+    let layer := session.transactions.getD Transactions.Layer.fresh
+    { session with
+        transactions := some (if outbound then { layer with capabilities }
+                              else { layer with peerCapabilities := capabilities }) }
+
+/-- The session a released link leaves: the control link's transactions are rolled back.
+
+"Note that links to the «coordinator» cannot be resumed", and "If the control link is
+closed while there exist non-discharged transactions it created, then all such
+transactions are immediately rolled back, and attempts to perform further transactional
+work on them will lead to failure." The link's close is the detach that releases it, which
+is the release `detachLink` performs rather than every detach a peer may send. -/
+def Session.afterLinkRelease (session : Session) : Session :=
+  { session with transactions := session.transactions.map Transactions.Layer.retireAll }
 
 /-- The handle a frame names, in the direction it travels: a received frame names the
 handle the *peer* assigned, and a sent frame names ours, which is the meaning `link-handles`
@@ -847,12 +892,15 @@ def detachLink (session : Session) (outbound : Bool) (body : Value) :
   if outbound then
     -- a released link takes its flow state with it: the credit is a quantity the partner
     -- granted for this link, and the partner's own count is its announcement about it, so
-    -- neither outlives the link they are about
-    return { session with handle := none, role := none, position := none,
-                          peerCount := 0, peerCredit := 0, delivery := none }
+    -- neither outlives the link they are about. A control link's release also rolls back
+    -- the transactions it created, "all such transactions are immediately rolled back"
+    return Session.afterLinkRelease
+      { session with handle := none, role := none, position := none,
+                     peerCount := 0, peerCredit := 0, delivery := none }
   else
-    return { session with peerHandle := none, peerRole := none,
-                          peerCount := 0, peerCredit := 0, delivery := none }
+    return Session.afterLinkRelease
+      { session with peerHandle := none, peerRole := none,
+                     peerCount := 0, peerCredit := 0, delivery := none }
 
 /-- The disposition exchange: `disposition.1/.2`'s directionality ("all links MUST have
 the directionality indicated by the specified role"), the range `first`/`last` name, and
@@ -891,6 +939,65 @@ def dispositionLink (session : Session) (outbound : Bool) (body : Value) :
       return { session with delivery := none }
     else return session
   | none => return session
+
+/-! ## The transaction layer's carriers
+
+Part 4's transaction performatives travel in two frames and nowhere else: the two message
+bodies as a transfer's payload, and the outcome a coordinator answers with as a
+disposition's `state`. Both reach the layer here, and only where the session has one — a
+session whose link is not a control link dispatches exactly as it did before the layer
+existed, which is what keeps the added arms unreachable for every exchange that does not
+ask for them. -/
+
+/-- One transaction value, from the frame that carried it.
+
+Nothing is decided here: whether the value is a transaction performative at all is the
+layer's question, and a value that is not one is carried. A refusal is placed the way the
+link's other refusals are, by the caller. -/
+def stepTransaction (session : Session) (outbound : Bool) (value : Value) (settled : Bool) :
+    Except Refusal Session := do
+  match session.transactions with
+  | none => return session
+  | some layer =>
+    match Transactions.step layer outbound value settled with
+    | .ok layer => return { session with transactions := some layer }
+    | .error reason =>
+      .error { condition := reason.condition, detail := reason.detail, state := none,
+               closesConnection := false }
+
+/-- The transaction layer's step for a transfer's payload.
+
+Part 4's declare and discharge are message bodies, so the payload is read as a message
+whose body is exactly one `amqp-value` section — the shape the section's own worked
+exchange draws, `TRANSFER(delivery-id=0){ AmqpValue( Declare() ) }` — and the value it
+carries is handed to the transaction layer.
+
+Two shapes are deliberately *not* refusals here. A session whose link is not a control link
+has no transaction layer, so its payload is what the transfer layer has always said it was,
+opaque. And a payload that is not one amqp-value section is not a transaction message at
+all — a `data` message is a perfectly ordinary body — which is the message layer's business
+and not a rule this layer may invent; the clause that *is* about messages on a control link
+states what they are for rather than refusing what they are not, and it is recorded as an
+unpinned cell rather than enforced here. -/
+def stepTransactionPayload (session : Session) (outbound : Bool) (payload : Octets)
+    (settled : Bool) : Except Refusal Session := do
+  match session.transactions with
+  | none => return session
+  | some _ =>
+    match Message.bodyValue Message.Policy.empty payload with
+    | .error _ => return session
+    | .ok value => stepTransaction session outbound value settled
+
+/-- The transaction layer's step for a disposition's `state`, which is where a coordinator's
+answer arrives: "If the declaration is successful, the coordinator responds with a
+disposition outcome of «declared» which carries the assigned identifier for the
+transaction." The settlement a disposition may carry is the disposition's own and not the
+transfer's, so the value is handed over unsettled. -/
+def stepTransactionState (session : Session) (outbound : Bool) (body : Value) :
+    Except Refusal Session :=
+  match fieldValue "disposition" "state" body with
+  | some state => stepTransaction session outbound state false
+  | none => .ok session
 
 /-! ## Applying a step -/
 
@@ -996,9 +1103,14 @@ connection maps incoming frames to sessions by channel, so a frame on another ch
 not this session's to process), its mandatory fields must be set, and the state's own
 description must permit the direction. A receive the session cannot process is answered by
 the END the section mandates where the state can send at all — which is DISCARDING — and a
-send it cannot take is simply not taken, leaving the state where it was. -/
-def step (session : Session) (outbound : Bool) (channel : Nat) (body : Value) :
-    Except Refusal Session := do
+send it cannot take is simply not taken, leaving the state where it was.
+
+`payload` is the octets after the performative, which the frame layer calls "the remaining
+bytes in the frame body" whose meaning "is defined by the semantics of the given
+performative": opaque for every performative but the transfer, whose payload a session
+with a transaction layer reads as the transaction message it may carry. -/
+def step (session : Session) (outbound : Bool) (channel : Nat) (body : Value)
+    (payload : Octets) : Except Refusal Session := do
   let performative := Performative.ofBody body
   let typeName :=
     match performative with
@@ -1068,7 +1180,7 @@ def step (session : Session) (outbound : Bool) (channel : Nat) (body : Value) :
   | .begin => stepBegin session outbound channel body
   | .attach =>
     match attachLink session outbound body with
-    | .ok session => pure session
+    | .ok session => pure (session.withControlLink outbound body)
     | .error reason => .error (place reason)
   | .detach =>
     match detachLink session outbound body with
@@ -1101,6 +1213,13 @@ def step (session : Session) (outbound : Bool) (channel : Nat) (body : Value) :
           ((fieldValue "flow" "next-incoming-id" body).bind valueNat)
       return { session with windows }
   | .transfer =>
+    -- the settlement of the deliverable this transfer belongs to, as
+    -- `transfer/field:settled.4` interprets it: a first transfer that leaves the flag
+    -- unset means false, and a continuation carries what the delivery's earlier transfers
+    -- set. Read here rather than after `transferLink`, which releases the delivery when
+    -- the transfer completes it and would take the flag with it.
+    let settled := fieldSet "transfer" "settled" body ||
+      (session.delivery.map (fun delivery => delivery.settled)).getD false
     if outbound then do
       -- the two windows a sent transfer is charged against: ours, which "defines the
       -- maximum number of outgoing «transfer» frames that the endpoint can currently
@@ -1115,6 +1234,11 @@ def step (session : Session) (outbound : Bool) (channel : Nat) (body : Value) :
         match transferLink session outbound body with
         | .ok session => pure session
         | .error reason => .error (place reason)
+      -- and the transaction layer's half, where the payload is a transaction message
+      let session ←
+        match stepTransactionPayload session outbound payload settled with
+        | .ok session => pure session
+        | .error reason => .error (place reason)
       return { session with
                  windows := session.windows.afterSendingTransfer startPolicy }
     else do
@@ -1126,13 +1250,22 @@ def step (session : Session) (outbound : Bool) (channel : Nat) (body : Value) :
         match transferLink session outbound body with
         | .ok session => pure session
         | .error reason => .error (place reason)
+      let session ←
+        match stepTransactionPayload session outbound payload settled with
+        | .ok session => pure session
+        | .error reason => .error (place reason)
       return { session with
                  windows := session.windows.afterReceivingTransfer
                    session.windows.nextIncomingId startPolicy }
   | .other =>
     if isDisposition body then
       match dispositionLink session outbound body with
-      | .ok session => pure session
+      | .ok session =>
+        -- the outcome a coordinator answers a declare with arrives in the disposition's
+        -- `state`, which is the second of the transaction layer's two carriers
+        match stepTransactionState session outbound body with
+        | .ok session => pure session
+        | .error reason => .error (place reason)
       | .error reason => .error (place reason)
     -- a performative this slice does not model is carried rather than judged: the
     -- session's own state and channel rules still apply, and nothing here decides a

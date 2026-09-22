@@ -1,6 +1,7 @@
 import Generated.Oasis.Fields
 import Generated.Oasis.Types
 import Ref.Connection
+import Ref.Transactions
 
 /-!
 # The reference implementation of the session layer
@@ -24,6 +25,9 @@ namespace SpecAMQP.Ref.Session
 open SpecAMQP.Generated.Oasis
   (ChoiceDecl TypeDecl choices errorConditionsOf types)
 open SpecAMQP.Ref.Connection (missingMandatory numberOf valueOfField)
+-- The transaction layer's state and the two names this module reads from it. Opened
+-- selectively: `Ref.Transactions` also defines a `Refusal`, and this module has its own.
+open SpecAMQP.Ref.Transactions (Layer coordinatorCapabilities)
 
 /-! ## The state machine -/
 
@@ -337,6 +341,12 @@ structure Endpoint where
   senderSettleMode : Bool
   /-- The delivery in progress, while one is. -/
   delivery : Option Delivery
+  /-- The transaction layer, where this session's link is a control link: `some` once
+  either end's attach names a coordinator target, and `none` where it does not, which is
+  every session that is not doing transactional work. Part 4 sends the declare and
+  discharge messages "over the control link", so the layer's presence is a fact about the
+  link. -/
+  transactions : Option Transactions.Layer := none
 deriving Repr
 
 /-- The channel a session start assumes, on both sides: sessions are assigned "an unused
@@ -380,6 +390,25 @@ def Endpoint.atState (state : State) : Endpoint :=
   | .endSent => { fresh with incoming := some startChannel, peerBegun := true }
   | .endRcvd => { fresh with outgoing := some startChannel, peerBegun := true }
   | .discarding => { fresh with incoming := some startChannel, peerBegun := true }
+
+/-- The endpoint an attach leaves, where that attach's target is a coordinator: the
+control link exists and the transaction layer is present. Each direction records what its
+own attach announced — the controller's is the desired capability set and the resource's
+the actual one — so the `global-id` field rule has the coordinator's set to read. -/
+def Endpoint.withControlLink (endpoint : Endpoint) (outbound : Bool) (body : Value) : Endpoint :=
+  match (valueOfField "attach" "target" body).bind coordinatorCapabilities with
+  | none => endpoint
+  | some capabilities =>
+    let layer := endpoint.transactions.getD Layer.fresh
+    { endpoint with
+        transactions := some (if outbound then { layer with own := capabilities }
+                              else { layer with other := capabilities }) }
+
+/-- The endpoint a released link leaves: the control link's transactions are rolled back,
+since closing it "roll[s] back" the transactions it created and further work on them fails.
+Only the detach that releases the link counts, which is the release `detachLink` performs. -/
+def Endpoint.afterLinkRelease (endpoint : Endpoint) : Endpoint :=
+  { endpoint with transactions := endpoint.transactions.map Layer.retiredAll }
 
 /-- The handle maximum a begin announces, or the declared default where it leaves the field
 unset: `begin/field:handle-max.1` makes it the bound its partner may not attach outside. -/
@@ -612,12 +641,15 @@ def detachLink (endpoint : Endpoint) (outbound : Bool) (body : Value) :
   let releasable := named == (if outbound then endpoint.handle else endpoint.peerHandle)
   if !releasable then return endpoint
   if outbound then
-    -- the flow state belongs to the link the detach releases, so it goes with it
-    return { endpoint with handle := none, role := none, position := none,
-                           peerCount := 0, peerCredit := 0, delivery := none }
+    -- the flow state belongs to the link the detach releases, so it goes with it; and a
+    -- control link's release rolls back the transactions it created
+    return Endpoint.afterLinkRelease
+      { endpoint with handle := none, role := none, position := none,
+                      peerCount := 0, peerCredit := 0, delivery := none }
   else
-    return { endpoint with peerHandle := none, peerRole := none,
-                           peerCount := 0, peerCredit := 0, delivery := none }
+    return Endpoint.afterLinkRelease
+      { endpoint with peerHandle := none, peerRole := none,
+                      peerCount := 0, peerCredit := 0, delivery := none }
 
 /-- Whether a body is a disposition: the dispatch table gives it to the session, and this
 module's `Frame` names only the frames the state machine itself turns on. -/
@@ -844,7 +876,7 @@ def step (endpoint : Endpoint) (outbound : Bool) (channel : Nat) (body : Value) 
                      endpoint.windows.nextIncoming windowPolicy }
   | .attach =>
     match attachLink endpoint outbound body with
-    | .ok next => pure next
+    | .ok next => pure (next.withControlLink outbound body)
     | .error reason => .error (placeLink reason)
   | .detach =>
     match detachLink endpoint outbound body with

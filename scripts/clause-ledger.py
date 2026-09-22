@@ -50,12 +50,101 @@ EXCLUDED_TAGS = {"picture", "revhistory", "acknowledgements"}
 # keywords would report completeness while missing exactly that kind of sentence.
 # These are captured as reviewable statements, like pictures: an omission must be a
 # decision rather than a blind spot.
+#
+# The last two alternatives are one shape, and it was found by a slice rather than by a
+# reading: Part 4 states an obligation the whole transaction layer rests on as the
+# *consequence* of an action, in the indicative and with no keyword — "If the control
+# link is closed while there exist non-discharged transactions it created, then all such
+# transactions are immediately rolled back, and attempts to perform further
+# transactional work on them will lead to failure." That sentence is the rule the
+# transactions section is about; it was invisible to the census, and a slice whose
+# behaviour depends on it could not cite it.
+#
+# The shape is "a stated consequence": a conditional whose consequent is asserted in the
+# indicative (`then … is/are/will/…`), and a consequence named as leading to a failure.
+# It is deliberately not keyed on the one sentence's wording: measured against the pinned
+# artifacts it captures 25 statements beyond the previous vocabulary — in `links`,
+# `sessions`' flow-control doc, `attach`'s `source`/`target`, and `txn-work` — of which
+# several are plainly normative ("If no source is specified on an outgoing link, then
+# there is no source currently attached to the link") and the rest are for review, which
+# is what a captured statement is. `check_unkeyed` requires a disposition for each, so
+# the addition lands with its reviews rather than instead of them.
 UNKEYED_PHRASES = re.compile(
     r"\bis invalid\b|\bis not valid\b|\bis undefined\b|\bis reserved\b"
     r"|\bis not permitted\b|\bis not allowed\b|\bshall\b|\bis required to\b"
-    r"|\bcannot\b|\bonly the [\w-]+(?: [\w-]+)? can\b",
+    r"|\bcannot\b|\bonly the [\w-]+(?: [\w-]+)? can\b"
+    r"|\bthen\b[^.]{0,160}?\b(?:is|are|will|has|have|does|remains|can no longer)\b"
+    r"|\bwill lead to\b|\bwill result in\b"
+    # A census over the pinned artifacts named the class below and measured each
+    # alternative alone against them: indicative statements of prohibition, error and
+    # no-effect that carry no keyword ("It is an error if the delivery-tag on a
+    # continuation transfer differs…", "It is illegal to send any more frames after
+    # sending a close frame", "A link with no source will never produce outgoing
+    # messages"), and plural or variant phrasings of alternatives already above
+    # ("*are* reserved", "results in" against `will result in`, "*does not* increment",
+    # "will *not* be able to be resumed", "can only be", "will no longer", "takes
+    # precedence", "can be up to"). Each was measured on its own before landing, and
+    # each captures at least one statement no other alternative does; the count after
+    # the phrase is the statements it captured alone that the rest of the vocabulary
+    # did not:
+    #
+    #   it is an error ........... 5      can only be .............. 3
+    #   it is illegal ............ 3      can be up to ............. 2
+    #   will never ............... 3      takes precedence ......... 1
+    #   will be <participle> ..... 9      results in ............... 3
+    #   will not be able to ...... 3      are reserved ............. 2
+    #   will no longer ........... 2      is/are ignored .......... 2
+    #   is/are allowed ........... 1      does not <verb> ......... 22
+    #
+    # One measured alternative is deliberately absent: `is not retained` captured two
+    # sentences and no others, both of which `does not <verb>` already captures — a
+    # phrase with no unique contribution in this corpus is not worth its weight in the
+    # list. `does not <verb>` is the broadest shape here and the two definition terms
+    # it matches are handled by the prose guard below rather than by narrowing it to a
+    # verb list, which would trade a rule for a word list.
+    r"|\bit is an error\b|\bit is illegal\b"
+    r"|\bwill never\b|\bwill not be able to\b|\bwill no longer\b"
+    r"|\b(?:is|are) (?:ignored|allowed)\b"
+    r"|\bdoes not \w+"
+    r"|\bare reserved\b|\bresults in\b"
+    r"|\bcan only be\b|\bcan be up to\b"
+    r"|\btakes precedence\b"
+    r"|\bwill be (?:discarded|deleted|chosen|cleared|applied|ignored|retained|rolled back)\b",
     re.IGNORECASE,
 )
+
+# What a statement captured for a declared choice carries in `unkeyed_phrases`.
+CHOICE_MEANING = "a declared choice's meaning"
+
+
+def reads_as_prose(sentence: str) -> bool:
+    """True when the sentence carries at least one ordinary lowercase word.
+
+    A phrase can match text that is not a statement: `txn-work`'s two definition terms
+    ("Delivery Sent Unsettled By Controller; Resource Does Not Settle") are title-cased
+    labels for the prose beside them, and `does not <verb>` matches them. Measured
+    against the pinned artifacts this guard excludes exactly those two units and nothing
+    the ledger already captures — no committed clause lacks a lowercase word, and a
+    guard on a trailing full stop would have excluded a legitimate statement ("…
+    remote-incoming-window is computed as follows:").
+    """
+    return any(word.islower() and len(word) >= 3 for word in sentence.split())
+
+
+def documents_a_choice(path: str) -> bool:
+    """True when the anchor path names a declared `choice`.
+
+    A choice's doc is the artifact's only statement of what its symbolic value means:
+    `Generated/Oasis/Choices.lean` carries the owner path, the name and the value, and
+    the meaning is written in prose beside the choice — "The sender will send all
+    deliveries initially unsettled to the receiver" for `snd-settle-mode=unsettled`,
+    "once successfully transferred over the link, the message will no longer be
+    available to other links from the same node" for `move`. A symbol a peer's behaviour
+    depends on cannot be carried by prose the census cannot see, so these are captured
+    for review like the rest of the class.
+    """
+    return "/choice:" in path
+
 
 # Pictures are excluded from clause extraction because most are sequence
 # diagrams, but some carry formal grammar (`Constructor BNF`) or normative
@@ -404,6 +493,13 @@ def emit_statements(
         if sentence.startswith("The key words"):
             continue
         matched = sorted({phrase.strip().lower() for phrase in UNKEYED_PHRASES.findall(sentence)})
+        if matched and not reads_as_prose(sentence):
+            # A phrase matched a title-cased label rather than a statement, which is a
+            # definition term's text and not prose: see `reads_as_prose`.
+            matched = []
+        if not matched and documents_a_choice(path):
+            # The artifact's only statement of what this symbolic value means.
+            matched = [CHOICE_MEANING]
         if matched:
             key = f"{path}#unkeyed"
             counters[key] = counters.get(key, 0) + 1

@@ -69,8 +69,11 @@ def establishedConnection : Endpoint :=
 /-- Which machine answers for a step. -/
 inductive Target where
   | connection
-  /-- A frame a session answers for, with the channel it carries and its performative. -/
-  | session (channel : Nat) (body : SpecAMQP.Spec.Codec.Value)
+  /-- A frame a session answers for, with the channel it carries, its performative, and
+  the payload after that performative. The payload is the frame's opaque remainder and only
+  a session with a transaction layer reads it; it is carried here because the codec is
+  where the frame is read. -/
+  | session (channel : Nat) (body : SpecAMQP.Spec.Codec.Value) (payload : Octets)
   /-- A session performative on channel zero, which is the connection's to relay and
   nobody's to answer as a session step. -/
   | stray
@@ -79,12 +82,12 @@ inductive Target where
 the corpus vocabulary names the channel and the body, and either is what says which
 machine the step is for. -/
 def carried (step : ExchangeStep) :
-    Except String (Option (Nat × SpecAMQP.Spec.Codec.Value)) := do
+    Except String (Option (Nat × SpecAMQP.Spec.Codec.Value × Octets)) := do
   match step.value with
   | some json =>
     let frame ← frameOfJson json
     match frame.body with
-    | some body => return some (frame.channel, body)
+    | some body => return some (frame.channel, body, frame.payload)
     | none => return none
   | none =>
     match step.bytes with
@@ -96,7 +99,7 @@ def carried (step : ExchangeStep) :
         | .error _ => return none
         | .ok (frame, _) =>
           match frame.body with
-          | some body => return some (frame.channel, body)
+          | some body => return some (frame.channel, body, frame.payload)
           | none => return none
 
 /-- Whether a frame is the connection's rather than a session's: `open` and `close` are
@@ -123,10 +126,10 @@ connection has no session on channel zero to delegate it to. -/
 def targetOf (step : ExchangeStep) : Except String Target := do
   match (← carried step) with
   | none => return .connection
-  | some (channel, body) =>
+  | some (channel, body, payload) =>
     if isConnectionLevel body then return .connection
     else if channel == 0 then return .stray
-    else return .session channel body
+    else return .session channel body payload
 
 /-- A connection outcome with its layer on the state name. -/
 def asConnection (outcome : StepOutcome) : StepOutcome :=
@@ -149,7 +152,7 @@ def stepOf (peer : Peer) (step : ExchangeStep) : Except String (StepOutcome × P
                connection has no session to delegate it to; the peer is in \
                connection:{connection.state.name}"⟩,
             { peer with connection := connection })
-  | .session channel body =>
+  | .session channel body payload =>
     -- the connection first: the frame must be one it can carry, at all
     let (relayed, connection) ← SpecAMQP.Spec.ConnectionCodec.stepOf peer.connection step
     if !relayed.admitted then
@@ -160,7 +163,7 @@ def stepOf (peer : Peer) (step : ExchangeStep) : Except String (StepOutcome × P
     if connection.state == State.discarding then
       return (asConnection relayed, { peer with connection := connection })
     -- then the session, whose moment depends on what the connection is doing
-    match SpecAMQP.Spec.Session.step peer.session step.send channel body with
+    match SpecAMQP.Spec.Session.step peer.session step.send channel body payload with
     | .ok session =>
       let state := s!"session:{session.state.name}"
       return ({ relayed with state, detail := s!"admitted; the peer is in {state}" },
