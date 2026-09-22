@@ -1,0 +1,264 @@
+{
+ "conventions": {
+  "deferred:": "A real obligation the plan carries later; the suffix names the milestone, and the note names the gap that keeps it out of the carrier set.",
+  "formalized:": "A Lean declaration path that carries this clause's meaning, verified present in the module it names.",
+  "informative": "A statement of what a conformant implementation is rather than a rule this specification enforces: there is no wire obligation to carry.",
+  "superseded:": "Decided by an entry in the ambiguity register (ledger/ambiguities), whose id is the suffix.",
+  "test:": "A vector id whose expectation is the clause's only observable form."
+ },
+ "design_consequences": [
+  "An empty (header-only) frame is refused at decode (class `sizeMismatch`, lean/Spec/Frame.lean:261-263), so doc:doc-idle-time-out.7 is not merely uncarried but contradicted: the frame layer needs a header-only case before a vector can send one.",
+  "doc:session-flow-control.4 and .8 write remote-outgoing-window and nothing reads it in either artifact, so those MUSTs are carried by a declaration no test can pin; witnessing them is upstream work (something must consume the quantity), not a new vector.",
+  "The ten uncarried Part 0 clauses are dispositioned informative rather than deferred because the interface that would carry them \u2014 PLAN.md \u00a710's Conformance.lean and its Conforms relation \u2014 is not in the tree; conformance.3 is the eleventh and has a real carrier.",
+  "connections.11 and doc:doc-idle-time-out.9 reach channel 0 only by entailment through Limits.aPriori and limitsFor: open's channel rule is stated in stepAmqpFrame and close's is not, and ledger/ambiguities/channel-zero-layering.json is the only place the close half is written down."
+ ],
+ "dispositions": {
+  "amqp-core-overview-v1.0-os.xml#amqp:overview/section:conformance.1": {
+   "clause_text": "A conformant implementation MUST perform protocol negotiation (see \u00abversion-negotiation\u00bb), and then parse, process, and produce frames in accordance with the format and semantics defined in parts 1 through 5 of this specification.",
+   "disposition": "informative",
+   "kind": "MUST",
+   "note": "Part 0's conformance framework: it states what a conformant implementation is rather than a rule this specification enforces. The parts it names are formalized (Spec.Connection, Spec.Session, Spec.Codec) but no declaration or vector states the obligation, and the conformance interface PLAN.md \u00a710 promises (Conformance.lean) is not in the tree.",
+   "text_sha256": "9ecb1231d3f4221f5500f89ee3cfee18b13d08553fc10e9bdecd96227b596c70"
+  },
+  "amqp-core-overview-v1.0-os.xml#amqp:overview/section:conformance.10": {
+   "clause_text": "Where a behavior is not admitted, the implementation MUST respond according to the rules defined within this specification.",
+   "disposition": "informative",
+   "kind": "MUST",
+   "note": "Part 0's conformance framework: it states what a conformant implementation is rather than a rule this specification enforces. The nearest bearer is SpecAMQP.Spec.Session.step, which answers non-admitted input with the artifact's condition and the DISCARDING placement, but nothing states the Part 0 sentence.",
+   "text_sha256": "ad54d4eb061661ea8f624062af13a8c935b940858ff63436bb13cc8f20eb975c"
+  },
+  "amqp-core-overview-v1.0-os.xml#amqp:overview/section:conformance.15": {
+   "clause_text": "Where a behavior is not admitted, the rules defined in part 4 regarding responses to non-admitted behaviors MUST be followed.",
+   "disposition": "informative",
+   "kind": "MUST",
+   "note": "Part 0's conformance framework: it states what a conformant implementation is rather than a rule this specification enforces. It binds non-admitted behaviour to Part 4's rules, and Part 4 (transactions) has no machine here \u2014 the unkeyed register defers that part's clauses to S6.",
+   "text_sha256": "2b377f7b75445c9f9deecaec297b684f32b6ffd58736b4bd41e88fae784dcb1a"
+  },
+  "amqp-core-overview-v1.0-os.xml#amqp:overview/section:conformance.2": {
+   "clause_text": "Conformant implementations MUST NOT require the use of any extensions defined outside this document in order to interoperate with any other conformant implementation.",
+   "disposition": "informative",
+   "kind": "MUST",
+   "note": "Part 0's conformance framework: it states what a conformant implementation is rather than a rule this specification enforces. Extension-freedom has no bearer \u2014 capabilities are opaque generated field rows (lean/Generated/Oasis/Fields.lean:106) and no layer reads them \u2014 so nothing would move if the clause changed.",
+   "text_sha256": "9eb914fad554a1cae26f587a05c1d6ce97453693900716e8bd4e821e1398d3d3"
+  },
+  "amqp-core-overview-v1.0-os.xml#amqp:overview/section:conformance.3": {
+   "clause_text": "\u00abtypes\u00bb of this document defines the type system and type encodings that every conformant implementation MUST implement.",
+   "disposition": "formalized:SpecAMQP.Contracts.ConstructorGrammarConforms",
+   "kind": "MUST",
+   "note": "Part 1's type system is implemented and this is its acceptance declaration \u2014 the grammar checked against the generated encoding table (SpecAMQP.Spec.Value.classify), with theorem `constructor_grammar_public` (lean/Contracts/TypeSystem.lean:37) \u2014 so the type system the clause makes mandatory is what carries it; only its universal over conformant implementations has no bearer.",
+   "text_sha256": "af51a70f7d2fa1843a2b399457f74d8ec4650999ea7658dad43d04c4b727fcb1"
+  },
+  "amqp-core-overview-v1.0-os.xml#amqp:overview/section:conformance.4": {
+   "clause_text": "Every conformant implementation of AMQP over TCP MUST implement Part 2. Future standards mapping AMQP to protocols other than TCP MAY modify or replace Part 2 when AMQP is being used over that protocol.",
+   "disposition": "informative",
+   "kind": "MUST",
+   "note": "Part 0's conformance framework: it states what a conformant implementation is rather than a rule this specification enforces. Part 2 is the formalized core (Spec.Connection, Spec.Session) but no declaration or vector states the implement-Part-2 obligation itself, and the MAY half is about future standards rather than this tree.",
+   "text_sha256": "6639aaa1fd5cb7857bb62c8e265538a9c2bf4afe0e2c8477100d5fa3f6f12a9d"
+  },
+  "amqp-core-overview-v1.0-os.xml#amqp:overview/section:conformance.6": {
+   "clause_text": "A conformant implementation MUST implement Part 2 or a mapping of AMQP to some non-TCP protocol.",
+   "disposition": "informative",
+   "kind": "MUST",
+   "note": "Part 0's conformance framework: it states what a conformant implementation is rather than a rule this specification enforces. No non-TCP mapping exists or is planned (PLAN.md \u00a75 makes transport an environment assumption), and the Part 2 disjunct is formalized without the clause being stated.",
+   "text_sha256": "e3dfae3f25020fab6380b4c9f37e0d6b885392a5650c00d55888ef37905eb71c"
+  },
+  "amqp-core-overview-v1.0-os.xml#amqp:overview/section:conformance.7": {
+   "clause_text": "Where an implementation does not allow for a behavior the implementation MUST respond according to the rules defined within Part 2 of the specification.",
+   "disposition": "informative",
+   "kind": "MUST",
+   "note": "Part 0's conformance framework: it states what a conformant implementation is rather than a rule this specification enforces. The Part 2 responses it points at are carried rule by rule in SpecAMQP.Spec.Connection.step and its refusals, but the Part 0 sentence itself is carried by nothing.",
+   "text_sha256": "e4370094c1bff8b810149c4d3f0d32fe30fa700b4a94d8591d9451bf6f7efc04"
+  },
+  "amqp-core-overview-v1.0-os.xml#amqp:overview/section:conformance.8": {
+   "clause_text": "Every conformant implementation which processes messages MUST implement this part of the specification.",
+   "disposition": "informative",
+   "kind": "MUST",
+   "note": "Part 0's conformance framework: it states what a conformant implementation is rather than a rule this specification enforces. Part 3 has no machine here \u2014 only its sections as encodings (Spec.Codec, pinned by vectors/messages.ndjson) \u2014 so nothing carries the messaging-layer obligation.",
+   "text_sha256": "c373a1fe37995a144bae0ddd5f4dca3746ea6b8f6ac86ab761f07d4c83d41b8b"
+  },
+  "amqp-core-overview-v1.0-os.xml#amqp:overview/section:conformance.9": {
+   "clause_text": "Such implementations do not actively implement Part 3, but MUST NOT act in ways which violate the rules of this part of the specification.",
+   "disposition": "informative",
+   "kind": "MUST",
+   "note": "Part 0's conformance framework: it states what a conformant implementation is rather than a rule this specification enforces. A negative obligation over Part 3, which the repository does not formalize as a layer: no declaration, contract or vector asserts or tests it.",
+   "text_sha256": "5dcf968cef747fe12ed24bd78824a66948e478e9400207dfd90da7a105268b01"
+  },
+  "amqp-core-overview-v1.0-os.xml#amqp:overview/section:intro.1": {
+   "clause_text": "Every compliant AMQP process MUST be able to send and receive messages in this standard encoding.",
+   "disposition": "informative",
+   "kind": "MUST",
+   "note": "Part 0's conformance framework: it states what a conformant implementation is rather than a rule this specification enforces. The value codec (Spec.Codec) and the message corpus (vectors/messages.ndjson) could bear it, but neither makes the send-and-receive-the-standard-encoding claim.",
+   "text_sha256": "8027ce449e1172d76e67a103bb87e6245f025291f7711a0b2b208f96bacad60c"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections.1": {
+   "clause_text": "Prior to any explicit negotiation, the maximum frame size is 512 and the maximum channel number is 0. After establishing or accepting a TCP connection and sending the protocol header, each peer MUST send an \u00abopen\u00bb frame before sending any other frames.",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.Limits.aPriori; formalized:SpecAMQP.Spec.Connection.minMaxFrameSize; formalized:SpecAMQP.Spec.Connection.State.sendClass; test:exchange-open-before-header; test:exchange-pipelined-channel-limit",
+   "kind": "MUST",
+   "note": "The a priori limits are the MIN-MAX-FRAME-SIZE octets and channel 0, and the START/HDR_SENT/HDR_EXCH send columns admit the header and then the open: exchange-open-before-header pins an open refused in START while the header is admitted, exchange-pipelined-channel-limit the a priori channel zero.",
+   "text_sha256": "d05735c30b460753d5df02b69fc87b5a97033621ba3fa2f4ddc7b91cd3c23465"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections.11": {
+   "clause_text": "However, implementations SHOULD send it on channel 0, and MUST send it on channel 0 if pipelined in a single batch with the corresponding \u00abopen\u00bb.",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.limitsFor; formalized:SpecAMQP.Spec.Connection.Limits.aPriori; formalized:SpecAMQP.Spec.Connection.State.sendClass",
+   "kind": "MUST",
+   "note": "Carried by entailment rather than by a named rule: a close pipelined with the open is sent from a `**` column, which limitsFor measures against the a priori limits, so channel-max 0 refuses it off channel 0; no vector exercises that refusal, and ledger/ambiguities/channel-zero-layering.json records the reading.",
+   "text_sha256": "f0f2595fb7aaa060666cb89284d71689bf458200c9a26b8c9efc7c03259cda5c"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections.16": {
+   "clause_text": "In this case any incoming frames on the connection MUST be silently discarded until the peer's \u00abclose\u00bb frame is received.",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.Refusal.withPlace; formalized:SpecAMQP.Spec.Connection.State.receiveClass; formalized:SpecAMQP.Spec.SessionCodec.stepOf; test:exchange-discarding-ignores-frames; test:exchange-connection-discarding-discards-session-frames",
+   "kind": "MUST",
+   "note": "A refused receive leaves the peer in DISCARDING, whose `*` receive column admits frames and writes nothing until the partner's close, and the codec's dispatch honours that state above the session machine; the two vectors pin frames ignored, and a session frame discarded with them.",
+   "text_sha256": "8f3107fb6a87b3134c2ae264f1e73d4f91039d961185df87673ad3860e2c4eb6"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections.2": {
+   "clause_text": "The \u00abopen\u00bb frame can only be sent on channel 0. After sending the \u00abopen\u00bb frame and reading its partner's \u00abopen\u00bb frame a peer MUST operate within mutually acceptable limitations from this point forward.",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.stepAmqpFrame; formalized:SpecAMQP.Spec.Connection.limitsFor; formalized:SpecAMQP.Spec.Connection.Endpoint.afterFrame; test:exchange-open-on-channel-one-send; test:exchange-open-on-channel-one-receive",
+   "kind": "MUST",
+   "note": "The channel guard refuses an open off channel 0 in both directions, and afterFrame installs each partner's declared limits so that frames are measured against mutually acceptable limits from the open exchange on.",
+   "text_sha256": "e2f323ea5c93331c5fb8da9a9aded690530c76bfc64e72a7456f4affa969b687"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections.5": {
+   "clause_text": "Prior to closing a connection, each peer MUST write a \u00abclose\u00bb frame with a code indicating the reason for closing.",
+   "disposition": "deferred:S4",
+   "kind": "MUST",
+   "note": "deferred: S4 \u2014 uncarried: the layer builds no close frame at all (the corpus supplies the frame and the model only transitions on sending it), so the code the clause requires is built nowhere; exchange-pipelined-close carries the state machine beside the clause, not its content.",
+   "text_sha256": "43e7f71f450123d098cecda2d03898bd4cc47e1932cfbe214b381c315f9ab065"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections.6": {
+   "clause_text": "This frame MUST be the last thing ever written onto a connection.",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.State.sendClass; formalized:SpecAMQP.Spec.Connection.permitsSend; test:exchange-conforming-frame-in-open-sent; test:exchange-frame-in-end-refused",
+   "kind": "MUST",
+   "note": "After the close is written the send column is empty, so a second close or any other frame is refused: the two vectors pin the admitted close in OPEN_SENT against the same frame refused in CLOSE_PIPE and END.",
+   "text_sha256": "198f5db1bc50e773ac09a7477b00334b0898f46df047e2ae1bf1b4892f6882c2"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections/doc:doc-idle-time-out.10": {
+   "clause_text": "As they are a frame, they MUST NOT be sent after the \u00abclose\u00bb frame has been sent.",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.State.sendClass; formalized:SpecAMQP.Spec.Connection.permitsSend",
+   "kind": "MUST",
+   "note": "The same empty send column as connections.6, seen for empty frames: once the close is written the table admits nothing, so a frame of any shape is refused.",
+   "text_sha256": "56c9bcfcb2dfee78d02b6a9f77ab263053312d576cdd206aadfedccac8956b6d"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections/doc:doc-idle-time-out.7": {
+   "clause_text": "Implementations MUST be prepared to handle empty frames arriving on any valid channel, though implementations SHOULD use channel 0 when sending empty frames, and MUST use channel 0 if a maximum channel number has not yet been negotiated (i.e., before an \u00abopen\u00bb frame has been received).",
+   "disposition": "deferred:S4",
+   "kind": "MUST",
+   "note": "deferred: S4 \u2014 uncarried: the clause requires empty frames on any valid channel to be handled, and the frame layer refuses one instead \u2014 decodeFrame takes the body region as the rest of the buffer and translates the truncated read (class `sizeMismatch`, \"the performative at octet 8 does not complete within the 8 octets SIZE declares\") \u2014 with no vector sending a header-only frame.",
+   "text_sha256": "a841484728ed46b719b13151d11f227da41ef8f0e0cf917c603424dadc56c5eb"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections/doc:doc-idle-time-out.9": {
+   "clause_text": "Implementations MUST be prepared to handle empty frames arriving on any valid channel, though implementations SHOULD use channel 0 when sending empty frames, and MUST use channel 0 if a maximum channel number has not yet been negotiated (i.e., before an \u00abopen\u00bb frame has been received).",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.Limits.aPriori; formalized:SpecAMQP.Spec.Connection.limitsFor; test:exchange-pipelined-channel-limit",
+   "kind": "MUST",
+   "note": "The channel-0 half is the a priori channel-max of 0 enforced on every send before the partner's open, which exchange-pipelined-channel-limit pins; the sentence's other MUST, handling empty frames, is uncarried as recorded under doc:doc-idle-time-out.7.",
+   "text_sha256": "a841484728ed46b719b13151d11f227da41ef8f0e0cf917c603424dadc56c5eb"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:begin/field:desired-capabilities.1": {
+   "clause_text": "The sender MUST NOT attempt to use any capability other than those it has declared in desired-capabilities field.",
+   "disposition": "deferred:S4",
+   "kind": "MUST",
+   "note": "deferred: S4 \u2014 uncarried: no capability handling in Spec or Ref \u2014 `desired-capabilities` is only a generated field row and no layer reads capability lists, so nothing would move if the clause changed.",
+   "text_sha256": "82e2369ddc4cc1918c3074d9e7414d07dff2e581a8a0b94e8faa8aec8d677f8f"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:begin/field:handle-max.1": {
+   "clause_text": "A peer MUST NOT attempt to attach a link using a handle value outside the range that its partner can handle.",
+   "disposition": "formalized:SpecAMQP.Spec.Session.attachLink; test:exchange-link-handle-out-of-range",
+   "kind": "MUST",
+   "note": "An outbound attach is bounded by the handle-max the partner's begin announced and an inbound one by this endpoint's own, so a peer cannot attach outside the range its partner can handle; the vector pins the send direction with the partner's bound of 2 and handle 5.",
+   "text_sha256": "da6f184d7c737c4b681add6ab254c574ebe87701959d728247a2ed15443ac2a1"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:begin/field:handle-max.2": {
+   "clause_text": "A peer that receives a handle outside the supported range MUST close the connection with the framing-error error-code.",
+   "disposition": "formalized:SpecAMQP.Spec.Session.attachLink; formalized:SpecAMQP.Spec.Session.closingRefusal; formalized:SpecAMQP.Spec.SessionCodec.stepOf; test:exchange-link-handle-out-of-range",
+   "kind": "MUST",
+   "note": "The out-of-range refusal carries amqp:connection:framing-error and closesConnection, and the codec moves the connection to CLOSE_SENT \u2014 the mandated close with the framing-error code; the vector pins the send direction only.",
+   "text_sha256": "639821fe49ce15401d9257dd302fec50d5fe412459f57cd7e8cae97a5a6b756f"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:begin/field:remote-channel.1": {
+   "clause_text": "If a session is locally initiated, the remote-channel MUST NOT be set.",
+   "disposition": "formalized:SpecAMQP.Spec.Session.stepBegin",
+   "kind": "MUST",
+   "note": "A locally initiated begin that sets remote-channel is refused with amqp:invalid-field; no vector pins that refusal, and the Ref twin states the same rule at lean/Ref/Session.lean:673-677.",
+   "text_sha256": "7fe29468c62bc3d38d18ed30536d51a57933a8303fa9a7d3fc600372c7e87d3d"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:begin/field:remote-channel.2": {
+   "clause_text": "When an endpoint responds to a remotely initiated session, the remote-channel MUST be set to the channel on which the remote session sent the begin.",
+   "disposition": "formalized:SpecAMQP.Spec.Session.stepBegin; test:exchange-session-begin-remotely-initiated",
+   "kind": "MUST",
+   "note": "The answering begin must set remote-channel to the channel the remote session sent its begin on, refused when it is empty or names another channel (lean/Spec/Session.lean:940-942); the vector pins the conforming case with remote-channel 1.",
+   "text_sha256": "09cd4c5372d9ade38adba1e25e14fd576a6a070c509d3839a9ee3c4a2c4d378e"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions.1": {
+   "clause_text": "However, a link MUST NOT be attached to more than one session at a time.",
+   "disposition": "superseded:link-uniqueness-vacuous",
+   "kind": "MUST",
+   "note": "A session holds one link's flow state and no reference to any other session, so a link cannot be attached to two sessions and the clause is satisfied vacuously; ledger/ambiguities/link-uniqueness-vacuous.json records the reading, and no carrier is owed for a violation the model cannot express.",
+   "text_sha256": "498a314527492b0002b80cdbf2eb476fb765d4df2ba151877bd25fc61265a61e"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions.12": {
+   "clause_text": "In this case any incoming frames on the session MUST be silently discarded until the peer's \u00abend\u00bb frame is received.",
+   "disposition": "formalized:SpecAMQP.Spec.Session.step; formalized:SpecAMQP.Spec.Session.afterEnd; test:exchange-session-end-with-error-discards",
+   "kind": "MUST",
+   "note": "The DISCARDING early return hands back everything but an end unread, and the peer's end releases the session to UNMAPPED \u2014 the vector pins a refused session discarding until the peer's end.",
+   "text_sha256": "e56b57cdb2df64888872b64884b9fd85359be537b59f28c344a60f9874b6eb59"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions.3": {
+   "clause_text": "The remote-channel field of a \u00abbegin\u00bb frame MUST be empty for a locally initiated session, and MUST be set when announcing the endpoint created as a result of a remotely initiated session.",
+   "disposition": "formalized:SpecAMQP.Spec.Session.stepBegin; test:exchange-session-begin-then-end; test:exchange-session-begin-remotely-initiated",
+   "kind": "MUST",
+   "note": "The local-begin half of the sentence: both vectors pin the two admitted orders (a local begin with a null remote-channel, a remote begin answered with one), and no vector pins the refusal for a locally initiated begin that sets it.",
+   "text_sha256": "233e06906c527ac2aa7a00d66ea58d93fcd99b11ec5bbb02ad6681b0f207c206"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions.4": {
+   "clause_text": "The remote-channel field of a \u00abbegin\u00bb frame MUST be empty for a locally initiated session, and MUST be set when announcing the endpoint created as a result of a remotely initiated session.",
+   "disposition": "formalized:SpecAMQP.Spec.Session.stepBegin; test:exchange-session-begin-remotely-initiated",
+   "kind": "MUST",
+   "note": "The set-half of the same sentence: the answering begin must carry the channel the remote begin arrived on, refused when empty or naming another channel (lean/Spec/Session.lean:940-942), and the vector pins the conforming case.",
+   "text_sha256": "233e06906c527ac2aa7a00d66ea58d93fcd99b11ec5bbb02ad6681b0f207c206"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions.5": {
+   "clause_text": "When a session is unable to process input, it MUST indicate this by issuing an END with an appropriate \u00aberror\u00bb indicating the cause of the problem.",
+   "disposition": "formalized:SpecAMQP.Spec.Session.step; formalized:SpecAMQP.Spec.Session.afterEnd; test:exchange-session-end-with-error-discards; test:exchange-session-window-incoming-exhausted",
+   "kind": "MUST",
+   "note": "Input the session cannot process is answered with an END carrying the artifact's own condition (illegal-state, window-violation, invalid-field, read off the generated tables) and the DISCARDING placement, reachable from every state that can still receive, END_SENT included.",
+   "text_sha256": "5d72e388afc5891c62dc89547859a555d1ec3c5c83e2853ad557be2b531a3498"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions.6": {
+   "clause_text": "It MUST then proceed to discard all incoming frames from the remote endpoint until receiving the remote endpoint's corresponding \u00abend\u00bb frame.",
+   "disposition": "formalized:SpecAMQP.Spec.Session.step; formalized:SpecAMQP.Spec.Session.afterEnd; test:exchange-session-end-with-error-discards; test:exchange-session-refusal-in-end-sent-discards",
+   "kind": "MUST",
+   "note": "The discard-until-the-peer's-end phase is the DISCARDING early return, entered by a refusal's placement from any state that can still receive; exchange-session-refusal-in-end-sent-discards pins a refusal raised in END_SENT leaving the session discarding.",
+   "text_sha256": "2e0df746645feab62bf45fa6d2dca0178ce646f5603e1b75b6e7f08774ffc801"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions/doc:session-flow-control.2": {
+   "clause_text": "This value MUST be decremented after every \u00abtransfer\u00bb frame is sent, and recomputed when informed of the remote session endpoint state.",
+   "disposition": "formalized:SpecAMQP.Spec.Session.Windows.afterSendingTransfer; test:exchange-session-window-remote-incoming",
+   "kind": "MUST",
+   "note": "One sent transfer decrements remote-incoming-window and the guard refuses the next when it reaches zero: the vector pins that exhaustion with amqp:session:window-violation, so the clause is witnessed even though the vector's own clause list cites .3/.5/.7 rather than .2.",
+   "text_sha256": "fd183ff49ae8d41765cce2b1f935bc06a9659839f8e179711e5f7c90cc94ac45"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions/doc:session-flow-control.4": {
+   "clause_text": "This value MUST be decremented after every incoming \u00abtransfer\u00bb frame is received, and recomputed when informed of the remote session endpoint state.",
+   "disposition": "formalized:SpecAMQP.Spec.Session.Windows.afterReceivingTransfer",
+   "kind": "MUST",
+   "note": "Computed but never read: remote-outgoing-window is written at lean/Spec/Session.lean:252, :284, :305 and :324 and read nowhere in either artifact, so a dropped decrement would change no verdict and no vector can witness the clause \u2014 the declaration is its only bearer.",
+   "text_sha256": "64e06c5a37d96a4b248c9c4888ccf951b1ec9f40c1ee5d60f1f0c3e1ebf566e2"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions/doc:session-flow-control.7": {
+   "clause_text": "When the endpoint receives a \u00abflow\u00bb frame from its peer, it MUST update the next-incoming-id directly from the next-outgoing-id of the frame, and it MUST update the remote-outgoing-window directly from the outgoing-window of the frame.",
+   "disposition": "formalized:SpecAMQP.Spec.Session.Windows.afterReceivingFlow; test:exchange-session-window-recomputed",
+   "kind": "MUST",
+   "note": "The flow's next-outgoing-id becomes this endpoint's next-incoming-id directly, and a later flow replaces an earlier one: the vector pins the replacement through the remote-incoming-window formula, which consumes the updated id.",
+   "text_sha256": "3e281471aa68b2679565f6fb54692455ea81e108985fae6fc03ac774f67847ae"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions/doc:session-flow-control.8": {
+   "clause_text": "When the endpoint receives a \u00abflow\u00bb frame from its peer, it MUST update the next-incoming-id directly from the next-outgoing-id of the frame, and it MUST update the remote-outgoing-window directly from the outgoing-window of the frame.",
+   "disposition": "formalized:SpecAMQP.Spec.Session.Windows.afterReceivingFlow; test:exchange-session-receive-in-end-sent",
+   "kind": "MUST",
+   "note": "The remote-outgoing-window half is computed but never read by a guard (see doc:session-flow-control.4), so no vector discriminates it; the named vector exercises the flow update through the next-incoming-id half.",
+   "text_sha256": "3e281471aa68b2679565f6fb54692455ea81e108985fae6fc03ac774f67847ae"
+  }
+ },
+ "schema_version": 1,
+ "scope": "The slice's undispositioned MUST-class clauses: Part 0's conformance framework (section conformance and the standard-encoding sentence of the introduction), and Part 2's connection lifecycle and session machine (the connections section, the begin performative's desired-capabilities, handle-max and remote-channel fields, and the sessions section with the doc session-flow-control arithmetic)."
+}
