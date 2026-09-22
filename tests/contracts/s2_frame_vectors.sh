@@ -30,6 +30,7 @@ set -euo pipefail
 readonly root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 readonly positives="$root/vectors/frames.ndjson"
 readonly negatives="$root/vectors/frames-negative.ndjson"
+readonly generated="$root/vectors/generated-frames.ndjson"
 readonly schema="$root/tests/contracts/frame-vector.schema.json"
 readonly ledger="$root/ledger/clauses.json"
 readonly pictures="$root/ledger/pictures.json"
@@ -46,17 +47,17 @@ command -v lake >/dev/null || die "lake is not on PATH: run inside \`nix develop
   die "building the executables failed: $(tail -3 "$tmp/build.log")"
 note "both executables build from Lean"
 
-for required in "$positives" "$negatives" "$schema" "$ledger" "$pictures"; do
+for required in "$positives" "$negatives" "$generated" "$schema" "$ledger" "$pictures"; do
   [ -f "$required" ] || die "missing $required"
 done
 
 # 2. Shape, ids, cited sources and the SIZE arithmetic. The schema is the authoring
 #    contract; these are the checks that catch data drifting away from it, and every
 #    one of them has been paid for at least once by a bug in this repository.
-python3 - "$positives" "$negatives" "$schema" "$ledger" "$pictures" <<'PYSHAPE' || exit 1
+python3 - "$positives" "$negatives" "$generated" "$schema" "$ledger" "$pictures" <<'PYSHAPE' || exit 1
 import json, pathlib, re, sys
 
-positives, negatives, schema_path, ledger_path, pictures_path = sys.argv[1:6]
+positives, negatives, generated, schema_path, ledger_path, pictures_path = sys.argv[1:7]
 schema = json.loads(pathlib.Path(schema_path).read_text())
 id_pattern = re.compile(schema["properties"]["vector"]["pattern"])
 kinds = set(schema["properties"]["kind"]["enum"])
@@ -66,7 +67,7 @@ known |= {entry["ref"] for entry in json.loads(pathlib.Path(pictures_path).read_
 
 problems: list[str] = []
 summary = {}
-for corpus in (positives, negatives):
+for corpus in (positives, negatives, generated):
     seen: set[str] = set()
     counts: dict[str, int] = {}
     for number, line in enumerate(pathlib.Path(corpus).read_text().splitlines(), 1):
@@ -117,7 +118,7 @@ PYSHAPE
 note "both corpora are well formed, cite their sources, and declare the SIZE they carry"
 
 # 3 and 4. Run both artefacts over both corpora and compare verdict by verdict.
-for corpus in "$positives" "$negatives"; do
+for corpus in "$positives" "$negatives" "$generated"; do
   name="$(basename "$corpus" .ndjson)"
   for exe in amqp-ref amqp-spec; do
     ( cd "$root/lean" && lake exe "$exe" "$corpus" ) >"$tmp/$exe-$name.log" 2>"$tmp/$exe-$name.err" ||
@@ -178,6 +179,67 @@ print(f"     {name}: {len(reference)} vectors, identical verdicts and reason cla
 PYCMP
   note "$name: verdicts and reason classes identical across both artefacts"
 done
+
+# 4b. The generated corpus reproduces from its generator, and it is also where coverage
+#     is measured: every performative the pinned artifacts define must appear in it, with
+#     the list read from the artifacts rather than typed here. That is the check that
+#     fails when a performative is added to the surface and nobody generates a vector for
+#     it, which is the failure a hand-written list would never notice.
+python3 "$root/scripts/gen-value-vectors.py" --frames "$tmp/regen-frames.ndjson" >"$tmp/gen.log" 2>&1 ||
+  die "the generator failed: $(tail -3 "$tmp/gen.log")"
+cmp -s "$tmp/regen-frames.ndjson" "$generated" ||
+  die "generated-frames.ndjson is not what the generator produces (regenerate it)"
+note "the generated frame corpus reproduces byte-for-byte from the generator"
+
+python3 - "$root/spec/oasis" "$generated" "$positives" <<'PYCOVER' || exit 1
+import json, pathlib, re, sys
+from xml.etree import ElementTree as ET
+
+oasis, generated_path, positives_path = (pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]),
+                                        pathlib.Path(sys.argv[3]))
+
+performatives = {}
+for artifact in sorted(oasis.glob("amqp-core-*.xml")):
+    for kind in ET.parse(artifact).getroot().iter("type"):
+        provides = kind.attrib.get("provides", "")
+        roles = {role for role in re.split(r"[,\s]+", provides) if role in ("frame", "sasl-frame")}
+        if not roles:
+            continue
+        for descriptor in kind.iter("descriptor"):
+            raw = descriptor.attrib.get("code", "")
+            if ":" not in raw:
+                continue
+            domain, code = (int(part, 0) for part in raw.split(":", 1))
+            performatives[domain * 2**32 + code] = (kind.attrib.get("name", "?"), sorted(roles)[0])
+
+if len(performatives) != 14:
+    print(f"  frame coverage: the artifacts define {len(performatives)} performatives, not 14 "
+          f"— the count moved, so this check needs revisiting rather than adjusting")
+    raise SystemExit(1)
+
+exercised = set()
+for corpus in (generated_path, positives_path):
+    for line in corpus.read_text().splitlines():
+        if not line.strip():
+            continue
+        entry = json.loads(line)
+        for value in (entry.get("frame") or {}).get("body", []) or []:
+            descriptor = value.get("descriptor") or {}
+            if descriptor.get("type") == "ulong":
+                exercised.add(int(descriptor["value"]))
+            elif descriptor.get("type") == "symbol":
+                for code, (name, _) in performatives.items():
+                    if name == descriptor.get("text"):
+                        exercised.add(code)
+
+missing = sorted(code for code in performatives if code not in exercised)
+if missing:
+    print("  frame coverage: no vector exercises "
+          + ", ".join(f"{performatives[code][0]} (0x{code:x})" for code in missing))
+    raise SystemExit(1)
+print(f"     all {len(performatives)} performatives the artifacts define are exercised")
+PYCOVER
+note "every performative is covered, in the frame type its role gives it"
 
 # 5. Non-vacuity: the extended-header vector is present, because a codec that
 #    validates the ignored octets passes every vector that has none.

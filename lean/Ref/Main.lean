@@ -28,7 +28,7 @@ def main (args : List String) : IO UInt32 := do
       catch e =>
         IO.eprintln s!"amqp-ref: cannot read {path}: {e}"
         return (2 : UInt32)
-    match runCorpus refCodec text with
+    match runCorpusWith refCodec refFrameCodec text with
     | .error message =>
       IO.eprintln s!"amqp-ref: {message}"
       return (2 : UInt32)

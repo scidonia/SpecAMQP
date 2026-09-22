@@ -1,4 +1,5 @@
 import Harness.Runner
+import Ref.Frame
 import Ref.Value
 
 /-!
@@ -16,6 +17,7 @@ namespace SpecAMQP.Ref.Vectors
 
 open Lean
 open SpecAMQP.Harness
+open SpecAMQP.Ref.Frame (Frame Kind decodeFrame encodeFrame)
 
 /-- An unsigned field of a given width, with the range checked rather than
 truncated: a vector that asks for `uint 4294967296` is a corpus defect, not a
@@ -198,5 +200,48 @@ def refCodec : Codec where
   encode := fun json => do
     let value ← valueOfJson 64 json
     encode value
+
+/-- A frame in the corpus vocabulary: the layout's fields, the body as the one
+described value the layout requires, and the payload as octets. -/
+def frameToJson (frame : Frame) (consumed : Nat) : Json :=
+  Json.mkObj [("size", consumed),
+              ("doff", frame.doff),
+              ("type", toHex #[UInt8.ofNat frame.kind.code]),
+              ("channel", frame.channel),
+              ("extended", toHex frame.extended),
+              ("body", Json.arr #[jsonOfValue frame.body]),
+              ("payload", toHex frame.payload)]
+
+/-- A corpus frame read as a frame. `extended` and `payload` are optional in the
+vocabulary and absent means empty; the body is the one performative the layout allows. -/
+def frameOfJson (json : Json) : Except String Frame := do
+  let text (key : String) : String := (json.getObjValAs? String key).toOption.getD ""
+  let doff ← json.getObjValAs? Nat "doff"
+  let channel ← json.getObjValAs? Nat "channel"
+  let kind ←
+    match (← ofHex (text "type")).toList with
+    | [code] =>
+      match Kind.ofCode code.toNat with
+      | some kind => .ok kind
+      | none =>
+        .error s!"frame type {code.toNat} is not a frame type this specification assigns"
+    | _ => .error "a frame's TYPE field is one octet"
+  let extended ← ofHex (text "extended")
+  let payload ← ofHex (text "payload")
+  match (← json.getObjValAs? (Array Json) "body").toList with
+  | [valueJson] =>
+    .ok ⟨doff, kind, channel, extended, (← valueOfJson 64 valueJson), payload⟩
+  | _ => .error "a frame's body is one performative"
+
+/-- The reference implementation's frame layer behind the corpus interface. -/
+def refFrameCodec : FrameCodec where
+  name := "reference"
+  decode := fun bytes =>
+    match decodeFrame bytes with
+    | .ok (frame, consumed) => .ok (frameToJson frame consumed, consumed)
+    | .error e => .error e
+  encode := fun json => do
+    let frame ← frameOfJson json
+    encodeFrame frame
 
 end SpecAMQP.Ref.Vectors

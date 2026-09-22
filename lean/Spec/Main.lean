@@ -1,5 +1,6 @@
 import Harness.Runner
 import Spec.Codec
+import Spec.FrameCodec
 
 /-!
 `amqp-spec` — run the executable specification over a vector corpus.
@@ -13,6 +14,7 @@ outcome. Nothing here touches the network, a clock, or a random source.
 
 open SpecAMQP.Harness
 open SpecAMQP.Spec.Codec
+open SpecAMQP.Spec.FrameCodec
 
 def main (args : List String) : IO UInt32 := do
   let quiet := args.contains "--quiet"
@@ -28,7 +30,7 @@ def main (args : List String) : IO UInt32 := do
       catch e =>
         IO.eprintln s!"amqp-spec: cannot read {path}: {e}"
         return (2 : UInt32)
-    match runCorpus specCodec text with
+    match runCorpusWith specCodec specFrameCodec text with
     | .error message =>
       IO.eprintln s!"amqp-spec: {message}"
       return (2 : UInt32)

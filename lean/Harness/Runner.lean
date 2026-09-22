@@ -91,7 +91,40 @@ def reasonClassOf (detail : String) : Option String :=
   then some head
   else none
 
-def runVector (codec : Codec) (json : Json) : Except String Verdict := do
+/-- The interface a frame corpus needs from an artefact's frame layer, on the same
+terms as `Codec`: octets to a frame in the corpus vocabulary and back, so the
+comparison happens in the vocabulary rather than between two artefacts' frame types. -/
+structure FrameCodec where
+  name : String
+  /-- Octets to a corpus frame, and how many octets the frame consumed. -/
+  decode : Octets → Except String (Json × Nat)
+  /-- A corpus frame back to octets. -/
+  encode : Json → Except String Octets
+
+/-- The frame codec a value-only runner carries: frame vectors fail loudly instead of
+being read as values, which is what a caller with no frame layer needs to hear. -/
+def noFrameCodec : FrameCodec where
+  name := "none"
+  decode := fun _ => .error "this runner carries no frame codec"
+  encode := fun _ => .error "this runner carries no frame codec"
+
+/-- A frame object with its optional fields made explicit, so two frames are compared
+as frames rather than as JSON objects that happen to differ in which absent fields they
+mention. `size` is deliberately not part of the comparison: it is the octet count the
+frame consumed, which the runner checks against the vector's own `size` where the
+vector carries one. -/
+def frameObject (json : Json) : Json :=
+  let text (key : String) : String := (json.getObjValAs? String key).toOption.getD ""
+  Json.mkObj [("doff", (json.getObjValAs? Nat "doff").toOption.getD 0),
+              ("type", text "type"),
+              ("channel", (json.getObjValAs? Nat "channel").toOption.getD 0),
+              ("extended", text "extended"),
+              ("body", (json.getObjVal? "body").toOption.getD (Json.arr #[])),
+              ("payload", text "payload")]
+
+/-- Run one vector with both codecs: the value vocabulary and the frame vocabulary,
+each kind dispatched to the layer that owns it. -/
+def runVectorWith (codec : Codec) (frames : FrameCodec) (json : Json) : Except String Verdict := do
   let id ← json.getObjValAs? String "vector"
   let kind ← json.getObjValAs? String "kind"
   match kind with
@@ -180,10 +213,52 @@ def runVector (codec : Codec) (json : Json) : Except String Verdict := do
             else
               return ⟨id, kind, false, s!"re-encoding decoded to {again.compress}"⟩
     | other => .error s!"unknown property '{other}'"
+  | "frame-decode" =>
+    let bytes ← octetsOf json
+    let expected ← json.getObjVal? "frame"
+    match frames.decode bytes with
+    | .error e => return ⟨id, kind, false, s!"expected a frame, got {e}"⟩
+    | .ok (frame, consumed) =>
+      let declared := (expected.getObjValAs? Nat "size").toOption
+      if declared.isSome && declared != some consumed then
+        return ⟨id, kind, false,
+          s!"consumed {consumed} octets, and the vector declares SIZE {declared.getD 0}"⟩
+      else if frameObject frame != frameObject expected then
+        return ⟨id, kind, false,
+          s!"decoded {frame.compress}, expected {expected.compress}"⟩
+      else
+        return ⟨id, kind, true, s!"decoded a frame consuming {consumed} octets"⟩
+  | "frame-encode" =>
+    let expected ← json.getObjVal? "frame"
+    match frames.encode expected with
+    | .error e => return ⟨id, kind, false, s!"could not encode: {e}"⟩
+    | .ok produced =>
+      let bytes ← octetsOf json
+      let declared := (expected.getObjValAs? Nat "size").toOption
+      if produced != bytes then
+        return ⟨id, kind, false,
+          s!"encoded to {toHexBrief produced}, expected {toHexBrief bytes}"⟩
+      else if declared.isSome && declared != some produced.size then
+        return ⟨id, kind, false,
+          s!"the vector declares SIZE {declared.getD 0} and the frame is {produced.size} octets"⟩
+      else
+        return ⟨id, kind, true, "encoded to the expected octets"⟩
+  | "frame-reject" =>
+    let bytes ← octetsOf json
+    match frames.decode bytes with
+    | .error reason => return ⟨id, kind, true, reason⟩
+    | .ok (frame, _) => return ⟨id, kind, false, s!"expected a refusal, decoded {frame.compress}"⟩
   | other => .error s!"unknown vector kind '{other}'"
 
-/-- Run every line, returning the verdicts and whether all of them passed. -/
-def runCorpus (codec : Codec) (text : String) : Except String (List Verdict × Bool) := do
+/-- Run one vector against the value vocabulary alone, which is what a caller with no
+frame layer means by a corpus. -/
+def runVector (codec : Codec) (json : Json) : Except String Verdict :=
+  runVectorWith codec noFrameCodec json
+
+/-- Run every line with both codecs, returning the verdicts and whether all of them
+passed. -/
+def runCorpusWith (codec : Codec) (frames : FrameCodec) (text : String) :
+    Except String (List Verdict × Bool) := do
   let mut verdicts : List Verdict := []
   let mut allOk := true
   for (line, index) in text.splitOn "\n" |>.zipIdx do
@@ -192,11 +267,15 @@ def runCorpus (codec : Codec) (text : String) : Except String (List Verdict × B
     match Json.parse trimmed with
     | .error e => .error s!"line {index + 1}: not valid JSON: {e}"
     | .ok json =>
-      match runVector codec json with
+      match runVectorWith codec frames json with
       | .error e => .error s!"line {index + 1}: {e}"
       | .ok verdict =>
         verdicts := verdict :: verdicts        -- prepend, then reverse once: a corpus
         if !verdict.ok then allOk := false     -- of tens of thousands is not a place
   return (verdicts.reverse, allOk)             -- for quadratic list append
+
+/-- Run every line of a value corpus. -/
+def runCorpus (codec : Codec) (text : String) : Except String (List Verdict × Bool) :=
+  runCorpusWith codec noFrameCodec text
 
 end SpecAMQP.Harness
