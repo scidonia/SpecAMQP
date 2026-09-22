@@ -540,7 +540,30 @@ First three concrete actions:
 2. Implement `scripts/clause-ledger.py` and land the first disposition pass for Part 2 `#framing` and `#performatives`, with the planted-negative controls observed failing first.
 3. Freeze the interface alphabet, the environment assumptions, and the vector schema — then write the Part 1 tables generator and its mutation control, so `Value.lean` starts on generated data rather than transcription.
 
-## 22. Handoff: what downstream implementation work needs from here
+## 22. Parallel work order, S3 to S7
+
+The remaining milestones are decomposed into slices that can run at the same time without sharing a file, because the cost of a parallel batch is the interface that has to be fixed before it starts and the conflict that follows if it is not. Three rules hold for every batch:
+
+* **interfaces are fixed by the planner before the batch starts** — a state type, a dispatch hook, a corpus schema. A slice that discovers it needs a different interface reports that; it does not negotiate one with its sibling, because two coders agreeing on an interface is not the same as the interface being right.
+* **file ownership is disjoint**, and the generator is the one shared boundary, so it is split before a wave needs two slices to touch it.
+* **one integration owner** — the planner runs the acceptance commands, not the slices, since a slice that validates its own work is validating against its own reading of the contract.
+
+**Wave 1 (running).** The reference's element-constructor gap (`lean/Ref/**`, `scripts/gen-value-vectors.py`); the value codec's round-trip rung R1 and the frame layer's three statements (both `lean/Proofs/**`, separate files so the two proof slices cannot collide); and S3's facts, read from the artifacts rather than remembered.
+
+**Wave 2, after S3's facts land.** Three implementation slices and one enabling change:
+
+* **S3-connection** — `lean/Spec/Connection.lean` and `lean/Ref/Connection.lean`: the protocol header and version negotiation, the SASL ANONYMOUS phase, `open`/`close`, the connection state machine and the connection error conditions; plus harness support for exchange vectors and the slice's generator family. The interfaces the planner fixes first: the state type takes the artifact's own state names, and the observable is the per-step verdict the exchange schema defines.
+* **S3-session** — `lean/Spec/Session.lean` and `lean/Ref/Session.lean`: `begin`/`end`, `attach`/`detach`, `flow`, and `transfer` carrying one unfragmented `data` section. It depends on one thing from S3-connection and that thing is fixed before either starts: a frame whose channel is not zero is handed to the session layer, which decides whether the moment is legal.
+* **S5-message** — `lean/Spec/Message.lean` and `lean/Ref/Message.lean`: the Part 3 section types and the outcome state machine. It depends on nothing in S3 at all — sections are values carried in a transfer's payload — which is why it can run beside the connection work rather than after it.
+* **the generator split** — `scripts/gen/values.py`, `scripts/gen/frames.py`, `scripts/gen/slices.py`, with the existing script becoming the entry point that dispatches to them. This exists so that two slices can add families in the same wave without editing one file; until it lands, families are added by one slice at a time and the second waits.
+
+**Wave 3.** S4's flow control (`lean/Spec/Session.lean`'s window arithmetic, credit conservation and settlement, with the fragmentation adequacy control) on top of S3-session; S6's transactions as its own performative family and state machine, which needs only the session dispatch; S7's full SASL mechanism negotiation and layer-transition rules on top of S3-connection's ANONYMOUS phase. R2–R5 of the proof ladder continue beside them.
+
+**Wave 4.** The handoff, which is H1: what a downstream Rust implementation and its proof need from this repository, with the conformance interface and the frozen lexical surface named rather than described.
+
+**One acceptance item is blocked on something no slice can produce.** S3's plan asks for at least two *recorded third-party* exchanges (V3) of the same slice, admitted, with the mutation controls (V4) firing. Recording requires an independent implementation to talk to, and this repository captures nothing over a network by design: the outputs of a capture are committed data, and there is no capture to commit. S3's acceptance therefore proceeds on V1, V2 and V4 — the authored and generated corpora and the mutation controls — and V3 stays outstanding with its requirement stated here rather than quietly dropped: a capture of the same exchange from an independent implementation, committed under `vectors/recorded/` with its provenance recorded the way the artifacts' identities are.
+
+## 23. Handoff: what downstream implementation work needs from here
 
 This repository stops at the specification. The remaining work — a Rust reference implementation, its extraction through Charon and Aeneas, proofs that it conforms, a fast implementation, performance evidence — belongs to TemperMint and is scheduled there. What it needs from here, and what `HANDOFF.md` records:
 

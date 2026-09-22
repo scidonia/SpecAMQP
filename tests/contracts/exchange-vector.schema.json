@@ -1,0 +1,81 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://scidonia.example/specamqp/exchange-vector.schema.json",
+ "title": "SpecAMQP exchange vector",
+ "description": "A sequence of frames a peer sends and receives, with the outcome each step must have and the state it must leave the peer in. Single-frame vectors cannot express the connection lifecycle, because what a peer may send depends on what it has already sent and received: the corpus has to be able to say 'this frame, now, in this state' and 'this frame, now, is not permitted'.",
+ "type": "object",
+ "required": ["vector", "kind", "clauses", "steps"],
+ "additionalProperties": false,
+ "properties": {
+  "vector": {
+   "type": "string",
+   "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+   "description": "Stable vector id. The pattern is the one the contract validates against, so an id cannot drift out of it unnoticed."
+  },
+  "kind": {
+   "const": "exchange",
+   "description": "One kind only, deliberately. An exchange is not a frame vector with more frames: its expectations are per step and include state."
+  },
+  "clauses": {
+   "type": "array",
+   "minItems": 1,
+   "items": { "type": "string" },
+   "description": "The clauses or pictures this exchange is authored from — the state tables are pictures, and a vector whose sequence comes from a table cites that picture."
+  },
+  "start": {
+   "type": "string",
+   "description": "The state the peer is in before the first step. Names come from the artifact's own tables; a name the specification's state type does not have is a defect in the vector, not in the model."
+  },
+  "steps": {
+   "type": "array",
+   "minItems": 2,
+   "items": {
+    "type": "object",
+    "required": ["direction", "expect"],
+    "additionalProperties": false,
+    "properties": {
+     "direction": {
+      "enum": ["send", "receive"],
+      "description": "`send` offers a frame to this peer's encoder and legality check; `receive` hands octets to its decoder and state machine. The two are different observables and a corpus that conflated them could not fail a peer that answers its own frames."
+     },
+     "bytes": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{2})+$",
+      "description": "The frame's octets. Required on `receive` always, and on `send` when the step is admitted, because then the encoder must produce exactly these — which is how the exchange pins the encoding rather than only the permission."
+     },
+     "value": {
+      "type": "object",
+      "description": "The frame as a structure, for a `send` step: what the peer is asked to send. Either `bytes` or this, never both: bytes pin the encoding, the structure pins the request."
+     },
+     "expect": {
+      "type": "object",
+      "required": ["status"],
+      "additionalProperties": false,
+      "properties": {
+       "status": {
+        "enum": ["admitted", "refused"],
+        "description": "`admitted` means the peer sends it (producing `bytes`) or accepts it (leaving the state named below). `refused` means the peer must not send it, or must reject it, with the condition and reason class named."
+       },
+       "condition": {
+        "type": "string",
+        "pattern": "^amqp:",
+        "description": "Required for a refusal: the protocol-level condition the peer reports or raises. `amqp:connection:framing-error` and the connection-error conditions from the generated choice table are the vocabulary."
+       },
+       "reason": {
+        "type": "string",
+        "enum": ["truncated", "unassigned", "unsupported", "sizeMismatch", "malformed", "limit", "illegalState"],
+        "description": "The implementation's reason class, as the leading token of the detail. `illegalState` is the class a step uses when the octets are perfectly well formed and the *moment* is wrong — sending `open` twice, or a session frame before `begin` — which is a different failure from anything the encoder or decoder can see on its own."
+       },
+       "state": {
+        "type": "string",
+        "description": "The state the peer must be in after the step. Omitted when the step leaves it unchanged."
+       }
+      }
+     },
+     "note": { "type": "string" }
+    }
+   }
+  },
+  "note": { "type": "string" }
+ }
+}
