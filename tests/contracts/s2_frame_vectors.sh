@@ -87,9 +87,12 @@ for corpus in (positives, negatives, generated):
         for ref in entry.get("clauses", []):
             if ref not in known:
                 problems.append(f"{where}: cites {ref}, which is not a clause or picture in the ledger")
-        octets = len(entry["bytes"]) // 2
+        # `bytes` is absent on an encode-direction refusal: there is no expected encoding when
+        # the encoder is required to refuse. The SIZE check is about a declared size agreeing with
+        # octets the vector carries, so it only applies where octets exist.
+        octets = len(entry.get("bytes", "")) // 2
         frame = entry.get("frame")
-        if frame and frame.get("size") is not None and frame["size"] != octets:
+        if entry.get("bytes") and frame and frame.get("size") is not None and frame["size"] != octets:
             problems.append(
                 f"{where}: declares SIZE {frame['size']} and carries {octets} octets")
         if entry.get("kind") == "frame-reject":
