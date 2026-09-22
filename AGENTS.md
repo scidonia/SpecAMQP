@@ -8,7 +8,7 @@ Standard, Parts 0–5) in Lean 4, with a clause-level ledger that makes complete
 and fidelity measurable. Read `PLAN.md`; it is the programme of record.
 
 There is no Rust, no extraction, no Charon/Aeneas and no performance work here.
-Those belong to TemperMint and are scheduled there; `PLAN.md` §22 records what
+Those belong to TemperMint and are scheduled there; `PLAN.md` §23 records what
 downstream work needs from this repository.
 
 ## Layers

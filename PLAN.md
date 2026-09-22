@@ -6,7 +6,7 @@ Produce, in this repository, **a complete, correct, executable formal specificat
 
 This repository holds the specification, the evidence that it is correct, and a **reference implementation written in Lean**. The two are deliberately separate artefacts: the specification is declarative, generated-table-driven and shaped for proof, while the reference implementation is operational, independently written from the same clauses, and compiled to a native executable by Lean itself — so its behaviour rests on no translation step. Differential testing runs the implementation against the specification and against recorded third-party exchanges; the corpus, not either artefact, is what both are measured by.
 
-Nothing here is Rust: extraction through Charon and Aeneas, proofs about a Rust programme, and performance work remain downstream (§22). What this repository now provides to that work is an executable oracle.
+Nothing here is Rust: extraction through Charon and Aeneas, proofs about a Rust programme, and performance work remain downstream (§23). What this repository now provides to that work is an executable oracle.
 
 ## 1. What "a correct specification" means here
 
@@ -58,7 +58,7 @@ Scan numbers size the work; the ledger is the work.
 
 ## 3. Non-goals
 
-- **No Rust, no extraction, no performance work.** The reference implementation is in Lean, and it is the only implementation here. A Rust programme, its extraction through Charon and Aeneas, proofs about it, optimised candidates and measurements belong to TemperMint and are scheduled there (§22).
+- **No Rust, no extraction, no performance work.** The reference implementation is in Lean, and it is the only implementation here. A Rust programme, its extraction through Charon and Aeneas, proofs about it, optimised candidates and measurements belong to TemperMint and are scheduled there (§23).
 - **No claims about the reference implementation's conformance beyond its corpus.** It is an implementation, not a proof: what it satisfies is stated by the vectors it passes, and a clause it does not yet exercise is a clause it does not yet demonstrate. The specification's theorems are about the specification.
 - **No protocol extensions.** AMQP management (`amqp-man`), filter expressions (`filtex`), claims-based security (`amqp-cbs`), addressing, JMS mapping, HTTP-over-AMQP, event streams, and connection-info are out of scope; they exist as working drafts in `oasis-tcs/amqp-specs`, not as part of the OASIS Standard for core AMQP 1.0. Core must nonetheless model how unknown described types and pass-through annotations are handled.
 - **No broker or queue semantics.** AMQP core defines links and termini, not what a destination does with a message. `source`/`target` are formalized as protocol-visible field sets and obligations, not as a routing model.
@@ -197,7 +197,7 @@ Defining rules, decided here so the specification is not retrofitted later:
 5. **Bounded resources are explicit.** Capacity exhaustion is specified behaviour with a mandated error code (`amqp:resource-limit-exceeded`, `amqp:frame-size-too-small`, `amqp:connection:framing-error` as the clauses direct), so an implementation that runs out of room is incorrect in a checked way rather than silently lossy.
 6. **Anchored in an environment model.** The peer, the ordered byte stream with arbitrary fragmentation, timers as explicit ticks, and TLS/crypto as opaque are named assumptions, each with a ledger disposition. A claim that rests on one says so.
 
-Proving an instance of `Conforms` for a concrete programme is downstream work (§22) and requires the extraction toolchain; defining it correctly is this repository's job, and it is the reason the interface is frozen before any implementation exists.
+Proving an instance of `Conforms` for a concrete programme is downstream work (§23) and requires the extraction toolchain; defining it correctly is this repository's job, and it is the reason the interface is frozen before any implementation exists.
 
 ## 11. Specification test vectors
 
@@ -412,7 +412,7 @@ Acceptance: the SASL state machine proved; mechanism negotiation exercised; PLAI
 
 ### H1 — handoff
 
-Produce `HANDOFF.md`: the frozen interface, the ledger and coverage report, the vector corpus, the executable driver's invocation, and the requirements this specification places on implementation tooling (§22). No implementation work.
+Produce `HANDOFF.md`: the frozen interface, the ledger and coverage report, the vector corpus, the executable driver's invocation, and the requirements this specification places on implementation tooling (§23). No implementation work.
 
 ## 14. Repository layout
 
@@ -498,7 +498,7 @@ Test forms:
 | Executability cost | the executable specification becomes too slow to run the corpus | the corpus is a specification test suite, not a benchmark: vector count in the hundreds, not millions; if a definition resists computation, that is a design smell in the definition, reported rather than worked around |
 | Corpus acquisition | no access to a second implementation for V3 | capture is off-gate; clause-authored vectors land first, recorded vectors are added as they become available without blocking milestones |
 | Correlated misreadings | a second transcription repeats the same error, so cross-checking two of our own developments reports agreement | third-party admission (§12 V3) is the independent evidence, because its independence is in authorship and experience rather than in language; a second prover is a cross-check, never an oracle (§12). Observed in practice at S1: the corpus generator and the implementation shared two encoding defects, and what caught them was the *reader's* independent arithmetic — a size window measured rather than trusted — not agreement between the two writers |
-| Scope creep toward implementation | Rust creeps back in because it is the natural next step | §3 and §22: implementation work is scheduled in TemperMint; this repository stops at the handoff |
+| Scope creep toward implementation | Rust creeps back in because it is the natural next step | §3 and §23: implementation work is scheduled in TemperMint; this repository stops at the handoff |
 
 ## 20. Acceptance commands
 
