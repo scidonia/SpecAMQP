@@ -83,7 +83,9 @@ def carried (step : ExchangeStep) :
   match step.value with
   | some json =>
     let frame ← frameOfJson json
-    return some (frame.channel, frame.body)
+    match frame.body with
+    | some body => return some (frame.channel, body)
+    | none => return none
   | none =>
     match step.bytes with
     | none => return none
@@ -92,7 +94,10 @@ def carried (step : ExchangeStep) :
       else
         match SpecAMQP.Spec.Frame.decodeFrame octets with
         | .error _ => return none
-        | .ok (frame, _) => return some (frame.channel, frame.body)
+        | .ok (frame, _) =>
+          match frame.body with
+          | some body => return some (frame.channel, body)
+          | none => return none
 
 /-- Whether a frame is the connection's rather than a session's: `open` and `close` are
 the two the dispatch table gives the connection endpoint, whatever channel they are on —
@@ -161,6 +166,16 @@ def stepOf (peer : Peer) (step : ExchangeStep) : Except String (StepOutcome × P
       return ({ relayed with state, detail := s!"admitted; the peer is in {state}" },
               { peer with connection := connection, session := session })
     | .error reason =>
+      if reason.closesConnection then
+        -- the session's rule with the connection's consequence: `attach/field:handle.2`
+        -- and `begin/field:handle-max.2` both mandate an immediate close, which is the
+        -- connection's frame to write, so the connection moves to CLOSE_SENT and the
+        -- state the outcome names is the one that moved
+        let connection := { connection with state := State.closeSent }
+        let state := s!"connection:{connection.state.name}"
+        return (⟨false, none, state, some reason.condition,
+                 s!"{reason.detail}; the peer closes the connection, and is in {state}"⟩,
+                { peer with connection, session := peer.session })
       let session := { peer.session with state := reason.state.getD peer.session.state }
       let state := s!"session:{session.state.name}"
       return (⟨false, none, state, some reason.condition,

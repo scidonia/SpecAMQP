@@ -95,14 +95,20 @@ theorem code_lt (t : FrameType) : t.code < 2 ^ 8 := by
 
 /-! ## The contract's first two propositions -/
 
-/-- Every frame the decoder accepts carries a performative.
+/-- Every frame the decoder accepts either carries no body at all or carries a performative.
 
-The decoder's accepted branch is reachable only through the `described` shape, through a
-descriptor `typeOfDescriptor` resolves to a declared type, and through
-`decl.provides.contains frameType.role` — which is exactly `carriesPerformative`'s definition.
-The two errors the branch can raise instead are a descriptor naming no declared type and a
-declared role set that does not include the frame type's role, and both are refuted here by the
-hypothesis that the result was `.ok`. -/
+The decoder's accepted branches are the empty frame and the `described` shape: the empty case is
+the idle-timeout clause's ("a frame consisting solely of a frame header, with no frame body"), and
+it is decided on the frame's own window, so an accepted frame whose body is absent is its own
+disjunct rather than an exception to the other. The described branch is reachable only through a
+descriptor `typeOfDescriptor` resolves to a declared type and through
+`decl.provides.contains frameType.role` — which is exactly `carriesPerformative`'s definition — and
+the two errors it can raise instead are refuted by the hypothesis that the result was `.ok`.
+
+Stated as a disjunction rather than as a claim about frames that carry a body, because the clause
+is a statement about *every* frame a receiver must handle: an empty frame is traffic to defeat an
+idle timeout and, in the clause's own words, "apart from this use, empty frames have no meaning" —
+so "no body, or a described value naming a performative" is what an accepted frame is. -/
 theorem accepted_frames_carry_performatives :
     SpecAMQP.Contracts.AcceptedFramesCarryPerformatives := by
   intro bytes frame consumed h
@@ -145,9 +151,9 @@ theorem encodeFrame_ok_facts (frame : Frame) (bytes : Octets) (h : encodeFrame f
       frame.channel ≤ 2 ^ (8 * channelOctets) - 1 ∧
       frame.doff ≤ 2 ^ (8 * doffOctets) - 1 ∧
       frame.extended.size = bodyStart frame.doff - headerOctets ∧
-      frame.body = .described descriptor inner ∧
+      frame.body = some (.described descriptor inner) ∧
       carriesPerformative frame.frameType descriptor = true ∧
-      encodeValue frame.body = .ok bodyOctets ∧
+      encodeValue (.described descriptor inner) = .ok bodyOctets ∧
       headerOctets + frame.extended.size + bodyOctets.size + frame.payload.size ≤ maxSize ∧
       bytes = (beOctets sizeOctets (headerOctets + frame.extended.size + bodyOctets.size +
           frame.payload.size) ++ beOctets 1 frame.doff ++ beOctets 1 frame.frameType.code ++
@@ -158,17 +164,10 @@ theorem encodeFrame_ok_facts (frame : Frame) (bytes : Octets) (h : encodeFrame f
   repeat' split at h
   all_goals first
     | (exfalso; grind; done)
-    | (cases hb : encodeValue frame.body with
-       | error e =>
-         dsimp only [Bind.bind, Monad.toBind, Monad.toApplicative, Applicative.toPure,
-           Pure.pure, Except.instMonad, Except.bind, Except.pure] at h
-         rw [hb] at h
-         simp at h
-       | ok b =>
-         dsimp only [Bind.bind, Monad.toBind, Monad.toApplicative, Applicative.toPure,
-           Pure.pure, Except.instMonad, Except.bind, Except.pure] at h
-         repeat' split at h
-         all_goals grind [carriesPerformative_eq])
+    | (dsimp only [Bind.bind, Monad.toBind, Monad.toApplicative, Applicative.toPure,
+        Pure.pure, Except.instMonad, Except.bind, Except.pure] at h
+       repeat' split at h
+       all_goals grind [carriesPerformative_eq])
 
 /-! ## Big-endian fields, and the header the writer writes
 
@@ -418,6 +417,8 @@ guards, `hMinDoff` the `DOFF` floor, `hBodyStart` the `DOFF`-against-`SIZE` guar
 `hType` and `hChannel` name the fields, `hExtended`, `hDecode`, `hFit` and `hPayload` describe the
 body's window, and `hCarried` is what the descriptor check needs. -/
 theorem decodeFrame_eq_ok_of (bytes : Octets) (frame : Frame) (consumed : Nat)
+    (descriptor inner : Value) (hbody : frame.body = some (.described descriptor inner))
+    (hcarry : carriesPerformative frame.frameType descriptor = true)
     (hSize : beAt bytes 0 sizeOctets = bytes.size)
     (hHeader : headerOctets ≤ bytes.size)
     (hMinDoff : minDoff ≤ frame.doff)
@@ -427,14 +428,27 @@ theorem decodeFrame_eq_ok_of (bytes : Octets) (frame : Frame) (consumed : Nat)
     (hChannel : beAt bytes 6 channelOctets = frame.channel)
     (hExtended : bytes.extract headerOctets (bodyStart frame.doff) = frame.extended)
     (hDecode : decodeValue (bytes.extract (bodyStart frame.doff) bytes.size) =
-      .ok (frame.body, consumed))
+      .ok (.described descriptor inner, consumed))
     (hFit : bodyStart frame.doff + consumed ≤ bytes.size)
-    (hPayload : bytes.extract (bodyStart frame.doff + consumed) bytes.size = frame.payload)
-    (hCarried : ∃ descriptor inner, frame.body = .described descriptor inner ∧
-      carriesPerformative frame.frameType descriptor = true) :
+    (hPayload : bytes.extract (bodyStart frame.doff + consumed) bytes.size = frame.payload) :
     decodeFrame bytes = .ok (frame, bytes.size) := by
-  obtain ⟨descriptor, inner, hbody, hcarry⟩ := hCarried
   obtain ⟨decl, hdec, hprov⟩ := exists_decl_of_carriesPerformative _ _ hcarry
+  -- the empty frame is decided on the frame's own window, so a frame whose body decodes
+  -- cannot be one: an empty window has no octets for a value to be read from
+  have g6 : ¬ (bytes.size = headerOctets ∧ frame.doff = minDoff) := by
+    rintro ⟨hsz, hdoff⟩
+    have hstart : bodyStart frame.doff = bytes.size := by
+      rw [hdoff, hsz, SpecAMQP.Contracts.body_starts_after_the_header]
+    -- the region the decoder reads is then empty, and `decodeValue` spends one octet of
+    -- fuel per buffer octet: an empty buffer is refused before any value is read
+    have hempty : bytes.extract (bodyStart frame.doff) bytes.size = #[] := by
+      rw [hstart]
+      exact Array.extract_eq_empty_iff.mpr (by simp)
+    rw [hempty] at hDecode
+    -- `decodeValue` on an empty buffer is the reader's fuel-0 refusal, before any value is read
+    simp only [decodeValue] at hDecode
+    unfold SpecAMQP.Spec.Codec.readValue at hDecode
+    exact absurd hDecode (by simp)
   have g1 : ¬ (bytes.size < headerOctets) := by omega
   have g2 : ¬ (frame.doff < minDoff) := by omega
   have g3 : ¬ (bodyStart frame.doff > bytes.size) := by omega
@@ -447,9 +461,9 @@ theorem decodeFrame_eq_ok_of (bytes : Octets) (frame : Frame) (consumed : Nat)
   try dsimp only []
   rw [ofCode_code]
   try dsimp only []
-  rw [hDecode]
+  rw [if_neg g6]
   try dsimp only []
-  rw [hbody]
+  rw [hDecode]
   try dsimp only []
   rw [hdec]
   try dsimp only []
@@ -459,7 +473,9 @@ theorem decodeFrame_eq_ok_of (bytes : Octets) (frame : Frame) (consumed : Nat)
   try dsimp only []
   rw [hPayload]
   rw [if_pos hprov]
+  try dsimp only []
   rw [← hbody]
+  try rfl
 
 /-! ## The value layer's consumption law, the one hypothesis the round trip rests on -/
 
@@ -532,8 +548,8 @@ theorem frame_round_trip (valueConsumption : ValueConsumption)
     have hmin := hMinDoff
     simp only [bodyStart, doffWord, minDoff, headerOctets] at h hmin ⊢
     omega
-  refine decodeFrame_eq_ok_of bytes frame bodyOctets.size ?_ ?_ hMinDoff ?_ ?_ ?_ ?_ ?_ ?_ ?_
-    ?_ ⟨descriptor, inner, hBody, hCarry⟩
+  refine decodeFrame_eq_ok_of bytes frame bodyOctets.size descriptor inner hBody hCarry ?_
+    ?_ hMinDoff ?_ ?_ ?_ ?_ ?_ ?_ ?_ ?_
   · rw [hLen, hBytes']
     rw [beAt_append_of_le (h := by rw [frameHeader_size]; decide)]
     exact beAt_frameHeader_size _ _ _ _ hSizeLt
@@ -559,7 +575,7 @@ theorem frame_round_trip (valueConsumption : ValueConsumption)
       rw [hLen, hBytes', hStart]
       exact extract_region_of_size _ _ _ _ _ (frameHeader_size _ _ _ _) hsz.symm
     rw [hregion]
-    exact valueConsumption frame.body bodyOctets frame.payload hEnc
+    exact valueConsumption (.described descriptor inner) bodyOctets frame.payload hEnc
   · rw [hLen, hStart, ← hsz]
     simp only [headerOctets]
     omega

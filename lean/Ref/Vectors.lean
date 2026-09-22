@@ -209,7 +209,9 @@ def frameToJson (frame : Frame) (consumed : Nat) : Json :=
               ("type", toHex #[UInt8.ofNat frame.kind.code]),
               ("channel", frame.channel),
               ("extended", toHex frame.extended),
-              ("body", Json.arr #[jsonOfValue frame.body]),
+              ("body", match frame.body with
+                | some body => Json.arr #[jsonOfValue body]
+                | none => Json.arr #[]),
               ("payload", toHex frame.payload)]
 
 /-- A corpus frame read as a frame. `extended` and `payload` are optional in the
@@ -230,7 +232,8 @@ def frameOfJson (json : Json) : Except String Frame := do
   let payload ← ofHex (text "payload")
   match (← json.getObjValAs? (Array Json) "body").toList with
   | [valueJson] =>
-    .ok ⟨doff, kind, channel, extended, (← valueOfJson 64 valueJson), payload⟩
+    .ok ⟨doff, kind, channel, extended, some (← valueOfJson 64 valueJson), payload⟩
+  | [] => .ok ⟨doff, kind, channel, extended, none, payload⟩
   | _ => .error "a frame's body is one performative"
 
 /-- The reference implementation's frame layer behind the corpus interface. -/

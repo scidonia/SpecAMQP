@@ -192,8 +192,14 @@ structure Frame where
   channel : Nat
   /-- The extended header octets, `doff * 4 - 8` of them. -/
   extended : Octets
-  /-- The performative. -/
-  body : Value
+  /-- The body: a performative as a described value, or `none` for the empty frame the
+  idle-timeout clauses make a receiver handle ("a frame consisting solely of a frame
+  header, with no frame body", and "apart from this use, empty frames have no meaning").
+  `Option` rather than a distinguished `Value` because a frame with no body is not a frame
+  whose body is unusual: `.null` would be indistinguishable from a malformed body the
+  layout refuses, and a unit constructor in `Value` would put a non-AMQP inhabitant into
+  the value language the codec and the corpus vocabulary both range over. -/
+  body : Option Value
   /-- The opaque octets after the performative. -/
   payload : Octets
 deriving Repr
@@ -255,37 +261,43 @@ def decodeFrame (bytes : Octets) : Except String (Frame × Nat) := do
       | some frameType => do
         let start := bodyStart doff
         let extended := bytes.extract headerOctets start
-        let region := bytes.extract start bytes.size
-        match decodeValue region with
-        | .error e =>
-          if reasonClassOf e == "truncated" then
-            .error (refusal "sizeMismatch" s!"the performative at octet {start} does \
-              not complete within the {size} octets SIZE declares: {e}")
-          else .error e
-        | .ok (body, consumed) =>
-          if start + consumed > size then
-            .error (refusal "sizeMismatch" s!"the performative at octet {start} ends \
-              at octet {start + consumed} of a {size}-octet frame")
-          else
-            match body with
-            | .described descriptor _ =>
-              match typeOfDescriptor descriptor with
-              | none =>
-                .error (refusal "unsupported" s!"the frame body's descriptor names no \
-                  type the declared surface defines, so it is not a performative")
-              | some decl =>
-                if decl.provides.contains frameType.role then
-                  .ok (⟨doff, frameType, channel, extended, body,
-                    bytes.extract (start + consumed) size⟩, size)
-                else
-                  .error (refusal "unsupported" s!"the frame body's performative is \
-                    {decl.name}, whose declared roles are {decl.provides}, which does not \
-                    include the {frameType.role} role a {frameType.name} frame carries")
-            | other =>
-              .error (refusal "malformed" s!"the frame body starts with \
-                {typeName other}, and a frame's performative is encoded as a described \
-                type")
-
+        if size = headerOctets ∧ doff = minDoff then
+          -- the empty frame: a frame header and nothing else. The test is the frame's own
+          -- window — SIZE equal to the header's octets with DOFF at its minimum — and never
+          -- a body read: the body region below runs to the end of the *buffer*, so an empty
+          -- frame ahead of another would otherwise be read against the next frame's octets.
+          .ok (⟨doff, frameType, channel, extended, none, #[]⟩, size)
+        else
+          let region := bytes.extract start bytes.size
+          match decodeValue region with
+          | .error e =>
+            if reasonClassOf e == "truncated" then
+              .error (refusal "sizeMismatch" s!"the performative at octet {start} does \
+                not complete within the {size} octets SIZE declares: {e}")
+            else .error e
+          | .ok (body, consumed) =>
+            if start + consumed > size then
+              .error (refusal "sizeMismatch" s!"the performative at octet {start} ends \
+                at octet {start + consumed} of a {size}-octet frame")
+            else
+              match body with
+              | .described descriptor _ =>
+                match typeOfDescriptor descriptor with
+                | none =>
+                  .error (refusal "unsupported" s!"the frame body's descriptor names no \
+                    type the declared surface defines, so it is not a performative")
+                | some decl =>
+                  if decl.provides.contains frameType.role then
+                    .ok (⟨doff, frameType, channel, extended, some body,
+                      bytes.extract (start + consumed) size⟩, size)
+                  else
+                    .error (refusal "unsupported" s!"the frame body's performative is \
+                      {decl.name}, whose declared roles are {decl.provides}, which does not \
+                      include the {frameType.role} role a {frameType.name} frame carries")
+              | other =>
+                .error (refusal "malformed" s!"the frame body starts with \
+                  {typeName other}, and a frame's performative is encoded as a described \
+                  type")
 /-- Encode one frame, computing the SIZE it declares from the octets it writes.
 
 SIZE is not carried by the value being encoded, so it cannot disagree with the octets:
@@ -316,28 +328,36 @@ def encodeFrame (frame : Frame) : Except String Octets := do
       {frame.extended.size}")
   else
     match frame.body with
-    | .described descriptor _ =>
-      if !carriesPerformative frame.frameType descriptor then
-        match typeOfDescriptor descriptor with
-        | none =>
-          .error (refusal "unsupported" "the frame body's descriptor names no type the \
-            declared surface defines, so it is not a performative")
-        | some decl =>
-          .error (refusal "unsupported" s!"the frame body's performative is {decl.name}, \
-            whose declared roles are {decl.provides}, which does not include the \
-            {frame.frameType.role} role a {frame.frameType.name} frame carries")
-      else do
-        let body ← encodeValue frame.body
-        let size := headerOctets + frame.extended.size + body.size + frame.payload.size
-        if size ≤ maxSize then
-          return (beOctets sizeOctets size ++ beOctets 1 frame.doff ++
-            beOctets 1 frame.frameType.code ++ beOctets channelOctets frame.channel
-            ).toArray ++ frame.extended ++ body ++ frame.payload
-        else
-          .error (refusal "sizeMismatch" s!"SIZE cannot carry {size} octets in its \
-            {sizeOctets} octets")
-    | other =>
-      .error (refusal "malformed" s!"the frame body is {typeName other}, and a frame's \
-        performative is encoded as a described type")
+    | none =>
+      -- Sending an empty frame is a MAY, so refusing to write one is conforming; the
+      -- receiver's obligation is in the decoder above, not here.
+      .error (refusal "unsupported" "the frame carries no body: an empty frame is how a \
+        peer with nothing to send defeats an idle timeout, and this writer does not send \
+        one")
+    | some body =>
+      match body with
+      | .described descriptor _ =>
+        if !carriesPerformative frame.frameType descriptor then
+          match typeOfDescriptor descriptor with
+          | none =>
+            .error (refusal "unsupported" "the frame body's descriptor names no type the \
+              declared surface defines, so it is not a performative")
+          | some decl =>
+            .error (refusal "unsupported" s!"the frame body's performative is {decl.name}, \
+              whose declared roles are {decl.provides}, which does not include the \
+              {frame.frameType.role} role a {frame.frameType.name} frame carries")
+        else do
+          let octets ← encodeValue body
+          let size := headerOctets + frame.extended.size + octets.size + frame.payload.size
+          if size ≤ maxSize then
+            return (beOctets sizeOctets size ++ beOctets 1 frame.doff ++
+              beOctets 1 frame.frameType.code ++ beOctets channelOctets frame.channel
+              ).toArray ++ frame.extended ++ octets ++ frame.payload
+          else
+            .error (refusal "sizeMismatch" s!"SIZE cannot carry {size} octets in its \
+              {sizeOctets} octets")
+      | other =>
+        .error (refusal "malformed" s!"the frame body is {typeName other}, and a frame's \
+          performative is encoded as a described type")
 
 end SpecAMQP.Spec.Frame

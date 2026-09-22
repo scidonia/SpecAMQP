@@ -230,8 +230,13 @@ inductive Kind where
 deriving Repr, BEq, DecidableEq
 
 /-- Whether a frame may be sent from a state: the `open` is admitted only by the OPEN
-column, and the column's frame cases admit a frame that is not the peer's own `open`,
-which is sent once, first. -/
+column, and the column's frame cases admit a frame that is not the peer's own `open`.
+
+That exclusion is a reading rather than a transcription. What the artifact says is that the
+first frame in each direction contains an `open`, which implies at most one without
+forbidding a second; it states no rule about a second `open` at all. The register records
+the rule together with the sweep that measured its scope — every permissive cell, both
+directions — in `ledger/ambiguities/second-open-refusal.json`. -/
 def maySend (state : State) (kind : Kind) : Bool :=
   let r := row state
   match kind with
@@ -240,7 +245,8 @@ def maySend (state : State) (kind : Kind) : Bool :=
   | .saslFrame => false
   | .close | .relayed => r.sendsAny || r.sendsExpected
 
-/-- Whether a frame may be received in a state, on the same terms. -/
+/-- Whether a frame may be received in a state, on the same terms and with the same
+citation for the second-`open` exclusion. -/
 def mayReceive (state : State) (kind : Kind) : Bool :=
   let r := row state
   match kind with
@@ -275,6 +281,16 @@ def refuse (reasonClass text : String) : Refusal :=
 the condition says which of the artifact's rules the frame broke. -/
 def refuseWith (condition reasonClass text : String) : Refusal :=
   ⟨condition, reasonClass, text, none, []⟩
+
+/-- The condition for a frame that is well formed and arrives in a state that does not
+permit it: the `amqp-error` family's `illegal-state`, whose definition is "The peer sent a
+frame that is not permitted in the current state". The wire condition is a different
+failure — "a valid frame header cannot be formed from the incoming byte stream" — and a
+peer acts on which one it is told, so the two are kept apart. -/
+def stateCondition : String :=
+  match (errorConditionsOf "amqp-error").find? (fun c => c.name == "illegal-state") with
+  | some c => c.value
+  | none => "no illegal-state in the amqp-error choice"
 
 /-- The rendered detail: what the corpus and the differential comparison read, class
 first. -/
@@ -572,13 +588,13 @@ def takeHeader (peer : Peer) (outbound : Bool) (header : Header) : Except Refusa
       peer speaks")
   if outbound then
     if !(row peer.state).sendsHeader then
-      .error (refuse "illegalState" s!"{peer.state.label} may not send a protocol \
+      .error (refuseWith stateCondition "illegalState" s!"{peer.state.label} may not send a protocol \
         header: the table's legal sends for that state are not HDR")
     let next := if peer.state == .start then State.sndHdr else State.bothHdr
     return inDialogue { peer with state := next, protocolId := header.protocolId }
   else
     if !(row peer.state).receivesHeader then
-      .error (refuse "illegalState" s!"{peer.state.label} may not receive a protocol \
+      .error (refuseWith stateCondition "illegalState" s!"{peer.state.label} may not receive a protocol \
         header: its receive column excludes HDR")
     if peer.state != .start && header.protocolId != peer.protocolId then
       .error { refuse "unsupported" s!"the header names {idName header.protocolId} while \
@@ -603,7 +619,7 @@ def takeSasl (peer : Peer) (outbound : Bool) (size : Nat) (body : Value) :
   match peer.sasl with
   | .wantsMechanisms =>
     if name != "sasl-mechanisms" then
-      .error (refuse "illegalState" "the SASL dialogue is waiting for the partner's \
+      .error (refuseWith stateCondition "illegalState" "the SASL dialogue is waiting for the partner's \
         sasl-mechanisms frame")
     let offered :=
       symbolList ((valueOfField "sasl-mechanisms" "sasl-server-mechanisms" body).getD .null)
@@ -615,14 +631,14 @@ def takeSasl (peer : Peer) (outbound : Bool) (size : Nat) (body : Value) :
     return advanced
   | .wantsInit =>
     if name != "sasl-init" then
-      .error (refuse "illegalState" "the SASL dialogue is waiting for the sasl-init \
+      .error (refuseWith stateCondition "illegalState" "the SASL dialogue is waiting for the sasl-init \
         that chooses one of the mechanisms")
     let mechanism :=
       match valueOfField "sasl-init" "mechanism" body with
       | some (.symbol s) => s
       | _ => ""
     if peer.announcedBy == some outbound then
-      .error (refuse "illegalState" "the peer that announced the mechanisms is the SASL \
+      .error (refuseWith stateCondition "illegalState" "the peer that announced the mechanisms is the SASL \
         server, and the init belongs to its partner")
     if !peer.offered.contains mechanism then
       .error (refuse "unsupported" s!"{mechanism} is not a mechanism the partner \
@@ -634,14 +650,14 @@ def takeSasl (peer : Peer) (outbound : Bool) (size : Nat) (body : Value) :
     let server := peer.announcedBy == some true
     if name == "sasl-challenge" then
       if outbound == server then return peer
-      else .error (refuse "illegalState" "the sasl-challenge is the SASL server's to send")
+      else .error (refuseWith stateCondition "illegalState" "the sasl-challenge is the SASL server's to send")
     if name == "sasl-response" then
       if outbound != server then return peer
-      else .error (refuse "illegalState" "the sasl-response is the SASL client's to send")
+      else .error (refuseWith stateCondition "illegalState" "the sasl-response is the SASL client's to send")
     if name != "sasl-outcome" then
-      .error (refuse "illegalState" "the SASL dialogue is waiting for the outcome")
+      .error (refuseWith stateCondition "illegalState" "the SASL dialogue is waiting for the outcome")
     if outbound != server then
-      .error (refuse "illegalState" "the sasl-outcome is the SASL server's to send")
+      .error (refuseWith stateCondition "illegalState" "the sasl-outcome is the SASL server's to send")
     let code := (valueOfField "sasl-outcome" "code" body).bind numberOf
     if code == successCode then
       -- The security layer is established, and the peers MUST exchange protocol headers
@@ -653,7 +669,7 @@ def takeSasl (peer : Peer) (outbound : Bool) (size : Nat) (body : Value) :
       -- invented.
       return { peer with state := State.done }
   | .idle =>
-    .error (refuse "illegalState" "the SASL layer's dialogue has not begun")
+    .error (refuseWith stateCondition "illegalState" "the SASL layer's dialogue has not begun")
 
 /-- The kind's name, for a diagnostic. -/
 def kindName : Kind → String
@@ -703,11 +719,11 @@ def takeFrame (peer : Peer) (outbound : Bool) (channel size : Nat) (body : Value
     Except Refusal Peer := do
   let kind := kindOfBody body
   if kind == .saslFrame then
-    .error (refuse "illegalState" "a SASL performative belongs to the SASL layer's \
+    .error (refuseWith stateCondition "illegalState" "a SASL performative belongs to the SASL layer's \
       dialogue, and this is the AMQP layer's exchange")
   let allowed := if outbound then maySend peer.state kind else mayReceive peer.state kind
   if !allowed then
-    .error (refuse "illegalState" s!"{peer.state.label} does not admit a \
+    .error (refuseWith stateCondition "illegalState" s!"{peer.state.label} does not admit a \
       {kindName kind} frame on the {if outbound then "send" else "receive"} side")
   if kind == .open && channel != 0 then
     .error (refuse "illegalState" s!"the open frame can only be sent on channel 0, and \
@@ -739,7 +755,9 @@ def takeFrame (peer : Peer) (outbound : Bool) (channel size : Nat) (body : Value
 which the state decides how to read. -/
 inductive Offer where
   | header (header : Header)
-  | frame (channel : Nat) (octets : Octets) (body : Value)
+  | /-- A frame to deliver: its decoded body, or `none` for the empty frame, which has
+    no performative to answer. -/
+    frame (channel : Nat) (octets : Octets) (body : Option Value)
   | arrives (octets : Octets)
 
 /-- Apply one offer. A frame that arrives is read here, because whether the octets are a
@@ -749,8 +767,13 @@ def apply (peer : Peer) (outbound : Bool) (offer : Offer) : Except Refusal Peer 
     match offer with
     | .header header => takeHeader peer outbound header
     | .frame channel octets body =>
-      if peer.protocolId == saslId then takeSasl peer outbound octets.size body
-      else takeFrame peer outbound channel octets.size body
+      match body with
+      -- an empty frame: it is traffic, and "apart from this use, empty frames have no
+      -- meaning", so the peer is left as it was
+      | none => .ok peer
+      | some body =>
+        if peer.protocolId == saslId then takeSasl peer outbound octets.size body
+        else takeFrame peer outbound channel octets.size body
     | .arrives octets =>
       if outbound then
         .error (refuse "illegalState" "a send carries a frame the encoder has already \
@@ -769,8 +792,11 @@ def apply (peer : Peer) (outbound : Bool) (offer : Offer) : Except Refusal Peer 
         match Ref.Frame.decodeFrame octets with
         | .error message => .error (fromFrame message)
         | .ok (frame, used) =>
-          if peer.protocolId == saslId then takeSasl peer false used frame.body
-          else takeFrame peer false frame.channel used frame.body
+          match frame.body with
+          | none => .ok peer
+          | some body =>
+            if peer.protocolId == saslId then takeSasl peer false used body
+            else takeFrame peer false frame.channel used body
   match step with
   | .ok next => .ok next
   | .error r => .error (placeRefusal peer outbound r)

@@ -134,8 +134,12 @@ structure Frame where
   /-- The extended header, whose treatment depends on the frame type; every type read
   here ignores it. -/
   extended : Octets
-  /-- The performative, which the layout requires to be a described type. -/
-  body : Value
+  /-- The body: a performative as a described type, or `none` for the empty frame the
+  idle-timeout clauses require a receiver to handle. The two are told apart here rather
+  than by a distinguished value, because a bodyless frame is not a frame with an unusual
+  body: `.null` would be a body the layout refuses, and a unit `Value` would be an
+  inhabitant of the value language that no octet can produce. -/
+  body : Option Value
   /-- The opaque octets the performative's semantics give meaning to. -/
   payload : Octets
 deriving Repr
@@ -206,6 +210,14 @@ def decodeFrame (bytes : Octets) : Except String (Frame × Nat) :=
           specification assigns")
       | some kind =>
         let start := doff * wordOctets
+        if size = headerOctets ∧ doff = minDoff then
+          -- the empty frame: the frame's own window is SIZE's whole extent with DOFF at its
+          -- minimum, so this is a frame header and nothing else. Deciding it here rather
+          -- than after a body read is what keeps the coalesced case right: the region below
+          -- runs to the end of the buffer, so an empty frame ahead of another would
+          -- otherwise be read as that frame's octets.
+          .ok (⟨doff, kind, channel, bytes.extract headerOctets start, none, #[]⟩, size)
+        else
         match decode (bytes.extract start bytes.size) with
         | .error e =>
           let rendered := valueFailure e
@@ -226,7 +238,7 @@ def decodeFrame (bytes : Octets) : Except String (Frame × Nat) :=
                   the declared surface defines, so it is not a performative")
               | some decl =>
                 if decl.provides.contains kind.role then
-                  .ok (⟨doff, kind, channel, bytes.extract headerOctets start, body,
+                  .ok (⟨doff, kind, channel, bytes.extract headerOctets start, some body,
                     bytes.extract (start + used) size⟩, size)
                 else
                   .error (refusal "unsupported" s!"the frame body's performative is \
@@ -258,7 +270,13 @@ def encodeFrame (frame : Frame) : Except String Octets :=
       {frame.extended.size}")
   else
     match frame.body with
-    | .described descriptor _ =>
+    | none =>
+      -- Sending an empty frame is a MAY, so refusing to write one is conforming: the
+      -- receiver's obligation lives in the decoder above.
+      .error (refusal "unsupported" "the frame carries no body: an empty frame is how a \
+        peer with nothing to send defeats an idle timeout, and this writer does not send \
+        one")
+    | some (body@(.described descriptor _)) =>
       if !isPerformativeFor frame.kind descriptor then
         match typeOfDescriptor descriptor with
         | none =>
@@ -269,7 +287,7 @@ def encodeFrame (frame : Frame) : Except String Octets :=
             whose declared roles are {decl.provides}, which does not include the \
             {frame.kind.role} role a {frame.kind.name} frame carries")
       else
-        match encode frame.body with
+        match encode body with
         | .error e => .error e
         | .ok body =>
           let size := headerOctets + frame.extended.size + body.size + frame.payload.size
@@ -280,7 +298,7 @@ def encodeFrame (frame : Frame) : Except String Octets :=
           else
             .error (refusal "sizeMismatch" s!"SIZE cannot carry {size} octets in \
               {4} octets")
-    | _ =>
+    | some _ =>
       .error (refusal "malformed" "the frame body is not a described type, so it is not \
         a performative")
 

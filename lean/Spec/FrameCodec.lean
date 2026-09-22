@@ -30,7 +30,9 @@ def frameToJson (frame : Frame) (consumed : Nat) : Json :=
               ("type", toHex #[UInt8.ofNat frame.frameType.code]),
               ("channel", frame.channel),
               ("extended", toHex frame.extended),
-              ("body", Json.arr #[toJson frame.body]),
+              ("body", match frame.body with
+                | some body => Json.arr #[toJson body]
+                | none => Json.arr #[]),
               ("payload", toHex frame.payload)]
 
 /-- A corpus frame read as a frame. `extended` and `payload` are optional in the
@@ -53,8 +55,12 @@ def frameOfJson (json : Json) : Except String Frame := do
   let payload ← ofHex (text "payload")
   match (← json.getObjValAs? (Array Json) "body").toList with
   | [valueJson] =>
-    .ok ⟨doff, frameType, channel, extended, (← valueOfJson 64 valueJson), payload⟩
-  | _ => .error "a frame's body is one performative"
+    .ok ⟨doff, frameType, channel, extended, some (← valueOfJson 64 valueJson), payload⟩
+  | [] =>
+    -- the empty frame: a header and nothing else, which the vocabulary writes as an
+    -- empty body array and the idle-timeout clause requires a receiver to handle
+    .ok ⟨doff, frameType, channel, extended, none, payload⟩
+  | _ => .error "a frame's body is one performative or none"
 
 /-- The specification's frame layer behind the corpus interface. -/
 def specFrameCodec : FrameCodec where

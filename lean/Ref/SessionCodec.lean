@@ -65,7 +65,9 @@ def carried (step : ExchangeStep) : Except String (Option (Nat × Value)) := do
   match step.value with
   | some json =>
     let frame ← SpecAMQP.Ref.Vectors.frameOfJson json
-    return some (frame.channel, frame.body)
+    match frame.body with
+    | some body => return some (frame.channel, body)
+    | none => return none
   | none =>
     match step.bytes with
     | none => return none
@@ -74,7 +76,10 @@ def carried (step : ExchangeStep) : Except String (Option (Nat × Value)) := do
       else
         match SpecAMQP.Ref.Frame.decodeFrame octets with
         | .error _ => return none
-        | .ok (frame, _) => return some (frame.channel, frame.body)
+        | .ok (frame, _) =>
+          match frame.body with
+          | some body => return some (frame.channel, body)
+          | none => return none
 
 /-- Which machine answers for a step. -/
 def targetOf (step : ExchangeStep) : Except String Target := do
@@ -119,6 +124,16 @@ def stepOf (both : Both) (step : ExchangeStep) : Except String (StepOutcome × B
       return ({ relayed with state, detail := s!"admitted; the peer is in {state}" },
               { both with connection := connection, session := session })
     | .error reason =>
+      if reason.closes then
+        -- the session's rule with the connection's consequence: an immediate close is the
+        -- connection's frame to write, so the connection moves and the state the outcome
+        -- names is the one that moved
+        let connection := { connection with
+                              state := SpecAMQP.Ref.Connection.State.sndClose }
+        let state := s!"connection:{connection.state.label}"
+        return (⟨false, none, state, some reason.condition,
+                 s!"{reason.detail}; the peer closes the connection, and is in {state}"⟩,
+                { both with connection := connection })
       let session := { both.session with state := reason.place.getD both.session.state }
       let state := s!"session:{session.state.label}"
       return (⟨false, none, state, some reason.condition,
