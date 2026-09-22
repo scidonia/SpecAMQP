@@ -1013,6 +1013,123 @@ theorem readValue_dispatch (fuel : Nat) (c : Cursor) (value : Value) (c' : Curso
         exact ⟨v, rfl, h⟩
     exact Or.inr (Or.inr (Or.inr ⟨⟨_, by assumption⟩, decl, dataDecl_ok_mem hbd, hbd, hrest⟩))
 
+/-! ## The fixed family's reading-off step
+
+A fixed-width row has no length field to read: the value's octets *are* the row's width, so the
+advance is the row's width and there is no measurement to convert. That makes this the one family
+whose reading-off step needs nothing beyond `takeBytes`' own advance — and the one whose *canonical*
+comparison needs a per-owner agreement between the writer's row and the reader's, since the
+writer picks a row from the value (a `uint` of 0 is a different row than a `uint` of 300) while
+the reader is handed whichever row the octet named. That agreement is named in the rung's
+disclosure rather than assumed here. -/
+
+/-- **The fixed family's forward inversion.**
+
+An accepted read from a fixed-width row took the row's width's octets and ended at the cursor that
+take left. Unlike the variable family there is no length field and no re-encoding step, so the
+inversion is one bind and the reader's own consumption is the row's width. -/
+theorem readFixed_ok (decl : EncodingDecl) (c : Cursor) (value : Value) (c' : Cursor)
+    (h : readFixed decl c = .ok (value, c')) :
+    ∃ payload : Octets, ∃ c₁ : Cursor, takeBytes decl.width c = .ok (payload, c₁) ∧ c₁ = c' := by
+  obtain ⟨payload, c₁, hb⟩ : ∃ p : Octets, ∃ cc : Cursor, takeBytes decl.width c = .ok (p, cc) := by
+    cases hb : takeBytes decl.width c with
+    | error e =>
+      exfalso
+      simp only [readFixed, hb, except_bind_error] at h
+      exact absurd h (by simp)
+    | ok v => exact ⟨v.1, v.2, rfl⟩
+  unfold readFixed at h
+  rw [hb] at h
+  simp only [except_bind_ok] at h
+  have hrec : c₁ = c' := by
+    /- The owner match, the `boolean` row's width test and that test's inner name match are three
+    nested splits; `repeat split` stops at the first branch it cannot split, so the splits are
+    chained explicitly. -/
+    split at h <;> try (split at h) <;> try (split at h) <;> try (split at h)
+    all_goals first
+      | (simp only [Except.ok.injEq, Prod.mk.injEq] at h
+         exact h.2)
+      | simp at h
+  exact ⟨payload, c₁, hb, hrec⟩
+
+/-- **A fixed-width row's read consumed exactly the row's width.**
+
+The reading-off step for the fixed family, and the one family whose step needs no measurement
+converted: the row declares its width, the reader takes that many octets, and `takeBytes_advances`
+already states the result as an addition. What this does *not* settle is the canonical comparison —
+the writer picks a row from the *value* while the reader is handed whichever row the octet named —
+which is the per-owner agreement named in the rung's disclosure. -/
+theorem readFixed_consumes (decl : EncodingDecl) (c : Cursor) (value : Value) (c' : Cursor)
+    (h : readFixed decl c = .ok (value, c')) : c'.pos = c.pos + decl.width := by
+  obtain ⟨payload, c₁, hb, hc⟩ := readFixed_ok decl c value c' h
+  obtain ⟨hpos, _⟩ := takeBytes_advances decl.width c payload c₁ hb
+  rw [← hc]
+  exact hpos
+
+/-- **A scalar row's read, split by the category the row declares.**
+
+The two halves of the scalar family in one statement: a fixed row's read consumed its own width,
+and a variable row's read consumed its width plus the length its field carried, with the value
+carrying the payload that length counted. `readScalarData` is the reader's own dispatch between
+them, so a caller that has a scalar read has one of these two cases and does not have to repeat
+the category case analysis. -/
+theorem readScalarData_consumes (decl : EncodingDecl) (c : Cursor) (value : Value) (c' : Cursor)
+    (h : readScalarData decl c = .ok (value, c')) :
+    (decl.category = .fixed ∧ c'.pos = c.pos + decl.width) ∨
+      (decl.category = .variable ∧ ∃ length : Nat, ∃ payload : Octets,
+        payload.size = length ∧
+        length < 2 ^ (8 * decl.width) ∧
+        c'.pos = c.pos + decl.width + length ∧
+        ValueCarries value payload) := by
+  unfold readScalarData at h
+  split at h
+  · exact Or.inl ⟨by assumption, readFixed_consumes decl c value c' h⟩
+  · exact Or.inr ⟨by assumption, readVariable_consumes decl c value c' h⟩
+  · exact absurd h (by simp)
+
+/-- **The writer's lookup returns a row of the declared surface, at the owner and width asked
+for.**
+
+The writer selects a row by owner and width (`rowOf`) while the reader is handed whichever row the
+accepted octet named; the two agree because the lookup reaches a row *of the same table*, whose
+owner and width are the ones it asked for. That is the fact the fixed family's size comparison
+consumes: it says the writer's row is not a row invented for the occasion but the table's own row
+at that owner and width, so a row the reader read and a row the writer chose at the same owner and
+width are rows of the same width.
+
+Stated at the lookup rather than as an inventory of the table's widths, and deliberately so: an
+inventory ("every `ubyte` row is one octet wide", and so on for each fixed owner) is a
+transcription of the generated table, which is what this repository decides rather than writes
+down, and a decided statement of the form "the row found at a width has that width" is only
+`find?`'s own filtering. The content worth having is that the row found is the table's — the
+lookup's soundness — and that is what this is. What the fixed family's *comparison* still needs on
+top of it is the per-owner rule: the writer picks a width from the value, so for an owner whose
+rows are 0/1/4 wide the chosen row is the narrower one, and the arithmetic for that comes from
+`readFixed_ok`'s reading of the row the reader consumed. -/
+theorem rowOf_mem {owner : String} {width : Nat} {decl : EncodingDecl}
+    (h : rowOf owner width = .ok decl) :
+    decl ∈ encodings ∧ decl.owner = owner ∧ decl.width = width := by
+  unfold rowOf at h
+  cases hfind : encodings.find? (fun d => d.owner == owner && d.width == width) with
+  | none =>
+    simp only [hfind] at h
+    exact absurd h (by simp)
+  | some found =>
+    simp only [hfind, Except.ok.injEq] at h
+    have hpred : (found.owner == owner && found.width == width) = true :=
+      List.find?_some (p := fun d => d.owner == owner && d.width == width) (l := encodings) hfind
+    simp only [Bool.and_eq_true, beq_iff_eq] at hpred
+    subst h
+    exact ⟨List.mem_of_find?_eq_some hfind, hpred.1, hpred.2⟩
+
+/-- **A row the writer's lookup returns is the width it asked for.**
+
+The row-level form of `rowOf_mem`, which is the shape the fixed family's comparison will use: given
+a row `found` that the lookup at `owner` and `width` returned, `found` declares exactly `width`. -/
+theorem rowOf_width (owner : String) (width : Nat) (found : EncodingDecl)
+    (h : rowOf owner width = .ok found) : found.width = width :=
+  (rowOf_mem h).2.2
+
 /-! ## The rung's claim -/
 
 /-- **R5: the writer's encoding is no longer than anything the reader accepts.**
