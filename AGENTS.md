@@ -91,6 +91,14 @@ Coder-owned: `flake.nix`, `flake.lock`, `scripts/**`, `lean/Proofs/**`,
 - **No `sorry`, no `noncomputable`, no unreviewed trust**: the proof-integrity
   and executability gates are part of acceptance, and `native_decide` requires
   explicit disclosure because it adds trust.
+- **A build whose result is evidence sets `LAKE_NO_CACHE=1`.** Without it `lake`
+  may use mathlib's cache hook and fetch over the network into the provisioned
+  workspace, so the build can rest on artifacts that arrived over the wire rather
+  than on what the pinned closure provides. Every contract script already does
+  this; an ad-hoc verification build must too. A build that did not is disclosed
+  rather than counted, which is what happened once in this repository — the
+  conclusion drawn from it was re-derived from an offline build before being
+  relied on.
 
 ## Commands
 
