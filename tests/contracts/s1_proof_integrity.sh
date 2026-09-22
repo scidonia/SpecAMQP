@@ -246,6 +246,17 @@ import Spec.ReadLaws
 #print axioms SpecAMQP.Proofs.takeBe_beOctets
 #print axioms SpecAMQP.Spec.ReadLaws.extract_toList_eq_drop_take
 #print axioms SpecAMQP.Spec.ReadLaws.takeBe_eq_fold
+#print axioms SpecAMQP.Proofs.narrowest_encoding_of_comparisons
+#print axioms SpecAMQP.Proofs.takeU8_advances
+#print axioms SpecAMQP.Proofs.readScalarData_category
+#print axioms SpecAMQP.Proofs.readVariable_owner
+#print axioms SpecAMQP.Proofs.takeBe_progress
+#print axioms SpecAMQP.Proofs.takeBytes_progress
+#print axioms SpecAMQP.Proofs.takeU8_progress
+#print axioms SpecAMQP.Proofs.readFixed_progress
+#print axioms SpecAMQP.Proofs.readVariable_progress
+#print axioms SpecAMQP.Proofs.readScalarData_progress
+#print axioms SpecAMQP.Proofs.exists_of_bind_ok
 AXIOMS
 ( cd "$root/lean" && LAKE_NO_CACHE=1 lake env lean "$tmp/Axioms.lean" ) >"$tmp/axioms.log" 2>&1 ||
   die "could not print the accepted theorem's axioms: $(tail -3 "$tmp/axioms.log")"
