@@ -32,12 +32,89 @@
    "note": "Normative layout: the frame header is fixed width while the extended header and frame body are variable; the REQUIRED/OPTIONAL lanes are the same distinction the framing clauses state in prose.",
    "text_sha256": "b8112c6e9cd68e24ab3009b284427b0b058f65b1dd2153e4f7be34140e587a44"
   },
+  "amqp-core-transport-v1.0-os.xml#picture.16": {
+   "clause_text": "[picture] AMQP Frame Layout: type: 0x00 - AMQP frame +0 +1 +2 +3 +-----------------------------------+ -. 0 | SIZE | | +-----------------------------------+ |---> Frame Header 4 | DOFF |...",
+   "disposition": "formalized:Spec.Wire.frameLayout",
+   "kind": "picture",
+   "note": "AMQP frame layout: the fixed 8-byte header with the size, data offset, frame type 0x00 and channel fields, then the body. The frame-type octet comes from the generated table.",
+   "text_sha256": "481f0791733d5b9613401a5f7bff90e677db855480f36b53f03ea9a23bb80657"
+  },
+  "amqp-core-types-v1.0-os.xml#picture.1": {
+   "clause_text": "[picture] Primitive Format Code (String): constructor untyped bytes | | +--+ +-----------------+-----------------+ | | | | ... 0xA1 0x1E \"Hello Glorious Messaging World\" ... | | | | | | | | utf8 byte...",
+   "disposition": "formalized:Spec.Value.Writer",
+   "kind": "picture",
+   "note": "Worked example of the str8-utf8 encoding: 0xA1 0x1E followed by 30 octets. Every byte is exact, and the encoding is exercised by vector str8-hello.",
+   "text_sha256": "b4c8b5795fc08f7fcc8c4eed5eb115731393b77d402924190e17e775659f67e0"
+  },
+  "amqp-core-types-v1.0-os.xml#picture.18": {
+   "clause_text": "[picture] Example Composite Type: <type class=\"composite\" name=\"book\" label=\"example composite type\"> <doc> <p>An example composite type.</p> </doc> <descriptor name=\"example:book:list\" code=...",
+   "disposition": "formalized:Spec.Value.CompositeType",
+   "kind": "picture",
+   "note": "Worked example of a composite type definition: the book type in descriptor domain 0x00000003 with field multiplicities and a mandatory title. It is the model for how a described list maps onto declared fields.",
+   "text_sha256": "6f82b0b098427cccc4b98bb35b8c24145fd2514fb8390685ffa809c4c4abd003"
+  },
+  "amqp-core-types-v1.0-os.xml#picture.19": {
+   "clause_text": "[picture] Example Composite Value: constructor list representation of a book | | +-----------------+-------------------+ +-------------+---------------+ | | | | 0x00 0xA3 0x11 \"example:book:li...",
+   "disposition": "superseded:compound-size-field",
+   "kind": "picture",
+   "note": "Worked example of a composite value. Its list8 size byte reads 0x40 where the depicted content is 63 octets, so the byte is superseded by the reading recorded in ledger/ambiguities/compound-size-field.json rather than copied.",
+   "text_sha256": "018b99a7a27a05ca75a066ef7e3fa959c1178dba0d5b56aa0ea0bb91be475648"
+  },
+  "amqp-core-types-v1.0-os.xml#picture.2": {
+   "clause_text": "[picture] Described Format Code (URL): constructor untyped bytes | | +-----------+-----------+ +-----------------+-----------------+ | | | | ... 0x00 0xA1 0x03 \"URL\" 0xA1 0x1E \"http://example.org/...",
+   "disposition": "formalized:Spec.Value.Described",
+   "kind": "picture",
+   "note": "Worked example of a described value: 0x00, a str8 descriptor \"URL\", then the value. The picture states that a string-typed descriptor is reserved, which is why symbolic descriptors are the modelled case; exercised by vector described-url.",
+   "text_sha256": "45d67576a0d879fe73ebf49a8536b010156ed1bb2504746db525acb0d4b19898"
+  },
   "amqp-core-types-v1.0-os.xml#picture.3": {
    "clause_text": "[picture] Constructor BNF: constructor = format-code / %x00 descriptor constructor format-code = fixed / variable / compound / array fixed = empty / fixed-one / fixed-two / fixed-four ...",
    "disposition": "formalized:Spec.Value.Constructor",
    "kind": "picture",
    "note": "Normative: this is the formal constructor grammar \u2014 the format-code ranges, the %x00 descriptor prefix, and the reserved octets. It is the specification's own normative statement of which octets are format codes, so the codec's accepted set is checked against these ranges as a theorem rather than asserted.",
    "text_sha256": "428149a68550cdb5125461d030d6cc6513482c4887ceacd016647356b381c332"
+  },
+  "amqp-core-types-v1.0-os.xml#picture.4": {
+   "clause_text": "[picture] Format Code Layout: Bit: 7 6 5 4 3 2 1 0 +------------------------------------+ +----------+ | subcategory | subtype | | ext-type | +------------------------------------+ +-----...",
+   "disposition": "formalized:Spec.Value.classify",
+   "kind": "picture",
+   "note": "Layout: a constructor followed by untyped bytes, with the constructor stating how to read them. This is the picture behind the classification function.",
+   "text_sha256": "64354c6928ec1e9bc6030b304b24ec7a496fa3807c5c6de4b8b6a6132a2fcf7b"
+  },
+  "amqp-core-types-v1.0-os.xml#picture.5": {
+   "clause_text": "[picture] Subcategory Formats: Subcategory Category Format ============================================================================== 0x4 Fixed Width Zero octets of data. 0x5 Fixed Wid...",
+   "disposition": "formalized:Spec.Value.categoryWidths",
+   "kind": "picture",
+   "note": "The subcategory table: 0x4/0x5/0x6/0x7/0x8/0x9 are fixed widths of 0/1/2/4/8/16 octets, 0xA/0xB variable with one or four size octets, 0xC/0xD compound with one or four size and count octets, 0xE/0xF array with one or four size and count octets. This is the tabular source of the widths that `classify` assigns, and the widths agree numerically.",
+   "text_sha256": "629884a2db5f66290dc052b11fb083aae2d04c90d315193661029bfd312ab7be"
+  },
+  "amqp-core-types-v1.0-os.xml#picture.6": {
+   "clause_text": "[picture] Layout of Fixed Width Data Encodings: n OCTETs +----------+ | data | +----------+ Subcategory n ================= 0x4 0 0x5 1 0x6 2 0x7 4 0x8 8 0x9 16",
+   "disposition": "formalized:Spec.Value.FixedLayout",
+   "kind": "picture",
+   "note": "Layout of fixed-width encodings: the constructor determines the data size, with no length field.",
+   "text_sha256": "ecf99229787968ad229390143915c16447123b0a73d7cf32e887c0c33b3f212a"
+  },
+  "amqp-core-types-v1.0-os.xml#picture.7": {
+   "clause_text": "[picture] Layout of Variable Width Data Encodings: n OCTETs size OCTETs +----------+-------------+ | size | value | +----------+-------------+ Subcategory n ================= 0xA 1 0xB 4",
+   "disposition": "formalized:Spec.Value.VariableLayout",
+   "kind": "picture",
+   "note": "Layout of variable-width encodings: a size field of the subcategory width, then that many octets.",
+   "text_sha256": "1b805cdc9ebcac1bab881081d5797ecee3618d132ede6638791c35c9c7482be2"
+  },
+  "amqp-core-types-v1.0-os.xml#picture.8": {
+   "clause_text": "[picture] Layout of Compound Data Encodings: +----------= count items =----------+ | | n OCTETs n OCTETs | | +----------+----------+--------------+------------+-------+ | size | count | ... /| item |\\ ....",
+   "disposition": "formalized:Spec.Value.CompoundLayout",
+   "kind": "picture",
+   "note": "Layout of compound encodings: size, count, then count constructed items. The scope of the size field is decided in ledger/ambiguities/compound-size-field.json.",
+   "text_sha256": "5268f8d82ade3d7c2b122ee20674a935b6d483e77fb81fd5a762a5425ffe9a86"
+  },
+  "amqp-core-types-v1.0-os.xml#picture.9": {
+   "clause_text": "[picture] Layout of Array Encodings: +--= count elements =--+ | | n OCTETs n OCTETs | | +----------+----------+---------------------+-------+------+-------+ | size | count | element-constructor ...",
+   "disposition": "formalized:Spec.Value.ArrayLayout",
+   "kind": "picture",
+   "note": "Layout of array encodings: size, count, one element constructor, then the elements in that constructor's form. This figure is the arithmetic check that fixes the size field's scope.",
+   "text_sha256": "837570b7af3b199888d2c3d4baec9c47cbe79879ad8925c60db4c984d478ab01"
   }
  },
  "schema_version": 1,

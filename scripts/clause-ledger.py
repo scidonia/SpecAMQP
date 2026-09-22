@@ -45,7 +45,13 @@ EXCLUDED_TAGS = {"picture", "revhistory", "acknowledgements"}
 # diagrams, but some carry formal grammar (`Constructor BNF`) or normative
 # keywords. Those are surfaced for disposition rather than dropped: excluding a
 # subtree is not the same as having decided it carries nothing.
-PICTURE_REVIEW_PATTERN = re.compile(r"%x|\bMUST\b|\bSHOULD\b|\bMAY\b|\bREQUIRED\b|\bOPTIONAL\b")
+# A picture earns review when it states a grammar (`%x`), carries a normative
+# keyword, or shows concrete encoded octets (`0x..`): a worked example is
+# evidence about the wire format, and copying one without checking it is how a
+# documentation defect becomes a specification defect.
+PICTURE_REVIEW_PATTERN = re.compile(
+    r"%x|\bMUST\b|\bSHOULD\b|\bMAY\b|\bREQUIRED\b|\bOPTIONAL\b|0x[0-9A-Fa-f]{1,2}\b|0x[0-9A-Fa-f]{8}:0x[0-9A-Fa-f]{8}"
+)
 
 # Sections excluded by name: in the artifacts these are section *names*, not
 # element tags, so matching on the tag alone silently keeps revision history and

@@ -192,6 +192,8 @@
    "index": 5,
    "looks_normative": true,
    "matches": [
+    "0x01",
+    "0x02",
     "SHOULD"
    ],
    "ref": "amqp-core-security-v1.0-os.xml#picture.5",
@@ -415,8 +417,10 @@
    "content_sha256": "481f0791733d5b9613401a5f7bff90e677db855480f36b53f03ea9a23bb80657",
    "excerpt": "type: 0x00 - AMQP frame +0 +1 +2 +3 +-----------------------------------+ -. 0 | SIZE | | +-----------------------------------+ |---> Frame Header 4 | DOFF |...",
    "index": 16,
-   "looks_normative": false,
-   "matches": [],
+   "looks_normative": true,
+   "matches": [
+    "0x00"
+   ],
    "ref": "amqp-core-transport-v1.0-os.xml#picture.16",
    "title": "AMQP Frame Layout"
   },
@@ -855,8 +859,11 @@
    "content_sha256": "b4c8b5795fc08f7fcc8c4eed5eb115731393b77d402924190e17e775659f67e0",
    "excerpt": "constructor untyped bytes | | +--+ +-----------------+-----------------+ | | | | ... 0xA1 0x1E \"Hello Glorious Messaging World\" ... | | | | | | | | utf8 byte...",
    "index": 1,
-   "looks_normative": false,
-   "matches": [],
+   "looks_normative": true,
+   "matches": [
+    "0x1E",
+    "0xA1"
+   ],
    "ref": "amqp-core-types-v1.0-os.xml#picture.1",
    "title": "Primitive Format Code (String)"
   },
@@ -865,8 +872,13 @@
    "content_sha256": "45d67576a0d879fe73ebf49a8536b010156ed1bb2504746db525acb0d4b19898",
    "excerpt": "constructor untyped bytes | | +-----------+-----------+ +-----------------+-----------------+ | | | | ... 0x00 0xA1 0x03 \"URL\" 0xA1 0x1E \"http://example.org/...",
    "index": 2,
-   "looks_normative": false,
-   "matches": [],
+   "looks_normative": true,
+   "matches": [
+    "0x00",
+    "0x03",
+    "0x1E",
+    "0xA1"
+   ],
    "ref": "amqp-core-types-v1.0-os.xml#picture.2",
    "title": "Described Format Code (URL)"
   },
@@ -887,8 +899,10 @@
    "content_sha256": "64354c6928ec1e9bc6030b304b24ec7a496fa3807c5c6de4b8b6a6132a2fcf7b",
    "excerpt": "Bit: 7 6 5 4 3 2 1 0 +------------------------------------+ +----------+ | subcategory | subtype | | ext-type | +------------------------------------+ +-----...",
    "index": 4,
-   "looks_normative": false,
-   "matches": [],
+   "looks_normative": true,
+   "matches": [
+    "0xF"
+   ],
    "ref": "amqp-core-types-v1.0-os.xml#picture.4",
    "title": "Format Code Layout"
   },
@@ -897,8 +911,21 @@
    "content_sha256": "629884a2db5f66290dc052b11fb083aae2d04c90d315193661029bfd312ab7be",
    "excerpt": "Subcategory Category Format ============================================================================== 0x4 Fixed Width Zero octets of data. 0x5 Fixed Wid...",
    "index": 5,
-   "looks_normative": false,
-   "matches": [],
+   "looks_normative": true,
+   "matches": [
+    "0x4",
+    "0x5",
+    "0x6",
+    "0x7",
+    "0x8",
+    "0x9",
+    "0xA",
+    "0xB",
+    "0xC",
+    "0xD",
+    "0xE",
+    "0xF"
+   ],
    "ref": "amqp-core-types-v1.0-os.xml#picture.5",
    "title": "Subcategory Formats"
   },
@@ -907,8 +934,15 @@
    "content_sha256": "ecf99229787968ad229390143915c16447123b0a73d7cf32e887c0c33b3f212a",
    "excerpt": "n OCTETs +----------+ | data | +----------+ Subcategory n ================= 0x4 0 0x5 1 0x6 2 0x7 4 0x8 8 0x9 16",
    "index": 6,
-   "looks_normative": false,
-   "matches": [],
+   "looks_normative": true,
+   "matches": [
+    "0x4",
+    "0x5",
+    "0x6",
+    "0x7",
+    "0x8",
+    "0x9"
+   ],
    "ref": "amqp-core-types-v1.0-os.xml#picture.6",
    "title": "Layout of Fixed Width Data Encodings"
   },
@@ -917,8 +951,11 @@
    "content_sha256": "1b805cdc9ebcac1bab881081d5797ecee3618d132ede6638791c35c9c7482be2",
    "excerpt": "n OCTETs size OCTETs +----------+-------------+ | size | value | +----------+-------------+ Subcategory n ================= 0xA 1 0xB 4",
    "index": 7,
-   "looks_normative": false,
-   "matches": [],
+   "looks_normative": true,
+   "matches": [
+    "0xA",
+    "0xB"
+   ],
    "ref": "amqp-core-types-v1.0-os.xml#picture.7",
    "title": "Layout of Variable Width Data Encodings"
   },
@@ -927,8 +964,11 @@
    "content_sha256": "5268f8d82ade3d7c2b122ee20674a935b6d483e77fb81fd5a762a5425ffe9a86",
    "excerpt": "+----------= count items =----------+ | | n OCTETs n OCTETs | | +----------+----------+--------------+------------+-------+ | size | count | ... /| item |\\ ....",
    "index": 8,
-   "looks_normative": false,
-   "matches": [],
+   "looks_normative": true,
+   "matches": [
+    "0xC",
+    "0xD"
+   ],
    "ref": "amqp-core-types-v1.0-os.xml#picture.8",
    "title": "Layout of Compound Data Encodings"
   },
@@ -937,8 +977,11 @@
    "content_sha256": "837570b7af3b199888d2c3d4baec9c47cbe79879ad8925c60db4c984d478ab01",
    "excerpt": "+--= count elements =--+ | | n OCTETs n OCTETs | | +----------+----------+---------------------+-------+------+-------+ | size | count | element-constructor ...",
    "index": 9,
-   "looks_normative": false,
-   "matches": [],
+   "looks_normative": true,
+   "matches": [
+    "0xE",
+    "0xF"
+   ],
    "ref": "amqp-core-types-v1.0-os.xml#picture.9",
    "title": "Layout of Array Encodings"
   },
@@ -1027,8 +1070,10 @@
    "content_sha256": "6f82b0b098427cccc4b98bb35b8c24145fd2514fb8390685ffa809c4c4abd003",
    "excerpt": "<type class=\"composite\" name=\"book\" label=\"example composite type\"> <doc> <p>An example composite type.</p> </doc> <descriptor name=\"example:book:list\" code=...",
    "index": 18,
-   "looks_normative": false,
-   "matches": [],
+   "looks_normative": true,
+   "matches": [
+    "0x00000003:0x00000002"
+   ],
    "ref": "amqp-core-types-v1.0-os.xml#picture.18",
    "title": "Example Composite Type"
   },
@@ -1037,8 +1082,22 @@
    "content_sha256": "018b99a7a27a05ca75a066ef7e3fa959c1178dba0d5b56aa0ea0bb91be475648",
    "excerpt": "constructor list representation of a book | | +-----------------+-------------------+ +-------------+---------------+ | | | | 0x00 0xA3 0x11 \"example:book:li...",
    "index": 19,
-   "looks_normative": false,
-   "matches": [],
+   "looks_normative": true,
+   "matches": [
+    "0x00",
+    "0x02",
+    "0x03",
+    "0x0E",
+    "0x11",
+    "0x13",
+    "0x15",
+    "0x25",
+    "0x40",
+    "0xA1",
+    "0xA3",
+    "0xC0",
+    "0xE0"
+   ],
    "ref": "amqp-core-types-v1.0-os.xml#picture.19",
    "title": "Example Composite Value"
   },
