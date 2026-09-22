@@ -1,14 +1,14 @@
 {
  "conventions": {
   "deferred:": "A real obligation the plan carries later; the suffix names the milestone, and the note names the gap that keeps it out of the carrier set.",
-  "formalized:": "A Lean declaration path that carries this clause's meaning, verified present in the module it names.",
+  "formalized:": "A Lean declaration path that carries this clause's meaning. The register writes these both fully qualified (`SpecAMQP.Spec.Session.stepBegin`) and module-relative (`Spec.Frame.decodeFrame`); both name declarations that exist in the tree, and every path recorded here was resolved against the module it names.",
   "informative": "A statement of what a conformant implementation is rather than a rule this specification enforces: there is no wire obligation to carry.",
   "kind": "The clause's keyword kind, `MUST` or `MUST NOT`, taken from the ledger's own clause. `class` is the conformance class the coverage gate counts; the two coincide for `MUST` and diverge for `MUST NOT`, so `kind` must be read from the clause rather than inferred from the class.",
   "superseded:": "Decided by an entry in the ambiguity register (ledger/ambiguities), whose id is the suffix.",
   "test:": "A vector id whose expectation is the clause's only observable form."
  },
  "design_consequences": [
-  "The empty-frame carrier landed while this pass ran \u2014 both decoders decide a header-only frame on its own window (size = headerOctets and doff = minDoff, lean/Spec/Frame.lean:264 and lean/Ref/Frame.lean:213) and both connection dispatches answer it with the endpoint unchanged and nothing written \u2014 so doc:doc-idle-time-out.7 now lacks a witness rather than a carrier: the additive vector belongs in vectors/frames.ndjson and must expect an admitted step whose state does not move.",
+  "A disposition can be overtaken while the pass runs: doc:doc-idle-time-out.7 was reported uncarried and written as `deferred:S4`, and by the time the entries landed the frame layer had a header-only case in both artefacts (lean/Spec/Frame.lean:264, lean/Ref/Frame.lean:213, with both connection dispatches answering it without moving the state) and vectors/frames.ndjson had `frame-decode-empty-frame` for it, so the entry names the carrier and the witness instead \u2014 the mapping is a snapshot, the tree is the record.",
   "doc:session-flow-control.4 and .8 write remote-outgoing-window and nothing reads it in either artifact, so those MUSTs are carried by a declaration no test can pin; witnessing them is upstream work (something must consume the quantity), not a new vector.",
   "The ten uncarried Part 0 clauses are dispositioned informative rather than deferred because the interface that would carry them \u2014 PLAN.md \u00a710's Conformance.lean and its Conforms relation \u2014 is not in the tree; conformance.3 is the eleventh and has a real carrier.",
   "connections.11 and doc:doc-idle-time-out.9 reach channel 0 only by entailment through Limits.aPriori and limitsFor: open's channel rule is stated in stepAmqpFrame and close's is not, and ledger/ambiguities/channel-zero-layering.json is the only place the close half is written down."
@@ -142,7 +142,7 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections/doc:doc-idle-time-out.7": {
    "clause_text": "Implementations MUST be prepared to handle empty frames arriving on any valid channel, though implementations SHOULD use channel 0 when sending empty frames, and MUST use channel 0 if a maximum channel number has not yet been negotiated (i.e., before an \u00abopen\u00bb frame has been received).",
-   "disposition": "formalized:Spec.Frame.decodeFrame; formalized:Spec.Endpoint.stepAmqpFrame; test:frame-decode-empty-frame",
+   "disposition": "formalized:Spec.Frame.decodeFrame; formalized:Spec.Connection.step; formalized:Spec.Connection.Submission.frame; test:frame-decode-empty-frame",
    "kind": "MUST",
    "note": "Carried in three places, and the clause is about *handling* arriving frames rather than about decoding them, so the dispatcher matters as much as the decoder. The decode path decides the empty case on the frame's own window (size = headerOctets with doff at its minimum) before any body region is taken, so a header-only frame decodes to a frame the session can answer without acting; the dispatcher's `| none =>` case answers it with the endpoint unchanged and nothing written, in both the receive and send routes, with the reference's twins doing the same; and the vector witnesses both \u2014 eight octets of header alone on channel 0, expectation `body: []`, passing in both artefacts, which settles the bodyless vocabulary empirically rather than by proposal. The writers still refuse to send an empty frame, which is the clause's MAY rather than its MUST. Until the change this was a gap: the decoder refused, translating the truncated body read into sizeMismatch.",
    "text_sha256": "a841484728ed46b719b13151d11f227da41ef8f0e0cf917c603424dadc56c5eb"
@@ -151,7 +151,7 @@
    "clause_text": "Implementations MUST be prepared to handle empty frames arriving on any valid channel, though implementations SHOULD use channel 0 when sending empty frames, and MUST use channel 0 if a maximum channel number has not yet been negotiated (i.e., before an \u00abopen\u00bb frame has been received).",
    "disposition": "formalized:SpecAMQP.Spec.Connection.Limits.aPriori; formalized:SpecAMQP.Spec.Connection.limitsFor; test:exchange-pipelined-channel-limit",
    "kind": "MUST",
-   "note": "The channel-0 half is the a priori channel-max of 0 enforced on every send before the partner's open, which exchange-pipelined-channel-limit pins; the sentence's other MUST, handling empty frames, is uncarried as recorded under doc:doc-idle-time-out.7.",
+   "note": "The channel-0 half is the a priori channel-max of 0 enforced on every send before the partner's open, which exchange-pipelined-channel-limit pins; the sentence's other MUST, handling empty frames, is carried and witnessed as recorded under doc:doc-idle-time-out.7.",
    "text_sha256": "a841484728ed46b719b13151d11f227da41ef8f0e0cf917c603424dadc56c5eb"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:begin/field:desired-capabilities.1": {

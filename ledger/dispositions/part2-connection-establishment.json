@@ -132,7 +132,7 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:max-frame-size.1": {
    "clause_text": "A peer MUST NOT send frames larger than its partner can handle.",
-   "disposition": "formalized:Spec.Endpoint.stepAmqpFrame",
+   "disposition": "formalized:Spec.Connection.stepAmqpFrame",
    "kind": "MUST NOT",
    "note": "The comparison sits at Connection.lean:1053 inside `stepAmqpFrame`, as `refuseUnless (size \u2264 limits.maxFrameSize)` with the message branching on direction (the partner's limit for a send, this peer's for a receive), and `limitsFor` routes to `remoteLimits` or `localLimits` accordingly. The obligation is therefore carried by one declaration reached by two paths \u2014 and the sending path does not currently reach it for a frame one octet over the partner's *declared* maximum, which the session sweep's eight-step probe shows while the a priori case in `exchange-pipelined-frame-size-limit` refuses correctly. Recorded as a defect in a reached carrier, not as a missing one.",
    "text_sha256": "97783ab79b63d57287d31eb65e403938c09edc83c89c1ec888d1c69fdd310c0a"
