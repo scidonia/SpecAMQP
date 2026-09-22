@@ -272,6 +272,35 @@ theorem described_canonical_le (descriptorCanonical valueCanonical descriptorAcc
     1 + descriptorCanonical + valueCanonical ≤ 1 + descriptorAccepted + valueAccepted := by
   omega
 
+/-! ## What the reader consumed
+
+The third thing the global step needs is a fact about the *reader's cursor* rather than
+about the table: that a field read advances the cursor by the field's width (`takeBe_eq_fold`
+gives both the fold and the advance), and that a payload read advances it by the payload's own
+length and no more. `takeBytes_advances` is the second of those — the reader's own account of
+how far it moved, which is what lets an accepted encoding's size be written as the field plus
+the quantity the family inequalities compare.
+
+It carries the cursor's check as a hypothesis for the same reason `takeBe_lt` does: its
+success implies the check, but extracting that means inverting `takeBytes`' refusal branch,
+and that is the `Functor.map` on `Except` obstruction this ladder has met three times. The
+check is what every consumption site already has. -/
+
+/-- **Reading `n` octets advances the cursor by `n` and yields `n` of them.**
+
+The reader's own account of its movement: `takeBytes n` at a checked offset returns a cursor
+at `pos + n` and a buffer of exactly `n` octets. This is what an accepted encoding's size is
+made of — a field, then a payload of the payload's own length. -/
+theorem takeBytes_advances (n : Nat) (c : Cursor) (h : c.pos + n ≤ c.data.size)
+    (bytes : Octets) (c' : Cursor) (hb : takeBytes n c = .ok (bytes, c')) :
+    c'.pos = c.pos + n ∧ bytes.size = n := by
+  simp only [takeBytes, h, ↓reduceIte, Except.ok.injEq, Prod.mk.injEq] at hb
+  obtain ⟨hbytes, hcursor⟩ := hb
+  refine ⟨?_, ?_⟩
+  · rw [← hcursor]
+  · rw [← hbytes, Array.size_extract]
+    omega
+
 /-! ## The rung's claim -/
 
 /-- **R5: the writer's encoding is no longer than anything the reader accepts.**
