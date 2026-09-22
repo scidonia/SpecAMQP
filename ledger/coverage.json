@@ -1,9 +1,9 @@
 {
  "by_disposition": {
-  "deferred": 24,
+  "deferred": 44,
   "environment": 6,
-  "formalized": 60,
-  "informative": 12,
+  "formalized": 63,
+  "informative": 15,
   "out-of-scope": 1,
   "superseded": 1,
   "underspecified": 3
@@ -38,8 +38,8 @@
    "total": 12
   },
   "UNKEYED": {
-   "dispositioned": 27,
-   "total": 27
+   "dispositioned": 53,
+   "total": 53
   }
  },
  "lowercase_keyword_statements": 0,
@@ -344,7 +344,7 @@
  },
  "per_artifact": {
   "amqp-core-messaging-v1.0-os.xml": {
-   "anchors": 39,
+   "anchors": 44,
    "audit": {
     "excluded": {
      "MAY": 0,
@@ -381,11 +381,11 @@
     "RECOMMENDED": 1,
     "SHOULD": 13,
     "SHOULD NOT": 7,
-    "UNKEYED": 8
+    "UNKEYED": 13
    },
    "must_class": 57,
    "sha256": "35830a7ea489b2453ba5eb5dfdab3d8b5b865002f2cff7d57c9a9f43861b94cf",
-   "statements": 98
+   "statements": 103
   },
   "amqp-core-overview-v1.0-os.xml": {
    "anchors": 2,
@@ -471,7 +471,7 @@
    "statements": 25
   },
   "amqp-core-transactions-v1.0-os.xml": {
-   "anchors": 6,
+   "anchors": 9,
    "audit": {
     "excluded": {
      "MAY": 0,
@@ -507,14 +507,14 @@
     "REQUIRED": 1,
     "SHOULD": 5,
     "SHOULD NOT": 1,
-    "UNKEYED": 1
+    "UNKEYED": 7
    },
    "must_class": 29,
    "sha256": "6f6e2112d24bb81a285f6e1ed5acc015804a3f6a434fe74cdacc86a9fb6618ff",
-   "statements": 37
+   "statements": 43
   },
   "amqp-core-transport-v1.0-os.xml": {
-   "anchors": 76,
+   "anchors": 85,
    "audit": {
     "excluded": {
      "MAY": 0,
@@ -552,11 +552,11 @@
     "REQUIRED": 2,
     "SHOULD": 32,
     "SHOULD NOT": 4,
-    "UNKEYED": 14
+    "UNKEYED": 29
    },
    "must_class": 117,
    "sha256": "9cd32460d1730975ff0a9dbb66573ff456cbd53ffd8d4f6899c497f02867f637",
-   "statements": 240
+   "statements": 255
   },
   "amqp-core-types-v1.0-os.xml": {
    "anchors": 4,
@@ -608,13 +608,13 @@
  },
  "schema_version": 1,
  "totals": {
-  "anchors": 138,
-  "clauses": 428,
+  "anchors": 155,
+  "clauses": 454,
   "must_class": 230
  },
  "unkeyed": {
-  "dispositioned": 27,
+  "dispositioned": 53,
   "note": "Statements that carry no conformance keyword but are still normative, or still an explicit silence the specification chooses. Captured because the keyword scan cannot see them: Part 1's duplicate-key rule is one sentence of a paragraph whose other sentences do carry keywords. Every one requires a disposition.",
-  "total": 27
+  "total": 53
  }
 }

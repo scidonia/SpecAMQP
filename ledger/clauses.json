@@ -15,6 +15,21 @@
   {
    "anchor": "amqp:messaging/section:addressing",
    "artifact": "amqp-core-messaging-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing.u1",
+   "references": [],
+   "statement_sha256": "aed598102e20f8f4653a15ffd5e8402b13ff2a713b34f15ae868566c5ed805c0",
+   "text": "For a move link with a default configuration this is trivially achieved as such an end result will lead to the message in the ARCHIVED state on the node, and thus ineligible for transfer.",
+   "text_sha256": "aed598102e20f8f4653a15ffd5e8402b13ff2a713b34f15ae868566c5ed805c0",
+   "unkeyed_phrases": [
+    "will lead to"
+   ]
+  },
+  {
+   "anchor": "amqp:messaging/section:addressing",
+   "artifact": "amqp-core-messaging-v1.0-os.xml",
    "class": "MUST",
    "index": 2,
    "kind": "MUST NOT",
@@ -355,6 +370,21 @@
    "statement_sha256": "c40763242a282b21b8bf3ac9046a0e81f26e37aa9f34bd2111dd756801d23000",
    "text": "If the dynamic field is not set to true this field MUST be left unset.",
    "text_sha256": "c40763242a282b21b8bf3ac9046a0e81f26e37aa9f34bd2111dd756801d23000"
+  },
+  {
+   "anchor": "amqp:messaging/section:addressing/type:terminus-expiry-policy",
+   "artifact": "amqp-core-messaging-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:terminus-expiry-policy.u1",
+   "references": [],
+   "statement_sha256": "230a3a0d23c714afe90f1b04578ee77bf92566e9cff23eea18be2833749aa840",
+   "text": "If the link is subsequently re-attached before the terminus is expired, then the count down is aborted.",
+   "text_sha256": "230a3a0d23c714afe90f1b04578ee77bf92566e9cff23eea18be2833749aa840",
+   "unkeyed_phrases": [
+    "then the count down is"
+   ]
   },
   {
    "anchor": "amqp:messaging/section:delivery-state/doc:more-resuming-deliveries",
@@ -1021,6 +1051,23 @@
    "text_sha256": "4043b441ef1de54a87f0a3d83b7b0ef58b457853162e468d10ed0b51924c077f"
   },
   {
+   "anchor": "amqp:messaging/section:message-format/type:header/field:first-acquirer",
+   "artifact": "amqp-core-messaging-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:first-acquirer.u1",
+   "references": [
+    "distribution-nodes"
+   ],
+   "statement_sha256": "11e2adddc584c8fb6eae045cf5c02177e0506c96e6fb0e8ff07ca5320e739462",
+   "text": "If this value is true, then this message has not been acquired by any other link (see \u00abdistribution-nodes\u00bb).",
+   "text_sha256": "11e2adddc584c8fb6eae045cf5c02177e0506c96e6fb0e8ff07ca5320e739462",
+   "unkeyed_phrases": [
+    "then this message has"
+   ]
+  },
+  {
    "anchor": "amqp:messaging/section:message-format/type:header/field:priority",
    "artifact": "amqp-core-messaging-v1.0-os.xml",
    "class": "MAY",
@@ -1031,6 +1078,21 @@
    "statement_sha256": "cc5e37d3062fb9f93f2c254b2fa4a6f42ca33ec87284b9dcaab6aa5af1738994",
    "text": "Messages with higher priorities MAY be delivered before those with lower priorities.",
    "text_sha256": "3786beed90d02daf7a214cd6707eb334ea2f0153842eb925d5b751d2dbb5493c"
+  },
+  {
+   "anchor": "amqp:messaging/section:message-format/type:header/field:priority",
+   "artifact": "amqp-core-messaging-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:priority.u1",
+   "references": [],
+   "statement_sha256": "1d882499623943b20a4a659690d0f97be531b6289efe315064ed3cb9a6682524",
+   "text": "Thus, for example, if 2 distinct priorities are implemented, then levels 0 to 4 are equivalent, and levels 5 to 9 are equivalent and levels 4 and 5 are distinct.",
+   "text_sha256": "1d882499623943b20a4a659690d0f97be531b6289efe315064ed3cb9a6682524",
+   "unkeyed_phrases": [
+    "then levels 0 to 4 are"
+   ]
   },
   {
    "anchor": "amqp:messaging/section:message-format/type:header/field:priority",
@@ -1139,6 +1201,21 @@
    "statement_sha256": "917500f804944439c55c4226236a8f89cc4860625734a1ea12770755c92afff9",
    "text": "When a message is transmitted by an intermediary that was received with a ttl, the transmitted message's header SHOULD contain a ttl that is computed as the difference between the current time and the formerly computed message expiration time, i.e., the reduced ttl, so that messages will eventually die if they end up in a delivery loop.",
    "text_sha256": "7456085540cfaa7355426f407331f584f7396009a7a559c1fde8057a88607dc0"
+  },
+  {
+   "anchor": "amqp:messaging/section:message-format/type:header/field:ttl",
+   "artifact": "amqp-core-messaging-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:ttl.u1",
+   "references": [],
+   "statement_sha256": "5ae376c0304337ed3c6bf9a8ca5b91c96402f41aa2c2c1b07e509e272314c3c0",
+   "text": "If this is set then a message expiration time will be computed based on the time of arrival at an intermediary.",
+   "text_sha256": "5ae376c0304337ed3c6bf9a8ca5b91c96402f41aa2c2c1b07e509e272314c3c0",
+   "unkeyed_phrases": [
+    "then a message expiration time will"
+   ]
   },
   {
    "anchor": "amqp:messaging/section:message-format/type:message-annotations",
@@ -1858,7 +1935,7 @@
    "text": "If it does so, then it is undefined what happens if this differs from hostname in the \u00absasl-init\u00bb and \u00abopen\u00bb frame frames.",
    "text_sha256": "adcbd20d4200a9c4d8c52a6f91cccebe49fccfa042ce00e400d9dab1f77a8c5c",
    "unkeyed_phrases": [
-    "is undefined"
+    "then it is"
    ]
   },
   {
@@ -1968,6 +2045,40 @@
    "statement_sha256": "a9d6e521d27abb6c9118e443a025b32190876357575981650fcfe9f1f18a9567",
    "text": "This field MUST NOT be set if the coordinator does not have the \u00abtxn-capability\u00bb capability.",
    "text_sha256": "6b3f68c2b03e7aea14192669f76066cd383feec7939376031d0e040a507ac064"
+  },
+  {
+   "anchor": "amqp:transactions/section:coordination/type:discharge/field:fail",
+   "artifact": "amqp-core-transactions-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:coordination/type:discharge/field:fail.u1",
+   "references": [],
+   "statement_sha256": "9738e9dfd0270813f81f0a062e8b2c1794c0a5a0a4290384788b762a22cfb5a2",
+   "text": "If the transaction is a local transaction, then this flag controls whether the transaction is committed or aborted when it is discharged.",
+   "text_sha256": "9738e9dfd0270813f81f0a062e8b2c1794c0a5a0a4290384788b762a22cfb5a2",
+   "unkeyed_phrases": [
+    "then this flag controls whether the transaction is"
+   ]
+  },
+  {
+   "anchor": "amqp:transactions/section:transactions",
+   "artifact": "amqp-core-transactions-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:transactions.u1",
+   "references": [
+    "declare",
+    "discharge"
+   ],
+   "statement_sha256": "f8e1e93508b9505a1f3886c0ebd87d8d78bdf9adc79caf96e4fc111d3eefcd5e",
+   "text": "If the control link is closed while there exist non-discharged transactions it created, then all such transactions are immediately rolled back, and attempts to perform further transactional work on them will lead to failure.",
+   "text_sha256": "f8e1e93508b9505a1f3886c0ebd87d8d78bdf9adc79caf96e4fc111d3eefcd5e",
+   "unkeyed_phrases": [
+    "then all such transactions are",
+    "will lead to"
+   ]
   },
   {
    "anchor": "amqp:transactions/section:txn-declare",
@@ -2228,6 +2339,21 @@
   {
    "anchor": "amqp:transactions/section:txn-work",
    "artifact": "amqp-core-transactions-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.u1",
+   "references": [],
+   "statement_sha256": "41ddc44e4a8211c726932196d441336b8eb75c3eacb19a74284c3fd17b00bcb9",
+   "text": "If the transaction is rolled back then the delivery is not made available.",
+   "text_sha256": "41ddc44e4a8211c726932196d441336b8eb75c3eacb19a74284c3fd17b00bcb9",
+   "unkeyed_phrases": [
+    "then the delivery is"
+   ]
+  },
+  {
+   "anchor": "amqp:transactions/section:txn-work",
+   "artifact": "amqp-core-transactions-v1.0-os.xml",
    "class": "MUST",
    "index": 2,
    "kind": "MUST",
@@ -2240,6 +2366,21 @@
    "statement_sha256": "1b3a500be5bee5426f9ba0bdf9420eb01eb6dbda1d6eeaffdd98959bf6946faa",
    "text": "If the transaction controller wishes to associate an outgoing \u00abtransfer\u00bb with a transaction, it MUST set the state of the transfer with a \u00abtransactional-state\u00bb carrying the appropriate transaction identifier.",
    "text_sha256": "2a131d83be0814a74cef4e17d7960009ce5f74a77edb2d36accc9d853c259721"
+  },
+  {
+   "anchor": "amqp:transactions/section:txn-work",
+   "artifact": "amqp-core-transactions-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 2,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.u2",
+   "references": [],
+   "statement_sha256": "dca753f335a9a865a90828bf0c925b2099f2de8ac25906dd721edc83172f0d7a",
+   "text": "If the transaction is rolled back then the delivery is not made available at the target.",
+   "text_sha256": "dca753f335a9a865a90828bf0c925b2099f2de8ac25906dd721edc83172f0d7a",
+   "unkeyed_phrases": [
+    "then the delivery is"
+   ]
   },
   {
    "anchor": "amqp:transactions/section:txn-work",
@@ -2260,6 +2401,21 @@
   {
    "anchor": "amqp:transactions/section:txn-work",
    "artifact": "amqp-core-transactions-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 3,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.u3",
+   "references": [],
+   "statement_sha256": "cd0211c931554cc9764bc1cb853f0631adb708e2824e600ff7a580d0351b08db",
+   "text": "If the controller requests a rollback or the discharge attempt be unsuccessful, then the outcome is not applied.",
+   "text_sha256": "cd0211c931554cc9764bc1cb853f0631adb708e2824e600ff7a580d0351b08db",
+   "unkeyed_phrases": [
+    "then the outcome is"
+   ]
+  },
+  {
+   "anchor": "amqp:transactions/section:txn-work",
+   "artifact": "amqp-core-transactions-v1.0-os.xml",
    "class": "MUST",
    "index": 4,
    "kind": "MUST",
@@ -2272,6 +2428,21 @@
    "statement_sha256": "1b3a500be5bee5426f9ba0bdf9420eb01eb6dbda1d6eeaffdd98959bf6946faa",
    "text": "If this happens, the control link MUST be terminated with the \u00abtransaction-error\u00bb error.",
    "text_sha256": "ed56101244d7afadcaf78be7e6dd27fbef5dd1a21a486351afea28c36489db5c"
+  },
+  {
+   "anchor": "amqp:transactions/section:txn-work",
+   "artifact": "amqp-core-transactions-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 4,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.u4",
+   "references": [],
+   "statement_sha256": "fd479618b3fc7bf2e0d5f83e681a6ed905e42804e2b8dd412390f0c1f2c14369",
+   "text": "If the resource settles the delivery before the discharge then the behavior after discharge is the same as the case above.",
+   "text_sha256": "fd479618b3fc7bf2e0d5f83e681a6ed905e42804e2b8dd412390f0c1f2c14369",
+   "unkeyed_phrases": [
+    "then the behavior after discharge is"
+   ]
   },
   {
    "anchor": "amqp:transactions/section:txn-work",
@@ -3213,6 +3384,23 @@
   {
    "anchor": "amqp:transport/section:links",
    "artifact": "amqp-core-transport-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.u1",
+   "references": [
+    "attach"
+   ],
+   "statement_sha256": "ef5b4a02c2c16c2836275d59351e0e5d2f8588095e758f4d7052f05d5c61fce3",
+   "text": "The link endpoint is then mapped to an unused handle, and an \u00abattach\u00bb frame is issued carrying the state of the newly created endpoint.",
+   "text_sha256": "ef5b4a02c2c16c2836275d59351e0e5d2f8588095e758f4d7052f05d5c61fce3",
+   "unkeyed_phrases": [
+    "then mapped to an unused handle, and an \u00abattach\u00bb frame is"
+   ]
+  },
+  {
+   "anchor": "amqp:transport/section:links",
+   "artifact": "amqp-core-transport-v1.0-os.xml",
    "class": "MUST",
    "index": 2,
    "kind": "MUST",
@@ -3223,6 +3411,23 @@
    "statement_sha256": "4c86c0f4facaea9e3c449ac7b91e38a59c423b51cfd94f6e26ef128c91420754",
    "text": "If an attempt is made to attach the link subsequently when it is not suspended, then the link can be 'stolen', i.e., the second attach succeeds and the first attach MUST then be closed with a link error of \u00ablink-error\u00bb.",
    "text_sha256": "39b86a096396de45b474c0f912912baa70d5c08e429e45ff1aa6da0d909f2082"
+  },
+  {
+   "anchor": "amqp:transport/section:links",
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 2,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.u2",
+   "references": [
+    "attach"
+   ],
+   "statement_sha256": "c1d2cb488b4e77aa496e2893e7b38790b198260c2c96213d1ff8ecaf6f945a1d",
+   "text": "The full link state is then constructed from the authoritative source or target supplied by the other endpoint once the link is established.",
+   "text_sha256": "c1d2cb488b4e77aa496e2893e7b38790b198260c2c96213d1ff8ecaf6f945a1d",
+   "unkeyed_phrases": [
+    "then constructed from the authoritative source or target supplied by the other endpoint once the link is"
+   ]
   },
   {
    "anchor": "amqp:transport/section:links",
@@ -3241,6 +3446,23 @@
   {
    "anchor": "amqp:transport/section:links",
    "artifact": "amqp-core-transport-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 3,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.u3",
+   "references": [
+    "attach"
+   ],
+   "statement_sha256": "40fc5be6df42797cb822dab460e8c3ec17221689fc75afd54dcf35da71ed9fc7",
+   "text": "If the remote peer has no record of the link, then no terminus will be located, and local terminus (source or target as appropriate) field in the \u00abattach\u00bb frame will be null.",
+   "text_sha256": "40fc5be6df42797cb822dab460e8c3ec17221689fc75afd54dcf35da71ed9fc7",
+   "unkeyed_phrases": [
+    "then no terminus will"
+   ]
+  },
+  {
+   "anchor": "amqp:transport/section:links",
+   "artifact": "amqp-core-transport-v1.0-os.xml",
    "class": "MUST",
    "index": 4,
    "kind": "MUST",
@@ -3251,6 +3473,21 @@
    "statement_sha256": "65061dd902d0e9ae4ecdb45d7d890e35a9b6cf5ec553240dc251694532409dde",
    "text": "In this case, the session endpoint MUST immediately detach the newly created link endpoint.",
    "text_sha256": "6cb94cd066651facc7647c6fbca4860c15bc9b8a55cee66533543f83220b1a89"
+  },
+  {
+   "anchor": "amqp:transport/section:links",
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 4,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.u4",
+   "references": [],
+   "statement_sha256": "7774caf6ed9a158f0aa74bc9d70644119959d418ceb9d6784290457f427b7b53",
+   "text": "The sender will then send its final delivery state along with an indication that the delivery is settled at the sender.",
+   "text_sha256": "7774caf6ed9a158f0aa74bc9d70644119959d418ceb9d6784290457f427b7b53",
+   "unkeyed_phrases": [
+    "then send its final delivery state along with an indication that the delivery is"
+   ]
   },
   {
    "anchor": "amqp:transport/section:links",
@@ -3269,6 +3506,21 @@
   {
    "anchor": "amqp:transport/section:links",
    "artifact": "amqp-core-transport-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 5,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.u5",
+   "references": [],
+   "statement_sha256": "9da2420a24e8fbaacd809278e7ba274545a215f68a81d5bef4ee1c715f64d770",
+   "text": "The application can then perform some final action, e.g., remove the delivery-tag from a set kept for de-duplication, and then notify the receiver that the delivery is settled.",
+   "text_sha256": "9da2420a24e8fbaacd809278e7ba274545a215f68a81d5bef4ee1c715f64d770",
+   "unkeyed_phrases": [
+    "then notify the receiver that the delivery is"
+   ]
+  },
+  {
+   "anchor": "amqp:transport/section:links",
+   "artifact": "amqp-core-transport-v1.0-os.xml",
    "class": "MAY",
    "index": 6,
    "kind": "MAY",
@@ -3277,6 +3529,21 @@
    "statement_sha256": "9f5a5034b7170623bb24a44901c6a7b175e212adcad00d3656236297e745997a",
    "text": "If this happens, the endpoint MAY adjust the properties in order to succeed in creating the terminus.",
    "text_sha256": "b4a176b477dfed16c50b72a38e1f3fab9b3c549e60f20301a54ee14a713db063"
+  },
+  {
+   "anchor": "amqp:transport/section:links",
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 6,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.u6",
+   "references": [],
+   "statement_sha256": "7eb245561a76d02bef2cd65faa69d3713aac2f4f43fd56f303ca7c4c201f0c2f",
+   "text": "If the disposition frame indicated below is lost, then upon link recovery the sender will not see the delivery-tag in the receiver's unsettled map and will therefore assume the delivery was lost and resend it, resulting in duplicate processing of the message at the receiver.",
+   "text_sha256": "7eb245561a76d02bef2cd65faa69d3713aac2f4f43fd56f303ca7c4c201f0c2f",
+   "unkeyed_phrases": [
+    "then upon link recovery the sender will"
+   ]
   },
   {
    "anchor": "amqp:transport/section:links",
@@ -4156,6 +4423,36 @@
    "text_sha256": "1437ef94c69019c082f02d4d229560bdbce4f29c5aa52697c3f9e8d3e4e33b2f"
   },
   {
+   "anchor": "amqp:transport/section:performatives/type:attach/field:source",
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:attach/field:source.u1",
+   "references": [],
+   "statement_sha256": "94c8c07fdf38f2ba0081fd22f3fb8f6fef1025105451493127fa4139deb62d7d",
+   "text": "If no source is specified on an outgoing link, then there is no source currently attached to the link.",
+   "text_sha256": "94c8c07fdf38f2ba0081fd22f3fb8f6fef1025105451493127fa4139deb62d7d",
+   "unkeyed_phrases": [
+    "then there is"
+   ]
+  },
+  {
+   "anchor": "amqp:transport/section:performatives/type:attach/field:target",
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:attach/field:target.u1",
+   "references": [],
+   "statement_sha256": "4b709bc83b85e76fd65e70f36defe98fb6371865d00cdae722155304dcd3a13c",
+   "text": "If no target is specified on an incoming link, then there is no target currently attached to the link.",
+   "text_sha256": "4b709bc83b85e76fd65e70f36defe98fb6371865d00cdae722155304dcd3a13c",
+   "unkeyed_phrases": [
+    "then there is"
+   ]
+  },
+  {
    "anchor": "amqp:transport/section:performatives/type:attach/field:unsettled",
    "artifact": "amqp-core-transport-v1.0-os.xml",
    "class": "MUST",
@@ -4390,6 +4687,21 @@
    "statement_sha256": "14de030b47b1154b2fcb1daa64221d158530c69faf9cefc322a31db17b1ae18c",
    "text": "This hint MAY be used to artificially increase the amount of batching an implementation uses when communicating delivery states, and thereby save bandwidth.",
    "text_sha256": "9ee98756cd32f2effe05b7ab84c8a7168da8632c0bba94df427907a6db2bbf5f"
+  },
+  {
+   "anchor": "amqp:transport/section:performatives/type:disposition/field:batchable",
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:disposition/field:batchable.u1",
+   "references": [],
+   "statement_sha256": "428aa2f78fe563d4e8b71c8d490061c7740490fc8dad6aef851ee61ae01d8c33",
+   "text": "If true, then the issuer is hinting that there is no need for the peer to urgently communicate the impact of the updated delivery states.",
+   "text_sha256": "428aa2f78fe563d4e8b71c8d490061c7740490fc8dad6aef851ee61ae01d8c33",
+   "unkeyed_phrases": [
+    "then the issuer is"
+   ]
   },
   {
    "anchor": "amqp:transport/section:performatives/type:end/field:error",
@@ -4682,6 +4994,21 @@
   {
    "anchor": "amqp:transport/section:performatives/type:open/field:desired-capabilities",
    "artifact": "amqp-core-transport-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:desired-capabilities.u1",
+   "references": [],
+   "statement_sha256": "b8e64314b90c87ddc8a3e943d29111cd6c4988f5d4e8f5aaf51df359063b03cf",
+   "text": "If the receiver of the desired-capabilities offers extension capabilities which are not present in the desired-capabilities list it received, then it can be sure those (undesired) capabilities will not be used on the connection.",
+   "text_sha256": "b8e64314b90c87ddc8a3e943d29111cd6c4988f5d4e8f5aaf51df359063b03cf",
+   "unkeyed_phrases": [
+    "then it can be sure those (undesired) capabilities will"
+   ]
+  },
+  {
+   "anchor": "amqp:transport/section:performatives/type:open/field:desired-capabilities",
+   "artifact": "amqp-core-transport-v1.0-os.xml",
    "class": "MUST",
    "index": 2,
    "kind": "MUST NOT",
@@ -4761,6 +5088,21 @@
    "statement_sha256": "11f4a2e77fe5050a6561506b3f55665965592bbc5ff09d398f458bc0c4950e11",
    "text": "The idle timeout REQUIRED by the sender (see \u00abdoc-idle-time-out\u00bb).",
    "text_sha256": "f7829561dca73a47c8af2e0fa6c24f2ac2b9f4c29eb84a12db97d6e5f2e75031"
+  },
+  {
+   "anchor": "amqp:transport/section:performatives/type:open/field:idle-time-out",
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:idle-time-out.u1",
+   "references": [],
+   "statement_sha256": "41026e18bfc29fb56c9f8ac59cc7458ee248ed733bae93001209f2c7d3067d46",
+   "text": "If the value is not set, then the sender does not have an idle time-out.",
+   "text_sha256": "41026e18bfc29fb56c9f8ac59cc7458ee248ed733bae93001209f2c7d3067d46",
+   "unkeyed_phrases": [
+    "then the sender does"
+   ]
   },
   {
    "anchor": "amqp:transport/section:performatives/type:open/field:idle-time-out",
@@ -4937,6 +5279,38 @@
    "text_sha256": "9ee98756cd32f2effe05b7ab84c8a7168da8632c0bba94df427907a6db2bbf5f"
   },
   {
+   "anchor": "amqp:transport/section:performatives/type:transfer/field:batchable",
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:batchable.u1",
+   "references": [],
+   "statement_sha256": "42a21902693b6af0c9e63ad6b9dbc490bbdc0a4a6de63bd6c6236941678b7e0f",
+   "text": "If true, then the issuer is hinting that there is no need for the peer to urgently communicate updated delivery state.",
+   "text_sha256": "42a21902693b6af0c9e63ad6b9dbc490bbdc0a4a6de63bd6c6236941678b7e0f",
+   "unkeyed_phrases": [
+    "then the issuer is"
+   ]
+  },
+  {
+   "anchor": "amqp:transport/section:performatives/type:transfer/field:batchable",
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 2,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:batchable.u2",
+   "references": [
+    "transfer"
+   ],
+   "statement_sha256": "2885e0c192e2a13267edad24d06b27174f2cfd411866298725f4e57457528fe7",
+   "text": "If the message being delivered is too large to fit within a single frame, then the setting of batchable to true on any of the \u00abtransfer\u00bb performatives for the delivery is equivalent to setting batchable to true for all the \u00abtransfer\u00bb performatives for the delivery.",
+   "text_sha256": "2885e0c192e2a13267edad24d06b27174f2cfd411866298725f4e57457528fe7",
+   "unkeyed_phrases": [
+    "then the setting of batchable to true on any of the \u00abtransfer\u00bb performatives for the delivery is"
+   ]
+  },
+  {
    "anchor": "amqp:transport/section:performatives/type:transfer/field:delivery-id",
    "artifact": "amqp-core-transport-v1.0-os.xml",
    "class": "MUST",
@@ -5021,6 +5395,23 @@
    "statement_sha256": "3c136f9b2a1dd8f2d074b0cf77f2ad686cda54b05961100ea4404c0245d8c23f",
    "text": "If \u00abreceiver-settle-mode\u00bb, this indicates that the receiver MUST settle the delivery once it has arrived without waiting for the sender to settle first.",
    "text_sha256": "3c136f9b2a1dd8f2d074b0cf77f2ad686cda54b05961100ea4404c0245d8c23f"
+  },
+  {
+   "anchor": "amqp:transport/section:performatives/type:transfer/field:rcv-settle-mode",
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:rcv-settle-mode.u1",
+   "references": [
+    "receiver-settle-mode"
+   ],
+   "statement_sha256": "3c3963c72790e68e044e90698a8af94075b745447ee6d39d60fec1aa4adb8ef3",
+   "text": "If the negotiated link value is \u00abreceiver-settle-mode\u00bb, then it is illegal to set this field to \u00abreceiver-settle-mode\u00bb.",
+   "text_sha256": "3c3963c72790e68e044e90698a8af94075b745447ee6d39d60fec1aa4adb8ef3",
+   "unkeyed_phrases": [
+    "then it is"
+   ]
   },
   {
    "anchor": "amqp:transport/section:performatives/type:transfer/field:rcv-settle-mode",
@@ -5371,6 +5762,23 @@
    "statement_sha256": "8b9009d7ce855df521ccf4e290e1f5d6d5ed106be468e7edc220a52a5491f377",
    "text": "The next-outgoing-id MAY be initialized to an arbitrary value and is incremented after each successive \u00abtransfer\u00bb according to RFC-1982 [ \u00abRFC1982\u00bb] serial number arithmetic.",
    "text_sha256": "e7e1638243beb485ab8766d8ec907bacc32859e1e6d87b535852a0dad0613d0a"
+  },
+  {
+   "anchor": "amqp:transport/section:sessions/doc:session-flow-control",
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions/doc:session-flow-control.u1",
+   "references": [
+    "flow"
+   ],
+   "statement_sha256": "faf73e651b78f5e317dad39d734d89330569575da0b8539d15e3cf053a24bb68",
+   "text": "If the next-incoming-id field of the \u00abflow\u00bb frame is not set, then remote-incoming-window is computed as follows:",
+   "text_sha256": "faf73e651b78f5e317dad39d734d89330569575da0b8539d15e3cf053a24bb68",
+   "unkeyed_phrases": [
+    "then remote-incoming-window is"
+   ]
   },
   {
    "anchor": "amqp:transport/section:sessions/doc:session-flow-control",
