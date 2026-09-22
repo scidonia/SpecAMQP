@@ -203,6 +203,8 @@ import Proofs.CodecRoundTripNarrowest
 import Proofs.CodecRoundTripVariable
 import Spec.ReadLaws
 
+import Proofs.ReadProgress
+import Proofs.CodecNarrowestAssembly
 #print axioms SpecAMQP.Contracts.constructor_grammar_public
 #print axioms SpecAMQP.Contracts.extended_header_width
 #print axioms SpecAMQP.Contracts.body_starts_after_the_header
