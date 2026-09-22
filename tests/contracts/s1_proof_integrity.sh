@@ -211,6 +211,8 @@ import Spec.ReadLaws
 #print axioms SpecAMQP.Proofs.go_foldr_value
 #print axioms SpecAMQP.Proofs.bigEndianFieldValue
 #print axioms SpecAMQP.Proofs.fieldValueRoundTrip
+#print axioms SpecAMQP.Proofs.foldl_be_bound
+#print axioms SpecAMQP.Proofs.takeBe_lt
 #print axioms SpecAMQP.Proofs.widthChoice_le_of_fits
 #print axioms SpecAMQP.Proofs.widthChoice_narrow_iff
 #print axioms SpecAMQP.Proofs.lengthPrefixed_canonical_size
@@ -256,6 +258,7 @@ for theorem in "$accepted_theorem" extended_header_width body_starts_after_the_h
                SpecAMQP.Proofs.beOctets_length SpecAMQP.Proofs.go_length \
                SpecAMQP.Proofs.mod_mul_base SpecAMQP.Proofs.go_foldr_value \
                SpecAMQP.Proofs.bigEndianFieldValue SpecAMQP.Proofs.fieldValueRoundTrip \
+               SpecAMQP.Proofs.foldl_be_bound SpecAMQP.Proofs.takeBe_lt \
                SpecAMQP.Proofs.widthChoice_le_of_fits SpecAMQP.Proofs.widthChoice_narrow_iff \
                SpecAMQP.Proofs.lengthPrefixed_canonical_size \
                SpecAMQP.Proofs.descriptorPrefix_length SpecAMQP.Proofs.described_overhead \

@@ -23,29 +23,32 @@ does not, so nothing narrower could have carried the same quantities.
 `encodeValue`/`decodeValue`.
 
 **What the remaining argument needs, and from where.** To go from the rule to the law, a
-proof has to know that *the reader accepts the wide forms at all*: the law compares the
-writer's canonical octets against an arbitrary accepted encoding, so it must know that an
-accepted encoding of a given value carries the same quantities in a field of one of the
-widths the table offers. That is a fact about the reader — R2's `lengthPrefixed` and R3's
-compound case both exercise it — and it is not proved by the four rungs below, which reason
-about the writer's own output. It is stated here as the hypothesis it is rather than assumed,
-in the same way the frame round trip carries the value law as a hypothesis.
+proof has to know not what the *writer* chose but what the *reader consumed*: the law
+compares the writer's canonical octets against an arbitrary accepted encoding, so it must
+know that an accepted encoding carried the same quantities in a field of one of the two
+widths the table offers, and at a size no smaller than the width the rule picks. That is a
+set of reader-side lemmas, per family, derived from `takeBe`/`takeBytes`' own consumption
+rather than from the writer's behaviour — the reader's dispatch is a function of the
+accepted buffer's first octet, the same table decision the writer consults, so a proof of
+the law can case on that octet and read the field's width off it without any API change.
+They are proof-internal and they compose into the global statement.
 
-**Per family, not globally — and the honest form of that.** The rule is proved for the
-quantities a field carries, and the canonical size is known per family (R2's
-`lengthPrefixed_ok`, R3's `compoundOctets_ok_length` and `arrayOctets_ok_length`). What is
-*not* yet available is a single statement of the reader's accepted widths covering all
-families at once, which is what a global `NarrowestEncoding` needs. R5 therefore proves the
-rule's inequality and the canonical sizes, and states the law; the step between them is the
-reader-acceptance fact, named rather than elided.
+**The law is not weakened, and it carries no hypothesis.** `NarrowestEncoding` is stated
+exactly as the contract states it. What is missing is a rung of reader-consumption lemmas,
+not a fact the reader withholds: "the accepted encoding's size is at least the canonical
+size", once per family, is the work this rung leaves named rather than a reason to restate
+the law per family.
 
 ## What is proved
 
 * `widthChoice_le_of_fits` — the rule as an inequality: any width the table offers that
   carries every quantity is at least the width the rule chooses.
 * `widthChoice_narrow_iff` — the rule read as an order: the chosen width is one octet
-  exactly when one octet carries every quantity, so the wide choice is forced rather than
-  optional.
+  exactly when one octet carries every quantity. This is what makes the wide choice
+  **forced rather than preferred**: it is not a style the writer could reverse, it is what
+  is left when one octet does not suffice, and `widthChoice_le_of_fits` is the same fact
+  seen as an inequality. A reader who does not see this stated will assume the writer had a
+  choice, which is exactly what "narrowest" denies.
 * `lengthPrefixed_canonical_size` — the canonical size for a variable-width family, which is
   the right-hand side a per-family instance of the law compares against.
 -/
@@ -108,6 +111,64 @@ theorem lengthPrefixed_canonical_size (payload : List UInt8) :
     (beOctets (lengthWidthOf payload.length) payload.length ++ payload).length =
       lengthWidthOf payload.length + payload.length := by
   simp [List.length_append, beOctets_length]
+
+/-! ## The reader on arbitrary accepted octets
+
+Everything below is a fact about the *reader*, on octets the writer did not necessarily
+produce. The four agreement rungs never needed one: each of them compares the reader's
+result with the writer's own output, so the octets it reasons about are the writer's by
+construction. The narrowest-form law is a statement about the *choice rule* rather than
+about agreement — it compares the writer's canonical octets with an arbitrary accepted
+encoding — so it is the first claim that needs the reader measured on its own. That is why
+these lemmas live here and not in `Spec/ReadLaws.lean`: they are about the choice, not
+about the codec's behaviour, and the module that proves a law about the choice is where a
+reader of this ladder will look for them.
+-/
+
+/-- **A big-endian fold of `words` octets is bounded by `256 ^ words`.**
+
+The induction under `takeBe_lt`, generalised to an arbitrary accumulator because the loop
+carries one: after `words` octets the accumulator is below `(init + 1) * 256 ^ words`, since
+each octet multiplies by 256 and adds less than 256. -/
+theorem foldl_be_bound (bytes : List UInt8) (init : Nat) :
+    bytes.foldl (fun acc byte => acc * 256 + byte.toNat) init < (init + 1) * 256 ^ bytes.length := by
+  induction bytes generalizing init with
+  | nil => simp only [List.foldl_nil, List.length_nil, Nat.pow_zero, Nat.mul_one]; omega
+  | cons x xs ih =>
+    rw [List.length_cons, List.foldl_cons]
+    have hx : x.toNat < 256 := x.toNat_lt
+    calc xs.foldl (fun acc byte => acc * 256 + byte.toNat) (init * 256 + x.toNat)
+        < (init * 256 + x.toNat + 1) * 256 ^ xs.length := ih (init * 256 + x.toNat)
+      _ ≤ ((init + 1) * 256) * 256 ^ xs.length := by
+          have hstep : init * 256 + x.toNat + 1 ≤ (init + 1) * 256 := by omega
+          exact Nat.mul_le_mul_right _ hstep
+      _ = (init + 1) * (256 ^ xs.length * 256) := by
+          rw [Nat.mul_assoc, Nat.mul_comm 256 (256 ^ xs.length)]
+      _ = (init + 1) * 256 ^ (xs.length + 1) := by rw [Nat.pow_succ]
+
+/-- **A field's value is bounded by its own width.**
+
+`takeBe width` folds the `width` octets it took, so what it returns is below
+`256 ^ width`: a length read from a one-octet field is at most 255, and one read from a
+four-octet field is below `2 ^ 32`. This is the reader's counterpart of the writer's
+`filled` check, and it is the fact a narrowest-form argument about an *accepted* encoding
+needs — the quantity it compares is one the reader read from a field of some width, and
+this is what bounds it by that width. -/
+theorem takeBe_lt (width : Nat) (c : Cursor) (h : c.pos + width ≤ c.data.size)
+    (v : Nat) (c' : Cursor) (hv : takeBe width c = .ok (v, c')) : v < 256 ^ width := by
+  rw [takeBe_eq_fold width c h] at hv
+  have hval : beValue ((c.data.toList.drop c.pos).take width) = v :=
+    congrArg Prod.fst (Except.ok.inj hv)
+  have hlen : ((c.data.toList.drop c.pos).take width).length ≤ width := by
+    rw [List.length_take]
+    exact Nat.min_le_left _ _
+  rw [← hval, beValue]
+  have hbound : ((c.data.toList.drop c.pos).take width).foldl
+      (fun acc byte => acc * 256 + byte.toNat) 0 <
+        256 ^ ((c.data.toList.drop c.pos).take width).length := by
+    simpa using foldl_be_bound ((c.data.toList.drop c.pos).take width) 0
+  exact Nat.lt_of_lt_of_le hbound
+    (Nat.pow_le_pow_right (by decide : (0 : Nat) < 256) hlen)
 
 /-! ## The rung's claim -/
 
