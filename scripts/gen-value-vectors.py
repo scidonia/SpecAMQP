@@ -1206,6 +1206,61 @@ def element_rejects() -> list[dict]:
     return vectors
 
 
+# ------------------------------------------------------ writer-refusal vectors
+#
+# An array's declared element form fixes how its elements are written, so a value the
+# declared form cannot carry is refused rather than written in another form: the
+# writer's domain has to sit inside what its reader accepts, and a value masked into a
+# shorter field would encode something other than what was asked for. These are the
+# encode direction of the element family — an `expectError` on an encode vector means
+# the encoder must refuse the value — and each pins the reason class both artefacts
+# must name, which is the check that makes a refusal worth having.
+
+ELEMENT_REFUSAL_CLASS = "limit"
+
+
+def element_writer_refusals() -> list[dict]:
+    """Values the declared element form cannot carry, in the encode direction."""
+    vectors: list[dict] = []
+
+    def refuse(name: str, value: dict, note: str) -> None:
+        vectors.append({
+            "vector": f"gen-element-refuse-{name}", "kind": "encode",
+            "clauses": [ENCODINGS_CLAUSE], "value": value,
+            "expectError": {"condition": "amqp:decode-error",
+                            "reason": ELEMENT_REFUSAL_CLASS,
+                            "endpoint": "connection"},
+            "note": note,
+        })
+
+    def array(constructor: int, items: list[dict]) -> dict:
+        return {"type": "array", "constructor": f"{constructor:02x}", "items": items}
+
+    refuse("str8-element-over-long", array(0xA1, [{"type": "string", "text": "x" * 300}]),
+           "a str8 element cannot announce 300 octets in a one-octet length field")
+    refuse("list8-element-over-count", array(0xC0, [
+        {"type": "list", "items": [{"type": "ubyte", "value": 1}] * 300}]),
+        "a list8 element cannot announce 300 items in a one-octet count field")
+    refuse("array8-element-over-count", array(0xE0, [
+        {"type": "array", "constructor": "40", "items": [{"type": "null"}] * 300}]),
+        "an array8 element cannot announce 300 elements in a one-octet count field")
+    refuse("ubyte-element-holds-uint", array(0x50, [{"type": "uint", "value": 7}]),
+           "a ubyte element constructor cannot carry a uint")
+    refuse("smalluint-element-over-range", array(0x52, [{"type": "uint", "value": 300}]),
+           "a smalluint element carries one octet and 300 does not fit")
+    refuse("smallint-element-over-range", array(0x54, [{"type": "int", "value": 300}]),
+           "a smallint element carries one signed octet and 300 does not fit")
+    refuse("uint0-element-nonzero", array(0x43, [{"type": "uint", "value": 1}]),
+           "the uint zero form carries only the value zero")
+    refuse("list0-element-nonempty", array(0x45, [
+        {"type": "list", "items": [{"type": "null"}]}]),
+        "the empty-list form carries only the empty list")
+    refuse("list8-element-holds-ubyte", array(0xC0, [{"type": "ubyte", "value": 7}]),
+           "a list8 element constructor cannot carry a ubyte: a compound's declared form "
+           "carries compound values")
+    return vectors
+
+
 def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--out", default=str(ROOT / "vectors" / "generated.ndjson"))
@@ -1219,7 +1274,8 @@ def main(argv: list[str]) -> int:
 
     self_check()
     gold = golden() + element_arrays()
-    corpus = gold + rejects(gold) + element_rejects() + properties()
+    corpus = (gold + rejects(gold) + element_rejects()
+              + element_writer_refusals() + properties())
     if args.limit_properties is not None:
         props = [v for v in corpus if v["kind"] == "property"]
         corpus = [v for v in corpus if v["kind"] != "property"] + props[:args.limit_properties]

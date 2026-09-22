@@ -192,13 +192,13 @@ than truncating it: a payload that silently lost its high octets would encode a
 different value than the one asked for. -/
 def filled (width : Nat) (n : Nat) : Except String (List UInt8) :=
   if n < 2 ^ (8 * width) then .ok (beOctets width n)
-  else .error s!"{n} does not fit in {width} big-endian octet(s)"
+  else .error (refusal "limit" s!"{n} does not fit in {width} big-endian octet(s)")
 
 /-- `i` in `width` two's-complement octets, refusing a value outside the range. -/
 def twosComplement (width : Nat) (i : Int) : Except String (List UInt8) :=
   let modulus : Int := (2 : Int) ^ (8 * width)
   if -(modulus / 2) ≤ i ∧ i < modulus / 2 then .ok (beOctets width (i % modulus).toNat)
-  else .error s!"{i} does not fit in {width} octet(s) of two's complement"
+  else .error (refusal "limit" s!"{i} does not fit in {width} octet(s) of two's complement")
 
 /-- A `width`-octet big-endian field read as a two's-complement integer. -/
 def signedOfOctets (width : Nat) (n : Nat) : Int :=
@@ -678,8 +678,8 @@ def compoundOctets (decl : EncodingDecl) (count : Nat) (body : List UInt8) :
   if size < 2 ^ (8 * decl.width) ∧ count < 2 ^ (8 * decl.width) then
     return beOctets decl.width size ++ beOctets decl.width count ++ body
   else
-    .error s!"no {decl.owner} encoding of width {decl.width} carries {count} item(s) \
-      in {body.length} octet(s)"
+    .error (refusal "limit" s!"no {decl.owner} encoding of width {decl.width} \
+      carries {count} item(s) in {body.length} octet(s)")
 
 /-- An array's octets under a declaration: the size field, the count field, the
 element constructor, then the elements' data. The size counts the count field, the
@@ -691,8 +691,8 @@ def arrayOctets (decl : EncodingDecl) (constructor : UInt8) (count : Nat)
     return beOctets decl.width size ++ beOctets decl.width count ++
       [constructor] ++ elements
   else
-    .error s!"no array encoding of width {decl.width} carries {count} element(s) \
-      in {elements.length} octet(s)"
+    .error (refusal "limit" s!"no array encoding of width {decl.width} carries \
+      {count} element(s) in {elements.length} octet(s)")
 
 /-- A fixed-width declaration's data: as many octets as the row declares, in the
 type's own form. A value of another type is refused rather than written short. -/
@@ -718,8 +718,9 @@ def writeFixedData (decl : EncodingDecl) (value : Value) : Except String (List U
   | "uuid", .uuid bits => rawPayload decl bits
   | "list", .list [] => .ok []
   | owner, other =>
-    .error s!"the declared surface calls octet 0x{toHex #[UInt8.ofNat decl.code]} a \
-      {owner} encoding, which cannot carry {typeName other}"
+    .error (refusal "limit" s!"the declared surface calls octet \
+      0x{toHex #[UInt8.ofNat decl.code]} a {owner} encoding, which cannot carry \
+      {typeName other}")
 
 /-- A variable-width declaration's data: the length in the row's width, then the
 payload. -/
@@ -729,8 +730,9 @@ def writeVariableData (decl : EncodingDecl) (value : Value) : Except String (Lis
   | "string", .string text => lengthPrefixed decl text.toUTF8.toList
   | "symbol", .symbol text => lengthPrefixed decl text.toUTF8.toList
   | owner, other =>
-    .error s!"the declared surface calls octet 0x{toHex #[UInt8.ofNat decl.code]} a \
-      {owner} encoding, which cannot carry {typeName other}"
+    .error (refusal "limit" s!"the declared surface calls octet \
+      0x{toHex #[UInt8.ofNat decl.code]} a {owner} encoding, which cannot carry \
+      {typeName other}")
 
 /-- A scalar value's octets under the declaration the table gives it: the constructor
 octet, then the row's data form. -/
@@ -879,8 +881,9 @@ def writeCompoundData : Value → EncodingDecl → Except String (List UInt8)
     let body ← writePairs pairs
     compoundOctets decl (2 * pairs.length) body
   | item, decl =>
-    .error s!"the declared surface calls octet 0x{toHex #[UInt8.ofNat decl.code]} a \
-      {decl.owner} encoding, which cannot carry {typeName item}"
+    .error (refusal "limit" s!"the declared surface calls octet \
+      0x{toHex #[UInt8.ofNat decl.code]} a {decl.owner} encoding, which cannot carry \
+      {typeName item}")
 termination_by item _ => sizeOf item
 
 /-- An array's data: its elements' data, then the size and count fields that

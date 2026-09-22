@@ -568,8 +568,8 @@ def elementVariableData (constructor : UInt8) (form : String) (payload : List UI
   else if payload.length ≤ 255 then
     .ok (#[payload.length.toUInt8] ++ payload.toArray)
   else
-    .error s!"a {form} element carries {payload.length} octet(s), which a one-octet \
-      length field cannot announce"
+    .error s!"limit: a {form} element carries {payload.length} octet(s), which a \
+      one-octet length field cannot announce"
 
 /-- A value's type in the corpus's own words: what a refusal names when the value and the
 constructor disagree. -/
@@ -605,12 +605,12 @@ the array's declared constructor gives it: masking the value would write a diffe
 value, which a reader would then accept. -/
 def elementOctet (kind : String) (n : Nat) : Except String Octets :=
   if n ≤ 255 then .ok #[n.toUInt8]
-  else .error s!"a {kind} element carries one octet and {n} does not fit"
+  else .error s!"limit: a {kind} element carries one octet and {n} does not fit"
 
 /-- A one-octet signed element, on the same terms. -/
 def elementSignedOctet (kind : String) (n : Int) : Except String Octets :=
   if -128 ≤ n && n ≤ 127 then .ok #[(n % 256).toNat.toUInt8]
-  else .error s!"a {kind} element carries one signed octet and {n} does not fit"
+  else .error s!"limit: a {kind} element carries one signed octet and {n} does not fit"
 
 /-- A compound element's data: its items' octets, announced by the size and count
 fields of the width the array's constructor fixes. A count or a size the declared width
@@ -620,8 +620,8 @@ def elementCompoundData (width : Nat) (kind : String) (count : Nat) (body : Octe
   let size := width + body.size
   if width = 1 then
     if size ≤ 255 && count ≤ 255 then .ok (#[size.toUInt8, count.toUInt8] ++ body)
-    else .error s!"a {kind}8 element carries {count} item(s) in {body.size} octet(s), \
-      which a one-octet size or count field cannot announce"
+    else .error s!"limit: a {kind}8 element carries {count} item(s) in {body.size} \
+      octet(s), which a one-octet size or count field cannot announce"
   else
     .ok (u32be size ++ u32be count ++ body)
 
@@ -798,8 +798,8 @@ def arrayElement : UInt8 → Value → Except String Octets
       if size ≤ 255 && count ≤ 255 then
         return #[size.toUInt8, count.toUInt8, constructor] ++ body
       else
-        .error s!"an array8 element carries {count} element(s) in {body.size} octet(s), \
-          which a one-octet size or count field cannot announce"
+        .error s!"limit: an array8 element carries {count} element(s) in \
+          {body.size} octet(s), which a one-octet size or count field cannot announce"
   | 0xF0, .array constructor items =>
     if items.length > arrayElementLimit then
       .error s!"limit: an array of {items.length} element(s): this writer materialises \
@@ -809,8 +809,8 @@ def arrayElement : UInt8 → Value → Except String Octets
       let count := items.length
       return u32be (5 + body.size) ++ u32be count ++ #[constructor] ++ body
   | constructor, value =>
-    .error s!"an array whose element constructor is {constructor.toNat} cannot carry a \
-      {typeName value}"
+    .error s!"limit: an array whose element constructor is {constructor.toNat} cannot \
+      carry a {typeName value}"
 termination_by _ value => sizeOf value
 
 end
