@@ -673,6 +673,21 @@
   {
    "anchor": "amqp:messaging/section:delivery-state/type:rejected",
    "artifact": "amqp-core-messaging-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/type:rejected.u1",
+   "references": [],
+   "statement_sha256": "75c6ce68b99884a1d0b241250be3b3d0bde23a7edc9c85a8cbbaf761853c1da4",
+   "text": "At the target, the rejected outcome is used to indicate that an incoming message is invalid and therefore unprocessable.",
+   "text_sha256": "75c6ce68b99884a1d0b241250be3b3d0bde23a7edc9c85a8cbbaf761853c1da4",
+   "unkeyed_phrases": [
+    "is invalid"
+   ]
+  },
+  {
+   "anchor": "amqp:messaging/section:delivery-state/type:rejected",
+   "artifact": "amqp-core-messaging-v1.0-os.xml",
    "class": "SHOULD NOT",
    "index": 1,
    "kind": "SHOULD NOT",
@@ -779,6 +794,27 @@
    "statement_sha256": "72b3c8ad501212af9ce143b0d75be6497887d3a0474537496c43b0a0db3cceb4",
    "text": "The capabilities negotiated on link \u00abattach\u00bb and on the \u00absource\u00bb and \u00abtarget\u00bb SHOULD be used to establish which annotations a peer supports.",
    "text_sha256": "c3b46d01422a4c7d848d200cd458d83141f7cdb870884a45339e3ef6a72b2124"
+  },
+  {
+   "anchor": "amqp:messaging/section:message-format/type:delivery-annotations",
+   "artifact": "amqp-core-messaging-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:delivery-annotations.u1",
+   "references": [
+    "AMQPDELANN",
+    "attach",
+    "error",
+    "source",
+    "target"
+   ],
+   "statement_sha256": "63e1cd744372b1d10f32cb9f73b51fe9966d4bb3756f48996e4c33897f14e238",
+   "text": "The symbolic key \"rejected\" is reserved for the use of communicating error information regarding rejected messages.",
+   "text_sha256": "63e1cd744372b1d10f32cb9f73b51fe9966d4bb3756f48996e4c33897f14e238",
+   "unkeyed_phrases": [
+    "is reserved"
+   ]
   },
   {
    "anchor": "amqp:messaging/section:message-format/type:delivery-annotations",
@@ -1585,6 +1621,23 @@
   {
    "anchor": "amqp:security/section:sasl/type:sasl-init/field:hostname",
    "artifact": "amqp-core-security-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl/type:sasl-init/field:hostname.u1",
+   "references": [
+    "RFC4366"
+   ],
+   "statement_sha256": "1e80e25977f36487fe65972c103ddbf944a4bb1f50a420b58dda61b20bf1abe1",
+   "text": "It is undefined what a different value to those already specified means.",
+   "text_sha256": "1e80e25977f36487fe65972c103ddbf944a4bb1f50a420b58dda61b20bf1abe1",
+   "unkeyed_phrases": [
+    "is undefined"
+   ]
+  },
+  {
+   "anchor": "amqp:security/section:sasl/type:sasl-init/field:hostname",
+   "artifact": "amqp-core-security-v1.0-os.xml",
    "class": "SHOULD",
    "index": 2,
    "kind": "SHOULD",
@@ -1633,6 +1686,21 @@
    "text_sha256": "0061b0a210976030ec094db21ed94c81645da1a683234ab012db02503924c3e6"
   },
   {
+   "anchor": "amqp:security/section:sasl/type:sasl-mechanisms/field:sasl-server-mechanisms",
+   "artifact": "amqp-core-security-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl/type:sasl-mechanisms/field:sasl-server-mechanisms.u1",
+   "references": [],
+   "statement_sha256": "0f2e0b8b96e5844c0e7edc274e9400230aca239e3a4f00d40e47ad5a28f02e66",
+   "text": "It is invalid for this list to be null or empty.",
+   "text_sha256": "0f2e0b8b96e5844c0e7edc274e9400230aca239e3a4f00d40e47ad5a28f02e66",
+   "unkeyed_phrases": [
+    "is invalid"
+   ]
+  },
+  {
    "anchor": "amqp:security/section:sasl/type:sasl-outcome",
    "artifact": "amqp-core-security-v1.0-os.xml",
    "class": "MUST",
@@ -1675,6 +1743,25 @@
    "statement_sha256": "bf08d98cf6d7604a6cf4e7db7084b25a15b60707399f8eb3d5897749d4dcb9d1",
    "text": "To establish a TLS session, each peer MUST start by sending a protocol header before commencing with TLS negotiation.",
    "text_sha256": "270847748f29b70b53dd07e72dfb1ec3bce992f93c9ebf9c622f3e3f5ed6559c"
+  },
+  {
+   "anchor": "amqp:security/section:tls",
+   "artifact": "amqp-core-security-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-security-v1.0-os.xml#amqp:security/section:tls.u1",
+   "references": [
+    "RFC4366",
+    "open",
+    "sasl-init"
+   ],
+   "statement_sha256": "adcbd20d4200a9c4d8c52a6f91cccebe49fccfa042ce00e400d9dab1f77a8c5c",
+   "text": "If it does so, then it is undefined what happens if this differs from hostname in the \u00absasl-init\u00bb and \u00abopen\u00bb frame frames.",
+   "text_sha256": "adcbd20d4200a9c4d8c52a6f91cccebe49fccfa042ce00e400d9dab1f77a8c5c",
+   "unkeyed_phrases": [
+    "is undefined"
+   ]
   },
   {
    "anchor": "amqp:security/section:tls",
@@ -2720,6 +2807,21 @@
    "text_sha256": "fb19d5d275cb4f6349953e2e7edda009bed2c5cd810207909e390fafb67c8e44"
   },
   {
+   "anchor": "amqp:transport/section:definitions/definition:PORT",
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/definition:PORT.u1",
+   "references": [],
+   "statement_sha256": "277af1bf4460deb71340d6e4664a34154f07e06651bd24e1ef55c18dfd43b403",
+   "text": "The port number is reserved for future transport mappings to these protocols.",
+   "text_sha256": "277af1bf4460deb71340d6e4664a34154f07e06651bd24e1ef55c18dfd43b403",
+   "unkeyed_phrases": [
+    "is reserved"
+   ]
+  },
+  {
    "anchor": "amqp:transport/section:definitions/definition:SECURE-PORT",
    "artifact": "amqp-core-transport-v1.0-os.xml",
    "class": "SHOULD NOT",
@@ -2744,6 +2846,21 @@
    "statement_sha256": "395797e417ff9aff2a0b5adf118263fc3e3c90cfe6a59693f5f7c13286bcd746",
    "text": "Similarly when attaching a link with a large unsettled map the endpoint MAY make use of the incomplete-unsettled flag to avoid the need for overly large frames.",
    "text_sha256": "822e5a2c7bc86e8abbe5d5dd06d32ef795502f068396f8071a70e4f45a862363"
+  },
+  {
+   "anchor": "amqp:transport/section:definitions/type:amqp-error/choice:illegal-state",
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/type:amqp-error/choice:illegal-state.u1",
+   "references": [],
+   "statement_sha256": "7c1778d47fd8955faec50cbf915b74ddae59d2ce8928dcb8a9956e085a05966f",
+   "text": "The peer sent a frame that is not permitted in the current state.",
+   "text_sha256": "7c1778d47fd8955faec50cbf915b74ddae59d2ce8928dcb8a9956e085a05966f",
+   "unkeyed_phrases": [
+    "is not permitted"
+   ]
   },
   {
    "anchor": "amqp:transport/section:definitions/type:connection-error/choice:redirect",
@@ -4318,6 +4435,23 @@
   {
    "anchor": "amqp:transport/section:performatives/type:open/field:hostname",
    "artifact": "amqp-core-transport-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:hostname.u1",
+   "references": [
+    "sasl-init"
+   ],
+   "statement_sha256": "357c1b635d88a345c5856f9b5805746e811607788b45c38feff0597fc71834c0",
+   "text": "It is undefined what a different value to that already specified means.",
+   "text_sha256": "357c1b635d88a345c5856f9b5805746e811607788b45c38feff0597fc71834c0",
+   "unkeyed_phrases": [
+    "is undefined"
+   ]
+  },
+  {
+   "anchor": "amqp:transport/section:performatives/type:open/field:hostname",
+   "artifact": "amqp-core-transport-v1.0-os.xml",
    "class": "MAY",
    "index": 2,
    "kind": "MAY",
@@ -5320,6 +5454,21 @@
    "statement_sha256": "e4e83f03231ebee0386fa879d5d31f9d02830cdcc3992b6b4561d70d3c28037c",
    "text": "Map encodings MUST contain an even number of items (i.e. an equal number of keys and values).",
    "text_sha256": "76ee953c6c5d7366525472d7e6a40a006b69d537b0bcecb07cb2138a649c1bb4"
+  },
+  {
+   "anchor": "amqp:types/section:primitive-type-definitions/type:map",
+   "artifact": "amqp-core-types-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-types-v1.0-os.xml#amqp:types/section:primitive-type-definitions/type:map.u1",
+   "references": [],
+   "statement_sha256": "9b2b112f06fbceb126af8f873361d7e623832a136d936d5814d7c502544132d6",
+   "text": "A map in which there exist two identical key values is invalid.",
+   "text_sha256": "9b2b112f06fbceb126af8f873361d7e623832a136d936d5814d7c502544132d6",
+   "unkeyed_phrases": [
+    "is invalid"
+   ]
   },
   {
    "anchor": "amqp:types/section:primitive-type-definitions/type:map",

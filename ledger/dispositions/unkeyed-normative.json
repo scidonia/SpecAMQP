@@ -1,0 +1,100 @@
+{
+ "conventions": {
+  "deferred:": "A real obligation the plan places later; the note names where, and no gate claims it today.",
+  "informative": "Rationale or an address-level fact, with no wire obligation.",
+  "underspecified:": "The artifact deliberately leaves behaviour open. Nothing is enforced, and tests must not assert either reading.",
+  "unkeyed": "A statement with no RFC 2119 keyword that is still normative, or an explicit silence the specification chooses. The keyword scan cannot see these, so each one is captured and decided explicitly; `check_unkeyed` refuses an omission."
+ },
+ "dispositions": {
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/type:rejected.u1": {
+   "clause_text": "At the target, the rejected outcome is used to indicate that an incoming message is invalid and therefore unprocessable.",
+   "disposition": "deferred:S3-outcomes",
+   "kind": "UNKEYED",
+   "note": "Describes what the `rejected` outcome means at the target (the incoming message was invalid). The obligation belongs to the messaging layer's outcome semantics, not to the codec: the codec carries outcomes as symbols and neither produces nor inspects them. Dispositioned with the S3 messaging work, which is where an outcome acquires meaning.",
+   "text_sha256": "75c6ce68b99884a1d0b241250be3b3d0bde23a7edc9c85a8cbbaf761853c1da4",
+   "unkeyed_phrases": [
+    "is invalid"
+   ]
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:delivery-annotations.u1": {
+   "clause_text": "The symbolic key \"rejected\" is reserved for the use of communicating error information regarding rejected messages.",
+   "disposition": "deferred:S3-annotations",
+   "kind": "UNKEYED",
+   "note": "A reservation on the symbolic key `rejected` inside the delivery-annotations map. This is a rule about annotation content, and the codec deliberately does not interpret annotations \u2014 it decodes the map and leaves its meaning to the layer that reads the keys. Enforced where annotations are interpreted, not at the wire.",
+   "text_sha256": "63e1cd744372b1d10f32cb9f73b51fe9966d4bb3756f48996e4c33897f14e238",
+   "unkeyed_phrases": [
+    "is reserved"
+   ]
+  },
+  "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl/type:sasl-init/field:hostname.u1": {
+   "clause_text": "It is undefined what a different value to those already specified means.",
+   "disposition": "underspecified:hostname-meanings",
+   "kind": "UNKEYED",
+   "note": "The artifact explicitly declines to fix what a second, differing hostname value means. There is nothing to enforce, and the constraint runs the other way: both readings are conformant, so property and differential tests must not assert either. Recorded so the latitude is excluded from assertions deliberately instead of being discovered as flakiness.",
+   "text_sha256": "1e80e25977f36487fe65972c103ddbf944a4bb1f50a420b58dda61b20bf1abe1",
+   "unkeyed_phrases": [
+    "is undefined"
+   ]
+  },
+  "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl/type:sasl-mechanisms/field:sasl-server-mechanisms.u1": {
+   "clause_text": "It is invalid for this list to be null or empty.",
+   "disposition": "formalized:Spec.Value.MultipleMandatory",
+   "kind": "UNKEYED",
+   "note": "Not a specifier: this sentence is an instance of Part 1's multiple-and-mandatory rule, which `Spec.Value.MultipleMandatory` already carries. The field is declared multiple=\"true\" mandatory=\"true\" in the artifact, so the generated field table holds the obligation and this sentence adds no separate check. Verified against the artifact's field element.",
+   "text_sha256": "0f2e0b8b96e5844c0e7edc274e9400230aca239e3a4f00d40e47ad5a28f02e66",
+   "unkeyed_phrases": [
+    "is invalid"
+   ]
+  },
+  "amqp-core-security-v1.0-os.xml#amqp:security/section:tls.u1": {
+   "clause_text": "If it does so, then it is undefined what happens if this differs from hostname in the \u00absasl-init\u00bb and \u00abopen\u00bb frame frames.",
+   "disposition": "underspecified:tls-hostname-mismatch",
+   "kind": "UNKEYED",
+   "note": "Explicit silence: if a TLS connection is made to a hostname differing from the one in the SASL exchange, the artifact says it is undefined what happens. No obligation, and no assertion is admissible on either behaviour.",
+   "text_sha256": "adcbd20d4200a9c4d8c52a6f91cccebe49fccfa042ce00e400d9dab1f77a8c5c",
+   "unkeyed_phrases": [
+    "is undefined"
+   ]
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/definition:PORT.u1": {
+   "clause_text": "The port number is reserved for future transport mappings to these protocols.",
+   "disposition": "informative",
+   "kind": "UNKEYED",
+   "note": "Rationale for the IANA port assignments (5682/5671, and 5672 reserved for future transport mappings). An address-level fact with no wire obligation: the codec never sees a port.",
+   "text_sha256": "277af1bf4460deb71340d6e4664a34154f07e06651bd24e1ef55c18dfd43b403",
+   "unkeyed_phrases": [
+    "is reserved"
+   ]
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/type:amqp-error/choice:illegal-state.u1": {
+   "clause_text": "The peer sent a frame that is not permitted in the current state.",
+   "disposition": "deferred:S3-state-machine",
+   "kind": "UNKEYED",
+   "note": "This is the description of the `illegal-state` error code, whose condition is the state machine's frame-permission rule (which frame is permitted in which state). The codec only transports the code, so the rule is dispositioned with the S3 state machine work rather than here.",
+   "text_sha256": "7c1778d47fd8955faec50cbf915b74ddae59d2ce8928dcb8a9956e085a05966f",
+   "unkeyed_phrases": [
+    "is not permitted"
+   ]
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:hostname.u1": {
+   "clause_text": "It is undefined what a different value to that already specified means.",
+   "disposition": "underspecified:hostname-meanings",
+   "kind": "UNKEYED",
+   "note": "The same sentence as the sasl-init hostname field, and the same disposition: the artifact leaves the meaning of a differing repeated hostname undefined, so the codec imposes no check and no assertion may depend on one reading.",
+   "text_sha256": "357c1b635d88a345c5856f9b5805746e811607788b45c38feff0597fc71834c0",
+   "unkeyed_phrases": [
+    "is undefined"
+   ]
+  },
+  "amqp-core-types-v1.0-os.xml#amqp:types/section:primitive-type-definitions/type:map.u1": {
+   "clause_text": "A map in which there exist two identical key values is invalid.",
+   "disposition": "deferred:map-duplicate-keys",
+   "kind": "UNKEYED",
+   "note": "A map with two identical key values is invalid. This is the sentence that forced the ledger to capture unkeyed statements: it shares a paragraph with two MUST clauses and carries no keyword of its own, so the keyword scan lost it entirely while reporting completeness. The reference reader accepts such a map today and no vector covers it \u2014 a tracked gap, not an oversight. Follow-up: a corpus family of duplicate-key maps (reject) and implementation in both artefacts. The check needs equality of keys, which for compound keys is structural, so it belongs with the value-equality work rather than bolted onto the pair loop.",
+   "text_sha256": "9b2b112f06fbceb126af8f873361d7e623832a136d936d5814d7c502544132d6",
+   "unkeyed_phrases": [
+    "is invalid"
+   ]
+  }
+ }
+}

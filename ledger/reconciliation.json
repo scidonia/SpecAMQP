@@ -17,6 +17,14 @@
       "excluded-subtrees"
      ],
      "ledger": 57
+    },
+    {
+     "baseline": 90,
+     "classes": "statements",
+     "explained_by": [
+      "unkeyed-statements"
+     ],
+     "ledger": 92
     }
    ],
    "ledger": {
@@ -28,7 +36,7 @@
     "required": 0,
     "should": 13,
     "should_not": 7,
-    "statements": 90
+    "statements": 92
    }
   },
   "amqp-core-overview-v1.0-os.xml": {
@@ -74,6 +82,14 @@
       "excluded-subtrees"
      ],
      "ledger": 6
+    },
+    {
+     "baseline": 22,
+     "classes": "statements",
+     "explained_by": [
+      "unkeyed-statements"
+     ],
+     "ledger": 25
     }
    ],
    "ledger": {
@@ -85,7 +101,7 @@
     "required": 0,
     "should": 6,
     "should_not": 0,
-    "statements": 22
+    "statements": 25
    }
   },
   "amqp-core-transactions-v1.0-os.xml": {
@@ -128,7 +144,16 @@
     "scan": "crude raw-text keyword scan (PLAN.md \u00a71)",
     "should": 36
    },
-   "differences": [],
+   "differences": [
+    {
+     "baseline": 226,
+     "classes": "statements",
+     "explained_by": [
+      "unkeyed-statements"
+     ],
+     "ledger": 229
+    }
+   ],
    "ledger": {
     "may": 69,
     "must": 94,
@@ -138,7 +163,7 @@
     "required": 2,
     "should": 32,
     "should_not": 4,
-    "statements": 226
+    "statements": 229
    }
   },
   "amqp-core-types-v1.0-os.xml": {
@@ -150,7 +175,16 @@
     "scan": "crude raw-text keyword scan (PLAN.md \u00a71)",
     "should": 0
    },
-   "differences": [],
+   "differences": [
+    {
+     "baseline": 6,
+     "classes": "statements",
+     "explained_by": [
+      "unkeyed-statements"
+     ],
+     "ledger": 7
+    }
+   ],
    "ledger": {
     "may": 1,
     "must": 4,
@@ -160,13 +194,14 @@
     "required": 1,
     "should": 0,
     "should_not": 0,
-    "statements": 6
+    "statements": 7
    }
   }
  },
  "mechanisms": {
   "excluded-subtrees": "The baseline matched raw file text, including <picture> diagrams and the revhistory/acknowledgements sections. Those carry no normative statements, so the ledger excludes them; the per-artifact audit records the excluded keyword census so the exclusion is visible rather than silent.",
   "overview-not-scanned": "Part 1-5 only were scanned for the baseline. Part 0 (Overview) carries normative statements about containers, nodes, negotiated frame size and connection concurrency; those clauses appear here for the first time.",
+  "unkeyed-statements": "Normative sentences that carry no conformance keyword are now ledger statements of their own. The baseline and the first ledger both counted only keyword tokens, so a paragraph such as Part 1's map type lost its duplicate-key sentence entirely while the counts agreed. Nine such statements exist across the five parts; each carries a disposition and `check_unkeyed` refuses an omission.",
   "wrapped-keyword": "A `MUST NOT` (or `SHOULD NOT`) broken across source lines is one clause. The baseline's raw-text pattern missed the wrap and counted the leading MUST as a plain MUST, so the MUST/MUST NOT split differs while the total is unchanged."
  },
  "purpose": "Reconcile the token-aware ledger against the crude baseline scan recorded in PLAN.md \u00a71. `clause-ledger.py check` verifies that the ledger numbers recorded here still match the generated ledger, so this record cannot drift silently.",

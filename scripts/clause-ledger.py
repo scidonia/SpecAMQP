@@ -41,6 +41,18 @@ BLOCK_TAGS = {"p", "li", "dt", "dd", "th", "td", "pre"}
 # Subtrees that carry no normative statements.
 EXCLUDED_TAGS = {"picture", "revhistory", "acknowledgements"}
 
+# Normative statements the keyword scan cannot see. The artifacts sometimes state a
+# requirement without an RFC 2119 keyword — Part 1's map type says "A map in which
+# there exist two identical key values is invalid" — and a ledger that only counts
+# keywords would report completeness while missing exactly that kind of sentence.
+# These are captured as reviewable statements, like pictures: an omission must be a
+# decision rather than a blind spot.
+UNKEYED_PHRASES = re.compile(
+    r"\bis invalid\b|\bis not valid\b|\bis undefined\b|\bis reserved\b"
+    r"|\bis not permitted\b|\bis not allowed\b|\bshall\b|\bis required to\b",
+    re.IGNORECASE,
+)
+
 # Pictures are excluded from clause extraction because most are sequence
 # diagrams, but some carry formal grammar (`Constructor BNF`) or normative
 # keywords. Those are surfaced for disposition rather than dropped: excluding a
@@ -98,8 +110,10 @@ ABBREVIATIONS = {"e.g", "i.e", "cf", "etc", "vs", "resp", "al", "approx", "seq"}
 
 DISPOSITION_PREFIXES = (
     "formalized:",
+    "deferred:",
     "environment:",
     "out-of-scope:",
+    "underspecified:",
     "test:",
     "superseded:",
 )
@@ -305,14 +319,52 @@ def emit_statements(
             }
         )
 
-    if not find_keywords(tokens) and re.search(r"\b(must|should|may)\b", text):
-        lowercase_only.append(
-            {
-                "artifact": artifact,
-                "anchor": path,
-                "text": text if len(text) <= 240 else text[:237] + "...",
-            }
-        )
+    keyword_positions = [position for position, _ in find_keywords(tokens)]
+
+    # Statements the keyword scan cannot see, at *sentence* granularity: a paragraph
+    # may carry both a keyword-bearing requirement and a keyword-free one. Part 1's
+    # map type is the case that forced this — "Map encodings MUST contain an even
+    # number of items" and "A map in which there exist two identical key values is
+    # invalid" are in the same paragraph, so a unit-level check sees the first and
+    # silently loses the second.
+    for start, stop in spans:
+        if any(start <= position < stop for position in keyword_positions):
+            continue
+        sentence = " ".join(tokens[start:stop])
+        if not sentence:
+            continue
+        # The paragraph that *defines* the keyword vocabulary is boilerplate about the
+        # specification's own language, not a requirement: it was captured as a
+        # statement until this exclusion, and it is not one.
+        if sentence.startswith("The key words"):
+            continue
+        matched = sorted({phrase.strip().lower() for phrase in UNKEYED_PHRASES.findall(sentence)})
+        if matched:
+            key = f"{path}#unkeyed"
+            counters[key] = counters.get(key, 0) + 1
+            clauses.append(
+                {
+                    "ref": f"{artifact}#{path}.u{counters[key]}",
+                    "artifact": artifact,
+                    "anchor": path,
+                    "index": counters[key],
+                    "kind": "UNKEYED",
+                    "class": "UNKEYED",
+                    "text": sentence,
+                    "text_sha256": sha256_text(sentence),
+                    "statement_sha256": sha256_text(sentence),
+                    "references": references,
+                    "unkeyed_phrases": matched,
+                }
+            )
+        elif re.search(r"\b(must|should|may)\b", sentence):
+            lowercase_only.append(
+                {
+                    "artifact": artifact,
+                    "anchor": path,
+                    "text": sentence if len(sentence) <= 240 else sentence[:237] + "...",
+                }
+            )
 
 
 def collect_audit_tokens(
@@ -536,7 +588,8 @@ def load_dispositions(directory: Path) -> tuple[dict[str, dict], list[str]]:
             if value != "informative" and not value.startswith(DISPOSITION_PREFIXES):
                 problems.append(
                     f"{path.name}: {ref}: disposition '{value}' is not one of "
-                    "formalized:/environment:/out-of-scope:/test:/superseded:/informative"
+                    "formalized:/deferred:/environment:/out-of-scope:/test:/superseded:/"
+                    "underspecified:/informative"
                 )
             if not entry.get("text_sha256"):
                 problems.append(f"{path.name}: {ref}: missing text_sha256")
@@ -596,6 +649,16 @@ def coverage(report: dict, dispositions: dict[str, dict]) -> dict:
             "note": "Pictures are excluded from clause extraction; those containing formal grammar "
             "or normative keywords require a disposition, because an exclusion is a decision.",
         },
+        "unkeyed": {
+            "total": sum(1 for c in clauses if c["kind"] == "UNKEYED"),
+            "dispositioned": sum(
+                1 for c in clauses if c["kind"] == "UNKEYED" and c["ref"] in dispositions
+            ),
+            "note": "Statements that carry no conformance keyword but are still normative, or still "
+            "an explicit silence the specification chooses. Captured because the keyword scan cannot "
+            "see them: Part 1's duplicate-key rule is one sentence of a paragraph whose other "
+            "sentences do carry keywords. Every one requires a disposition.",
+        },
         "per_artifact": report["per_artifact"],
         "by_kind": dict(sorted(by_kind.items())),
         "by_disposition": dict(sorted(by_disposition.items())),
@@ -612,6 +675,26 @@ def coverage(report: dict, dispositions: dict[str, dict]) -> dict:
             ),
         },
     }
+
+
+def check_unkeyed(report: dict, dispositions: dict[str, dict]) -> list[str]:
+    """Every keyword-free normative statement must carry a disposition.
+
+    These are the statements the keyword scan cannot see. Leaving one
+    undispositioned is how a requirement disappears while every gate stays green,
+    so this check is unconditional rather than a report: the list is short by
+    construction, and each entry is either an obligation somebody must carry or an
+    explicit silence worth recording.
+    """
+    problems: list[str] = []
+    for clause in report["clauses"]:
+        if clause["kind"] != "UNKEYED" or clause["ref"] in dispositions:
+            continue
+        problems.append(
+            f"{clause['ref']}: no conformance keyword, but states {'/'.join(clause['unkeyed_phrases'])} "
+            f"— decide what carries it: {' '.join(clause['text'].split())[:110]}"
+        )
+    return problems
 
 
 def check_dispositions(report: dict, dispositions: dict[str, dict]) -> list[str]:
@@ -722,6 +805,7 @@ def command_check(args: argparse.Namespace) -> int:
     )
     problems.extend(check_dispositions(report, dispositions))
     problems.extend(check_pictures(report, dispositions))
+    problems.extend(check_unkeyed(report, dispositions))
     repository_artifacts = (Path(__file__).resolve().parent.parent / "spec" / "oasis").resolve()
     problems.extend(
         check_reconciliation(

@@ -46,6 +46,18 @@ requires an explicit planner update plus a regenerated SHA-1 manifest:
 Coder-owned: `flake.nix`, `flake.lock`, `scripts/**`, `lean/Proofs/**`,
 `lean/Generated/**` (regenerated only), `AGENTS.md` under planner review.
 
+## Commits
+
+- **Commit only the paths your slice owns**: `git add <paths>`, never
+  `git add -A` or `git add .`. Parallel slices have uncommitted work in the tree
+  by design, and a pathspec-free add commits whatever state it finds — a
+  half-written file of someone else's slice under a message describing your own
+  change. This is not hypothetical: commit `ebf7d33` did exactly that, sweeping an
+  intermediate `lean/Ref/Value.lean` (whose map-pair writer did not yet compile)
+  into a commit about the ledger gate, and it took a corrective commit to undo.
+- A coder may commit its own slice's files and must report the commit id; a
+  planner pass that rewrites planner-owned files commits those files only.
+
 ## Test forms
 
 - **Specification properties and invariants** are theorem or
