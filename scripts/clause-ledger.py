@@ -49,7 +49,8 @@ EXCLUDED_TAGS = {"picture", "revhistory", "acknowledgements"}
 # decision rather than a blind spot.
 UNKEYED_PHRASES = re.compile(
     r"\bis invalid\b|\bis not valid\b|\bis undefined\b|\bis reserved\b"
-    r"|\bis not permitted\b|\bis not allowed\b|\bshall\b|\bis required to\b",
+    r"|\bis not permitted\b|\bis not allowed\b|\bshall\b|\bis required to\b"
+    r"|\bcannot\b|\bonly the [\w-]+(?: [\w-]+)? can\b",
     re.IGNORECASE,
 )
 

@@ -1,8 +1,7 @@
 {
  "adopted": "amqp:invalid-field for a flow carrying a link field with no handle",
  "clauses": [
-  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:link-credit.1",
-  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/type:amqp-error"
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:link-credit.1"
  ],
  "consequences": [
   "A `flow` carrying `available`, `delivery-count`, `drain`, `link-credit` or `properties` while its handle is unset is refused with `amqp:invalid-field`, the same condition the layer's mandatory-field refusals already name \u2014 so a field that breaks a rule the declared surface states is refused the same way whether the rule is `mandatory and missing` or `MUST NOT be set here`.",
