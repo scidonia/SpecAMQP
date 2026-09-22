@@ -61,6 +61,15 @@ TRANSPORT = "amqp-core-transport-v1.0-os.xml"
 MESSAGING = "amqp-core-messaging-v1.0-os.xml"
 SECURITY = "amqp-core-security-v1.0-os.xml"
 
+UNATTACHED_HANDLE = "amqp:session:unattached-handle"
+HANDLE_IN_USE = "amqp:session:handle-in-use"
+LINK_HANDLES = f"{TRANSPORT}#amqp:transport/section:link-handles"
+LINK_ERRORS = f"{TRANSPORT}#amqp:transport/section:closing-a-link"
+TRANSFER_FIRST_FIELDS = f"{TRANSPORT}#amqp:transport/section:performatives/type:transfer/field:delivery-tag.1"
+TRANSFER_SETTLED = f"{TRANSPORT}#amqp:transport/section:performatives/type:transfer/field:settled.4"
+DETACH_HANDLE = f"{TRANSPORT}#amqp:transport/section:performatives/type:detach/field:handle.1"
+DISPOSITION_ROLE = f"{TRANSPORT}#amqp:transport/section:performatives/type:disposition.1"
+FLOW_LINK_CREDIT = f"{TRANSPORT}#amqp:transport/section:flow-control"
 STATE_TABLE = f"{TRANSPORT}#picture.24"
 SESSION_STATES = f"{TRANSPORT}#amqp:transport/section:sessions.7"
 SESSION_TRANSITIONS = f"{TRANSPORT}#picture.30"
@@ -330,6 +339,7 @@ class Corpus:
         self.detach_code = descriptor_code(transport["detach"])
         self.flow_code = descriptor_code(transport["flow"])
         self.transfer_code = descriptor_code(transport["transfer"])
+        self.disposition_code = descriptor_code(transport["disposition"])
         # the `data` section is a messaging type: a transfer's payload is one, and the
         # session layer carries it without reading it
         self.data_code = descriptor_code(declared_types(MESSAGING)["data"])
@@ -337,10 +347,11 @@ class Corpus:
         self.codes = {"begin": self.begin_code, "end": self.end_code,
                       "attach": self.attach_code, "detach": self.detach_code,
                       "flow": self.flow_code, "transfer": self.transfer_code,
+                      "disposition": self.disposition_code,
                       "data": self.data_code, "error": self.error_code}
         self.fields = {name: field_names(transport[name])
                        for name in ("begin", "end", "attach", "detach", "flow",
-                                    "transfer", "error")}
+                                    "transfer", "disposition", "error")}
         self.open_fields = field_names(transport["open"])
         self.mechanisms_fields = field_names(security["sasl-mechanisms"])
         self.init_fields = field_names(security["sasl-init"])
@@ -422,6 +433,60 @@ class Corpus:
                             "delivery-tag": {"type": "binary", "hex": delivery_tag.hex()},
                             "message-format": {"type": "uint", "value": 0}})
 
+    def attach_body(self, role: bool = False, handle: int = 0, name: str = "link",
+                    initial_delivery_count: int = 0, sender_settle: int | None = None) -> dict:
+        """An `attach`. The `role` field's declared type is a restricted `boolean` whose
+        `sender` value is false and whose `receiver` value is true, and
+        `initial-delivery-count` "MUST NOT be null if role is sender", so this carries it
+        exactly in that case."""
+        fields: dict[str, dict] = {"name": {"type": "string", "text": name},
+                                   "handle": {"type": "uint", "value": handle},
+                                   "role": {"type": "boolean", "value": role}}
+        if not role:
+            fields["initial-delivery-count"] = {"type": "uint",
+                                                "value": initial_delivery_count}
+        if sender_settle is not None:
+            fields["snd-settle-mode"] = {"type": "ubyte", "value": sender_settle}
+        return self.body("attach", **fields)
+
+    def detach_body(self, handle: int = 0, closed: bool = True) -> dict:
+        """A `detach`, whose handle is mandatory and whose `closed` flag says whether the
+        link endpoint is destroyed rather than merely released."""
+        return self.body("detach", handle={"type": "uint", "value": handle},
+                         closed={"type": "boolean", "value": closed})
+
+    def flow_body(self, handle: int = 0, delivery_count: int = 0, link_credit: int = 0,
+                  next_incoming: int | None = 0, next_outgoing: int = 0,
+                  incoming: int = 1000, outgoing: int = 1000) -> dict:
+        """A `flow` for one link: the handle it names, the delivery-count the doc's
+        `flow-control` defines, and the credit the receiver grants."""
+        return self.body("flow", **{
+            "next-incoming-id": ({"type": "uint", "value": next_incoming}
+                                 if next_incoming is not None else {"type": "null"}),
+            "incoming-window": {"type": "uint", "value": incoming},
+            "next-outgoing-id": {"type": "uint", "value": next_outgoing},
+            "outgoing-window": {"type": "uint", "value": outgoing},
+            "handle": {"type": "uint", "value": handle},
+            "delivery-count": {"type": "uint", "value": delivery_count},
+            "link-credit": {"type": "uint", "value": link_credit}})
+
+    def fragment_body(self, index: int, count: int, delivery_id: int = 0,
+                      handle: int = 0, settled: bool | None = None) -> dict:
+        """One transfer of a delivery split into `count` transfers. `delivery-id`,
+        `delivery-tag` and `message-format` are specified for the first and omitted on
+        continuations, which is what the three clauses require of them; `more` is set on
+        every transfer but the last, which is what makes the delivery continue."""
+        fields: dict[str, dict] = {"handle": {"type": "uint", "value": handle}}
+        if index == 0:
+            fields["delivery-id"] = {"type": "uint", "value": delivery_id}
+            fields["delivery-tag"] = {"type": "binary", "hex": b"tag".hex()}
+            fields["message-format"] = {"type": "uint", "value": 0}
+        if index < count - 1:
+            fields["more"] = {"type": "boolean", "value": True}
+        if settled is not None:
+            fields["settled"] = {"type": "boolean", "value": settled}
+        return self.body("transfer", **fields)
+
     def error(self, condition: str) -> dict:
         """An `error` composite: the condition, and no description."""
         return described(self.error_code,
@@ -486,9 +551,11 @@ class Corpus:
                 note: str = "") -> dict:
         """A step the peer must not take. A `receive` carries octets; a `send` carries
         the frame it is asked to send, and produces nothing because the peer must not
-        write it at all. Every refusal the connection layer raises carries the one
-        condition the artifact uses for wire-level failures, so the cause is the reason
-        class rather than a condition per failure."""
+        write it at all. The condition is named per cause and never defaulted to what an
+        implementation happens to do: the state table's permission refusals carry the
+        artifact's `illegal-state`, the channel rules the `framing-error` the open's own
+        doc mandates for a channel out of range, and the link rules the session error the
+        artifact declares for them."""
         expect: dict = {"status": "refused", "condition": condition, "reason": reason}
         if state is not None:
             expect["state"] = state
@@ -508,7 +575,7 @@ class Corpus:
         """A `close` offered to a connection that is over: END's legal receives are `-`,
         so what arrives there is refused and the end stands."""
         return self.refused(
-            "receive", reason="illegalState", state=c("END"), body=self.close_body(),
+            "receive", reason="illegalState", condition=ILLEGAL_STATE, state=c("END"), body=self.close_body(),
             note=note or "END's legal receives are `-`: the connection is over, and "
                          "nothing can arrive on it")
 
@@ -664,7 +731,7 @@ def corpus(tables: Corpus) -> list[dict]:
     vectors.append(exchange(
         "exchange-open-before-header", start=c("START"),
         clauses=[STATE_TABLE, HEADER_FIRST, PRE_NEGOTIATION_LIMITS],
-        steps=[t.refused("send", reason="illegalState",
+        steps=[t.refused("send", reason="illegalState", condition=ILLEGAL_STATE,
                          state=c("START"), body=open0,
                          note="the first frame on a connection is the open, but the "
                               "protocol header precedes every frame, and START's legal "
@@ -677,7 +744,7 @@ def corpus(tables: Corpus) -> list[dict]:
         "exchange-open-twice", start=c("HDR_EXCH"),
         clauses=[STATE_TABLE, HEADER_FIRST, OPEN_ON_CHANNEL_ZERO],
         steps=[t.send_frame(AMQP_FRAME, open0, state=c("OPEN_SENT")),
-               t.refused("send", reason="illegalState",
+               t.refused("send", reason="illegalState", condition=ILLEGAL_STATE,
                          state=c("OPEN_SENT"), body=open0,
                          note="the table's OPEN_SENT column is `**`, and a second open "
                               "is not a frame known a priori to conform: the open is "
@@ -688,7 +755,7 @@ def corpus(tables: Corpus) -> list[dict]:
     vectors.append(exchange(
         "exchange-open-on-channel-one-send", start=c("HDR_EXCH"),
         clauses=[STATE_TABLE, OPEN_ON_CHANNEL_ZERO],
-        steps=[t.refused("send", reason="illegalState",
+        steps=[t.refused("send", reason="illegalState", condition=FRAMING_ERROR,
                          state=c("HDR_EXCH"), body=open0, channel=1,
                          note="the open frame can only be sent on channel 0"),
                t.send_frame(AMQP_FRAME, open0, state=c("OPEN_SENT"))],
@@ -697,7 +764,7 @@ def corpus(tables: Corpus) -> list[dict]:
     vectors.append(exchange(
         "exchange-open-on-channel-one-receive", start=c("HDR_EXCH"),
         clauses=[STATE_TABLE, OPEN_ON_CHANNEL_ZERO, CHANNEL_RANGE],
-        steps=[t.refused("receive", reason="illegalState",
+        steps=[t.refused("receive", reason="illegalState", condition=FRAMING_ERROR,
                          state=c("DISCARDING"), body=open0, channel=1,
                          note="a received open on channel one: the connection is in "
                               "error, so the peer closes and then discards what arrives "
@@ -723,7 +790,7 @@ def corpus(tables: Corpus) -> list[dict]:
         "exchange-two-headers", start=c("START"),
         clauses=[STATE_TABLE, STATE_DIAGRAM, HEADER_MISMATCH],
         steps=[t.receive_header("amqp", state=c("HDR_RCVD")),
-               t.refused("receive", reason="illegalState",
+               t.refused("receive", reason="illegalState", condition=FRAMING_ERROR,
                          state=c("DISCARDING"), octets=t.header("amqp"),
                          note="HDR_RCVD's legal receive is OPEN: a second header is not "
                               "a frame the state permits, and nothing is sent twice")],
@@ -748,7 +815,7 @@ def corpus(tables: Corpus) -> list[dict]:
         "exchange-conforming-frame-in-open-sent", start=c("OPEN_SENT"),
         clauses=[STATE_TABLE, CLOSE_WRITTEN, PRE_NEGOTIATION_LIMITS],
         steps=[t.send_frame(AMQP_FRAME, t.close_body(), state=c("CLOSE_PIPE")),
-               t.refused("send", reason="illegalState", state=c("CLOSE_PIPE"),
+               t.refused("send", reason="illegalState", condition=ILLEGAL_STATE, state=c("CLOSE_PIPE"),
                          body=t.close_body(),
                          note="CLOSE_PIPE's legal sends are `-`: the close has been "
                               "written, and nothing is written after it")],
@@ -760,7 +827,7 @@ def corpus(tables: Corpus) -> list[dict]:
     vectors.append(exchange(
         "exchange-frame-in-end-refused", start=c("END"),
         clauses=[STATE_TABLE, CLOSE_WRITTEN, CLOSE_LAST],
-        steps=[t.refused("send", reason="illegalState",
+        steps=[t.refused("send", reason="illegalState", condition=ILLEGAL_STATE,
                          state=c("END"), body=t.close_body(),
                          note="END's legal sends are `-`: the same close the previous "
                               "vector admits in OPEN_SENT is refused here, which is the "
@@ -785,6 +852,10 @@ def corpus(tables: Corpus) -> list[dict]:
                t.send_frame(AMQP_FRAME, t.begin_body(), state=s("BEGIN_SENT"), channel=1),
                t.receive_frame(AMQP_FRAME, t.begin_body(remote_channel=1), state=s("MAPPED"),
                                channel=1),
+               t.send_frame(AMQP_FRAME, t.attach_body(role=False), state=s("MAPPED"), channel=1),
+               t.receive_frame(AMQP_FRAME, t.attach_body(role=True), state=s("MAPPED"), channel=1),
+               t.receive_frame(AMQP_FRAME, t.flow_body(handle=0, link_credit=1000),
+                               state=s("MAPPED"), channel=1),
                t.send_frame(AMQP_FRAME, t.transfer_body(), state=s("MAPPED"), channel=1,
                             payload=t.data_section(b"one section"))],
         note="the same channel-one frame, refused and then admitted: refused while the "
@@ -812,6 +883,10 @@ def corpus(tables: Corpus) -> list[dict]:
                t.send_frame(AMQP_FRAME, t.begin_body(), state=s("BEGIN_SENT"), channel=1),
                t.receive_frame(AMQP_FRAME, t.begin_body(remote_channel=1), state=s("MAPPED"),
                                channel=1),
+               t.send_frame(AMQP_FRAME, t.attach_body(role=False), state=s("MAPPED"), channel=1),
+               t.receive_frame(AMQP_FRAME, t.attach_body(role=True), state=s("MAPPED"), channel=1),
+               t.receive_frame(AMQP_FRAME, t.flow_body(handle=0, link_credit=1000),
+                               state=s("MAPPED"), channel=1),
                t.send_frame(AMQP_FRAME, t.transfer_body(), state=s("MAPPED"), channel=1,
                             payload=payload_to_total(AMQP_FRAME, t.transfer_body(),
                                                      t.min_max_frame_size + 1))],
@@ -917,7 +992,7 @@ def corpus(tables: Corpus) -> list[dict]:
     vectors.append(exchange(
         "exchange-sasl-frame-before-header", start=c("START"),
         clauses=[STATE_TABLE, SASL_HEADER, SASL_FRAMES],
-        steps=[t.refused("send", reason="illegalState",
+        steps=[t.refused("send", reason="illegalState", condition=ILLEGAL_STATE,
                          frame_type=SASL_FRAME, body=t.mechanisms_body(["ANONYMOUS"]),
                          state=c("START"),
                          note="START's legal send is the protocol header, and the SASL "
@@ -932,7 +1007,7 @@ def corpus(tables: Corpus) -> list[dict]:
         clauses=[STATE_TABLE, SASL_HEADER, SASL_FRAMES, OPEN_ON_CHANNEL_ZERO],
         steps=[t.send_header("sasl"),
                t.receive_header("sasl", state=c("HDR_EXCH")),
-               t.refused("send", reason="illegalState",
+               t.refused("send", reason="illegalState", condition=ILLEGAL_STATE,
                          state=c("HDR_EXCH"), body=open0,
                          note="the SASL dialogue is not finished, so the AMQP layer's "
                               "open is not a frame of this layer: the outcome must "
@@ -945,7 +1020,7 @@ def corpus(tables: Corpus) -> list[dict]:
         clauses=[STATE_TABLE, SASL_FRAMES, SASL_HEADER],
         steps=[t.receive_header("amqp", state=c("HDR_RCVD")),
                t.send_header("amqp", state=c("HDR_EXCH")),
-               t.refused("receive", reason="illegalState",
+               t.refused("receive", reason="illegalState", condition=ILLEGAL_STATE,
                          state=c("DISCARDING"),
                          frame_type=SASL_FRAME, body=t.mechanisms_body(["ANONYMOUS"]),
                          note="this exchange is the AMQP layer's: HDR_EXCH's legal "
@@ -959,7 +1034,7 @@ def corpus(tables: Corpus) -> list[dict]:
         "exchange-discarding-ignores-frames", start=c("DISCARDING"),
         clauses=[STATE_TABLE, DISPATCH_TABLE, DISCARD_ON_ERROR, CLOSE_LAST],
         steps=[t.receive_frame(AMQP_FRAME, t.close_body(), state=c("END")),
-               t.refused("send", reason="illegalState",
+               t.refused("send", reason="illegalState", condition=ILLEGAL_STATE,
                          state=c("END"), body=t.close_body(),
                          note="END's legal sends are `-`: once the partner's close has "
                               "arrived the connection is over, and nothing is written "
@@ -997,6 +1072,26 @@ def session_corpus(tables: Corpus) -> list[dict]:
 
     def transfer(**kwargs) -> dict:
         return t.transfer_body(**kwargs)
+
+    def link_up(role_sender: bool = False, handle: int = 0, peer_handle: int = 0,
+                credit: int = 1000) -> list:
+        """The three steps that attach a link on a MAPPED session: our attach, the
+        peer's attach, and the peer's flow, which is what grants a sender its credit. Every
+        state is pinned, because a setup whose steps were unpinned could drift under a rule
+        the vector is not about."""
+        return [
+            t.send_frame(AMQP_FRAME, t.attach_body(role=not role_sender, handle=handle),
+                         state=s("MAPPED"), channel=1),
+            t.receive_frame(AMQP_FRAME, t.attach_body(role=role_sender, handle=peer_handle),
+                            state=s("MAPPED"), channel=1),
+            t.receive_frame(AMQP_FRAME, t.flow_body(
+                handle=peer_handle, delivery_count=0,
+                # the peer's flow grants credit when the peer is the receiver, and echoes
+                # the last value it was sent when the peer is the sender: only the receiver
+                # sets the quantity, and the sender's value is the echo of it
+                link_credit=(credit if role_sender else 0)),
+                state=s("MAPPED"), channel=1)]
+
 
     # -- establishing and ending a session -------------------------------- #
 
@@ -1049,13 +1144,20 @@ def session_corpus(tables: Corpus) -> list[dict]:
                             channel=1),
                t.receive_frame(AMQP_FRAME, t.body("begin", **windows(), **{"remote-channel": {"type": "ushort", "value": 1}}),
                                state=s("MAPPED"), channel=1),
-               t.send_frame(AMQP_FRAME, transfer(), state=None, channel=1,
-                            payload=t.data_section(b"one unfragmented section")),
-               t.receive_frame(AMQP_FRAME, transfer(), state=None, channel=1,
-                               payload=t.data_section(b"one unfragmented section"))],
-        note="one message in one transfer: the payload is a single data section, which "
-             "the frame layer calls opaque and the session layer does not read — what it "
-             "decides is that a MAPPED session may send and receive it"))
+               t.refused("send", reason="illegalState", condition=UNATTACHED_HANDLE,
+                         state=s("MAPPED"), body=transfer(), channel=1,
+                         note="a transfer names a link handle, and this session has no "
+                              "attached link, so there is no handle for it to name"),
+               t.refused("receive", reason="illegalState", condition=UNATTACHED_HANDLE,
+                         state=s("DISCARDING"), body=transfer(), channel=1,
+                         note="the same input refused the other way: the session cannot "
+                              "process a frame for a link it does not have, so it answers "
+                              "with the END the section mandates")],
+        note="one message in one transfer is what the *link* layer carries: a session on "
+             "its own has no link, so a transfer is refused on both sides with the "
+             "session error the artifact declares for a handle that is not attached — "
+             "the frame is the performative the descriptor names and the moment is "
+             "still wrong"))
 
     # -- fields the generated table makes mandatory, and their defaults ----- #
 
@@ -1068,10 +1170,7 @@ def session_corpus(tables: Corpus) -> list[dict]:
                          note="attach's role is mandatory in the declared surface, and a "
                               "performative that does not carry it is not the "
                               "performative its descriptor names"),
-               t.send_frame(AMQP_FRAME, t.body("attach", name={"type": "string", "text": "link"},
-                                               handle={"type": "uint", "value": 0},
-                                               role={"type": "boolean", "value": False}),
-                            state=None, channel=1)],
+               t.send_frame(AMQP_FRAME, t.attach_body(role=False), state=None, channel=1)],
         note="a mandatory field missing is refused with the artifact's own invalid-field "
              "condition, and the same attach carrying it is admitted — which is what "
              "makes the refusal about the field rather than about the frame"))
@@ -1079,13 +1178,8 @@ def session_corpus(tables: Corpus) -> list[dict]:
     vectors.append(exchange(
         "exchange-session-attach-defaults-admitted", start=s("MAPPED"),
         clauses=attach_clauses + [ATTACH_SETTLE_DEFAULT],
-        steps=[t.send_frame(AMQP_FRAME, t.body("attach", name={"type": "string", "text": "link"},
-                                               handle={"type": "uint", "value": 0},
-                                               role={"type": "boolean", "value": False}),
-                            state=None, channel=1),
-               t.send_frame(AMQP_FRAME, t.body("detach", handle={"type": "uint", "value": 0},
-                                               closed={"type": "boolean", "value": True}),
-                            state=None, channel=1)],
+        steps=[t.send_frame(AMQP_FRAME, t.attach_body(role=False), state=None, channel=1),
+               t.send_frame(AMQP_FRAME, t.detach_body(), state=None, channel=1)],
         note="an attach that omits snd-settle-mode and rcv-settle-mode is admitted: the "
              "declared surface gives them the defaults `mixed` and `first`, so omitting "
              "them is a value and not a refusal — and their effect on dispositions is not "
@@ -1125,7 +1219,8 @@ def session_corpus(tables: Corpus) -> list[dict]:
         steps=[t.refused("receive", reason="illegalState", state=s("MAPPED"), body=transfer(),
                          channel=2,
                          note="channel 2 is not this session's incoming channel, and the "
-                              "connection maps incoming frames to sessions by channel"),
+                              "connection maps incoming frames to sessions by channel")] +
+              link_up() + [
                t.receive_frame(AMQP_FRAME, transfer(), state=None, channel=1)],
         note="a frame on a channel no session here is mapped to: the session cannot even "
              "answer on it, so it refuses and the state does not move, and the same "
@@ -1157,7 +1252,8 @@ def session_corpus(tables: Corpus) -> list[dict]:
     vectors.append(exchange(
         "exchange-session-window-remote-incoming", start=s("MAPPED"),
         clauses=[WINDOW_REMOTE_INCOMING, WINDOW_AFTER_FLOW, WINDOW_AFTER_SENDING],
-        steps=[t.receive_frame(AMQP_FRAME, flow_frame(incoming=1), state=None, channel=1),
+        steps=link_up(role_sender=True) + [
+               t.receive_frame(AMQP_FRAME, flow_frame(incoming=1), state=None, channel=1),
                t.send_frame(AMQP_FRAME, transfer(), state=None, channel=1),
                t.refused("send", reason="limit", state=s("MAPPED"), condition=WINDOW_VIOLATION,
                          body=transfer(), channel=1,
@@ -1172,7 +1268,8 @@ def session_corpus(tables: Corpus) -> list[dict]:
     vectors.append(exchange(
         "exchange-session-window-recomputed", start=s("MAPPED"),
         clauses=[WINDOW_AFTER_FLOW, WINDOW_AFTER_SENDING],
-        steps=[t.receive_frame(AMQP_FRAME, flow_frame(incoming=0), state=None, channel=1),
+        steps=link_up(role_sender=True) + [
+               t.receive_frame(AMQP_FRAME, flow_frame(incoming=0), state=None, channel=1),
                t.refused("send", reason="limit", state=s("MAPPED"), condition=WINDOW_VIOLATION,
                          body=transfer(), channel=1,
                          note="a flow that leaves the window empty"),
@@ -1186,7 +1283,8 @@ def session_corpus(tables: Corpus) -> list[dict]:
         "exchange-session-window-incoming-exhausted", start=s("UNMAPPED"),
         clauses=[WINDOW_INCOMING, WINDOW_AFTER_RECEIVING],
         steps=[t.send_frame(AMQP_FRAME, t.body("begin", **{"incoming-window": {"type": "uint", "value": 1}, "next-outgoing-id": {"type": "uint", "value": 0}, "outgoing-window": {"type": "uint", "value": 10}}), state=s("BEGIN_SENT"), channel=1),
-               t.receive_frame(AMQP_FRAME, t.body("begin", **windows()), state=s("MAPPED"), channel=1),
+               t.receive_frame(AMQP_FRAME, t.body("begin", **windows()), state=s("MAPPED"), channel=1)] +
+              link_up() + [
                t.receive_frame(AMQP_FRAME, transfer(), state=None, channel=1),
                t.refused("receive", reason="limit", state=s("DISCARDING"),
                          condition=WINDOW_VIOLATION, body=transfer(), channel=1,
@@ -1213,15 +1311,430 @@ def session_corpus(tables: Corpus) -> list[dict]:
     vectors.append(exchange(
         "exchange-connection-discarding-discards-session-frames", start=s("MAPPED"),
         clauses=[DISPATCH_TABLE, OPEN_ON_CHANNEL_ZERO, DISCARD_ON_ERROR],
-        steps=[t.refused("receive", reason="illegalState", state=c("DISCARDING"),
+        steps=[t.refused("receive", reason="illegalState", condition=ILLEGAL_STATE, state=c("DISCARDING"),
                          body=t.open_body(), channel=1,
-                         note="the open frame can only be sent on channel 0, so one on "
-                              "channel 1 is the connection's own rule broken, and a "
-                              "refused receive is answered by closing"),
+                         note="the state's `*` receive column does not admit a second "
+                              "open -- the exclusion the register records rather than a "
+                              "column of the table -- and a refused receive on an open "
+                              "connection is answered by closing"),
                t.receive_frame(AMQP_FRAME, transfer(), state=None if False else c("DISCARDING"), channel=1)],
         note="a session frame arriving while the connection is discarding: the artifact "
              "says any incoming frames on the connection MUST be silently discarded "
              "until the peer's close, so it is admitted and changes nothing"))
+
+
+    # -- the link machine: handles, credit, deliveries and settlement ------ #
+
+    message = b"a message whose split points are the vector's business"
+    link_clauses = [LINK_HANDLES, ATTACH_MANDATORY, TRANSFER_FIRST_FIELDS, TRANSFER_SETTLED,
+                    DETACH_HANDLE, DISPOSITION_ROLE, FLOW_LINK_CREDIT]
+
+    vectors.append(exchange(
+        "exchange-link-handle-in-use", start=s("MAPPED"), clauses=link_clauses,
+        steps=link_up() + [
+            t.refused("send", reason="illegalState", condition=HANDLE_IN_USE,
+                      state=c("CLOSE_SENT"), body=t.attach_body(role=False), channel=1,
+                      note="handle 0 is already this endpoint's link handle, and "
+                           "attach/field:handle.1 says a handle MUST NOT be used for other "
+                           "open links: handle.2 mandates an immediate close carrying a "
+                           "handle-in-use session-error, and the state named is the "
+                           "connection's because the close is the connection's frame")],
+        note="a second attach reusing a live handle: the rule is `handle.1`'s and the "
+             "response is the immediate close `handle.2` mandates, which reaches "
+             "CLOSE_SENT on the connection rather than moving the session"))
+
+    vectors.append(exchange(
+        "exchange-link-handle-out-of-range", start=s("UNMAPPED"),
+        clauses=[LINK_HANDLES, ATTACH_MANDATORY, BEGIN_ESTABLISHES],
+        steps=[t.send_frame(AMQP_FRAME, t.begin_body(), state=s("BEGIN_SENT"), channel=1),
+               t.receive_frame(AMQP_FRAME,
+                               t.body("begin", **windows(),
+                                      **{"remote-channel": {"type": "ushort", "value": 1},
+                                         "handle-max": {"type": "uint", "value": 2}}),
+                               state=s("MAPPED"), channel=1),
+               t.refused("send", reason="limit", condition=FRAMING_ERROR,
+                         state=c("CLOSE_SENT"), body=t.attach_body(role=False, handle=5),
+                         channel=1,
+                         note="the partner's begin declared handle-max 2, and "
+                              "handle-max.1 forbids attaching outside the range its "
+                              "partner can handle; handle-max.2 mandates closing the "
+                              "connection with the framing-error the open's own doc names "
+                              "for an out-of-range value")],
+        note="a handle outside the range the partner announced: the two handle-max clauses "
+             "in the send direction, where the bound is the partner's and the response is "
+             "the connection's close"))
+
+    vectors.append(exchange(
+        "exchange-link-credit-granted-and-spent", start=s("MAPPED"),
+        clauses=[FLOW_LINK_CREDIT, TRANSFER_ONE_SECTION],
+        steps=link_up(role_sender=True, credit=1) + [
+            t.send_frame(AMQP_FRAME, t.fragment_body(0, 1), state=s("MAPPED"), channel=1,
+                         payload=message),
+            t.refused("send", reason="limit", condition=FRAMING_ERROR, state=s("MAPPED"),
+                      body=t.fragment_body(0, 1, delivery_id=1), channel=1,
+                      note="the receiver granted one delivery of credit, and the doc's "
+                           "flow-control makes the delivery-limit the receiver's "
+                           "delivery-count plus its link-credit: the sender's count has "
+                           "reached it")],
+        note="credit is a bound the receiver sets and the sender spends: one delivery fits "
+             "the grant and the second does not"))
+
+    vectors.append(exchange(
+        "exchange-link-credit-regranted", start=s("MAPPED"),
+        clauses=[FLOW_LINK_CREDIT, TRANSFER_ONE_SECTION],
+        steps=link_up(role_sender=True, credit=1) + [
+            t.send_frame(AMQP_FRAME, t.fragment_body(0, 1), state=s("MAPPED"), channel=1,
+                         payload=message),
+            t.receive_frame(AMQP_FRAME, t.flow_body(handle=0, delivery_count=1, link_credit=1),
+                            state=s("MAPPED"), channel=1),
+            t.send_frame(AMQP_FRAME, t.fragment_body(0, 1, delivery_id=1), state=s("MAPPED"),
+                         channel=1, payload=message)],
+        note="the doc's formula for a sender: link-credit_snd := delivery-count_rcv + "
+             "link-credit_rcv - delivery-count_snd — so a flow that raises the receiver's "
+             "credit by one raises the sender's by one, and the delivery the exhausted "
+             "link refused a moment ago is admitted"))
+
+    # the same message, three senders' framings: one transfer, two, three. Every split
+    # point is permitted, so a receiver that admitted one and refused another would be
+    # coupled to a sender's framing rather than to the message.
+    for count in (1, 2, 3):
+        chunks = [message[i::count] for i in range(count)] if count > 1 else [message]
+        steps = link_up()
+        for index in range(count):
+            steps.append(t.receive_frame(AMQP_FRAME, t.fragment_body(index, count),
+                                         state=s("MAPPED"), channel=1, payload=chunks[index]))
+        vectors.append(exchange(
+            f"exchange-link-fragments-{count}-transfer{'s' if count > 1 else ''}",
+            start=s("MAPPED"), clauses=link_clauses + [TRANSFER_ONE_SECTION],
+            steps=steps,
+            note=f"one message carried by {count} transfer(s): the transfer clauses make "
+                 f"the delivery-id, delivery-tag and message-format first-transfer fields "
+                 f"and `more` what continues a delivery, and a receiver that accepted this "
+                 f"framing is not thereby committed to another"))
+
+    vectors.append(exchange(
+        "exchange-link-settled-inherited", start=s("MAPPED"), clauses=link_clauses,
+        steps=link_up() + [
+            t.receive_frame(AMQP_FRAME, t.fragment_body(0, 2, settled=True),
+                            state=s("MAPPED"), channel=1, payload=message[:10]),
+            t.receive_frame(AMQP_FRAME, t.fragment_body(1, 2),
+                            state=s("MAPPED"), channel=1, payload=message[10:])],
+        note="the settled flag of a continuation left unset: the clause interprets it as "
+             "true if and only if a preceding transfer of the delivery set it, so this "
+             "delivery is settled even though its last frame does not say so"))
+
+    vectors.append(exchange(
+        "exchange-link-sender-settle-mode-unmet", start=s("MAPPED"), clauses=link_clauses,
+        steps=[t.send_frame(AMQP_FRAME, t.attach_body(role=True), state=s("MAPPED"), channel=1),
+               t.receive_frame(AMQP_FRAME, t.attach_body(role=False, sender_settle=0),
+                               state=s("MAPPED"), channel=1),
+               # the peer is this link's sender, so its flow echoes the credit this
+               # endpoint last sent rather than granting any
+               t.receive_frame(AMQP_FRAME, t.flow_body(handle=0, link_credit=0),
+                               state=s("MAPPED"), channel=1),
+               t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                         state=s("DISCARDING"), body=t.fragment_body(0, 1), channel=1,
+                         payload=message,
+                         note="snd-settle-mode was negotiated to sender-settle-mode, whose "
+                              "obligation is that a delivery MUST be settled in at least "
+                              "one of its transfers, and this delivery never carries the "
+                              "flag")],
+        note="settled.4 in the receive direction: the sender's obligation, checked where "
+             "the delivery ends — the frame is well formed and the delivery it carries "
+             "breaks the negotiated mode"))
+
+    vectors.append(exchange(
+        "exchange-link-first-transfer-needs-its-fields", start=s("MAPPED"),
+        clauses=link_clauses,
+        steps=link_up() + [
+            t.receive_frame(AMQP_FRAME, t.fragment_body(0, 1), state=s("MAPPED"), channel=1,
+                            payload=message),
+            t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                      state=s("DISCARDING"), octets=frame_octets(
+                          AMQP_FRAME, t.body("transfer", handle={"type": "uint", "value": 0}),
+                          channel=1, payload=message),
+                      note="delivery-tag and message-format MUST be specified for the "
+                           "first transfer of a message and can only be omitted for a "
+                           "continuation, and no delivery is in progress")],
+        note="the clause that couples `delivery-tag` to the delivery it continues: a "
+             "transfer that omits it is a continuation, and a continuation needs a "
+             "delivery to continue, so the same frame is admitted while a delivery is in "
+             "progress and refused when none is"))
+
+    vectors.append(exchange(
+        "exchange-link-detach-releases-handle", start=s("MAPPED"), clauses=link_clauses,
+        steps=link_up() + [
+            t.receive_frame(AMQP_FRAME, t.detach_body(), state=s("MAPPED"), channel=1),
+            t.refused("receive", reason="illegalState", condition=UNATTACHED_HANDLE,
+                      state=s("DISCARDING"), body=t.fragment_body(0, 1), channel=1,
+                      payload=message,
+                      note="link-handles says the handle remains in use until the link is "
+                           "detached, so the detach released it and a transfer naming it "
+                           "now names a link this endpoint does not have")],
+        note="a detach releases the handle, and the release is observable: the frame that "
+             "was admitted a moment ago is refused, with the session error the artifact "
+             "declares for a handle that is not attached"))
+
+    vectors.append(exchange(
+        "exchange-link-aborted-discarded", start=s("MAPPED"), clauses=link_clauses,
+        steps=link_up() + [
+            t.receive_frame(AMQP_FRAME,
+                            t.body("transfer", handle={"type": "uint", "value": 0},
+                                   **{"delivery-id": {"type": "uint", "value": 0},
+                                      "delivery-tag": {"type": "binary", "hex": b"tag".hex()},
+                                      "message-format": {"type": "uint", "value": 0},
+                                      "aborted": {"type": "boolean", "value": True}}),
+                            state=s("MAPPED"), channel=1, payload=message),
+            t.receive_frame(AMQP_FRAME, t.fragment_body(0, 1, delivery_id=1),
+                            state=s("MAPPED"), channel=1, payload=message)],
+        note="aborted.1: an aborted delivery is discarded and its payload ignored, so the "
+             "next transfer is a first transfer again rather than a continuation of it"))
+
+    vectors.append(exchange(
+        "exchange-link-disposition-direction", start=s("MAPPED"), clauses=link_clauses,
+        steps=link_up() + [
+            t.receive_frame(AMQP_FRAME,
+                            t.body("disposition", role={"type": "boolean", "value": True},
+                                   first={"type": "uint", "value": 0},
+                                   last={"type": "uint", "value": 0}),
+                            state=s("MAPPED"), channel=1),
+            t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                      state=s("DISCARDING"),
+                      body=t.body("disposition", role={"type": "boolean", "value": False},
+                                  first={"type": "uint", "value": 0},
+                                  last={"type": "uint", "value": 0}),
+                      channel=1,
+                      note="disposition.1: the disposition's role gives the directionality "
+                           "of the deliveries it names, and this endpoint attached as the "
+                           "receiver, so the sender's role is not its to send")],
+        note="the disposition's role is a direction, not a hint: the same frame with the "
+             "role this endpoint's end owns is admitted, and the range it names is "
+             "validated as a range"))
+
+
+    vectors.append(exchange(
+        "exchange-link-flow-unattached-handle", start=s("MAPPED"),
+        clauses=[FLOW_LINK_CREDIT, LINK_HANDLES],
+        steps=link_up() + [
+            t.refused("send", reason="illegalState", condition=UNATTACHED_HANDLE,
+                      state=s("MAPPED"),
+                      body=t.flow_body(handle=7, delivery_count=0, link_credit=1),
+                      channel=1,
+                      note="flow/field:handle.1: a flow set to a handle that is not "
+                           "currently associated with an attached link MUST be answered by "
+                           "ending the session with a session error — and this endpoint's "
+                           "link is handle 0"),
+            t.refused("receive", reason="illegalState", condition=UNATTACHED_HANDLE,
+                      state=s("DISCARDING"),
+                      body=t.flow_body(handle=7, delivery_count=0, link_credit=1),
+                      channel=1,
+                      note="the same clause in the direction that ends the session: the "
+                           "END it mandates is what leaves DISCARDING")],
+        note="the flow half of the rule the transfer vector pins: the corpus's other flows "
+             "leave the handle unset on purpose — they carry the session's windows — so "
+             "this is the vector for the clause that binds a flow that does name a link"))
+
+    vectors.append(exchange(
+        "exchange-link-detach-unattached-handle", start=s("MAPPED"),
+        clauses=[LINK_HANDLES, LINK_ERRORS],
+        steps=link_up(role_sender=True) + [
+            t.receive_frame(AMQP_FRAME, t.detach_body(handle=7), state=s("MAPPED"),
+                            channel=1),
+            t.send_frame(AMQP_FRAME, t.detach_body(handle=7), state=s("MAPPED"), channel=1),
+            t.send_frame(AMQP_FRAME, t.fragment_body(0, 1), state=s("MAPPED"), channel=1,
+                         payload=message)],
+        note="the exception in `links.15`, which terminates the session for input related "
+             "to a detached link endpoint \"other than a detach\": a detach naming a "
+             "handle this endpoint does not have is admitted in both directions, releases "
+             "nothing, and leaves the attached link usable — which is the last step"))
+
+
+    vectors.append(exchange(
+        "exchange-link-flow-field-without-handle", start=s("MAPPED"),
+        clauses=[FLOW_LINK_CREDIT, LINK_HANDLES],
+        steps=link_up() + [
+            t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                      state=s("DISCARDING"),
+                      # the windows, the next-incoming-id the session rule requires once
+                      # the peer's begin has arrived, and the link field the coupling
+                      # forbids — so the only rule that can refuse this frame is the one
+                      # the vector is about
+                      body=t.body("flow", **windows(),
+                                  **{"next-incoming-id": {"type": "uint", "value": 0},
+                                     "available": {"type": "uint", "value": 1}}),
+                      channel=1,
+                      note="flow/field:available.1, which five of the flow's fields carry "
+                           "verbatim: \"When the handle field is not set, this field MUST "
+                           "NOT be set\" — and this flow names no link. `available` is "
+                           "chosen deliberately: the other four fields are read by rules "
+                           "of their own (the delivery-count carriage, the credit echo), "
+                           "so a vector carrying one of them is refused whether or not "
+                           "the coupling is there and cannot witness it; nothing else in "
+                           "the layer reads `available`")],
+        note="a flow that carries the session's windows and a link's credit at once: the "
+             "credit belongs to a link, so naming none while sending it is the refusal the "
+             "five clauses state — and the window-only flows the rest of the corpus uses "
+             "are the conforming case"))
+
+    vectors.append(exchange(
+        "exchange-link-credit-echoed", start=s("MAPPED"), clauses=[FLOW_LINK_CREDIT],
+        steps=link_up() + [
+            t.receive_frame(AMQP_FRAME,
+                            t.flow_body(handle=0, delivery_count=0, link_credit=0),
+                            state=s("MAPPED"), channel=1),
+            t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                      state=s("DISCARDING"),
+                      body=t.flow_body(handle=0, delivery_count=0, link_credit=7),
+                      channel=1,
+                      note="the ownership sentence link-credit carries: \"Only the "
+                           "receiver endpoint can independently set this value. The sender "
+                           "endpoint sets this to the last known value seen from the "
+                           "receiver\" — this endpoint granted none, so a sender's flow "
+                           "carrying seven is inventing the receiver's quantity rather "
+                           "than echoing it")],
+        note="the conservation law the artifact states in words rather than in a keyword: "
+             "the sender's link-credit is what the receiver last sent, so a flow that "
+             "names another value is a deviation — the first flow, echoing the zero this "
+             "endpoint granted, is admitted"))
+
+    vectors.append(exchange(
+        "exchange-link-credit-counts-messages-not-frames", start=s("MAPPED"),
+        clauses=[FLOW_LINK_CREDIT, TRANSFER_FIRST_FIELDS],
+        steps=link_up(role_sender=True, credit=1) + [
+            t.send_frame(AMQP_FRAME, t.fragment_body(index, 3), state=s("MAPPED"),
+                         channel=1, payload=message[index::3])
+            for index in range(3)] + [
+            t.refused("send", reason="limit", condition=FRAMING_ERROR, state=s("MAPPED"),
+                      body=t.fragment_body(0, 1, delivery_id=1), channel=1,
+                      payload=message,
+                      note="the grant was one *message*, and this transfer begins a second "
+                           "one: link-credit is \"the current maximum number of messages "
+                           "that can be handled at the receiver endpoint\" and the "
+                           "delivery-count \"is incremented whenever a message is set\"")],
+        note="what the credit counts: one delivery of credit carries a message split over "
+             "three transfers, because the two continuations are frames of a message "
+             "already counted — a layer that charged per frame would refuse the second and "
+             "third, and the exhaustion is shown by the delivery that does begin a second "
+             "message"))
+
+    vectors.append(exchange(
+        "exchange-link-attach-keeps-the-credit", start=s("MAPPED"),
+        clauses=[FLOW_LINK_CREDIT, LINK_HANDLES],
+        steps=link_up(role_sender=True, credit=1) + [
+            t.receive_frame(AMQP_FRAME, t.attach_body(role=True, handle=1),
+                            state=s("MAPPED"), channel=1),
+            t.send_frame(AMQP_FRAME, t.fragment_body(0, 1), state=s("MAPPED"), channel=1,
+                         payload=message)],
+        note="an attach from the partner, arriving after the link is established and after "
+             "the partner granted credit, names a handle this endpoint has not seen — and "
+             "the flow state belongs to the link, not to the frame, so an attach that does "
+             "not establish the link must not replace what the link has agreed: the "
+             "transfer that follows is admitted on the credit the partner granted, and "
+             "before this rule it was refused for having none"))
+
+    # The two states the artifact gives a channel to, entered as *start* states.
+    # `sessions.10` gives END_SENT its entry in the incoming channel map ("but is no
+    # longer assigned an outgoing channel number") and `sessions.11` gives END_RCVD its
+    # outgoing number with no incoming entry. A state reached by a step keeps the maps of
+    # the state it came from, so only a vector that starts here can see what the state is
+    # assigned — which is why these two begin at the state rather than arriving at it.
+    vectors.append(exchange(
+        "exchange-session-receive-in-end-sent", start=s("END_SENT"),
+        clauses=[SESSION_STATES, WINDOW_AFTER_FLOW],
+        steps=[t.receive_frame(AMQP_FRAME, flow_frame(next_incoming=0),
+                               state=s("END_SENT"), channel=1),
+               t.receive_frame(AMQP_FRAME, t.body("end"), state=s("UNMAPPED"), channel=1)],
+        note="END_SENT keeps the incoming channel map, so a flow arriving on it is this "
+             "session's to receive and is admitted; the peer's end then releases the "
+             "session, which is the one frame a state that cannot send still answers"))
+
+    vectors.append(exchange(
+        "exchange-session-send-in-end-rcvd", start=s("END_RCVD"),
+        clauses=[SESSION_STATES, WINDOW_AFTER_FLOW],
+        steps=[t.send_frame(AMQP_FRAME, flow_frame(next_incoming=0),
+                            state=s("END_RCVD"), channel=1),
+               t.send_frame(AMQP_FRAME, t.body("end"), state=s("UNMAPPED"), channel=1)],
+        note="END_RCVD keeps its outgoing channel number with no incoming entry, so a flow "
+             "sent there is admitted and the end that follows releases the session"))
+
+    # The direction the role fixes: a transfer is the sender's frame, so a link whose
+    # endpoint is the sender may not receive one and an endpoint that is the receiver may
+    # not send one. The condition is the artifact's `illegal-state`, "The peer sent a frame
+    # that is not permitted in the current state" — not `framing-error`, whose definition
+    # is about octets that form no frame header.
+    vectors.append(exchange(
+        "exchange-link-transfer-direction-received", start=s("MAPPED"),
+        clauses=[SESSION_STATES, LINK_HANDLES],
+        steps=link_up(role_sender=True) + [
+            t.refused("receive", reason="illegalState", condition=ILLEGAL_STATE,
+                      state=s("DISCARDING"), body=t.fragment_body(0, 1), channel=1,
+                      payload=message,
+                      note="this endpoint attached as the link's sender, so a transfer "
+                           "arriving here is the peer's frame on the wrong end of the "
+                           "link; a receive the session cannot process is answered by "
+                           "the END an error, which is what DISCARDING records")],
+        note="the received half of the role rule: the frame is well formed and the moment "
+             "is wrong, which is illegal-state rather than a wire failure"))
+
+    vectors.append(exchange(
+        "exchange-link-transfer-direction-sent", start=s("MAPPED"),
+        clauses=[SESSION_STATES, LINK_HANDLES],
+        steps=link_up(role_sender=False) + [
+            t.refused("send", reason="illegalState", condition=ILLEGAL_STATE,
+                      state=s("MAPPED"), body=t.fragment_body(0, 1), channel=1,
+                      payload=message,
+                      note="this endpoint attached as the link's receiver, so offering a "
+                           "transfer is offering the sender's frame from the wrong end; "
+                           "a send it must not make is simply not made, so the state "
+                           "stands")],
+        note="the sent half: the same rule from the direction where the peer would have "
+             "written the frame, and the state does not move because nothing was written"))
+
+    # A state label and the channel map its description assigns are one fact, and a
+    # transition that releases a channel must move the label with it: `BEGIN_SENT` "is
+    # assigned an outgoing channel number", so sending the end that releases that channel
+    # lands in `END_SENT`, whose description is exactly the maps the record then has.
+    vectors.append(exchange(
+        "exchange-session-send-end-in-begin-sent", start=s("BEGIN_SENT"),
+        clauses=[SESSION_STATES, SESSION_TRANSITIONS, END_DISASSOCIATES],
+        steps=[t.send_frame(AMQP_FRAME, t.body("end"), state=s("END_SENT"), channel=1),
+               t.refused("receive", reason="illegalState", condition=FRAMING_ERROR,
+                         state=s("END_SENT"), body=t.body("end"), channel=1,
+                         note="END_SENT's own description is that it MAY receive frames and "
+                              "not send them, so the end that follows is refused — and the "
+                              "refusal is reached on the label, which is the point: this "
+                              "session reached END_SENT with no incoming channel at all, "
+                              "because BEGIN_SENT has none, whereas END_SENT's description "
+                              "claims an incoming entry — the pair of descriptions cannot "
+                              "both hold on this route")],
+        note="a session that has sent its begin and sends its end: the label follows the "
+             "channel, because BEGIN_SENT's own description claims the outgoing channel "
+             "the end releases; the second step shows why the label's arrival here is not "
+             "the whole story, since END_SENT is described as having an incoming entry and "
+             "this route cannot give it one"))
+
+    # The discarding phase, reached by a *rule* rather than by the channel map, so the
+    # predicate that reaches it is tested rather than shadowed: an unattached handle is
+    # refused by linkHandleOf in a state that can still receive, which is where the
+    # widening bites. The second step is the peer's end, the one frame a discarding
+    # session answers.
+    vectors.append(exchange(
+        "exchange-session-refusal-in-end-sent-discards", start=s("END_SENT"),
+        clauses=[SESSION_STATES, SESSION_ERRORS],
+        steps=[t.refused("receive", reason="illegalState", condition=UNATTACHED_HANDLE,
+                         state=s("DISCARDING"),
+                         body=t.flow_body(handle=7, delivery_count=0, link_credit=1,
+                                          next_incoming=0),
+                         channel=1,
+                         note="a flow naming a handle this endpoint does not have, "
+                              "refused by the handle rule rather than by the channel "
+                              "map: sessions.6 then obliges the session to discard until "
+                              "the peer's end, which is what DISCARDING records — and "
+                              "the state it left is what the widening moves"),
+               t.receive_frame(AMQP_FRAME, t.body("end"), state=s("UNMAPPED"), channel=1)],
+        note="the predicate that reaches the discarding phase, tested by a rule: the "
+             "channel map would answer first if the frame were on the wrong channel, "
+             "which is why the handle rule is used here"))
 
     return vectors
 
