@@ -1,0 +1,27 @@
+{
+ "adopted": "UNMAPPED forbids the session's traffic, not the frame that brings it into being",
+ "clauses": [
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions.7",
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions.8"
+ ],
+ "consequences": [
+  "A `begin` may be sent and received in UNMAPPED, which is what the state diagram draws and what the mapping requires: the state describes a session that does not yet exist on the channel, so the frame that creates it cannot be subject to the prohibition on its traffic.",
+  "The prohibition applies to the session's own frames once it exists — `transfer` above all — so the reading does not weaken the state, it scopes it.",
+  "The sentence is invisible to the ledger because it carries no keyword, and invisible to the unkeyed heuristic too, because that looks for `is invalid`, `is not permitted`, `shall` and their like while this says `cannot`. The limitation is the heuristic's rather than the ledger's, and it is recorded here so that the unkeyed set is not trusted as exhaustive."
+ ],
+ "evidence": "The session states are given as a definition list, and UNMAPPED's sentence says an endpoint cannot send or receive frames; the state diagram (picture 30) then draws both a send and a receive `begin` out of UNMAPPED. Neither is a clause: the permissions that do carry keywords are the five MAY sentences for the later states (`sessions.7` to `sessions.11`), and the transitions are the picture. So the two statements must be reconciled by reading rather than by citation, and the reading that makes both true is the one adopted — the sentence scopes to the session's traffic, and the picture supplies the exit that a session with no exit could not have.",
+ "id": "unmapped-begin",
+ "open": false,
+ "question": "UNMAPPED says an endpoint cannot send or receive frames, and the state diagram draws send and receive `begin` arrows out of it. Which governs?",
+ "readings": [
+  {
+   "name": "UNMAPPED forbids the session's traffic, not the frame that brings it into being",
+   "statement": "Adopted. The state describes a channel with no session mapped; `begin` is what creates the mapping, so it cannot be subject to a prohibition that presupposes the session. The sentence bites on the session's own frames once it exists."
+  },
+  {
+   "name": "The sentence includes `begin`, so UNMAPPED has no exit",
+   "statement": "Rejected: it makes the state diagram incoherent and the state unreachable in the wrong direction — a channel could never acquire a session, which contradicts the mapping rule the same section states."
+  }
+ ],
+ "schema_version": 1
+}
