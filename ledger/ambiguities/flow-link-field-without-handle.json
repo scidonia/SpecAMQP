@@ -1,0 +1,27 @@
+{
+ "adopted": "amqp:invalid-field for a flow carrying a link field with no handle",
+ "clauses": [
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:link-credit.1",
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/type:amqp-error"
+ ],
+ "consequences": [
+  "A `flow` carrying `available`, `delivery-count`, `drain`, `link-credit` or `properties` while its handle is unset is refused with `amqp:invalid-field`, the same condition the layer's mandatory-field refusals already name \u2014 so a field that breaks a rule the declared surface states is refused the same way whether the rule is `mandatory and missing` or `MUST NOT be set here`.",
+  "A handle-less `flow` carrying `echo` is *admitted*, and refusing it would forbid the field's one conforming use: `echo.2` says that set with no handle it asks only for the session endpoint state to be echoed, which is the case the field exists for.",
+  "`amqp:invalid-field` is a value of the `amqp-error` family, not of `connection-error` \u2014 the layer's own generated table returns only `framing-error` and `illegal-state` for the latter \u2014 so the reading is consistent with the rest of the layer rather than a special case."
+ ],
+ "evidence": "The artifact states the rule five times, on the five link fields: `available.1`, `delivery-count.1`, `drain.1`, `link-credit.1` and `properties.1` carry `When the handle field is not set, this field MUST NOT be set.` in the MUST class. `echo.2` carries a sixth occurrence of the phrase in the MAY class, and it is a different rule: `If set to true, and the handle field is not set, then the sender only requires session endpoint state to be echoed, however, the receiver MAY fulfil this requirement by sending a flow performative carrying link-specific state`. `amqp:invalid-field` is defined as `an invalid field was passed in a frame body, and the operation could not proceed`, which names this case exactly.",
+ "id": "flow-link-field-without-handle",
+ "open": false,
+ "question": "Which condition does a peer report when a `flow` carries a link field while its handle is unset?",
+ "readings": [
+  {
+   "name": "amqp:invalid-field for a flow carrying a link field with no handle",
+   "statement": "Adopted. The field breaks a rule the declared surface states, which is what the value's definition describes, and the layer's mandatory-field refusals already use it \u2014 one rule for field-rule violations rather than two by which rule was broken."
+  },
+  {
+   "name": "The same refusal extended to `echo`",
+   "statement": "Rejected: `echo`'s handle-less use is the one the artifact explicitly provides for, in a MAY that says so, so refusing it would turn the field's conforming case into an error."
+  }
+ ],
+ "schema_version": 1
+}
