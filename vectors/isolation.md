@@ -27,6 +27,23 @@ witnessed. The generated corpus's negatives are not listed: the label would be u
 * **`exchange-session-refusal-in-end-sent-discards`** — the isolating vector the layer work wrote, which
   failed on its first run until the second placement site was widened.
 
+## A mutation that survived, and what surviving means here
+
+The message slice's mutation window ran six mutants across the four classes; four were killed by corpus
+vectors, one did not build, and one survived with no observable verdict changing. That survivor is worth
+recording because it is not a coverage hole and not a corpus defect — it is a rule with two enforcers.
+
+The removed branch was the composite reader's "a mandatory field is absent" case. The only composites in the
+declared surface with a mandatory field are the delivery-state types, and `deliveryStateOfValue` reads those
+by name through `unsignedField`, whose `none` arm enforces the same rule and produces the same condition and
+reason class — so the deleted branch was **shadowed by an identical one**, and no vector could have failed.
+The classification is therefore the same label the rules above carry and for the same reason: **broad
+conformance evidence, not rule-isolated evidence**. A vector that fails if *both* guards go cannot distinguish
+them, so no vector isolates this rule today; the one that would is a section type that declares a mandatory
+field, at which point the branch becomes observable and the generator's descriptor sweep already carries the
+case. Recording this is the point: a survivor that is understood is evidence about the specification's shape,
+and a survivor that is merely written down as equivalent would be an assumption.
+
 ## The two broad-witnessed rows are the ones worth keeping
 
 Each names a rule and stays green when that rule is disabled — one because a value of 5 is refused by the
