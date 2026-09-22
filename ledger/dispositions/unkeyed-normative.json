@@ -6,6 +6,56 @@
   "unkeyed": "A statement with no RFC 2119 keyword that is still normative, or an explicit silence the specification chooses. The keyword scan cannot see these, so each one is captured and decided explicitly; `check_unkeyed` refuses an omission."
  },
  "dispositions": {
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.u1": {
+   "clause_text": "In this case the sender will either apply that outcome at the source, or in the rare case that it cannot apply that outcome, indicate the terminal outcome that has been applied.",
+   "disposition": "deferred:S5",
+   "kind": "UNKEYED",
+   "note": "deferred: S5 \u2014 the messaging milestone owns this statement.",
+   "text_sha256": "7afb62641a9d704698835018efd9e769c2cdfdbff71a58be5414cc71d9d2970e",
+   "unkeyed_phrases": [
+    "cannot"
+   ]
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.u2": {
+   "clause_text": "The only option available to the sender is to abort the transfer and to then (if possible) resend as a new delivery or else to report the possible message loss in some way if it cannot.",
+   "disposition": "deferred:S5",
+   "kind": "UNKEYED",
+   "note": "deferred: S5 \u2014 the messaging milestone owns this statement.",
+   "text_sha256": "a43aafd3435dd0aca63b9d31f94707f948dbf25bf5dc45479f901ff9aff7eba9",
+   "unkeyed_phrases": [
+    "cannot"
+   ]
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.u3": {
+   "clause_text": "In this case the sender can simply abort the delivery as it cannot be resumed.",
+   "disposition": "deferred:S5",
+   "kind": "UNKEYED",
+   "note": "deferred: S5 \u2014 the messaging milestone owns this statement.",
+   "text_sha256": "f77a4a0e3e970b008815724a2c5400cd99177f3407de578083fbd509b8ecd6b2",
+   "unkeyed_phrases": [
+    "cannot"
+   ]
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/type:received/field:section-number.u1": {
+   "clause_text": "Data from sections prior to the given section cannot be retransmitted for this delivery.",
+   "disposition": "deferred:S5",
+   "kind": "UNKEYED",
+   "note": "deferred: S5 \u2014 the messaging milestone owns this statement.",
+   "text_sha256": "2be19a2223351f1be3bf7a217ce456fb10693e98c90ed6ecd5ad15fa12f82560",
+   "unkeyed_phrases": [
+    "cannot"
+   ]
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/type:received/field:section-offset.u1": {
+   "clause_text": "Bytes from the same section prior to the given offset section cannot be retransmitted for this delivery.",
+   "disposition": "deferred:S5",
+   "kind": "UNKEYED",
+   "note": "deferred: S5 \u2014 the messaging milestone owns this statement.",
+   "text_sha256": "9ee47b6d09d3a0c0fd2a84903eb55ed1454b21afea578aa538937f121b596fd1",
+   "unkeyed_phrases": [
+    "cannot"
+   ]
+  },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/type:rejected.u1": {
    "clause_text": "At the target, the rejected outcome is used to indicate that an incoming message is invalid and therefore unprocessable.",
    "disposition": "deferred:S3-outcomes",
@@ -17,6 +67,16 @@
    ]
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:delivery-annotations.u1": {
+   "clause_text": "If the recipient does not understand the annotation it cannot be acted upon and its effects (such as any implied propagation) cannot be acted upon.",
+   "disposition": "deferred:S5",
+   "kind": "UNKEYED",
+   "note": "deferred: S5 \u2014 the messaging milestone owns this statement.",
+   "text_sha256": "84da38d8d8f206a23277f6a786b51d6b448d02c09a2b8cd67dab2fdf875a5632",
+   "unkeyed_phrases": [
+    "cannot"
+   ]
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:delivery-annotations.u2": {
    "clause_text": "The symbolic key \"rejected\" is reserved for the use of communicating error information regarding rejected messages.",
    "disposition": "deferred:S3-annotations",
    "kind": "UNKEYED",
@@ -56,6 +116,26 @@
     "is undefined"
    ]
   },
+  "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-declare.u1": {
+   "clause_text": "Note that links to the \u00abcoordinator\u00bb cannot be resumed.",
+   "disposition": "deferred:S6",
+   "kind": "UNKEYED",
+   "note": "deferred: S6 \u2014 the transaction machine's milestone owns this statement.",
+   "text_sha256": "426c8c1303fa88e23fda2da183755e8b2a89c1853f903e78b557346aadb92473",
+   "unkeyed_phrases": [
+    "cannot"
+   ]
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections.u1": {
+   "clause_text": "The use of pipelined frames by a peer cannot be distinguished by the peer's partner from non-pipelined use so long as the pipelined frames conform to the partner's capabilities and limitations.",
+   "disposition": "deferred:S4",
+   "kind": "UNKEYED",
+   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement.",
+   "text_sha256": "b0b58ff0fc6da36b46eeef908f4f6bfb4c49fad936800bd204b9ac5bb41b5d90",
+   "unkeyed_phrases": [
+    "cannot"
+   ]
+  },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/definition:PORT.u1": {
    "clause_text": "The port number is reserved for future transport mappings to these protocols.",
    "disposition": "informative",
@@ -64,6 +144,16 @@
    "text_sha256": "277af1bf4460deb71340d6e4664a34154f07e06651bd24e1ef55c18dfd43b403",
    "unkeyed_phrases": [
     "is reserved"
+   ]
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/type:amqp-error/choice:frame-size-too-small.u1": {
+   "clause_text": "The peer cannot send a frame because the smallest encoding of the performative with the currently valid values would be too large to fit within a frame of the agreed maximum frame size.",
+   "disposition": "deferred:S4",
+   "kind": "UNKEYED",
+   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement.",
+   "text_sha256": "012db40ed18696e5a15efa315d9adbbcb3b69808b8a11ebc92bd0c663034219e",
+   "unkeyed_phrases": [
+    "cannot"
    ]
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/type:amqp-error/choice:illegal-state.u1": {
@@ -76,6 +166,86 @@
     "is not permitted"
    ]
   },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/type:connection-error/choice:framing-error.u1": {
+   "clause_text": "A valid frame header cannot be formed from the incoming byte stream.",
+   "disposition": "deferred:S4",
+   "kind": "UNKEYED",
+   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement.",
+   "text_sha256": "0d8e5d66c1f50f98248729defed3c7650078218b07ea02966d02cb9f1261863f",
+   "unkeyed_phrases": [
+    "cannot"
+   ]
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/type:link-error/choice:redirect.u1": {
+   "clause_text": "The address provided cannot be resolved to a terminus at the current container.",
+   "disposition": "deferred:S4",
+   "kind": "UNKEYED",
+   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement.",
+   "text_sha256": "05fb1d33c46427a1db30dfcc0976ada62bf7653d1afb65162bc4a1beff096745",
+   "unkeyed_phrases": [
+    "cannot"
+   ]
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:flow-control.u1": {
+   "clause_text": "Only the receiver can independently choose a value for this field.",
+   "disposition": "deferred:S4",
+   "kind": "UNKEYED",
+   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement.",
+   "text_sha256": "e82bbac840cf96fc557d7c34bedb58dd15b6660e939f69312f494031c542a243",
+   "unkeyed_phrases": [
+    "only the receiver can"
+   ]
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:flow-control.u2": {
+   "clause_text": "Only the sender can independently modify this field.",
+   "disposition": "deferred:S4",
+   "kind": "UNKEYED",
+   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement.",
+   "text_sha256": "e0233cdfcb03212d1e69dac9df38db00516a61c049c13c5aeac820127a059431",
+   "unkeyed_phrases": [
+    "only the sender can"
+   ]
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:flow-control.u3": {
+   "clause_text": "Only the receiver can independently modify this field.",
+   "disposition": "deferred:S4",
+   "kind": "UNKEYED",
+   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement.",
+   "text_sha256": "676b3282b47443dbdebbe3844b4b14221023c2f3784765c6dce33dda55324d6d",
+   "unkeyed_phrases": [
+    "only the receiver can"
+   ]
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:attach/field:incomplete-unsettled.u1": {
+   "clause_text": "When the map is incomplete the recipient of the map cannot take the absence of a delivery tag from the map as evidence of settlement.",
+   "disposition": "deferred:S4",
+   "kind": "UNKEYED",
+   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement.",
+   "text_sha256": "855b0b16cac7d0e0da82f57a639c82423ed8f8892eccb2b63d21fc05d02a7c19",
+   "unkeyed_phrases": [
+    "cannot"
+   ]
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:available.u1": {
+   "clause_text": "Only the sender can independently set this value.",
+   "disposition": "deferred:S4",
+   "kind": "UNKEYED",
+   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement.",
+   "text_sha256": "f20e053727bc5a0aaaefefdf52f853ea0c716a1286ea94c5e679ee9f71cfa5a4",
+   "unkeyed_phrases": [
+    "only the sender can"
+   ]
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:link-credit.u1": {
+   "clause_text": "Only the receiver endpoint can independently set this value.",
+   "disposition": "deferred:S4",
+   "kind": "UNKEYED",
+   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement.",
+   "text_sha256": "6fbc87c70e1ea4132882bd9d10953d1e0407879f911a7c0dbbbaa211f4dca295",
+   "unkeyed_phrases": [
+    "only the receiver endpoint can"
+   ]
+  },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:hostname.u1": {
    "clause_text": "It is undefined what a different value to that already specified means.",
    "disposition": "underspecified:hostname-meanings",
@@ -84,6 +254,16 @@
    "text_sha256": "357c1b635d88a345c5856f9b5805746e811607788b45c38feff0597fc71834c0",
    "unkeyed_phrases": [
     "is undefined"
+   ]
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions.u1": {
+   "clause_text": "In this state an endpoint cannot send or receive frames.",
+   "disposition": "deferred:S4",
+   "kind": "UNKEYED",
+   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement.",
+   "text_sha256": "5f933d2322ca3a3f4c1b182df37647ca37885ac72595329650e513acb593d359",
+   "unkeyed_phrases": [
+    "cannot"
    ]
   },
   "amqp-core-types-v1.0-os.xml#amqp:types/section:primitive-type-definitions/type:map.u1": {
