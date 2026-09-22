@@ -1,0 +1,96 @@
+{
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "$id": "https://scidonia.example/specamqp/frame-vector.schema.json",
+ "title": "SpecAMQP frame vector",
+ "description": "A frame-layer vector: one frame's octets, the frame it must decode to, or the refusal it must draw. The body is expressed in the same vocabulary the value vectors use, because a frame body is a described performative followed by opaque payload octets — the frame layer adds structure around values, it does not replace them.",
+ "type": "object",
+ "required": ["vector", "kind", "clauses"],
+ "additionalProperties": false,
+ "properties": {
+  "vector": {
+   "type": "string",
+   "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+   "description": "Stable vector id; the schema pattern is the one the contract validates against, so an id cannot drift out of it unnoticed."
+  },
+  "kind": {
+   "enum": ["frame-decode", "frame-encode", "frame-reject"],
+   "description": "frame-decode: the octets must decode to the given frame. frame-encode: the frame must encode to the given octets. frame-reject: the octets must be refused, naming a protocol condition and an implementation reason class."
+  },
+  "clauses": {
+   "type": "array",
+   "minItems": 1,
+   "items": { "type": "string" },
+   "description": "The clauses or pictures this vector is authored from. For the frame layer these include the layout prose, which the ledger covers through the section's clauses and through the layout statement recorded in the plan rather than as clause text of its own."
+  },
+  "bytes": {
+   "type": "string",
+   "pattern": "^([0-9a-f]{2})+$",
+   "description": "Lower-case hex, no separators. Present on frame-decode and frame-reject always, and on frame-encode as the expected encoding."
+  },
+  "frame": {
+   "type": "object",
+   "required": ["doff", "type", "channel", "body"],
+   "additionalProperties": false,
+   "properties": {
+    "size": {
+     "type": "integer",
+     "minimum": 8,
+     "description": "The SIZE field: the whole frame's octet count, header included. Omitted when the vector is about a refusal, since there is then nothing to agree with."
+    },
+    "doff": {
+     "type": "integer",
+     "minimum": 2,
+     "description": "The DOFF field in four-octet words from the start of the frame to the body, so the extended header is DOFF*4-8 octets. Two is the minimum: a frame with no extended header."
+    },
+    "type": {
+     "type": "string",
+     "pattern": "^[0-9a-f]{2}$",
+     "description": "The TYPE octet: 00 for an AMQP frame, 01 for a SASL frame. One octet, because that is what the layout shows at byte 5."
+    },
+    "channel": {
+     "type": "integer",
+     "minimum": 0,
+     "maximum": 65535,
+     "description": "The CHANNEL field, two octets at bytes 6 and 7. Zero on connection-level frames, and ignored entirely on SASL frames."
+    },
+    "extended": {
+     "type": "string",
+     "pattern": "^([0-9a-f]{2})*$",
+     "description": "The extended header octets, DOFF*4-8 of them. Optional in the vector, because its content is ignored by every frame type this specification reads: the vectors that exercise it assert the ignore, not the content."
+    },
+    "body": {
+     "type": "array",
+     "minItems": 1,
+     "maxItems": 1,
+     "description": "The performative, as one described value in the value vocabulary, plus the payload when the performative has one. One entry: an AMQP frame's body is a performative followed by opaque octets, and the octets are the 'payload' property.",
+     "items": { "type": "object" }
+    },
+    "payload": {
+     "type": "string",
+     "pattern": "^([0-9a-f]{2})*$",
+     "description": "The opaque octets after the performative. Their meaning belongs to the performative's semantics, so the frame layer carries them without interpreting them."
+    }
+   }
+  },
+  "expectError": {
+   "type": "object",
+   "required": ["condition", "endpoint"],
+   "additionalProperties": false,
+   "description": "Required for frame-reject. The condition is the protocol-level consequence the peer sees; the reason is the implementation's named class, which both artefacts must agree on.",
+   "properties": {
+    "condition": {
+     "type": "string",
+     "pattern": "^amqp:"
+    },
+    "reason": {
+     "type": "string",
+     "enum": ["truncated", "unassigned", "unsupported", "sizeMismatch", "malformed", "limit"]
+    },
+    "endpoint": {
+     "enum": ["connection", "session", "link"]
+    }
+   }
+  },
+  "note": { "type": "string" }
+ }
+}
