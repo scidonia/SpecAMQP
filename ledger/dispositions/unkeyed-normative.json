@@ -540,9 +540,9 @@
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:transactions.u1": {
    "clause_text": "No transactional work is allowed on the control link.",
-   "disposition": "deferred:S5",
+   "disposition": "formalized:SpecAMQP.Spec.Transactions.notTheControlDialogue; test:txn-transactional-state-as-a-message-refused; test:txn-ordinary-message-on-the-control-link-admitted",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Refused where the work would be transactional and carried where it would not: the disarm names the carrier, because the same value means different things in a transfer's payload and in a disposition's state, and the sentence forbids transactional work rather than traffic. Disposed from deferred:S5 once the transaction slice implemented it \u2014 a reviewer caught that the entry still said the layer had not been written.",
    "text_sha256": "a26f6871592a1bef0bac54be4dded66b9027af777163019533c75a0d95476ad2"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:transactions.u2": {
