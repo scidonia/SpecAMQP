@@ -97,16 +97,29 @@ if disagreements:
 CLASSES = ("truncated", "unassigned", "unsupported", "sizeMismatch", "malformed", "limit")
 
 def reason_class(entry):
+    # Searched rather than split: a verdict that met its expectation reads "rejected, as the
+    # vector expects: limit: …", so the class is not the first colon-separated field. Searching
+    # for a known class name finds it in both the passing and the failing form.
     detail = entry.get("detail", "")
-    head = detail.split(":", 1)[0].strip()
-    return head if head in CLASSES else None
+    for name in CLASSES:
+        if name in detail:
+            return name
+    return None
 
+entry_kind = {}
+refusing = set()
 pinned = {}
 for line in pathlib.Path(sys.argv[4]).read_text().splitlines():
     if not line.strip():
         continue
     vector = json.loads(line)
     entry = vector.get("expectError") or {}
+    entry_kind[vector["vector"]] = vector.get("kind", "")
+    # A refusal is a rejection vector, or an encode vector asked to refuse: the second is how an
+    # encode-direction refusal is expressed, and it carries no bytes because there is no expected
+    # encoding when the encoder must say no.
+    if vector.get("kind") == "reject" or (vector.get("kind") == "encode" and entry):
+        refusing.add(vector["vector"])
     if vector.get("kind") == "reject" and entry.get("reason"):
         pinned[vector["vector"]] = entry["reason"]
 
@@ -126,13 +139,17 @@ if pin_problems:
 reason_problems = []
 for ident in sorted(set(reference) & set(specification)):
     left, right = reference[ident], specification[ident]
-    if left["status"] != "reject":
+    # Keyed on the corpus kind, not on a verdict status. The harness reports `pass`/`fail` —
+    # whether the *vector's* expectation was met — so the earlier status test never matched and
+    # this check was inert: the pinned-reason check caught a wrong pin while two artefacts
+    # disagreeing about *why* they refused went unnoticed.
+    if ident not in refusing:
         continue
     lclass, rclass = reason_class(left), reason_class(right)
     if lclass is None or rclass is None:
         reason_problems.append(
-            f"{ident}: a rejection must name its reason class as the leading token "
-            f"({', '.join(CLASSES)}); reference says {left['detail'][:50]!r}, "
+            f"{ident}: a refusal must name a reason class ({', '.join(CLASSES)}); "
+            f"reference says {left['detail'][:50]!r}, "
             f"specification says {right['detail'][:50]!r}")
     elif lclass != rclass:
         reason_problems.append(

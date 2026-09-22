@@ -48,6 +48,14 @@ Coder-owned: `flake.nix`, `flake.lock`, `scripts/**`, `lean/Proofs/**`,
 
 ## Commits
 
+- **The workspace's git index is shared between agents.** `git add <paths>` does not
+  protect a commit from another slice's staged entries: an explicit-paths commit still
+  commits whatever is already staged, and one session's nineteen-file commit went out
+  under a message describing three of them. So stage and commit in one command, never
+  leave a staged set sitting while you do something else, and when a commit does come out
+  describing more than it names, amend the message rather than the record — a log nobody
+  can audit is worse than a message admitting a sweep.
+
 - **Commit only the paths your slice owns**: `git add <paths>`, never
   `git add -A` or `git add .`. Parallel slices have uncommitted work in the tree
   by design, and a pathspec-free add commits whatever state it finds — a
