@@ -1,0 +1,35 @@
+{
+ "adopted": "A window violation is derived from the definitions, and exhausted windows do not wrap",
+ "clauses": [
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions/doc:session-flow-control.3",
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions/doc:session-flow-control.5",
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions/doc:session-flow-control.6",
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions/doc:session-flow-control.7",
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions/doc:session-flow-control.8"
+ ],
+ "consequences": [
+  "A transfer that would exceed either window is refused with `amqp:session:window-violation` and class `limit`: the class means a value outside a declared bound, and a window is exactly that \u2014 the same class the DOFF field and the declared-form refusals carry, because the failure is the same shape.",
+  "A received transfer that exceeds the window this peer announced ends the session into DISCARDING rather than being refused in place: the peer announced the bound, so a partner overrunning it is a session error rather than a frame-level one.",
+  "The `remote-incoming-window` recomputation's subtraction truncates at zero rather than wrapping. A partner whose numbers leave no room therefore yields an exhausted window, which fails the next send loudly, instead of a wrapped one the doc does not describe.",
+  "The two MAY-decrements the section allows are a `policy` value rather than behaviour compiled in, so the latitude is visible in the code and a vector can pin either reading deliberately."
+ ],
+ "evidence": "The `session-flow-control` doc holds five clauses that mention a window \u2014 the remote-outgoing-window's meaning, the increments on sending and receiving a transfer, and the two that require updating on a received flow \u2014 and none states that exceeding a window is an error, because the rule follows from the windows being declared bounds. No clause raises `window-violation` either: the choice values are declared and the rule is derived. Nothing in the register covered the windows, so this is the first written reading of the arithmetic, and the remaining freedom is what an unsigned subtraction does at its floor.",
+ "id": "session-window-violation",
+ "open": false,
+ "question": "No clause states that exceeding a window is an error, and none says what the window arithmetic does at zero. What does the specification do?",
+ "readings": [
+  {
+   "name": "A window violation is derived from the definitions, and exhausted windows do not wrap",
+   "statement": "Adopted. The windows are declared bounds, a transfer that would exceed one cannot be admitted, and the recomputation truncates at zero so that exhaustion is a state the next send fails on rather than a wraparound the artifact does not describe. The MAY-decrements stay a policy value."
+  },
+  {
+   "name": "The subtraction wraps, as unsigned arithmetic would",
+   "statement": "Rejected: a wrapped `remote-incoming-window` is a large number where the peer announced that it has no room, which would admit exactly the transfers the window exists to refuse. Wrapping is the reading that hides the failure."
+  },
+  {
+   "name": "A window violation needs no rule because the windows are advisory",
+   "statement": "Rejected: the section's clauses are requirements about the variables, and a bound nobody enforces is a bound that a partner can ignore \u2014 which is the shape of defect this repository's whole approach exists to find."
+  }
+ ],
+ "schema_version": 1
+}

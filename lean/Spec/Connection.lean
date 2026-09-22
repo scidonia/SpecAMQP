@@ -561,25 +561,70 @@ def missingMandatory (typeName : String) (body : Value) : List String :=
     (fieldsOf path).filterMap (fun field =>
       if field.mandatory && !fieldSet typeName field.name body then some field.name else none)
 
-/-- An integer field of a performative, taking the default the generated field table
-states where the sender left it unset. A field that is present and is not an integer is
-refused rather than read as the default: the artifact declares its type, and silently
-substituting the default for a wrong-typed value is the shape of a defect that survives
-every vector. -/
-def intField (owner fieldName : String) (body : Value) : Except Refusal Nat :=
+/-- The primitive a declared type resolves to, following a restricted type to its
+source: `channel-max` is declared a `ushort` and `milliseconds` a `ulong`, and a field's
+wire value must be of the declared type rather than of any type that happens to be a
+number.
+
+The walk is bounded, since a table that declared a cycle would otherwise not terminate;
+a type the surface does not declare has no primitive, which is a refusal rather than a
+default. -/
+def primitiveOf (typeName : String) : Option String :=
+  let rec follow (name : String) (fuel : Nat) : Option String :=
+    match fuel with
+    | 0 => none
+    | fuel + 1 =>
+      match types.find? (fun entry => entry.name == name) with
+      | none => none
+      | some declaration =>
+        match declaration.typeClass, declaration.source with
+        | .restricted, some source => follow source fuel
+        | _, _ => some declaration.name
+  follow typeName 8
+
+/-- The refusal a field earns when the wire carries a value of a type other than the one
+the declared surface gives it, or `none` where the two agree or the field is unset.
+
+This is the check `intField`'s own comment promises and did not make: `valueNat` reads a
+number out of any integer width, so without this a `channel-max` declared a `ushort` and
+sent as a `ulong` was installed rather than refused — the substitution that the declared
+type exists to prevent. -/
+def fieldTypeRefusal? (owner fieldName : String) (body : Value) : Option Refusal :=
   match fieldValue owner fieldName body with
-  | none | some .null =>
-    match fieldDefault owner fieldName with
-    | some number => .ok number
-    | none =>
-      .error (fieldRefusal "malformed" s!"the {owner}'s {fieldName} field is unset and the \
-        declared surface gives it no default")
+  | none | some .null => none
   | some value =>
-    match valueNat value with
-    | some number => .ok number
-    | none =>
-      .error (fieldRefusal "malformed" s!"the {owner}'s {fieldName} field is a \
-        {SpecAMQP.Spec.Codec.typeName value}, and the artifact declares it an integer")
+    match primitiveOf (match fieldOf owner fieldName with
+                        | some field => field.typeName
+                        | none => "") with
+    | none => none
+    | some declared =>
+      if SpecAMQP.Spec.Codec.typeName value == declared then none
+      else
+        some (fieldRefusal "malformed" s!"the {owner}'s {fieldName} field is declared a \
+          {declared} and this one is a {SpecAMQP.Spec.Codec.typeName value}")
+
+/-- An integer field of a performative, taking the default the generated field table
+states where the sender left it unset. A field that is present and is not an integer of
+the type the artifact declares for it is refused rather than read as a number or as the
+default: the declared type is part of the performative's meaning, and silently
+substituting either is the shape of a defect that survives every vector. -/
+def intField (owner fieldName : String) (body : Value) : Except Refusal Nat :=
+  match fieldTypeRefusal? owner fieldName body with
+  | some reason => .error reason
+  | none =>
+    match fieldValue owner fieldName body with
+    | none | some .null =>
+      match fieldDefault owner fieldName with
+      | some number => .ok number
+      | none =>
+        .error (fieldRefusal "malformed" s!"the {owner}'s {fieldName} field is unset and \
+          the declared surface gives it no default")
+    | some value =>
+      match valueNat value with
+      | some number => .ok number
+      | none =>
+        .error (fieldRefusal "malformed" s!"the {owner}'s {fieldName} field is a \
+          {SpecAMQP.Spec.Codec.typeName value}, and the artifact declares it an integer")
 
 /-- The limits an `open` declares: the largest frame the sender accepts, and the
 highest channel number it accepts. -/
@@ -889,7 +934,7 @@ def stepSaslFrame (endpoint : Endpoint) (outbound : Bool) (size : Nat) (body : V
     let announced :=
       symbolsOf (fieldValue "sasl-mechanisms" "sasl-server-mechanisms" body |>.getD .null)
     refuseUnless (!announced.isEmpty)
-      (refusal "malformed" "a sasl-mechanisms frame announces no mechanism, and the \
+      (fieldRefusal "malformed" "a sasl-mechanisms frame announces no mechanism, and the \
         artifact states that the list cannot be null or empty")
     let role := if outbound then some SaslRole.server else some SaslRole.client
     let endpoint :=
@@ -912,14 +957,28 @@ def stepSaslFrame (endpoint : Endpoint) (outbound : Bool) (size : Nat) (body : V
         announced: {endpoint.mechanisms}")
     return reporting { endpoint with phase := .awaitingOutcome }
   | .awaitingOutcome =>
-    if frame == .challenge || frame == .response then
-      -- The challenge and response step "can occur zero or more times depending on the
-      -- details of the SASL mechanism chosen", so it is legal where it belongs and
-      -- leaves the dialogue where it was.
+    -- The SASL Exchange picture gives each of the remaining performatives one direction:
+    -- the server challenges and the client responds — a step that "can occur zero or more
+    -- times depending on the details of the SASL mechanism chosen" — and the server sends
+    -- the outcome. Only `sasl-init` was checked against its direction before, so a peer
+    -- playing the client could challenge, which the picture does not admit.
+    let server := endpoint.role == some SaslRole.server
+    if frame == .challenge then
+      refuseUnless (outbound == server)
+        (refusal "illegalState" "the sasl-challenge is the SASL server's to send, and \
+          this peer is not the server")
+      return reporting endpoint
+    if frame == .response then
+      refuseUnless (outbound != server)
+        (refusal "illegalState" "the sasl-response is the SASL client's to send, and this \
+          peer is not the client")
       return reporting endpoint
     refuseUnless (frame == .outcome)
       (refusal "illegalState" "the SASL dialogue is waiting for the outcome of the \
         exchange the init began")
+    refuseUnless (outbound == server)
+      (refusal "illegalState" "the sasl-outcome is the SASL server's to send, and this \
+        peer is not the server")
     let code := (fieldValue "sasl-outcome" "code" body).bind valueNat
     if code == saslOk then
       -- The layer is established, and the peers MUST exchange protocol headers again:

@@ -75,6 +75,13 @@ ATTACH_MANDATORY = f"{TRANSPORT}#amqp:transport/section:performatives/type:attac
 ATTACH_DEFAULTS = f"{TRANSPORT}#amqp:transport/section:performatives/type:attach/field:snd-settle-mode.1"
 ATTACH_SETTLE_DEFAULT = f"{TRANSPORT}#amqp:transport/section:performatives/type:attach/field:rcv-settle-mode.1"
 FLOW_NEXT_INCOMING_ID = f"{TRANSPORT}#amqp:transport/section:performatives/type:flow/field:next-incoming-id.1"
+
+WINDOW_REMOTE_INCOMING = f"{TRANSPORT}#amqp:transport/section:sessions/doc:session-flow-control.3"
+WINDOW_INCOMING = f"{TRANSPORT}#amqp:transport/section:sessions/doc:session-flow-control.5"
+WINDOW_AFTER_SENDING = f"{TRANSPORT}#amqp:transport/section:sessions/doc:session-flow-control.5"
+WINDOW_AFTER_FLOW = f"{TRANSPORT}#amqp:transport/section:sessions/doc:session-flow-control.7"
+WINDOW_AFTER_RECEIVING = f"{TRANSPORT}#amqp:transport/section:sessions/doc:session-flow-control.6"
+
 CHANNEL_MAP = f"{TRANSPORT}#amqp:transport/section:connections.1"
 STATE_DIAGRAM = f"{TRANSPORT}#picture.23"
 DISPATCH_TABLE = f"{TRANSPORT}#picture.10"
@@ -120,6 +127,7 @@ SASL_FRAME = 0x01
 MAGIC = b"AMQP"
 FRAMING_ERROR = "amqp:connection:framing-error"
 INVALID_FIELD = "amqp:invalid-field"
+WINDOW_VIOLATION = "amqp:session:window-violation"
 ILLEGAL_STATE = "amqp:illegal-state"
 
 
@@ -1135,6 +1143,60 @@ def session_corpus(tables: Corpus) -> list[dict]:
         note="the same field, set: the rule is that next-incoming-id MUST be set "
              "once the peer has received the begin frame, and it has, so both "
              "directions carry it and neither is refused"))
+
+    # -- the session's flow-control arithmetic ---------------------------------- #
+
+    def flow_frame(next_outgoing=0, incoming=1000, outgoing=1000, next_incoming=0) -> dict:
+        return t.body("flow", **{"next-incoming-id": ({"type": "uint", "value": next_incoming}
+                                                      if next_incoming is not None
+                                                      else {"type": "null"}),
+                                 "incoming-window": {"type": "uint", "value": incoming},
+                                 "next-outgoing-id": {"type": "uint", "value": next_outgoing},
+                                 "outgoing-window": {"type": "uint", "value": outgoing}})
+
+    vectors.append(exchange(
+        "exchange-session-window-remote-incoming", start=s("MAPPED"),
+        clauses=[WINDOW_REMOTE_INCOMING, WINDOW_AFTER_FLOW, WINDOW_AFTER_SENDING],
+        steps=[t.receive_frame(AMQP_FRAME, flow_frame(incoming=1), state=None, channel=1),
+               t.send_frame(AMQP_FRAME, transfer(), state=None, channel=1),
+               t.refused("send", reason="limit", state=s("MAPPED"), condition=WINDOW_VIOLATION,
+                         body=transfer(), channel=1,
+                         note="remote-incoming-window was recomputed from the flow as "
+                              "next-incoming-id + incoming-window - next-outgoing-id = 1, "
+                              "and a sent transfer decrements it, so the second one has "
+                              "nothing to spend")],
+        note="the recomputation clause and the decrement it is spent by: one flow sets the "
+             "remote window to one transfer, the first transfer is admitted and the second "
+             "is refused as a window violation"))
+
+    vectors.append(exchange(
+        "exchange-session-window-recomputed", start=s("MAPPED"),
+        clauses=[WINDOW_AFTER_FLOW, WINDOW_AFTER_SENDING],
+        steps=[t.receive_frame(AMQP_FRAME, flow_frame(incoming=0), state=None, channel=1),
+               t.refused("send", reason="limit", state=s("MAPPED"), condition=WINDOW_VIOLATION,
+                         body=transfer(), channel=1,
+                         note="a flow that leaves the window empty"),
+               t.receive_frame(AMQP_FRAME, flow_frame(incoming=5), state=None, channel=1),
+               t.send_frame(AMQP_FRAME, transfer(), state=None, channel=1)],
+        note="the doc says the endpoint MUST update the remote windows \'directly from\' the "
+             "frame, so a later flow replaces an earlier one: the window is empty, then "
+             "five transfers wide, and only the later value decides"))
+
+    vectors.append(exchange(
+        "exchange-session-window-incoming-exhausted", start=s("UNMAPPED"),
+        clauses=[WINDOW_INCOMING, WINDOW_AFTER_RECEIVING],
+        steps=[t.send_frame(AMQP_FRAME, t.body("begin", **{"incoming-window": {"type": "uint", "value": 1}, "next-outgoing-id": {"type": "uint", "value": 0}, "outgoing-window": {"type": "uint", "value": 10}}), state=s("BEGIN_SENT"), channel=1),
+               t.receive_frame(AMQP_FRAME, t.body("begin", **windows()), state=s("MAPPED"), channel=1),
+               t.receive_frame(AMQP_FRAME, transfer(), state=None, channel=1),
+               t.refused("receive", reason="limit", state=s("DISCARDING"),
+                         condition=WINDOW_VIOLATION, body=transfer(), channel=1,
+                         note="this session announced an incoming window of one transfer "
+                              "and its policy decrements it per transfer received, so the "
+                              "second arrival is the window violation the session ends on")],
+        note="the window this endpoint announced in its own begin is what gates what it "
+             "receives, and its exhaustion is refused with the artifact\'s own "
+             "window-violation and the END that leaves the session DISCARDING"))
+
 
     # -- the dispatch the interface fixes ---------------------------------- #
 

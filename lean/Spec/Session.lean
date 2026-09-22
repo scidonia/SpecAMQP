@@ -177,6 +177,15 @@ channel the frame arrived on. No session-error value means "no session is mapped
 so this is the condition the register adopts for every wire-level failure. -/
 def wireCondition : String := framingError
 
+/-- The condition for a transfer that exceeds a window: the `session-error` family's
+`window-violation`, which is the artifact's own symbol for exactly this, read from the
+generated choice table. No clause raises it — the windows' definitions and the doc's
+update paragraphs imply it — so the rule it names is a reading of those, and it is
+reported as one. -/
+def windowViolation : String :=
+  (choiceValue? "session-error" "window-violation").getD "the session-error choice declares no window-violation"
+
+
 /-- A refusal of a given class, which leaves the state alone. -/
 def refusal (condition reasonClass prose : String) : Refusal :=
   ⟨condition, s!"{reasonClass}: {prose}", none⟩
@@ -185,13 +194,119 @@ def refusal (condition reasonClass prose : String) : Refusal :=
 def refuseUnless (condition : Bool) (reason : Refusal) : Except Refusal Unit :=
   if condition then .ok () else .error reason
 
+/-! ## The session's flow-control state (doc `session-flow-control`) -/
+
+/-- The id space the transfer numbers run in: a `transfer-number` is a `uint`, and
+`next-outgoing-id` is "incremented after each successive «transfer» according to
+RFC-1982 serial number arithmetic". -/
+def serialModulus : Nat := 2 ^ 32
+
+/-- The six variables the session's flow-control doc names, plus the value
+`next-outgoing-id` had when this endpoint began: the `initial-outgoing-id` of the
+artifact's second formula for `remote-incoming-window`.
+
+`next-incoming-id` "identifies the expected transfer-id of the next incoming «transfer»
+frame"; `incoming-window` "defines the maximum number of incoming «transfer» frames that
+the endpoint can currently receive"; `next-outgoing-id` "is the transfer-id to assign to
+the next transfer frame"; `outgoing-window` "defines the maximum number of outgoing
+«transfer» frames that the endpoint can currently send"; `remote-incoming-window`
+"reflects the maximum number of outgoing transfers that can be sent without exceeding the
+remote endpoint's incoming-window"; `remote-outgoing-window` "reflects the maximum number
+of incoming transfers that MAY arrive without exceeding the remote endpoint's
+outgoing-window". -/
+structure Windows where
+  nextIncomingId : Nat
+  incomingWindow : Nat
+  nextOutgoingId : Nat
+  outgoingWindow : Nat
+  remoteIncomingWindow : Nat
+  remoteOutgoingWindow : Nat
+  initialOutgoingId : Nat
+deriving Repr, BEq, DecidableEq
+
+/-- The windows a session starts at when a corpus names a state without the begins that
+would have set them: both peers' windows 1000 and both next ids 0, which is the arithmetic
+baseline a `session:` start assumes and which every vector that cares about the numbers
+sets for itself by running the begins. -/
+def Windows.start : Windows :=
+  ⟨0, 1000, 0, 1000, 1000, 1000, 0⟩
+
+/-- The windows this endpoint's own begin sets: the field labels call them "the initial
+incoming-window of the sender" and "the initial outgoing-window of the sender", and
+`next-outgoing-id` is "the transfer-id of the first transfer id the sender will send". -/
+def Windows.afterSendingBegin (windows : Windows) (nextOutgoing incoming outgoing : Nat) :
+    Windows :=
+  { windows with nextOutgoingId := nextOutgoing % serialModulus,
+                 initialOutgoingId := nextOutgoing % serialModulus,
+                 incomingWindow := incoming, outgoingWindow := outgoing }
+
+/-- The windows the peer's begin sets. `next-incoming-id` becomes "the expected
+transfer-id of the next incoming «transfer» frame", which is the id the partner will put
+on its first transfer — the `next-outgoing-id` it announced — and the two remote windows
+come from the same formula the doc gives for a received flow, with the unset branch taken:
+`initial-outgoing-id + incoming-window - next-outgoing-id` for the peer's incoming window,
+and its announced `outgoing-window` for its outgoing one. -/
+def Windows.afterReceivingBegin (windows : Windows) (theirNextOutgoing theirIncoming
+    theirOutgoing : Nat) : Windows :=
+  { windows with nextIncomingId := theirNextOutgoing % serialModulus,
+                 remoteIncomingWindow :=
+                   (windows.initialOutgoingId + theirIncoming) % serialModulus -
+                     windows.nextOutgoingId,
+                 remoteOutgoingWindow := theirOutgoing }
+
+/-- The windows a sent transfer leaves, per the doc's "sending a transfer": the endpoint
+"will increment its next-outgoing-id, decrement its remote-incoming-window, and MAY
+(depending on policy) decrement its outgoing-window". The policy is a parameter rather
+than a silent choice, because the artifact leaves it open and a MAY that is compiled into
+one branch is a decision nobody can see. -/
+def Windows.afterSendingTransfer (windows : Windows) (policy : Bool) : Windows :=
+  { windows with
+      nextOutgoingId := (windows.nextOutgoingId + 1) % serialModulus,
+      remoteIncomingWindow := windows.remoteIncomingWindow - 1,
+      outgoingWindow := if policy then windows.outgoingWindow - 1 else windows.outgoingWindow }
+
+/-- The windows a received transfer leaves, per the doc's "receiving a transfer": the
+endpoint "will increment the next-incoming-id to match the implicit transfer-id of the
+incoming transfer plus one, as well as decrementing the remote-outgoing-window, and MAY
+(depending on policy) decrement its incoming-window". -/
+def Windows.afterReceivingTransfer (windows : Windows) (transferId : Nat)
+    (policy : Bool) : Windows :=
+  { windows with
+      nextIncomingId := (transferId + 1) % serialModulus,
+      remoteOutgoingWindow := windows.remoteOutgoingWindow - 1,
+      incomingWindow := if policy then windows.incomingWindow - 1 else windows.incomingWindow }
+
+/-- The windows a received flow leaves: the doc says the endpoint "MUST update the
+next-incoming-id directly from the next-outgoing-id of the frame, and ... the
+remote-outgoing-window directly from the outgoing-window of the frame", and gives
+`remote-incoming-window` as `next-incoming-id_flow + incoming-window_flow -
+next-outgoing-id_endpoint`, or, "if the next-incoming-id field of the flow frame is not
+set", as `initial-outgoing-id_endpoint + incoming-window_flow - next-outgoing-id_endpoint`.
+
+The subtraction is over the id space the transfer numbers live in, so it wraps there
+rather than going negative: a window is a count of transfers that may arrive, and an id
+arithmetic that would make it negative is one the doc's RFC-1982 sentence already places
+in that space. -/
+def Windows.afterReceivingFlow (windows : Windows) (frameNextOutgoing frameIncoming
+    frameOutgoing : Nat) (frameNextIncoming : Option Nat) : Windows :=
+  let incomingId := frameNextIncoming.getD windows.initialOutgoingId
+  { windows with
+      nextIncomingId := frameNextOutgoing % serialModulus,
+      remoteOutgoingWindow := frameOutgoing,
+      -- a Nat subtraction here truncates at zero, which is the exhausted window rather
+      -- than a wrapped one: the doc gives the formula and not what happens when the
+      -- numbers leave no room, and an exhausted window fails the next send loudly rather
+      -- than permitting it quietly
+      remoteIncomingWindow :=
+        (incomingId + frameIncoming) % serialModulus - windows.nextOutgoingId }
+
 /-! ## The session endpoint -/
 
 /-- One session endpoint: the state, the outgoing channel it is assigned to, the
-incoming channel the partner's begin arrived on, and whether the partner's begin has
-arrived at all — which `flow`'s `next-incoming-id` rule turns on, and which the state
-alone cannot say, since `END_RCVD` is reached from a session whose begin had arrived and
-which no longer has an incoming channel. -/
+incoming channel the partner's begin arrived on, whether the partner's begin has arrived
+at all — which `flow`'s `next-incoming-id` rule turns on, and which the state alone
+cannot say, since `END_RCVD` is reached from a session whose begin had arrived and which
+no longer has an incoming channel — and the flow-control state the doc calls for. -/
 structure Session where
   state : State
   /-- The channel this endpoint sends on, assigned by its own begin. -/
@@ -200,10 +315,17 @@ structure Session where
   incoming : Option Nat
   /-- Whether the partner's begin has arrived. -/
   peerBegun : Bool
+  /-- The session's flow-control state. -/
+  windows : Windows
 deriving Repr
 
+/-- The policy the two MAY-decrements of the doc's update paragraphs are subject to.
+Held as a value rather than compiled in, so the choice is visible: this is the reading the
+corpus runs with, and the other branch is conforming too. -/
+def startPolicy : Bool := true
+
 /-- A session endpoint that has been created and has not begun. -/
-def Session.initial : Session := ⟨.unmapped, none, none, false⟩
+def Session.initial : Session := ⟨.unmapped, none, none, false, Windows.start⟩
 
 /-- The lowest channel number a session can be assigned: "it is RECOMMENDED that
 implementations always assign the lowest available unused channel number", and channel
@@ -222,15 +344,22 @@ arrived follows the same sentences: every state a begin had reached has one, and
 that a begin has not — `UNMAPPED` and `BEGIN_SENT` — do not. -/
 def Session.atState (state : State) : Session :=
   match state with
-  | .unmapped => ⟨.unmapped, none, none, false⟩
-  | .beginSent => ⟨.beginSent, some startChannel, none, false⟩
-  | .beginRcvd => ⟨.beginRcvd, none, some startChannel, true⟩
-  | .mapped => ⟨.mapped, some startChannel, some startChannel, true⟩
-  | .endSent => ⟨.endSent, none, some startChannel, true⟩
-  | .endRcvd => ⟨.endRcvd, some startChannel, none, true⟩
-  | .discarding => ⟨.discarding, none, some startChannel, true⟩
+  | .unmapped => ⟨.unmapped, none, none, false, Windows.start⟩
+  | .beginSent => ⟨.beginSent, some startChannel, none, false, Windows.start⟩
+  | .beginRcvd => ⟨.beginRcvd, none, some startChannel, true, Windows.start⟩
+  | .mapped => ⟨.mapped, some startChannel, some startChannel, true, Windows.start⟩
+  | .endSent => ⟨.endSent, none, some startChannel, true, Windows.start⟩
+  | .endRcvd => ⟨.endRcvd, some startChannel, none, true, Windows.start⟩
+  | .discarding => ⟨.discarding, none, some startChannel, true, Windows.start⟩
 
 /-! ## Applying a step -/
+
+/-- A window field as a number: the fields the arithmetic reads are mandatory, so a
+performative that reaches the arithmetic carries them, and a field that is not a number
+reads as zero rather than aborting the step — the mandatory rule has already refused the
+performatives that omit them. -/
+def fieldNumber (typeName : String) (body : Value) (fieldName : String) : Nat :=
+  ((fieldValue typeName fieldName body).bind valueNat).getD 0
 
 /-- The session a begin frame leaves, with the channel rules the artifact states for the
 frame that announces a session endpoint: the `remote-channel` field "MUST be empty for a
@@ -245,7 +374,10 @@ def stepBegin (session : Session) (outbound : Bool) (channel : Nat) (body : Valu
       refuseUnless (!fieldSet "begin" "remote-channel" body)
         (refusal invalidField "malformed"
           "a locally initiated begin MUST NOT set a remote-channel, and this one does")
-      return { session with state := .beginSent, outgoing := some channel }
+      let windows :=
+        session.windows.afterSendingBegin (fieldNumber "begin" body "next-outgoing-id")
+          (fieldNumber "begin" body "incoming-window") (fieldNumber "begin" body "outgoing-window")
+      return { session with state := .beginSent, outgoing := some channel, windows }
     | .beginRcvd =>
       match session.incoming, fieldValue "begin" "remote-channel" body with
       | some theirChannel, some value =>
@@ -253,7 +385,10 @@ def stepBegin (session : Session) (outbound : Bool) (channel : Nat) (body : Valu
           (refusal invalidField "malformed"
             s!"a begin answering a remotely initiated session MUST set the remote-channel \
               to the channel its begin arrived on, {theirChannel}")
-        return { session with state := .mapped, outgoing := some channel }
+        let windows :=
+          session.windows.afterSendingBegin (fieldNumber "begin" body "next-outgoing-id")
+            (fieldNumber "begin" body "incoming-window") (fieldNumber "begin" body "outgoing-window")
+        return { session with state := .mapped, outgoing := some channel, windows }
       | _, _ =>
         .error (refusal invalidField "malformed"
           "a begin answering a remotely initiated session MUST set the remote-channel, \
@@ -264,10 +399,15 @@ def stepBegin (session : Session) (outbound : Bool) (channel : Nat) (body : Valu
   else
     match session.state with
     | .unmapped =>
-      return { session with state := .beginRcvd, incoming := some channel,
-                            peerBegun := true }
+      let windows := session.windows.afterReceivingBegin (fieldNumber "begin" body "next-outgoing-id")
+        (fieldNumber "begin" body "incoming-window") (fieldNumber "begin" body "outgoing-window")
+      return { session with state := .beginRcvd, incoming := some channel, peerBegun := true,
+                            windows }
     | .beginSent =>
-      return { session with state := .mapped, incoming := some channel, peerBegun := true }
+      let windows := session.windows.afterReceivingBegin (fieldNumber "begin" body "next-outgoing-id")
+        (fieldNumber "begin" body "incoming-window") (fieldNumber "begin" body "outgoing-window")
+      return { session with state := .mapped, incoming := some channel, peerBegun := true,
+                            windows }
     | other =>
       .error (refusal illegalStateCondition "illegalState"
         s!"a session receives one begin, and this one is already {other.name}")
@@ -354,8 +494,37 @@ def step (session : Session) (outbound : Bool) (channel : Nat) (body : Value) :
         s!"a flow's next-incoming-id must be set exactly when the partner's begin has \
           arrived, and it is {if set then "set" else "unset"} while the begin has \
           {if session.peerBegun then "" else "not "}arrived")
-    return session
-  | .attach | .detach | .transfer => return session
+    if outbound then return session
+    else
+      -- "When the endpoint receives a «flow» frame from its peer, it MUST update the
+      -- next-incoming-id directly from the next-outgoing-id of the frame, and it MUST
+      -- update the remote-outgoing-window directly from the outgoing-window of the frame"
+      let windows :=
+        session.windows.afterReceivingFlow (fieldNumber "flow" body "next-outgoing-id")
+          (fieldNumber "flow" body "incoming-window")
+          (fieldNumber "flow" body "outgoing-window")
+          ((fieldValue "flow" "next-incoming-id" body).bind valueNat)
+      return { session with windows }
+  | .transfer =>
+    if outbound then do
+      -- the two windows a sent transfer is charged against: ours, which "defines the
+      -- maximum number of outgoing «transfer» frames that the endpoint can currently
+      -- send", and the partner's, which our remote-incoming-window mirrors
+      refuseUnless (session.windows.outgoingWindow > 0)
+        (placed windowViolation "limit" "this session's outgoing window is exhausted, so           it may not send another transfer")
+      refuseUnless (session.windows.remoteIncomingWindow > 0)
+        (placed windowViolation "limit" "the partner's incoming window is exhausted, so           it can accept no further transfers")
+      return { session with
+                 windows := session.windows.afterSendingTransfer startPolicy }
+    else do
+      refuseUnless (session.windows.incomingWindow > 0)
+        (placed windowViolation "limit" "this session's incoming window is exhausted, so           it cannot receive another transfer")
+      -- "the implicit transfer-id of the incoming transfer": the id the partner assigned
+      -- it, which is the one this session expected
+      return { session with
+                 windows := session.windows.afterReceivingTransfer
+                   session.windows.nextIncomingId startPolicy }
+  | .attach | .detach => return session
   | .other =>
     -- a performative the dispatch table gives a session and this slice does not model —
     -- a disposition, whose link is S4's — is carried rather than judged: the session's

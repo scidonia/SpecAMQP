@@ -48,11 +48,6 @@ that the reader's length field feeds back into how many octets it then takes, an
 recovered payload is the writer's payload — under `utf8Of` for the two text families. No
 obstruction is known in any of the three; each is a step of the same kind as R1's, over
 the branch the writer's own success has already selected.
-
-One step is named rather than taken: deriving `lengthPrefixed_ok`'s hypothesis from
-`lengthPrefixed decl payload = .ok out` goes through `Functor.map` on `Except.error`, and
-this closure has no simp lemma reducing that, so the size half carries `filled`'s check as
-a hypothesis and says so.
 -/
 namespace SpecAMQP.Proofs
 
@@ -133,16 +128,28 @@ theorem lengthPrefixed_eq (decl : EncodingDecl) (payload : List UInt8)
 
 /-- **A length field costs the payload's own octets and nothing else.**
 
-The octets `lengthPrefixed_eq` identifies as the writer's are the length field plus the
-payload, so their count is the row's width plus the payload's length: the length field's
-own octets are the whole overhead, and the payload is carried unchanged.
+The writer's octets under a length-prefixed row are the length field plus the payload, so a
+length field's own octets are the whole overhead and the payload is carried unchanged: the
+octets a successful write emits are the row's width plus the payload's length long.
 
-The size half needs nothing else — no hypothesis on the payload's length, because a length
-that `filled` refuses never reaches this list, and the list's size does not depend on the
-check that admitted it. -/
-theorem lengthPrefixed_ok (decl : EncodingDecl) (payload : List UInt8) :
-    (beOctets decl.width payload.length ++ payload).length = decl.width + payload.length := by
-  simp [List.length_append, beOctets_length]
+This *subsumes* the earlier form of this fact, which spoke about the list
+`beOctets decl.width payload.length ++ payload` rather than about the writer's own output:
+that list is what `lengthPrefixed_eq` identifies the output with, so it follows from this at
+`out :=` that list. There is one statement here rather than two for that reason — the
+success form is the claim, and the octets form is what it says about the only octets the
+writer can have produced. -/
+theorem lengthPrefixed_ok (decl : EncodingDecl) (payload : List UInt8) (out : List UInt8)
+    (h : lengthPrefixed decl payload = .ok out) :
+    out.length = decl.width + payload.length := by
+  by_cases hfit : payload.length < 2 ^ (8 * decl.width)
+  · rw [lengthPrefixed_eq decl payload hfit] at h
+    rw [← Except.ok.inj h]
+    simp [List.length_append, beOctets_length]
+  · -- `filled` refuses, so the write is a refusal and cannot be `.ok out`
+    have hbad : filled decl.width payload.length = .error
+        s!"{payload.length} does not fit in {decl.width} big-endian octet(s)" := by
+      simp [filled, hfit]
+    simp [lengthPrefixed, hbad] at h
 
 /-! ## The reader's half of the length agreement -/
 

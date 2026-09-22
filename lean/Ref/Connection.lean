@@ -429,9 +429,35 @@ def symbolList : Value → List String
     items.filterMap (fun i => match i with | .symbol s => some s | _ => none)
   | _ => []
 
-/-- An integer field, taking its declared default where the sender left it unset, and
-refusing a field that is present and is not an integer rather than substituting the
-default for it. -/
+/-- The primitive a declared type resolves to, following a restricted type to its source:
+a field's value must be of the declared type, not merely a number. -/
+def primitiveOfDeclared (typeName : String) : Option String :=
+  let rec follow (name : String) (fuel : Nat) : Option String :=
+    match fuel with
+    | 0 => none
+    | fuel + 1 =>
+      match types.find? (fun t => t.name == name) with
+      | none => none
+      | some declaration =>
+        match declaration.typeClass, declaration.source with
+        | .restricted, some source => follow source fuel
+        | _, _ => some declaration.name
+  follow typeName 8
+
+/-- A value's primitive name, which is the vocabulary the declared types use. -/
+def primitiveName : Value → String
+  | .null => "null" | .boolean _ => "boolean"
+  | .ubyte _ => "ubyte" | .ushort _ => "ushort" | .uint _ => "uint" | .ulong _ => "ulong"
+  | .byte _ => "byte" | .short _ => "short" | .int _ => "int" | .long _ => "long"
+  | .char _ => "char" | .timestamp _ => "timestamp"
+  | .float _ => "float" | .double _ => "double"
+  | .decimal32 _ => "decimal32" | .decimal64 _ => "decimal64" | .decimal128 _ => "decimal128"
+  | .uuid _ => "uuid" | .binary _ => "binary" | .string _ => "string" | .symbol _ => "symbol"
+  | .list _ => "list" | .map _ => "map" | .array _ _ => "array" | .described _ _ => "described"
+
+/-- An integer field, refusing a value whose type is not the declared one — the check that
+stops a `channel-max` declared a `ushort` from being installed when it arrives as a
+`ulong`. -/
 def integerField (typeName fieldName : String) (body : Value) :
     Except Refusal Nat :=
   match valueOfField typeName fieldName body with
@@ -443,7 +469,17 @@ def integerField (typeName fieldName : String) (body : Value) :
         surface gives it no default")
   | some v =>
     match numberOf v with
-    | some n => .ok n
+    | some n =>
+      match primitiveOfDeclared (match declaredField typeName fieldName with
+                                 | some field => field.typeName
+                                 | none => "") with
+      | some declared =>
+        if primitiveName v == declared then .ok n
+        else
+          .error (refuseWith invalidFieldCondition "malformed"
+            s!"{typeName}.{fieldName} is declared a {declared} and this one is a \
+              {primitiveName v}")
+      | none => .ok n
     | none =>
       .error (refuse "malformed" s!"{typeName}.{fieldName} is not an integer, and the \
         artifact declares it one")
@@ -572,8 +608,9 @@ def takeSasl (peer : Peer) (outbound : Bool) (size : Nat) (body : Value) :
     let offered :=
       symbolList ((valueOfField "sasl-mechanisms" "sasl-server-mechanisms" body).getD .null)
     if offered.length == 0 then
-      .error (refuse "malformed" "a sasl-mechanisms frame announces no mechanism, and \
-        the artifact states that the list cannot be null or empty")
+      .error (refuseWith invalidFieldCondition "malformed" "a sasl-mechanisms frame \
+        announces no mechanism, and the artifact states that the list cannot be null or \
+        empty")
     let advanced := { peer with sasl := Sasl.wantsInit, offered := offered, announcedBy := some outbound }
     return advanced
   | .wantsInit =>
@@ -592,10 +629,19 @@ def takeSasl (peer : Peer) (outbound : Bool) (size : Nat) (body : Value) :
         announced: {peer.offered}")
     return { peer with sasl := .wantsOutcome }
   | .wantsOutcome =>
-    if name == "sasl-challenge" || name == "sasl-response" then
-      return peer
+    -- the SASL Exchange picture gives each of these one direction: the server challenges
+    -- and sends the outcome, the client responds
+    let server := peer.announcedBy == some true
+    if name == "sasl-challenge" then
+      if outbound == server then return peer
+      else .error (refuse "illegalState" "the sasl-challenge is the SASL server's to send")
+    if name == "sasl-response" then
+      if outbound != server then return peer
+      else .error (refuse "illegalState" "the sasl-response is the SASL client's to send")
     if name != "sasl-outcome" then
       .error (refuse "illegalState" "the SASL dialogue is waiting for the outcome")
+    if outbound != server then
+      .error (refuse "illegalState" "the sasl-outcome is the SASL server's to send")
     let code := (valueOfField "sasl-outcome" "code" body).bind numberOf
     if code == successCode then
       -- The security layer is established, and the peers MUST exchange protocol headers
