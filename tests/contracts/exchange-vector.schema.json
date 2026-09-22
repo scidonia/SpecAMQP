@@ -20,7 +20,7 @@
    "type": "string"
   },
   "start": {
-   "description": "The state the peer is in before the first step. Names come from the artifact's own tables; a name the specification's state type does not have is a defect in the vector, not in the model.",
+   "description": "The state the peer is in before the first step, layer-prefixed like `state`: `connection:START` for a fresh connection, or the pair the vector begins from.",
    "type": "string"
   },
   "steps": {
@@ -61,7 +61,7 @@
         "type": "string"
        },
        "state": {
-        "description": "The state the peer must be in after the step. Omitted when the step leaves it unchanged.",
+        "description": "The state the peer must be in after the step, prefixed with its layer: `connection:OPENED`, `session:MAPPED`. The prefix is not decoration \u2014 the artifact's tables use the same names for different layers (`DISCARDING` appears in both the connection and session state tables), so an unprefixed name would be ambiguous exactly where ambiguity is most expensive. A step names the one layer it touches: a frame on channel 0 is the connection's, a frame on any other channel the session's.",
         "type": "string"
        },
        "status": {
