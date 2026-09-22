@@ -346,6 +346,7 @@ Directories appear with their first real file, exactly as in TemperMint: no empt
 - **Environment**: this repository gets its own `flake.nix` whose pins are copied verbatim from TemperMint `toolchain/pins.toml` — Aeneas `227f4e7ac70d687a6b1a4871b3304f5a1c6994bf` (`nightly-2026.09.21-227f4e7`), Charon `a5591f6b94c8575a6ba2ae71090614a722f2b011` (LLBC `0.1.263`), Rust `nightly-2026-09-17` with `rustc-dev`/`llvm-tools`/`rust-src`/`miri`, Lean `v4.31.0`, mathlib `v4.31.0`, nixpkgs `b3d51a0365f6695e7dd5cdf3e180604530ed33b4`. Adding our own flake is not "adjusting the toolchain": TemperMint is untouched.
 - **Cross-repository pin consistency**: a contract compares the revision set in `toolchain/pins.toml` against TemperMint's at `../TemperMint/toolchain/pins.toml` and fails on divergence, so the two environments cannot drift silently. This is the only cross-repository coupling, and it is read-only.
 - **Extraction and certificates**: the pinned TemperMint CLI (`check`, `mint`, `replay`, `build`, `bench`, `perf`) is used unmodified, per function, with experiment descriptors, for any unit whose shape fits its current assumptions. Where it does not fit (multi-function extraction, spec binding, corpus binding), the requirement goes to `TOOLING-FIT.md`; we do not fork, patch, or vendor it.
+- **Harness-contract runner**: `.feature` contracts are executed by `scripts/run-contracts.py` in this repository, adopting the runner idiom TemperMint established (a feature file names scenarios at the harness boundary; the runner is invoked per feature file). This is a new file here; TemperMint's copy is not modified.
 - **No new dependencies** beyond the pinned closure without a recorded decision: the generators use the Python standard library (XML parsing included); the Rust core stays dependency-free; the Rust workspace's non-core crates may use an async runtime and TLS only in `amqp-ref`, and only after the S0 spike records the exact crates and versions.
 
 ## 16. Contracts, ownership, and test forms
@@ -435,8 +436,8 @@ shell bash -c 'cd lean && lake build Contracts.CoreRefinement'
 shell bash scripts/check-proof-assumptions.sh
 
 # D1–D4
-shell bash tests/contracts/d2_trace_replay.feature
-shell bash tests/contracts/d4_mutations.feature
+shell python3 scripts/run-contracts.py tests/contracts/d2_trace_replay.feature
+shell python3 scripts/run-contracts.py tests/contracts/d4_mutations.feature
 ```
 
 Each milestone's contract list adds the concrete `lake build Contracts.<Module>` and `cargo test --test <name>` targets for that milestone; the block above is the spine, not the full set.
