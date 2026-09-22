@@ -1,0 +1,27 @@
+{
+ "adopted": "Channel zero is the connection's, and the artifact does not say so",
+ "clauses": [
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections.2",
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections.11"
+ ],
+ "consequences": [
+  "The specification dispatches by channel: a frame on channel zero belongs to the connection layer, a frame on any other channel to the session layer. The connection's own rules are then the ones that apply to a frame carrying, say, `begin` on channel zero — not the session's.",
+  "No vector exercises a session performative on channel zero, and the corpus records why: the artifact's silence means either reading is defensible, and a vector would turn one of them into a requirement nobody can cite.",
+  "The exchange corpus's start states are layer-prefixed for the same reason this ambiguity exists: the two layers have different rules and the artifact reuses the state names, so a name without a layer would be ambiguous in the one place where being wrong is a dispatch error."
+ ],
+ "evidence": "The artifact's frame dispatch table says which *endpoint* handles which performative — `open` and `close` at the connection, `begin`/`attach`/`flow`/`transfer`/`disposition`/`detach`/`end` intercepted at the connection and handled at the session — and it says nothing about channels. The only channel rules the ledger holds are `open`'s: it can only be sent on channel zero (`connections.2`), and a `close` SHOULD go on channel zero and MUST if pipelined (`connections.11`). So the natural reading — connection frames live on channel zero and session frames do not — is a reading, not a clause, and a slice generating a session performative on channel zero would be asserting a requirement the standard never states.",
+ "id": "channel-zero-layering",
+ "open": true,
+ "question": "Is channel zero reserved for connection-level frames, and what happens to a session performative sent there?",
+ "readings": [
+  {
+   "name": "Channel zero is the connection's, and the artifact does not say so",
+   "statement": "Dispatch is by channel: zero is the connection's, anything else the session's. Adopted: it is how the dispatch table is read in practice, it makes the two layers' rules total, and the artifact's only channel rules are `open`'s and `close`'s, both of which this reading satisfies rather than contradicts. The cost is honest and recorded: it is a reading."
+  },
+  {
+   "name": "The dispatch table alone decides, and channel zero carries no meaning",
+   "statement": "A performative's endpoint is fixed by the table and the channel is just its address, so a `begin` on channel zero is a session step at an unusual channel. Defensible on the artifact's text, and rejected because it would leave the session machine reachable at a channel number the connection layer has no way to describe — the specification would acquire a state nobody can reach deliberately."
+  }
+ ],
+ "schema_version": 1
+}
