@@ -64,13 +64,22 @@ performative to be one of those defined, and both artefacts accepted a frame who
 was a described value with a descriptor naming nothing — well-formed octets that name no
 performative. The check now exists in both; this proposition is what makes it a claim
 about every accepted frame rather than a branch somebody wrote, and it is proved in
-`Contracts.FrameCodecAcceptance`. -/
+`Contracts.FrameCodecAcceptance`.
+
+**Stated as a disjunction rather than as a claim about frames that carry a body**, and that
+is the empty-frame clause's doing rather than a weakening: `idle-time-out.7` requires that a
+frame consisting solely of a header, with no body, be handled — it is traffic to defeat an
+idle timeout and, in the clause's own words, "apart from this use, empty frames have no
+meaning". So an accepted frame either has no body, or has one that is a described value
+naming a performative; the claim stays about *every* accepted frame, which is the point of
+stating it here rather than in the decoder. -/
 def AcceptedFramesCarryPerformatives : Prop :=
   ∀ (bytes : Octets) (frame : Frame) (consumed : Nat),
     decodeFrame bytes = .ok (frame, consumed) →
-    ∃ descriptor inner,
-      frame.body = .described descriptor inner ∧
-        carriesPerformative frame.frameType descriptor = true
+    frame.body = none ∨
+      ∃ descriptor inner : Value,
+        frame.body = some (.described descriptor inner) ∧
+          carriesPerformative frame.frameType descriptor = true
 
 /-- A decoded frame reports the octet count its `SIZE` field declares, and that count is
 the prefix of the buffer the frame occupies. Everything downstream depends on it: a frame
