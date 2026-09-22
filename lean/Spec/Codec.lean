@@ -74,6 +74,40 @@ A notation rather than a parameterised `abbrev`, deliberately: instance search d
 not unfold an abbreviation, so `do` blocks over one cannot find `Bind`. -/
 notation "Result" α:max => Except String (α × Cursor)
 
+/-! ## Refusals and the declared limit
+
+A decode refusal's detail leads with its reason class: `truncated`, `unassigned`,
+`unsupported`, `sizeMismatch`, `malformed` or `limit`. The differential contract reads
+that token from the verdict and requires both artefacts to name the same one, so the
+vocabulary is interface rather than prose, and it lives here so that a message cannot
+quietly acquire a class nobody else uses.
+
+`unsupported` is not a claim about the grammar: it is a legal constructor whose form
+this reader does not handle. `unassigned` is the grammar's answer — the octet is below
+every format-code range, one of the escapes held for future formats, or a format code
+the declared surface leaves unassigned. -/
+
+/-- A refusal's detail: the reason class, then the prose. -/
+def refusal (reasonClass prose : String) : String := s!"{reasonClass}: {prose}"
+
+/-- The most array elements this reader materialises.
+
+Part 1 fixes an array as `size`, `count`, one element constructor, then `count`
+elements in that constructor's form, and its table assigns width zero to six legal
+element constructors (`null`, `true`, `false` and the three zero forms of the integers
+and of `list`). Those two rules together admit an encoding that declares billions of
+elements in ten octets, because the count is bounded by the width of the count field
+and by nothing in the data. A specification that models an array as a list of values
+must therefore bound the count or accept an unbounded memory obligation; this one
+bounds it, loudly and by name (`limit`), rather than letting whatever recursion device
+the reader happens to use bound it silently.
+
+The same number is declared by the reference implementation, because a limit that
+differed between the two would make the differential contract compare two different
+specifications. The decision and its rejected alternatives are recorded in
+`ledger/ambiguities/zero-width-array-count.json`. -/
+def arrayElementLimit : Nat := 65536
+
 /-- The specification's value domain: the types Part 1 defines, with the payloads
 this corpus can carry exactly. `float`, `double` and the three decimals keep their
 octets rather than a number, because what the clause fixes for them is the framing,
@@ -174,7 +208,7 @@ def signedOfOctets (width : Nat) (n : Nat) : Int :=
 def utf8Of (bytes : Octets) (kind : String) : Except String String :=
   match String.fromUTF8? (ByteArray.mk bytes) with
   | some text => .ok text
-  | none => .error s!"a {kind} payload of {bytes.size} octet(s) is not valid UTF-8"
+  | none => .error (refusal "malformed" s!"a {kind} payload of {bytes.size} octet(s) is not valid UTF-8")
 
 /-! ## The declared surface, looked up rather than transcribed -/
 
@@ -193,19 +227,24 @@ def declInRange (code : UInt8) (category : Category) (width : Nat) :
     Except String EncodingDecl :=
   match encodingOf code.toNat with
   | none =>
-    .error s!"octet 0x{toHex #[code]} lies in the {categoryName category} range of \
-      width {width} but the declared surface assigns it no encoding"
+    .error (refusal "unassigned" s!"octet 0x{toHex #[code]} lies in the \
+      {categoryName category} range of width {width} but the declared surface assigns \
+      it no encoding")
   | some decl =>
     if decl.category = category then .ok decl
     else
-      .error s!"octet 0x{toHex #[code]} lies in the {categoryName category} range while \
-        the declared surface places it in the {categoryName decl.category} category"
+      .error (refusal "malformed" s!"octet 0x{toHex #[code]} lies in the \
+        {categoryName category} range while the declared surface places it in the \
+        {categoryName decl.category} category, so the table and the constructor \
+        grammar disagree")
 
 /-- The declaration a leading octet selects, by the grammar's classification of it. -/
 def dataDecl (code : UInt8) : Except String EncodingDecl :=
   match classify code.toNat with
-  | .descriptor => .error s!"octet 0x{toHex #[code]} is the descriptor prefix, not an encoding"
-  | .reserved => .error s!"octet 0x{toHex #[code]} is reserved: the constructor grammar gives it no category"
+  | .descriptor =>
+    .error (refusal "unassigned" s!"octet 0x{toHex #[code]} is the descriptor prefix, not an encoding")
+  | .reserved =>
+    .error (refusal "unassigned" s!"octet 0x{toHex #[code]} is reserved: the constructor grammar gives it no category")
   | .fixed width => declInRange code .fixed width
   | .variable width => declInRange code .variable width
   | .compound width => declInRange code .compound width
@@ -221,8 +260,9 @@ def elementDecl? (constructor : UInt8) : Except String (Option EncodingDecl) :=
     match classify constructor.toNat with
     | .descriptor => .ok none
     | .reserved =>
-      .error s!"an array's element constructor 0x{toHex #[constructor]} is reserved: \
-        the constructor grammar gives it no category"
+      .error (refusal "unassigned" s!"an array's element constructor \
+        0x{toHex #[constructor]} is reserved: the constructor grammar gives it no \
+        category")
     | .fixed width => some <$> declInRange constructor .fixed width
     | .variable width => some <$> declInRange constructor .variable width
     | .compound width => some <$> declInRange constructor .compound width
@@ -259,13 +299,13 @@ receiver responsible for. -/
 /-- One octet. -/
 def takeU8 (c : Cursor) : Result UInt8 :=
   if h : c.pos < c.data.size then .ok (c.data[c.pos]'h, ⟨c.data, c.pos + 1⟩)
-  else .error s!"truncated: no octet at offset {c.pos} of {c.data.size}"
+  else .error (refusal "truncated" s!"no octet at offset {c.pos} of {c.data.size}")
 
 /-- Exactly `n` octets. -/
 def takeBytes (n : Nat) (c : Cursor) : Result Octets :=
   if c.pos + n ≤ c.data.size then
     .ok (c.data.extract c.pos (c.pos + n), ⟨c.data, c.pos + n⟩)
-  else .error s!"truncated: {n} octet(s) needed at offset {c.pos} of {c.data.size}"
+  else .error (refusal "truncated" s!"{n} octet(s) needed at offset {c.pos} of {c.data.size}")
 
 /-- A `width`-octet big-endian unsigned field. -/
 def takeBe (width : Nat) (c : Cursor) : Result Nat := do
@@ -285,7 +325,7 @@ def readFixed (decl : EncodingDecl) (c : Cursor) : Result Value := do
       | some "true" => .ok (.boolean true, c)
       | some "false" => .ok (.boolean false, c)
       | other =>
-        .error s!"the declared surface assigns no boolean encoding named {other} at width 0"
+        .error (refusal "unsupported" s!"the declared surface assigns no boolean encoding named {other} at width 0")
     else .ok (.boolean (n != 0), c)
   | "ubyte" => .ok (.ubyte n, c)
   | "ushort" => .ok (.ushort n, c)
@@ -305,8 +345,9 @@ def readFixed (decl : EncodingDecl) (c : Cursor) : Result Value := do
   | "decimal128" => .ok (.decimal128 payload, c)
   | "list" => .ok (.list [], c)
   | owner =>
-    .error s!"the declared surface assigns octet 0x{toHex #[UInt8.ofNat decl.code]} \
-      ({owner}) to a fixed-width form this reader does not know"
+    .error (refusal "unsupported" s!"the declared surface assigns octet \
+      0x{toHex #[UInt8.ofNat decl.code]} ({owner}) to a fixed-width form this reader \
+      does not read")
 
 /-- A variable-width encoding's data: the declared length, then that many octets,
 read as the type the row names. -/
@@ -318,8 +359,9 @@ def readVariable (decl : EncodingDecl) (c : Cursor) : Result Value := do
   | "string" => return (.string (← utf8Of payload "string"), c)
   | "symbol" => return (.symbol (← utf8Of payload "symbol"), c)
   | owner =>
-    .error s!"the declared surface assigns octet 0x{toHex #[UInt8.ofNat decl.code]} \
-      ({owner}) to a variable-width form this reader does not know"
+    .error (refusal "unsupported" s!"the declared surface assigns octet \
+      0x{toHex #[UInt8.ofNat decl.code]} ({owner}) to a variable-width form this reader \
+      does not read")
 
 /-- Items taken two at a time, as a map's pairs. A map with an odd item count is
 refused before this is reached, so an unpaired tail is unreachable. -/
@@ -335,24 +377,24 @@ def readScalarData (decl : EncodingDecl) (c : Cursor) : Result Value :=
   | .fixed => readFixed decl c
   | .variable => readVariable decl c
   | _ =>
-    .error s!"the declared surface calls octet 0x{toHex #[UInt8.ofNat decl.code]} a \
-      {categoryName decl.category} encoding, whose data is not read as a scalar"
+    .error (refusal "unsupported" s!"the declared surface calls octet \
+      0x{toHex #[UInt8.ofNat decl.code]} a {categoryName decl.category} encoding, whose \
+      data is not read as a scalar")
 
 mutual
 
 /-- Read one constructed value: its constructor octet, then the data that octet's
 declaration describes.
 
-`fuel` decreases at every recursive call, including the loops that read a compound's
-items and an array's elements, so no input makes this reader diverge. The entry point
-passes the number of octets it was given: every value and every constructed item
-consumes at least one octet, so a well-formed input is not refused for want of fuel.
-An element constructor that carries no octets at all — `null`, `true`, `false` — is
-the one shape the octet count does not bound, and an array with more of those than
-the fuel allows is refused rather than read to an unbounded length. -/
+`fuel` decreases at every recursive call, so no input makes this reader diverge — but
+it bounds the reader's *nesting*, never a count. Every descent spends octets as it
+spends fuel (a value spends its constructor octet, an array its header), while the
+loops over a compound's items and an array's elements carry their own count, which is
+what makes an array of zero-width elements as long as its declared limit readable out
+of a short buffer. -/
 def readValue (fuel : Nat) (c : Cursor) : Result Value :=
   match fuel with
-  | 0 => .error "the input ends before the value does"
+  | 0 => .error (refusal "truncated" "the input ends before the value does")
   | fuel + 1 => do
     let (code, c) ← takeU8 c
     match classify code.toNat with
@@ -361,7 +403,8 @@ def readValue (fuel : Nat) (c : Cursor) : Result Value :=
       let (value, c) ← readValue fuel c
       return (.described descriptor value, c)
     | .reserved =>
-      .error s!"octet 0x{toHex #[code]} is reserved: the constructor grammar gives it no category"
+      .error (refusal "unassigned" s!"octet 0x{toHex #[code]} is reserved: the \
+        constructor grammar gives it no category")
     | .fixed _ | .variable _ | .compound _ | .array _ => do
       let decl ← dataDecl code
       match decl.category with
@@ -381,52 +424,81 @@ def readCompound (fuel : Nat) (decl : EncodingDecl) (c : Cursor) : Result Value 
     let (items, c) ← readItems fuel count c
     let measured := c.pos - start
     if measured = size then .ok (.list items, c)
-    else .error s!"a list declares {size} octet(s) after its size field and measures {measured}"
+    else .error (refusal "sizeMismatch" s!"a list declares {size} octet(s) after its \
+      size field and measures {measured}")
   | "map" =>
     if count % 2 != 0 then
-      .error s!"a map declares {count} item(s): keys and values come in pairs, so an odd count is not a map"
+      .error (refusal "malformed" s!"a map declares {count} item(s): keys and values \
+        come in pairs, so an odd count is not a map")
     else do
       let (items, c) ← readItems fuel count c
       let measured := c.pos - start
       if measured = size then .ok (.map (pairUp items), c)
-      else .error s!"a map declares {size} octet(s) after its size field and measures {measured}"
+      else .error (refusal "sizeMismatch" s!"a map declares {size} octet(s) after its \
+        size field and measures {measured}")
   | owner =>
-    .error s!"the declared surface assigns octet 0x{toHex #[UInt8.ofNat decl.code]} \
-      ({owner}) to a compound form this reader does not know"
+    .error (refusal "unsupported" s!"the declared surface assigns octet \
+      0x{toHex #[UInt8.ofNat decl.code]} ({owner}) to a compound form this reader does \
+      not read")
 
 /-- An array: `size`, `count`, one element constructor, then the elements' data. The
-size counts the count field, the constructor and the elements. -/
-def readArrayData (fuel : Nat) (decl : EncodingDecl) (c : Cursor) : Result Value := do
-  let (size, c) ← takeBe decl.width c
-  let start := c.pos
-  let (count, c) ← takeBe decl.width c
-  let (constructor, c) ← takeU8 c
-  let elementDecl ← elementDecl? constructor
-  let (items, c) ← readElements fuel elementDecl count c
-  let measured := c.pos - start
-  if measured = size then .ok (.array constructor items, c)
-  else .error s!"an array declares {size} octet(s) after its size field and measures {measured}"
+size counts the count field, the constructor and the elements.
+
+The count is checked against `arrayElementLimit` before an element is read: a
+zero-width element constructor leaves the count bounded by nothing in the data, and a
+reader that discovers that bound by running out of input reports a legal encoding as
+truncated. -/
+def readArrayData (fuel : Nat) (decl : EncodingDecl) (c : Cursor) : Result Value :=
+  match fuel with
+  | 0 => .error (refusal "truncated" "the input ends before the array does")
+  | fuel + 1 => do
+    let (size, c) ← takeBe decl.width c
+    let start := c.pos
+    let (count, c) ← takeBe decl.width c
+    if count > arrayElementLimit then
+      .error (refusal "limit" s!"an array declares {count} element(s): this reader \
+        materialises at most {arrayElementLimit}")
+    else do
+      let (constructor, c) ← takeU8 c
+      let elementDecl ← elementDecl? constructor
+      let (items, c) ← readElements fuel elementDecl count c
+      let measured := c.pos - start
+      if measured = size then .ok (.array constructor items, c)
+      else .error (refusal "sizeMismatch" s!"an array declares {size} octet(s) after \
+        its size field and measures {measured}")
 
 /-- `count` items, each carrying its own constructor. -/
 def readItems (fuel : Nat) (count : Nat) (c : Cursor) : Result (List Value) :=
   match fuel, count with
-  | 0, _ => .error "the input ends before the list's items do"
+  | 0, _ => .error (refusal "truncated" "the input ends before the list's items do")
   | _, 0 => .ok ([], c)
   | fuel + 1, count + 1 => do
     let (item, c) ← readValue fuel c
     let (rest, c) ← readItems fuel count c
     return (item :: rest, c)
 
-/-- `count` array elements, each in the array's declared constructor form. The
-elements share the array's one constructor, so an element is read with the
-declaration that constructor selects — and, under the descriptor prefix, with its own
-descriptor and value. -/
+/-- `count` array elements, each in the array's declared constructor form. One unit of
+fuel is spent for the array's elements as a whole rather than for each of them, and the
+elements themselves are read by a loop that decreases its own count. -/
 def readElements (fuel : Nat) (elementDecl : Option EncodingDecl) (count : Nat) (c : Cursor) :
     Result (List Value) :=
-  match fuel, count with
-  | 0, _ => .error "the input ends before the array's elements do"
-  | _, 0 => .ok ([], c)
-  | fuel + 1, count + 1 => do
+  match fuel with
+  | 0 => .error (refusal "truncated" "the input ends before the array's elements do")
+  | fuel + 1 => readElementsLoop fuel elementDecl count c
+
+/-- The elements themselves, `count` of them, in the array's one declared constructor
+form. The count is what decreases here: an element whose data occupies no octets is
+still an element, so the count is bounded by the array's declared limit rather than by
+the buffer, and every element of the array is read under the same fuel.
+
+What follows an array's constructor is either the row that constructor names — a
+scalar, or a compound or array whose items recurse in the ordinary way — or, under the
+descriptor prefix, the element's own descriptor and value. -/
+def readElementsLoop (fuel : Nat) (elementDecl : Option EncodingDecl) (count : Nat)
+    (c : Cursor) : Result (List Value) :=
+  match count with
+  | 0 => .ok ([], c)
+  | count + 1 => do
     let (item, c) ←
       (match elementDecl with
        | none => (do
@@ -438,7 +510,7 @@ def readElements (fuel : Nat) (elementDecl : Option EncodingDecl) (count : Nat) 
           | .fixed | .variable => readScalarData decl c
           | .compound => readCompound fuel decl c
           | .array => readArrayData fuel decl c : Result Value))
-    let (rest, c) ← readElements fuel elementDecl count c
+    let (rest, c) ← readElementsLoop fuel elementDecl count c
     return (item :: rest, c)
 
 end
@@ -740,11 +812,15 @@ def writeValue : Value → Except String (List UInt8)
     let decl ← rowOf "map" (if body.length + 1 ≤ 255 && count ≤ 255 then 1 else 4)
     return tagOf decl ++ (← compoundOctets decl count body)
   | .array constructor items => do
-    let elementDecl ← elementDecl? constructor
-    let elements ← writeElements items elementDecl constructor
-    let decl ← rowOf "array"
-      (if elements.length + 2 ≤ 255 && items.length ≤ 255 then 1 else 4)
-    return tagOf decl ++ (← arrayOctets decl constructor items.length elements)
+    if items.length > arrayElementLimit then
+      .error (refusal "limit" s!"an array of {items.length} element(s): this writer \
+        materialises at most {arrayElementLimit}")
+    else
+      let elementDecl ← elementDecl? constructor
+      let elements ← writeElements items elementDecl constructor
+      let decl ← rowOf "array"
+        (if elements.length + 2 ≤ 255 && items.length ≤ 255 then 1 else 4)
+      return tagOf decl ++ (← arrayOctets decl constructor items.length elements)
 termination_by value => sizeOf value
 
 /-- Items in order, each carrying its own constructor. -/
@@ -811,9 +887,13 @@ termination_by item _ => sizeOf item
 announce them. -/
 def writeArrayData : Value → EncodingDecl → Except String (List UInt8)
   | .array constructor items, decl => do
-    let elementDecl ← elementDecl? constructor
-    let elements ← writeElements items elementDecl constructor
-    arrayOctets decl constructor items.length elements
+    if items.length > arrayElementLimit then
+      .error (refusal "limit" s!"an array of {items.length} element(s): this writer \
+        materialises at most {arrayElementLimit}")
+    else
+      let elementDecl ← elementDecl? constructor
+      let elements ← writeElements items elementDecl constructor
+      arrayOctets decl constructor items.length elements
   | item, _ => .error s!"an array encoding cannot carry {typeName item}"
 termination_by item _ => sizeOf item
 

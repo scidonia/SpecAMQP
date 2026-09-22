@@ -171,15 +171,32 @@ termination_by pair => sizeOf pair
 
 end
 
+/-- A decode failure as the corpus reports it: its reason class as the leading token,
+then the prose. The differential contract reads that token and requires both artefacts
+to name the same class — `truncated`, `unassigned`, `unsupported`, `sizeMismatch`,
+`malformed`, `limit` — so the vocabulary is interface rather than prose, and two
+artefacts refusing for different reasons are not agreeing. -/
+def refusalText : DecodeError → String
+  | .truncated context => s!"truncated: {context}"
+  | .unassigned octet =>
+    s!"unassigned: octet 0x{toHex #[octet]} is not an encoding the constructor grammar assigns"
+  | .unsupported octet =>
+    s!"unsupported: octet 0x{toHex #[octet]} is a legal constructor this implementation does not read"
+  | .sizeMismatch context declared observed =>
+    s!"sizeMismatch: a {context} declares {declared} octet(s) after its size field and \
+      measures {observed}"
+  | .malformed reason => s!"malformed: {reason}"
+  | .limit context => s!"limit: {context}"
+
 /-- The reference implementation behind the corpus interface. -/
 def refCodec : Codec where
   name := "reference"
   decode := fun bytes =>
     match decode bytes with
     | .ok (value, consumed) => .ok (jsonOfValue value, consumed)
-    | .error e => .error s!"{repr e}"
+    | .error e => .error (refusalText e)
   encode := fun json => do
     let value ← valueOfJson 64 json
-    return encode value
+    encode value
 
 end SpecAMQP.Ref.Vectors

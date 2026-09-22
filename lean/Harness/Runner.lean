@@ -74,12 +74,29 @@ def verdictJson (v : Verdict) : Json :=
   Json.mkObj [("vector", v.vector), ("kind", v.kind), ("status", if v.ok then "pass" else "fail"),
               ("detail", v.detail)]
 
+/-- The octets a vector carries. Read only where a vector's kind requires them: an
+encode vector that expects a refusal carries none, because what it pins is that the
+value cannot be written at all, and its `bytes` would have to be the octets a
+conforming writer must not produce. -/
+def octetsOf (json : Json) : Except String Octets := do
+  return (← ofHex (← json.getObjValAs? String "bytes"))
+
+/-- The reason class a codec message leads with — `truncated`, `unassigned`,
+`unsupported`, `sizeMismatch`, `malformed` or `limit` — or `none` for a message that
+names none of them. The differential contract reads the same token from the verdict,
+so a refusal nobody can name is a failure rather than a detail. -/
+def reasonClassOf (detail : String) : Option String :=
+  let head := (detail.splitOn ":").head?.getD "" |>.trimAscii.toString
+  if ["truncated", "unassigned", "unsupported", "sizeMismatch", "malformed", "limit"].contains head
+  then some head
+  else none
+
 def runVector (codec : Codec) (json : Json) : Except String Verdict := do
   let id ← json.getObjValAs? String "vector"
   let kind ← json.getObjValAs? String "kind"
-  let bytes ← ofHex (← json.getObjValAs? String "bytes")
   match kind with
   | "decode" =>
+    let bytes ← octetsOf json
     let expected ← json.getObjVal? "value"
     let canonical := (json.getObjValAs? Bool "canonical").toOption.getD false
     match codec.decode bytes with
@@ -103,24 +120,49 @@ def runVector (codec : Codec) (json : Json) : Except String Verdict := do
       else
         return ⟨id, kind, true, "decoded"⟩
   | "encode" =>
-    match codec.encode (← json.getObjVal? "value") with
-    | .error e => return ⟨id, kind, false, s!"could not encode: {e}"⟩
-    | .ok produced =>
-      if produced == bytes then
-        return ⟨id, kind, true, "encoded to the expected octets"⟩
-      else
-        return ⟨id, kind, false,
-          s!"encoded to {toHexBrief produced}, expected {toHexBrief bytes}"⟩
+    let value ← json.getObjVal? "value"
+    match json.getObjVal? "expectError" with
+    | .ok expected =>
+      -- An `expectError` on an encode vector means the encoder must refuse this value.
+      -- This is how an encode-direction refusal is expressed, and it matters because a
+      -- writer's domain has to sit inside what its reader accepts: one that emitted
+      -- octets it then refused to read back would be inconsistent with its own reader.
+      -- The refusal's class must be the one the vector pins.
+      let pinned := (expected.getObjValAs? String "reason").toOption
+      match codec.encode value with
+      | .error reason =>
+        if pinned.isNone || reasonClassOf reason == pinned then
+          return ⟨id, kind, true, s!"refused, as the vector expects: {reason}"⟩
+        else
+          return ⟨id, kind, false,
+            s!"refused with {reason}, which does not name {pinned.getD ""}"⟩
+      | .ok produced =>
+        return ⟨id, kind, false, s!"expected a refusal, encoded to {toHexBrief produced}"⟩
+    | .error _ =>
+      let bytes ← octetsOf json
+      match codec.encode value with
+      | .error e => return ⟨id, kind, false, s!"could not encode: {e}"⟩
+      | .ok produced =>
+        if produced == bytes then
+          return ⟨id, kind, true, "encoded to the expected octets"⟩
+        else
+          return ⟨id, kind, false,
+            s!"encoded to {toHexBrief produced}, expected {toHexBrief bytes}"⟩
   | "reject" =>
-    let condition ← (← json.getObjVal? "expectError").getObjValAs? String "condition"
+    -- The codec's own message is the detail, and it leads with its reason class
+    -- (`truncated: …`, `limit: …`): the *implementation's* reason is the observable
+    -- the differential contract compares, and a harness that replaced it with the
+    -- vector's protocol condition would make every refusal look alike.
+    let bytes ← octetsOf json
     match codec.decode bytes with
-    | .error _ => return ⟨id, kind, true, s!"rejected with {condition}"⟩
+    | .error reason => return ⟨id, kind, true, reason⟩
     | .ok (value, _) =>
       return ⟨id, kind, false, s!"expected rejection, decoded {value.compress}"⟩
   | "property" =>
     -- A law rather than an expectation, so the input domain can be closed instead
     -- of sampled: no answer is written down for the bytes, only a constraint on
     -- what may happen to the value they decode to.
+    let bytes ← octetsOf json
     let property ← json.getObjValAs? String "property"
     match property with
     | "decode-stable" =>

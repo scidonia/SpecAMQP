@@ -43,6 +43,11 @@ DESCRIBED_ANCHOR = "amqp-core-types-v1.0-os.xml#picture.2"
 STRING_ANCHOR = "amqp-core-types-v1.0-os.xml#picture.1"
 # Part 1's parity and ordering requirement for maps, as a clause of the ledger.
 MAP_CLAUSE = "amqp:types/section:primitive-type-definitions/type:map.1"
+# Part 1's array encoding clause: size, count, one element constructor, then count
+# elements in that constructor's form. The count is bounded by the count field and by
+# nothing in the data, which is why the zero-width element family is legal even when
+# the element count exceeds the buffer (ledger/ambiguities/zero-width-array-count.json).
+ENCODINGS_CLAUSE = "amqp-core-types-v1.0-os.xml#amqp:types/section:encodings.1"
 
 # ---------------------------------------------------------------- the encoder
 
@@ -326,6 +331,22 @@ def golden() -> list[dict]:
     add("array-null", {"type": "array", "constructor": "40",
                        "items": [{"type": "null"}, {"type": "null"}]}, ARRAY_ANCHOR,
         "an array of nulls, whose elements carry no data at all")
+
+    # Zero-width element constructors: elements that carry no octets of their own, so
+    # the buffer is smaller than the element count. Part 1 bounds the count by the
+    # count field and by nothing in the data, so every one of these is a legal encoding
+    # up to the declared element limit — in whichever form the count's width selects,
+    # eight-bit up to 255 elements and thirty-two-bit beyond — and a reader must
+    # materialise them rather than report truncation.
+    for constructor, element in (("40", {"type": "null"}),
+                                 ("41", {"type": "boolean", "value": True}),
+                                 ("42", {"type": "boolean", "value": False})):
+        for count in (0, 1, 2, 255, 256, 257):
+            add(f"zero-width-{constructor}-{count}",
+                {"type": "array", "constructor": constructor,
+                 "items": [dict(element) for _ in range(count)]},
+                ENCODINGS_CLAUSE,
+                f"{count} zero-width {constructor} element(s) occupying no element data")
     add("list-nested",
         {"type": "list", "items": [
             {"type": "list", "items": [{"type": "uint", "value": 7}]},
@@ -443,6 +464,30 @@ def rejects(golden_vectors: list[dict]) -> list[dict]:
         "expectError": {"condition": "amqp:decode-error", "endpoint": "connection"},
         "note": "a map declaring three items: keys and values must come in pairs, "
                 "so an odd item count is not a map",
+    })
+
+    # The declared element limit on the zero-width family, and its size control. A ten
+    # octet buffer can declare billions of elements, so what bounds an array of them is
+    # the declared limit — named, so that it is never mistaken for truncation — and the
+    # size field is still checked where it lies.
+    vectors.append({
+        "vector": "gen-zero-width-40-over-limit", "kind": "reject",
+        "clauses": [ENCODINGS_CLAUSE],
+        "bytes": (bytes([0xF0]) + be(5, 4) + be(65537, 4) + bytes([0x40])).hex(),
+        "expectError": {"condition": "amqp:decode-error", "endpoint": "connection",
+                        "reason": "limit"},
+        "note": "65537 zero-width elements: refused by the declared element limit, not "
+                "by truncation, because a count is not an octet count",
+    })
+    vectors.append({
+        "vector": "gen-zero-width-40-bad-size", "kind": "reject",
+        "clauses": [ENCODINGS_CLAUSE],
+        "bytes": (bytes([0xE0, 0x03, 0x0A, 0x40])).hex(),
+        "expectError": {"condition": "amqp:decode-error", "endpoint": "connection",
+                        "reason": "sizeMismatch"},
+        "note": "ten zero-width elements with the size field raised by one: the reading "
+                "measures two octets where three are declared, which is a size mismatch "
+                "rather than a limit",
     })
 
     # Every proper prefix of every golden encoding must be rejected as truncated.
