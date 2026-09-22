@@ -194,6 +194,7 @@
    "matches": [
     "0x01",
     "0x02",
+    "SASL Frame",
     "SHOULD"
    ],
    "ref": "amqp-core-security-v1.0-os.xml#picture.5",
@@ -354,8 +355,11 @@
    "content_sha256": "da4e1a2660c63ab5d65421f1be7a2c618e0f9a94cabeb09db2ae57d895f2a5db",
    "excerpt": "Frame Connection Session Link ======================================== open H begin I H attach I H flow I H transfer I H disposition I H detach I H end I H c...",
    "index": 10,
-   "looks_normative": false,
-   "matches": [],
+   "looks_normative": true,
+   "matches": [
+    "Dispatch Table",
+    "handled by the endpoint"
+   ],
    "ref": "amqp-core-transport-v1.0-os.xml#picture.10",
    "title": "Frame Dispatch Table"
   },
@@ -364,8 +368,10 @@
    "content_sha256": "0e1b6a81fb0a2fca0ad3dd8c10a50c1e64c566139c83d7a5b73d0b59e9d12213",
    "excerpt": "4 OCTETS 1 OCTET 1 OCTET 1 OCTET 1 OCTET +----------+---------+---------+---------+----------+ | \"AMQP\" | %d0 | major | minor | revision | +----------+------...",
    "index": 11,
-   "looks_normative": false,
-   "matches": [],
+   "looks_normative": true,
+   "matches": [
+    "Header Layout"
+   ],
    "ref": "amqp-core-transport-v1.0-os.xml#picture.11",
    "title": "Protocol Header Layout"
   },
@@ -396,6 +402,7 @@
    "index": 14,
    "looks_normative": true,
    "matches": [
+    "Frame Layout",
     "OPTIONAL",
     "REQUIRED"
    ],
@@ -407,8 +414,10 @@
    "content_sha256": "9bc27b3eac96c96fd4b012a45580d49b355b1fbd836d8e76509a2b30bc1ecbb9",
    "excerpt": "+0 +1 +2 +3 +-----------------------------------+ -. 0 | SIZE | | +-----------------------------------+ |---> Frame Header 4 | DOFF | TYPE | <TYPE-SPECIFIC> ...",
    "index": 15,
-   "looks_normative": false,
-   "matches": [],
+   "looks_normative": true,
+   "matches": [
+    "Frame Layout"
+   ],
    "ref": "amqp-core-transport-v1.0-os.xml#picture.15",
    "title": "General Frame Layout"
   },
@@ -419,7 +428,8 @@
    "index": 16,
    "looks_normative": true,
    "matches": [
-    "0x00"
+    "0x00",
+    "Frame Layout"
    ],
    "ref": "amqp-core-transport-v1.0-os.xml#picture.16",
    "title": "AMQP Frame Layout"
@@ -489,8 +499,10 @@
    "content_sha256": "714f1c54e6c206b00463bb66299f7d3c7350637c3f12e2b25c4d768281b788ca",
    "excerpt": "R:HDR @=======@ S:HDR R:HDR[!=S:HDR] +--------| START |-----+ +--------------------------------+ | @=======@ | | | \\|/ \\|/ | | @==========@ @==========@ S:OP...",
    "index": 23,
-   "looks_normative": false,
-   "matches": [],
+   "looks_normative": true,
+   "matches": [
+    "State Diagram"
+   ],
    "ref": "amqp-core-transport-v1.0-os.xml#picture.23",
    "title": "Connection State Diagram"
   },
@@ -499,8 +511,13 @@
    "content_sha256": "89f7ebaafe83027e033673a5ae7982a24e08e69a127608d15f02e60a6d4c5c64",
    "excerpt": "State Legal Sends Legal Receives Legal Connection Actions ======================================================================= START HDR HDR HDR_RCVD HDR ...",
    "index": 24,
-   "looks_normative": false,
-   "matches": [],
+   "looks_normative": true,
+   "matches": [
+    "Legal Connection Actions",
+    "Legal Receives",
+    "State Legal",
+    "State Table"
+   ],
    "ref": "amqp-core-transport-v1.0-os.xml#picture.24",
    "title": "Connection State Table"
   },
@@ -829,8 +846,10 @@
    "content_sha256": "707ce749628334e9b0129181b40eac6fc0f83db51d53468936cc291082dd8133",
    "excerpt": "+------------+ S:XFR(M=1,A=0) +------| NOT_SENT |------+ | +------------+ | | | | S:XFR(M=0,A=0) | | | S:XFR(M=1,A=0) | | +----------+ | | | | | \\|/ \\|/ | | ...",
    "index": 57,
-   "looks_normative": false,
-   "matches": [],
+   "looks_normative": true,
+   "matches": [
+    "State Diagram"
+   ],
    "ref": "amqp-core-transport-v1.0-os.xml#picture.57",
    "title": "Outgoing Fragmentation State Diagram"
   },
@@ -839,8 +858,10 @@
    "content_sha256": "7b963ba987b41317029fd4015ec4e3f9e3b7ea9acd7f7e1a09e36f0ea028ce53",
    "excerpt": "+------------+ R:XFR(M=1,A=0) +------| NOT_RCVD |------+ | +------------+ | | | | R:XFR(M=0,A=0) | | | R:XFR(M=1,A=0) | | +----------+ | | | | | \\|/ \\|/ | | ...",
    "index": 58,
-   "looks_normative": false,
-   "matches": [],
+   "looks_normative": true,
+   "matches": [
+    "State Diagram"
+   ],
    "ref": "amqp-core-transport-v1.0-os.xml#picture.58",
    "title": "Incoming Fragmentation State Diagram"
   },

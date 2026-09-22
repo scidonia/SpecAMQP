@@ -652,9 +652,9 @@
   }
  },
  "pictures": {
-  "dispositioned": 16,
+  "dispositioned": 23,
   "note": "Pictures are excluded from clause extraction; those containing formal grammar or normative keywords require a disposition, because an exclusion is a decision.",
-  "reviewable": 16,
+  "reviewable": 23,
   "total": 104
  },
  "schema_version": 1,

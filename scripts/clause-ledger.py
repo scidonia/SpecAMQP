@@ -58,11 +58,26 @@ UNKEYED_PHRASES = re.compile(
 # keywords. Those are surfaced for disposition rather than dropped: excluding a
 # subtree is not the same as having decided it carries nothing.
 # A picture earns review when it states a grammar (`%x`), carries a normative
-# keyword, or shows concrete encoded octets (`0x..`): a worked example is
-# evidence about the wire format, and copying one without checking it is how a
-# documentation defect becomes a specification defect.
+# keyword, shows concrete encoded octets (`0x..`), or is a *table that assigns
+# obligations* — a state machine's legal sends and receives, a dispatch table saying
+# which endpoint handles which performative. That last clause was missing, and it
+# mattered: the Connection State Table, the Frame Dispatch Table and the Protocol
+# Header Layout were all classified as carrying nothing, while being the only
+# normative statement in the artifact for the connection lifecycle. A diagram can be
+# skipped after review; a table that says what a peer may send in each state cannot.
 PICTURE_REVIEW_PATTERN = re.compile(
     r"%x|\bMUST\b|\bSHOULD\b|\bMAY\b|\bREQUIRED\b|\bOPTIONAL\b|0x[0-9A-Fa-f]{1,2}\b|0x[0-9A-Fa-f]{8}:0x[0-9A-Fa-f]{8}"
+    r"|\bLegal (Sends|Receives|Connection Actions)\b|\bState\s+Legal\b|handled by the endpoint"
+)
+
+# Some normative pictures are named by their *title* and say nothing extractable in
+# their text: the protocol header's layout is a row of columns, and the connection
+# state diagram is arrows between state names. Matching the title is blunter than
+# matching the content, and it is here because the alternative was a picture that
+# carried the only statement of the header's layout while being classified as
+# carrying nothing. A title match means "a human decides", which is what review is.
+PICTURE_TITLE_REVIEW_PATTERN = re.compile(
+    r"State (Table|Diagram)|Dispatch Table|Header Layout|Frame Layout|SASL Frame"
 )
 
 # Sections excluded by name: in the artifacts these are section *names*, not
@@ -459,7 +474,9 @@ def collect_pictures(path: Path, artifact: str) -> list[dict]:
     pictures: list[dict] = []
     for index, picture in enumerate(ElementTree.parse(path).getroot().iter("picture"), 1):
         text = " ".join("".join(picture.itertext()).split())
-        matches = sorted(set(PICTURE_REVIEW_PATTERN.findall(text)))
+        title = picture.attrib.get("title", "")
+        matches = sorted({match.group(0) for match in PICTURE_REVIEW_PATTERN.finditer(text)}
+                         | {match.group(0) for match in PICTURE_TITLE_REVIEW_PATTERN.finditer(title)})
         pictures.append(
             {
                 "ref": f"{artifact}#picture.{index}",

@@ -1,5 +1,6 @@
 {
  "conventions": {
+  "deferred:": "A real obligation this plan carries later; the suffix names the milestone. Used for pictures whose content is normative but whose milestone has not run: the picture is reviewed now so that its exclusion or its deferral is a decision, and the disposition moves to a `formalized:` declaration when the milestone lands.",
   "formalized:": "A Lean declaration path that carries this picture's meaning (the same commitment form as for clauses).",
   "informative": "The picture illustrates clauses that are formalized elsewhere, and adds no obligation of its own."
  },
@@ -19,11 +20,25 @@
    "text_sha256": "d0bc5a6c9445c4d1968ad8251fa94c5dae1901a2d4f6102426ec492b2a02703b"
   },
   "amqp-core-security-v1.0-os.xml#picture.5": {
-   "clause_text": "[picture] SASL Frame: type: 0x01 - SASL frame +0 +1 +2 +3 +-----------------------------------+ -. 0 | SIZE | | +-----------------------------------+ |---> Frame Header 4 | DOFF |...",
-   "disposition": "formalized:Spec.Wire.saslFrame",
-   "kind": "picture",
-   "note": "Normative layout: a SASL frame uses the same 8-byte frame header with type 0x01, and its extended header is ignored exactly as for AMQP frames. The frame-type octet is generated from the artifact table, not transcribed.",
+   "clause_text": "type: 0x01 - SASL frame +0 +1 +2 +3 +-----------------------------------+ -. 0 | SIZE | | +-----------------------------------+ |---> Frame Header 4 | DOFF |...",
+   "disposition": "deferred:S7",
+   "kind": "PICTURE",
+   "note": "The SASL Frame: its type code, the octets the channel field occupies and that they carry no meaning, the recommendation that DOFF be two, the size bound and the requirement that the body hold exactly one AMQP type providing `sasl-frame`. The frame shape is already formalized (S2's SASL frame type and the descriptor-role check); what remains is the mechanism negotiation and the layer-transition rules, which are S7's.",
    "text_sha256": "5b772750d45b0cf6dc787dfd3608cfa24d65adfee0f9b9646cc72451c08ffea1"
+  },
+  "amqp-core-transport-v1.0-os.xml#picture.10": {
+   "clause_text": "Frame Connection Session Link ======================================== open H begin I H attach I H flow I H transfer I H disposition I H detach I H end I H c...",
+   "disposition": "deferred:S3",
+   "kind": "PICTURE",
+   "note": "The Frame Dispatch Table: which endpoint handles which performative (open and close at the connection, begin/attach/flow/transfer/disposition/detach/end intercepted at the connection and handled at the session). It is the dispatch dimension of the slice and has no clause behind it.",
+   "text_sha256": "da4e1a2660c63ab5d65421f1be7a2c618e0f9a94cabeb09db2ae57d895f2a5db"
+  },
+  "amqp-core-transport-v1.0-os.xml#picture.11": {
+   "clause_text": "4 OCTETS 1 OCTET 1 OCTET 1 OCTET 1 OCTET +----------+---------+---------+---------+----------+ | \"AMQP\" | %d0 | major | minor | revision | +----------+------...",
+   "disposition": "deferred:S3",
+   "kind": "PICTURE",
+   "note": "The Protocol Header Layout: four octets of \"AMQP\", a protocol id octet, then major, minor and revision. The section states the exchange in prose and the mandated error conditions nowhere, so this layout is the header's definition. S3 formalizes it as the negotiation's first four fields; the version-mismatch condition is an ambiguity recorded in the register.",
+   "text_sha256": "0e1b6a81fb0a2fca0ad3dd8c10a50c1e64c566139c83d7a5b73d0b59e9d12213"
   },
   "amqp-core-transport-v1.0-os.xml#picture.14": {
    "clause_text": "[picture] Frame Layout: REQUIRED OPTIONAL OPTIONAL +--------------+-----------------+------------+ | frame header | extended header | frame body | +--------------+-----------------+...",
@@ -32,12 +47,47 @@
    "note": "Normative layout: the frame header is fixed width while the extended header and frame body are variable; the REQUIRED/OPTIONAL lanes are the same distinction the framing clauses state in prose.",
    "text_sha256": "b8112c6e9cd68e24ab3009b284427b0b058f65b1dd2153e4f7be34140e587a44"
   },
+  "amqp-core-transport-v1.0-os.xml#picture.15": {
+   "clause_text": "+0 +1 +2 +3 +-----------------------------------+ -. 0 | SIZE | | +-----------------------------------+ |---> Frame Header 4 | DOFF | TYPE | <TYPE-SPECIFIC> ...",
+   "disposition": "formalized:Spec.Frame.Frame",
+   "kind": "PICTURE",
+   "note": "The general frame layout: SIZE, DOFF, TYPE, the type-specific remainder of the header, and the extended header and body widths as the differences DOFF and SIZE imply. Formalized by the frame structure plus `bodyStart` and the two proved arithmetic theorems, which is why the extended header's width is a theorem rather than a comment.",
+   "text_sha256": "9bc27b3eac96c96fd4b012a45580d49b355b1fbd836d8e76509a2b30bc1ecbb9"
+  },
   "amqp-core-transport-v1.0-os.xml#picture.16": {
    "clause_text": "[picture] AMQP Frame Layout: type: 0x00 - AMQP frame +0 +1 +2 +3 +-----------------------------------+ -. 0 | SIZE | | +-----------------------------------+ |---> Frame Header 4 | DOFF |...",
    "disposition": "formalized:Spec.Wire.frameLayout",
    "kind": "picture",
    "note": "AMQP frame layout: the fixed 8-byte header with the size, data offset, frame type 0x00 and channel fields, then the body. The frame-type octet comes from the generated table.",
    "text_sha256": "481f0791733d5b9613401a5f7bff90e677db855480f36b53f03ea9a23bb80657"
+  },
+  "amqp-core-transport-v1.0-os.xml#picture.23": {
+   "clause_text": "R:HDR @=======@ S:HDR R:HDR[!=S:HDR] +--------| START |-----+ +--------------------------------+ | @=======@ | | | \\|/ \\|/ | | @==========@ @==========@ S:OP...",
+   "disposition": "deferred:S3",
+   "kind": "PICTURE",
+   "note": "The Connection State Diagram: the same machine as picture.24 drawn as transitions, and its value is the transitions rather than the states \u2014 which is why both are dispositioned rather than one being called a duplicate of the other.",
+   "text_sha256": "714f1c54e6c206b00463bb66299f7d3c7350637c3f12e2b25c4d768281b788ca"
+  },
+  "amqp-core-transport-v1.0-os.xml#picture.24": {
+   "clause_text": "State Legal Sends Legal Receives Legal Connection Actions ======================================================================= START HDR HDR HDR_RCVD HDR ...",
+   "disposition": "deferred:S3",
+   "kind": "PICTURE",
+   "note": "The Connection State Table: fourteen states with the frames each permits and the connection action each implies. It is the only normative statement of the connection lifecycle anywhere in the artifacts \u2014 the section has clauses for individual rules (channel zero, close ordering, idle timeouts) and no clause for the state dimension itself \u2014 so it is not a diagram to be summarised but the machine's source. S3 formalizes it as the state type and its transition relation, and this disposition moves to a `formalized:` path then.",
+   "text_sha256": "89f7ebaafe83027e033673a5ae7982a24e08e69a127608d15f02e60a6d4c5c64"
+  },
+  "amqp-core-transport-v1.0-os.xml#picture.57": {
+   "clause_text": "+------------+ S:XFR(M=1,A=0) +------| NOT_SENT |------+ | +------------+ | | | | S:XFR(M=0,A=0) | | | S:XFR(M=1,A=0) | | +----------+ | | | | | \\|/ \\|/ | | ...",
+   "disposition": "deferred:S4",
+   "kind": "PICTURE",
+   "note": "The outgoing fragmentation state diagram: when a transfer may carry more, and what the sender must do at each point. Fragmentation is S4's scope, and this is its source.",
+   "text_sha256": "707ce749628334e9b0129181b40eac6fc0f83db51d53468936cc291082dd8133"
+  },
+  "amqp-core-transport-v1.0-os.xml#picture.58": {
+   "clause_text": "+------------+ R:XFR(M=1,A=0) +------| NOT_RCVD |------+ | +------------+ | | | | R:XFR(M=0,A=0) | | | R:XFR(M=1,A=0) | | +----------+ | | | | | \\|/ \\|/ | | ...",
+   "disposition": "deferred:S4",
+   "kind": "PICTURE",
+   "note": "The incoming fragmentation state diagram: the receiver's counterpart of picture.57, and the reason both exist \u2014 one side's obligation is not the other's.",
+   "text_sha256": "7b963ba987b41317029fd4015ec4e3f9e3b7ea9acd7f7e1a09e36f0ea028ce53"
   },
   "amqp-core-types-v1.0-os.xml#picture.1": {
    "clause_text": "[picture] Primitive Format Code (String): constructor untyped bytes | | +--+ +-----------------+-----------------+ | | | | ... 0xA1 0x1E \"Hello Glorious Messaging World\" ... | | | | | | | | utf8 byte...",
