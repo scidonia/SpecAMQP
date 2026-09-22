@@ -1,7 +1,7 @@
 import Harness.Runner
 import Spec.Codec
-import Spec.ConnectionCodec
 import Spec.FrameCodec
+import Spec.SessionCodec
 
 /-!
 `amqp-spec` — run the executable specification over a vector corpus.
@@ -15,8 +15,8 @@ outcome. Nothing here touches the network, a clock, or a random source.
 
 open SpecAMQP.Harness
 open SpecAMQP.Spec.Codec
-open SpecAMQP.Spec.ConnectionCodec
 open SpecAMQP.Spec.FrameCodec
+open SpecAMQP.Spec.SessionCodec
 
 def main (args : List String) : IO UInt32 := do
   let quiet := args.contains "--quiet"

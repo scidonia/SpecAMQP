@@ -1,5 +1,5 @@
 import Harness.Runner
-import Ref.ConnectionCodec
+import Ref.SessionCodec
 import Ref.Vectors
 
 /-!
@@ -13,7 +13,7 @@ outcome. Nothing here touches the network, a clock, or a random source.
 -/
 
 open SpecAMQP.Harness
-open SpecAMQP.Ref.ConnectionCodec
+open SpecAMQP.Ref.SessionCodec
 open SpecAMQP.Ref.Vectors
 
 def main (args : List String) : IO UInt32 := do

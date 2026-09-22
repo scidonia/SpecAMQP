@@ -339,9 +339,30 @@ def framingError : String :=
   | some choice => choice.value
   | none => "the connection-error choice declares no framing-error"
 
+/-- The condition for a performative whose *fields* break a rule the declared surface
+states — one the performative must carry and does not, or one whose value the type's own
+documentation constrains: the `amqp-error` family's `invalid-field`, read from the
+generated choice table.
+
+This is the second condition the specification raises, and it is the artifact's own
+symbol rather than an invention: a well-formed described type whose field is wrong is
+exactly what `invalid-field` names, while `framing-error` names the wire-level failures
+the connection's clauses raise. Both layers use it for the same rule, so a
+performative missing a mandatory field does not refuse differently depending on which
+layer read it. -/
+def invalidField : String :=
+  match (errorConditionsOf "amqp-error").find? (fun choice => choice.name == "invalid-field") with
+  | some choice => choice.value
+  | none => "the amqp-error choice declares no invalid-field"
+
 /-- A refusal of a given class, which moves nothing and writes nothing. -/
 def refusal (reasonClass prose : String) : Refusal :=
   ⟨framingError, s!"{reasonClass}: {prose}", none, []⟩
+
+/-- A refusal whose cause is a field's value rather than the wire, carrying the
+artifact's own `invalid-field` condition. -/
+def fieldRefusal (reasonClass prose : String) : Refusal :=
+  ⟨invalidField, s!"{reasonClass}: {prose}", none, []⟩
 
 /-- Refuse unless a condition holds: the guards below are all of this shape, and
 spelling them out keeps each one's diagnostic at the check that raised it. -/
@@ -520,6 +541,26 @@ def symbolsOf : Value → List String
       | _ => none)
   | _ => []
 
+/-- Whether an integer field is set: present and not null. -/
+def fieldSet (typeName fieldName : String) (body : Value) : Bool :=
+  match fieldValue typeName fieldName body with
+  | some .null | none => false
+  | some _ => true
+
+/-- The mandatory fields of a performative that it does not carry.
+
+The rule is the artifact's: a field the declared surface marks `mandatory` is one the
+performative must set, so a performative missing one is not the performative its
+descriptor names. The list comes from the generated field table rather than from
+memory, which is why every layer reads it here instead of writing its own — a field the
+artifact makes mandatory cannot be missed by one layer and caught by another. -/
+def missingMandatory (typeName : String) (body : Value) : List String :=
+  match pathOf typeName with
+  | none => []
+  | some path =>
+    (fieldsOf path).filterMap (fun field =>
+      if field.mandatory && !fieldSet typeName field.name body then some field.name else none)
+
 /-- An integer field of a performative, taking the default the generated field table
 states where the sender left it unset. A field that is present and is not an integer is
 refused rather than read as the default: the artifact declares its type, and silently
@@ -531,13 +572,13 @@ def intField (owner fieldName : String) (body : Value) : Except Refusal Nat :=
     match fieldDefault owner fieldName with
     | some number => .ok number
     | none =>
-      .error (refusal "malformed" s!"the {owner}'s {fieldName} field is unset and the \
+      .error (fieldRefusal "malformed" s!"the {owner}'s {fieldName} field is unset and the \
         declared surface gives it no default")
   | some value =>
     match valueNat value with
     | some number => .ok number
     | none =>
-      .error (refusal "malformed" s!"the {owner}'s {fieldName} field is a \
+      .error (fieldRefusal "malformed" s!"the {owner}'s {fieldName} field is a \
         {SpecAMQP.Spec.Codec.typeName value}, and the artifact declares it an integer")
 
 /-- The limits an `open` declares: the largest frame the sender accepts, and the
@@ -918,6 +959,14 @@ def stepAmqpFrame (endpoint : Endpoint) (outbound : Bool) (channel size : Nat)
   refuseUnless (role != .open || channel == 0)
     (refusal "illegalState" s!"the open frame can only be sent on channel 0, and this \
       one is on channel {channel}")
+  let absent :=
+    match role with
+    | .open => missingMandatory "open" body
+    | .close => missingMandatory "close" body
+    | _ => []
+  refuseUnless absent.isEmpty
+    (fieldRefusal "malformed" s!"the {role.name} performative does not carry {absent}, \
+      and the declared surface marks it mandatory")
   let limits := limitsFor endpoint outbound
   refuseUnless (size ≤ limits.maxFrameSize)
     (refusal "limit" s!"the frame is {size} octets and the largest \

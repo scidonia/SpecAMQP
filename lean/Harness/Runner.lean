@@ -350,29 +350,56 @@ def exchangeStepOf (json : Json) : Except String ExchangeStep := do
     .error "a receive step carries the octets it delivers"
   return ⟨send, bytes, (json.getObjVal? "value").toOption⟩
 
+/-- The layer a state name belongs to: the prefix the schema requires, up to the first
+colon. Two layers reuse state names — `DISCARDING` is in the connection's table and in
+the session's — so the prefix is what keeps a name unambiguous. -/
+def layerOfName (name : String) : String :=
+  (name.splitOn ":").head?.getD ""
+
+/-- The state a layer was last left in, or `none` where that layer has not been named
+yet: an omitted `state` is compared against its own layer's previous name, never against
+the other layer's, which is what makes one exchange able to walk the connection and then
+a session. -/
+def rememberedState? (names : List (String × String)) (layer : String) : Option String :=
+  (names.find? (fun entry => entry.1 == layer)).map (fun entry => entry.2)
+
+/-- Remember a state name under its layer, replacing that layer's previous name. -/
+def rememberState (names : List (String × String)) (name : String) : List (String × String) :=
+  (layerOfName name, name) :: names.filter (fun entry => entry.1 != layerOfName name)
+
 /-- One step's verdict, compared in the corpus vocabulary.
 
 * an `admitted` step requires the peer to take it, to write exactly the octets the
-  vector carries when those are given and the step is a send, and to be in the state
-  the vector names — or, when it names none, the state it was in, since a step that
-  states nothing about the state is a step that leaves it alone;
-* a `refused` step requires the peer to refuse it with the named condition and the
-  named reason class.
+  vector carries when those are given and the step is a send, and to be in the state the
+  vector names — or, when it names none, the state its own layer was last left in, since
+  a step that says nothing about the state is a step that leaves it alone;
+* a `refused` step requires the peer to refuse it with the named condition and the named
+  reason class.
 
-The state is checked for both statuses, because a refusal is a step the connection
-answered: a refused frame is answered with a close, which is a state the corpus can
-pin, and pretending it left the peer where it was would make the state table's
-DISCARDING row unobservable. -/
+The state is checked for both statuses, because a refusal is a step the connection or
+the session answered: a refused frame is answered with a close or an end, which is a
+state the corpus can pin, and pretending it left the peer where it was would make the
+table's DISCARDING rows unobservable. A layer that has never been named and a step that
+names no state is a corpus defect rather than a pass, since there is nothing to compare
+against and silence is not agreement. -/
 def checkExchangeStep (id : String) (index : Nat) (step : ExchangeStep) (expect : Json)
-    (before : String) (outcome : StepOutcome) : Verdict :=
+    (names : List (String × String)) (outcome : StepOutcome) : Verdict :=
   let name := s!"{id}#{index + 1}"
   let wanted := (expect.getObjValAs? String "status").toOption.getD ""
-  let expectedState := (expect.getObjValAs? String "state").toOption.getD before
   let failed (detail : String) : Verdict := ⟨name, "exchange", false, detail⟩
+  let expectedState? :=
+    match (expect.getObjValAs? String "state").toOption with
+    | some named => some named
+    | none => rememberedState? names (layerOfName outcome.state)
   let passed (detail : String) : Verdict :=
-    if outcome.state == expectedState then ⟨name, "exchange", true, detail⟩
-    else failed s!"{detail}, but the peer is in {outcome.state} where the vector names \
-      {expectedState}"
+    match expectedState? with
+    | none =>
+      failed s!"{detail}, and neither the vector nor an earlier step names the \
+        {layerOfName outcome.state} layer's state for it to be compared against"
+    | some expected =>
+      if outcome.state == expected then ⟨name, "exchange", true, detail⟩
+      else failed s!"{detail}, but the peer is in {outcome.state} where the vector names \
+        {expected}"
   if wanted == "admitted" then
     if !outcome.admitted then
       failed s!"the peer refused the step: {outcome.detail}"
@@ -396,7 +423,7 @@ def checkExchangeStep (id : String) (index : Nat) (step : ExchangeStep) (expect 
       let reason := (reasonClassOf outcome.detail).getD ""
       if condition != expectedCondition then
         failed s!"refused with condition {condition}, and the vector names \
-          {expectedCondition}"
+          {expectedCondition}: {outcome.detail}"
       else if reason != expectedReason then
         failed s!"refused as {reason}, and the vector names {expectedReason}: \
           {outcome.detail}"
@@ -408,8 +435,9 @@ def checkExchangeStep (id : String) (index : Nat) (step : ExchangeStep) (expect 
 step.
 
 The peer's state is carried between steps by the codec, so a corpus says "this frame,
-now" rather than restating the machine; the runner's own view of the state is the
-*name* the corpus uses, which is all a comparison needs. -/
+now" rather than restating the machine; the runner's own view of the state is the *name*
+the corpus uses, remembered per layer, which is what lets one exchange walk the
+connection and then a session without the two layers' names colliding. -/
 def runExchange (codec : ExchangeCodec) (json : Json) : Except String (List Verdict) := do
   let id ← json.getObjValAs? String "vector"
   let startName ← json.getObjValAs? String "start"
@@ -417,15 +445,15 @@ def runExchange (codec : ExchangeCodec) (json : Json) : Except String (List Verd
   if steps.size < 2 then
     .error "an exchange is a sequence of steps, not a single one"
   let mut state ← codec.start startName
-  let mut stateName := startName
+  let mut names := rememberState [] startName
   let mut verdicts : List Verdict := []
   for (stepJson, index) in steps.toList.zipIdx do
     let step ← exchangeStepOf stepJson
     let expect ← stepJson.getObjVal? "expect"
     let (outcome, next) ← codec.step state step
-    verdicts := checkExchangeStep id index step expect stateName outcome :: verdicts
+    verdicts := checkExchangeStep id index step expect names outcome :: verdicts
     state := next
-    stateName := outcome.state
+    names := rememberState names outcome.state
   return verdicts.reverse
 
 /-- Run one line: an exchange yields one verdict per step, and every other kind yields
