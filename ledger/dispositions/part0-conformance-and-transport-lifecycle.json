@@ -242,9 +242,9 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions/doc:session-flow-control.4": {
    "clause_text": "This value MUST be decremented after every incoming \u00abtransfer\u00bb frame is received, and recomputed when informed of the remote session endpoint state.",
-   "disposition": "formalized:SpecAMQP.Spec.Session.Windows.afterReceivingTransfer",
+   "disposition": "formalized:SpecAMQP.Spec.Session.Windows.afterReceivingFlow; invariant:SpecAMQP.Contracts.SessionWindows.receiving_flow_adopts_remote_outgoing_window",
    "kind": "MUST",
-   "note": "Computed but never read: remote-outgoing-window is written at lean/Spec/Session.lean:252, :284, :305 and :324 and read nowhere in either artifact, so a dropped decrement would change no verdict and no vector can witness the clause \u2014 the declaration is its only bearer.",
+   "note": "Computed but never read: remote-outgoing-window is written at lean/Spec/Session.lean:252, :284, :305 and :324 and read nowhere in either artifact, so a dropped decrement would change no verdict and no vector can witness the clause \u2014 the declaration is its only bearer. The `formalized:` referent named `afterReceivingTransfer`, which is the received-transfer constructor; the clause is about a received flow, so a reader following the reference reached the wrong site. Corrected here, and the clause now also carries the window contract's law, because nothing reads the quantity and a law is the only bearer left.",
    "text_sha256": "64e06c5a37d96a4b248c9c4888ccf951b1ec9f40c1ee5d60f1f0c3e1ebf566e2"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions/doc:session-flow-control.7": {
@@ -256,9 +256,9 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions/doc:session-flow-control.8": {
    "clause_text": "When the endpoint receives a \u00abflow\u00bb frame from its peer, it MUST update the next-incoming-id directly from the next-outgoing-id of the frame, and it MUST update the remote-outgoing-window directly from the outgoing-window of the frame.",
-   "disposition": "formalized:SpecAMQP.Spec.Session.Windows.afterReceivingFlow; test:exchange-session-receive-in-end-sent",
+   "disposition": "formalized:SpecAMQP.Spec.Session.Windows.afterReceivingFlow; invariant:SpecAMQP.Contracts.SessionWindows.receiving_flow_adopts_remote_outgoing_window; test:exchange-session-receive-in-end-sent",
    "kind": "MUST",
-   "note": "The remote-outgoing-window half is computed but never read by a guard (see doc:session-flow-control.4), so no vector discriminates it; the named vector exercises the flow update through the next-incoming-id half.",
+   "note": "The remote-outgoing-window half is computed but never read by a guard (see doc:session-flow-control.4), so no vector discriminates it; the named vector exercises the flow update through the next-incoming-id half. The computed field and the adopted window are additionally carried by the window contract's laws, cited above, since the artifact's plain subtraction truncates rather than wraps and no vector can discriminate the decrement.",
    "text_sha256": "3e281471aa68b2679565f6fb54692455ea81e108985fae6fc03ac774f67847ae"
   }
  },
