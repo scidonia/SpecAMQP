@@ -91,6 +91,12 @@ Coder-owned: `flake.nix`, `flake.lock`, `scripts/**`, `lean/Proofs/**`,
 - **No `sorry`, no `noncomputable`, no unreviewed trust**: the proof-integrity
   and executability gates are part of acceptance, and `native_decide` requires
   explicit disclosure because it adds trust.
+- **Experiments belong outside the library trees.** A scratch module dropped into
+  `lean/Proofs/` or any other library directory sits inside that library's glob: it is
+  compiled by `lake build`, scanned by the trust gate, and, if committed, shipped as
+  part of the specification. One landed there this session and printed during every
+  build until it was removed. Use `/tmp`, which can still `import` the project's
+  modules.
 - **A build whose result is evidence sets `LAKE_NO_CACHE=1`.** Without it `lake`
   may use mathlib's cache hook and fetch over the network into the provisioned
   workspace, so the build can rest on artifacts that arrived over the wire rather
