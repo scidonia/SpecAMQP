@@ -271,6 +271,11 @@ def wireCondition : String :=
 def refuse (reasonClass text : String) : Refusal :=
   ⟨wireCondition, reasonClass, text, none, []⟩
 
+/-- A refusal under a named condition, for the refusals that are not wire-level failures:
+the condition says which of the artifact's rules the frame broke. -/
+def refuseWith (condition reasonClass text : String) : Refusal :=
+  ⟨condition, reasonClass, text, none, []⟩
+
 /-- The rendered detail: what the corpus and the differential comparison read, class
 first. -/
 def Refusal.detail (refusal : Refusal) : String :=
@@ -343,6 +348,12 @@ def declaredChoice (typeName choiceName : String) : Option String :=
     (choices.find? (fun c => c.ownerPath == path && c.name == choiceName)).map
       (fun c => c.value)
 
+/-- The condition for a performative whose field breaks a rule the declared surface
+states: the `amqp-error` family's `invalid-field`, read from the generated choice table
+rather than typed. -/
+def invalidFieldCondition : String :=
+  (declaredChoice "amqp-error" "invalid-field").getD "no invalid-field in the choice table"
+
 /-- The type a described value carries, by its descriptor. -/
 def bodyType (body : Value) : Option TypeDecl :=
   match body with
@@ -384,6 +395,22 @@ def valueOfField (typeName fieldName : String) (body : Value) : Option Value :=
   match declaredField typeName fieldName with
   | some f => if f.index == 0 then none else (fieldList body)[f.index - 1]?
   | none => none
+
+/-- The mandatory fields of a performative that it does not carry: the rule is the
+artifact's — a field the declared surface marks mandatory is one the performative must
+set — and the list comes from the generated field table rather than from memory, so a
+field the artifact makes mandatory cannot be caught by one layer and missed by another.
+No field is named here. -/
+def missingMandatory (typeName : String) (body : Value) : List String :=
+  match anchorOf typeName with
+  | none => []
+  | some path =>
+    (fieldsOf path).filterMap (fun (field : FieldDecl) =>
+      if !field.mandatory then none
+      else
+        match valueOfField typeName field.name body with
+        | some .null | none => some field.name
+        | some _ => none)
 
 /-- A value's number, whichever integer width carried it. -/
 def numberOf : Value → Option Nat
@@ -639,6 +666,19 @@ def takeFrame (peer : Peer) (outbound : Bool) (channel size : Nat) (body : Value
   if kind == .open && channel != 0 then
     .error (refuse "illegalState" s!"the open frame can only be sent on channel 0, and \
       this one is on channel {channel}")
+  -- The declared surface's mandatory rule, for the two performatives this layer reads
+  -- itself: a performative missing a field the generated table marks mandatory is not
+  -- the performative its descriptor names, and the refusal leaves the peer where it
+  -- stood, because nothing about the frame was accepted.
+  let absent :=
+    match kind with
+    | .open => missingMandatory "open" body
+    | .close => missingMandatory "close" body
+    | _ => []
+  if !absent.isEmpty then
+    .error (refuseWith invalidFieldCondition "malformed"
+      s!"the {kindName kind} performative does not carry {absent}, which the declared \
+        surface marks mandatory")
   let bounds := boundsFor peer outbound
   if size > bounds.frames then
     .error (refuse "limit" s!"{size} octets exceeds the largest frame \
