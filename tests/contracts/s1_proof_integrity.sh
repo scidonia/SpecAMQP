@@ -178,11 +178,17 @@ python3 "$tmp/scan.py" "${scanned_dirs[@]/#/$root/lean/}" >"$tmp/scan.log" 2>&1 
 tail -1 "$tmp/scan.log" | sed 's/^/     /'
 note "no sorry, admit, native_decide, partial, axiom, opaque, unsafe or extern in handwritten modules"
 
-# The accepted theorem's transitive axioms, printed by the kernel.
+# The accepted theorems' transitive axioms, printed by the kernel. Every proved theorem
+# the specification claims is inventoried here, not only the first: a theorem proved from
+# nothing but the library and another proved through an axiom nobody looked at are
+# different claims, and the difference is only visible if each is asked.
 cat >"$tmp/Axioms.lean" <<'AXIOMS'
+import Contracts.FrameCodec
 import Contracts.TypeSystem
 
 #print axioms SpecAMQP.Contracts.constructor_grammar_public
+#print axioms SpecAMQP.Contracts.extended_header_width
+#print axioms SpecAMQP.Contracts.body_starts_after_the_header
 AXIOMS
 ( cd "$root/lean" && LAKE_NO_CACHE=1 lake env lean "$tmp/Axioms.lean" ) >"$tmp/axioms.log" 2>&1 ||
   die "could not print the accepted theorem's axioms: $(tail -3 "$tmp/axioms.log")"
@@ -190,8 +196,12 @@ grep -q "sorryAx" "$tmp/axioms.log" &&
   { cat "$tmp/axioms.log"; die "the accepted theorem depends on sorryAx"; }
 grep -q "ofReduceBool" "$tmp/axioms.log" &&
   { cat "$tmp/axioms.log"; die "the accepted theorem depends on native_decide's ofReduceBool"; }
-printf '     axioms of %s: %s\n' "$accepted_theorem" \
-  "$(tr -d '\n' <"$tmp/axioms.log" | sed 's/  */ /g')"
-note "accepted theorem's axiom inventory contains no sorryAx and no ofReduceBool"
+grep -q "sorryAx" "$tmp/scan.log" && die "an accepted theorem is missing from the inventory"
+sed 's/^/     /' "$tmp/axioms.log" | grep "depends on axioms" | sed 's/^     //'
+for theorem in "$accepted_theorem" extended_header_width body_starts_after_the_header; do
+  grep -q "$theorem' depends on axioms" "$tmp/axioms.log" ||
+    die "$theorem was not inventoried — the inventory names a theorem the kernel did not print"
+done
+note "every accepted theorem's axiom inventory contains no sorryAx and no ofReduceBool"
 
 printf 's1_proof_integrity: PASS\n'
