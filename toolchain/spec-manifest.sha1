@@ -13,13 +13,14 @@ f5eabce0d6dcbec66bdaf79152a0b5a0e171c12d  lean/Contracts/Codec.lean
 ac372f4848586250e81968f3ead62410d598b57c  lean/Contracts/FrameCodec.lean
 a17f9194a7f52f841e936457cac7b7d9f0c0ed95  lean/Contracts/FrameCodecAcceptance.lean
 4451890c1389bf43a3ddf0e9b6ba17a34622c730  lean/Contracts/SessionCredit.lean
+a67c2b5be23a15b617bebef2fb595a10bb5357ca  lean/Contracts/SessionWindows.lean
 c5ee92929caed5a244bae9a85cea9d0af5e7749a  lean/Contracts/TypeSystem.lean
 0f123312d720c0282d52ceb90467270f289dc6ed  vectors/frames-negative.ndjson
 860b8160aeeff3a1c8033f86292924a99e797a9c  vectors/frames.ndjson
 391b38df5791d014e69a8955cb3949f68b125d50  vectors/generated-exchanges.ndjson
 d6ce3953f0a2ffecd4c947bd66c7d4799b3b5339  vectors/generated-frames.ndjson
 b22dd480096d2126ee8d6b764e03fc0540521cdb  vectors/generated.ndjson
-625e072165535fece8b1be9326c3f6ab5cf7e33c  vectors/isolation.md
+bf183431b74dea3c732ca5210f6ab0297d2029e2  vectors/isolation.md
 8a0698b69a00e858aefea2249a89ec7c20c1aed5  vectors/messages.ndjson
 4edac54f39746f6464d5b2711111720c5b658b5e  vectors/primitives.ndjson
 f2cb29da8b2443e29211ed71c267ce7458783104  vectors/slice.ndjson
@@ -38,7 +39,7 @@ c661a0341ee5572bd716861459bcfbedbae36a7f  ledger/ambiguities/unmapped-begin.json
 003cbf78615e5a2c39ff63ce21b19ef4ab0b6b68  ledger/ambiguities/zero-width-array-count.json
 3278574dbfa9a7e719200d86c14018d632e7b40e  ledger/clauses.json
 fa7f306cfca6e55b6b82dfdb0ac43c3af7defcf5  ledger/coverage.json
-71e244807f0248304751c62f9757a31d922fa204  ledger/dispositions/part0-conformance-and-transport-lifecycle.json
+8ca799e5f896eb9d74bf23cde7ebc9c46644698a  ledger/dispositions/part0-conformance-and-transport-lifecycle.json
 b9adec25fda0261806d98c5ab248e8ea25beb310  ledger/dispositions/part1-types.json
 7bc3f5ef2558a4807162b02463c900c798e3d1ac  ledger/dispositions/part2-connection-establishment.json
 360149c9ca009a25aa8976b63ecf81e9a6137eca  ledger/dispositions/picture-review.json

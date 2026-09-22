@@ -5,30 +5,63 @@ R's reason**. Where that cannot be arranged the vector is not evidence for R at 
 conformance evidence*, which is a label rather than a claim, and the difference is what stops a corpus
 that passes from being read as a corpus that proves.
 
-62 hand-authored negative vectors are classified below (5 isolated —
-3 of them witnessed by an experiment, 2 reasoned from their
-construction but not yet witnessed; 57 broad, 1 of those broad **and** witnessed).
-The generated value corpus carries further vectors that are broad absent an experiment per encoding rule,
-and they are not listed: the label would be uniform and therefore uninformative.
+65 hand-authored negative vectors are classified below: 8 isolated, **6 of them
+witnessed by a disabling experiment actually run**, 2 reasoned from construction with no
+experiment run. 57 are broad, 1 of those broad **and** witnessed. The generated value
+corpus's negatives are not listed: the label would be uniform and therefore uninformative.
 
-**The two witnessed-broad rows are the ones worth keeping.** `exchange-link-handle-out-of-range` and
-`exchange-session-transfer-one-data-section` each name a rule, and each stays green when that rule is
-disabled — the first because a value of 5 is refused by the true bound and the widened one alike, the
-second because the role rule answers first with a different condition. They are not corpus defects; they
-are proofs of the label, each a vector that no mutation of its named rule can kill.
+## The witnesses, and what they cost
 
-**Limit, stated rather than implied.** The rule column for entries under `generated-exchanges.ndjson`
-carries the file-level rule (`picture.24`) rather than a per-vector one, because the classification is a
-claim about evidence and no experiment has been run for those vectors; per-vector precision is owed before
-any of their experiments are run, and the three groups named as first candidates — the header/version
-rules, the sizing and channel limits in `exchange-pipelined-*`, and
-`exchange-link-credit-counts-messages-not-frames` — are each a rule another rule in the same layer can
+* **`exchange-link-handle-in-use`** — the attach guard removed (`Spec/Session.lean:621-624`, the answer to
+  an attach on an already-associated handle) failed **exactly one step** in the whole corpus,
+  `exchange-link-handle-in-use#4`, out of 278 step verdicts in one corpus run and 29 in the other, the
+  reference untouched. That is what rule-isolated evidence looks like: one rule, one failure.
+* **`exchange-link-credit-granted-and-spent`** and **`exchange-link-credit-counts-messages-not-frames`** —
+  removing the spend failed both, where the plan records **three** failures for this experiment. The
+  difference is not a disagreement: the plan measured the layer *before the fourth defect was fixed*,
+  where a delivery whose single transfer left `more` unset never incremented the delivery-count, so a
+  second delivery was admitted free and its vector failed too. Reported before the table was touched.
+* **`exchange-session-channel-above-the-declared-bound`** — widening the channel bound by one stopped that
+  vector alone from failing, and its revert restored it.
+* **`exchange-session-refusal-in-end-sent-discards`** — the isolating vector the layer work wrote, which
+  failed on its first run until the second placement site was widened.
+* **`exchange-session-window-spent-by-sent-transfers`** and **`exchange-link-handle-at-bound-plus-one`** —
+  isolated by construction, no experiment run against them yet, and labelled as reasoning rather than
+  witnessed.
+
+## The two witnessed-broad rows are the ones worth keeping
+
+`exchange-link-handle-out-of-range` and `exchange-session-transfer-one-data-section` each name a rule, and
+each stays green when that rule is disabled — the first because a value of 5 is refused by the true bound
+and the widened one alike, the second because the role rule answers first with a different condition. They
+are not corpus defects; they are proofs of the label, each a vector that no mutation of its named rule can
+kill.
+
+## One trap the experiments hit, recorded because it has now cost three runs
+
+A plant that does not typecheck leaves the previously built binary in place, and the corpus runs behind it
+print `0 failures` — which reads exactly like a mutant that changed nothing, and is really a mutant that
+never ran. One of the two credit plants failed this way (`credit := current.credit` left the `if` unused
+and the codec failed to build) and the run was discarded rather than counted, then re-planted in a
+well-typed form. The build is shown every time for this reason.
+
+## Limit, stated rather than implied
+
+The rule column for entries under `generated-exchanges.ndjson` carries the file-level rule rather than a
+per-vector one, because the classification is a claim about evidence and no experiment has been run for
+those vectors; per-vector precision is owed before their experiments are run, and the three groups named as
+first candidates — the header/version rules, the sizing and channel limits in `exchange-pipelined-*`, and
+`exchange-link-credit-counts-messages-not-frames` — each cite a rule another rule in the same layer can
 plausibly answer first, which is the failure mode this classification exists to expose.
 
-Drafted by the vector slice; reviewed, applied and committed by the planner as `vectors/**` requires.
+Drafted by the vector slice, whose experiments these are; reviewed, applied and committed by the planner as
+`vectors/**` requires.
 
 | file | vector | rule cited | classification | the disabling experiment |
 |---|---|---|---|---|
+| `generated-exchanges` | `exchange-link-handle-in-use` | `attach/field:handle.2` | **isolated (witnessed, re-run tonight)** | removing the guard at `Spec/Session.lean:621-624` failed **exactly this vector's step 4** and nothing else — across 278 step verdicts in `generated-exchanges.ndjson` and 29 in `slice.ndjson`, with the reference green throughout. The plan's record and the re-run agree. |
+| `generated-exchanges` | `exchange-link-credit-granted-and-spent` | the credit arithmetic (`Position.creditFor`; the spend at `Spec/Session.lean:809`) | **isolated (witnessed, re-run tonight)** | removing the credit spend failed **this vector's step 5** and one other, `exchange-link-credit-counts-messages-not-frames#7`. The plan records three failures for this experiment — the two continuation steps plus step 5. **The difference is a finding, not an error on either side**: the plan measured the pre-fix layer, where a delivery whose single transfer leaves `more` unset never incremented the delivery-count, so a second delivery was admitted free; that defect has since been fixed, and its extra failure is gone. |
+| `generated-exchanges` | `exchange-link-credit-counts-messages-not-frames` | the same | **isolated (witnessed, re-run tonight)** | the same experiment; its step 7 is the second of the two failures. |
 | generated-exchanges.ndjson | `exchange-header-protocol-id-unsupported` | picture.24 | **broad** | no disabling experiment run; the label records absence of evidence rather than intent |
 | generated-exchanges.ndjson | `exchange-header-protocol-id-unassigned` | picture.24 | **broad** | no disabling experiment run; the label records absence of evidence rather than intent |
 | generated-exchanges.ndjson | `exchange-header-version-unsupported` | picture.24 | **broad** | no disabling experiment run; the label records absence of evidence rather than intent |
@@ -63,7 +96,7 @@ Drafted by the vector slice; reviewed, applied and committed by the planner as `
 | generated-exchanges.ndjson | `exchange-session-window-incoming-exhausted` | amqp:transport/section:sessions/doc:session-flow-control.5 | **broad** | no disabling experiment run; the label records absence of evidence rather than intent |
 | generated-exchanges.ndjson | `exchange-connection-discarding-discards-session-frames` | picture.10 | **broad** | no disabling experiment run; the label records absence of evidence rather than intent |
 | generated-exchanges.ndjson | `exchange-link-handle-in-use` | amqp:transport/section:link-handles | **broad** | no disabling experiment run; the label records absence of evidence rather than intent |
-| generated-exchanges.ndjson | `exchange-link-handle-out-of-range` | amqp:transport/section:link-handles | **broad (witnessed)** | the same mutant that killed the bound + 1 vector left this one green: 5 is refused by the true bound and the widened one alike |
+| generated-exchanges.ndjson | `exchange-link-handle-out-of-range` | amqp:transport/section:link-handles | **broad** | the same mutant that killed the bound + 1 vector left this one green: 5 is refused by the true bound and the widened one alike |
 | generated-exchanges.ndjson | `exchange-link-credit-granted-and-spent` | amqp:transport/section:flow-control | **isolated (witnessed)** | reverting the credit accounting failed this vector's step 5 as well as its predicted two, per the plan's record |
 | generated-exchanges.ndjson | `exchange-link-sender-settle-mode-unmet` | amqp:transport/section:link-handles | **broad** | no disabling experiment run; the label records absence of evidence rather than intent |
 | generated-exchanges.ndjson | `exchange-link-first-transfer-needs-its-fields` | amqp:transport/section:link-handles | **broad** | no disabling experiment run; the label records absence of evidence rather than intent |
