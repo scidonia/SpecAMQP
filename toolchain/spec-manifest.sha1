@@ -19,6 +19,7 @@ c5ee92929caed5a244bae9a85cea9d0af5e7749a  lean/Contracts/TypeSystem.lean
 391b38df5791d014e69a8955cb3949f68b125d50  vectors/generated-exchanges.ndjson
 d6ce3953f0a2ffecd4c947bd66c7d4799b3b5339  vectors/generated-frames.ndjson
 b22dd480096d2126ee8d6b764e03fc0540521cdb  vectors/generated.ndjson
+5251c4b8efeddc1e333e2543e935a15a71115e2c  vectors/isolation.md
 8a0698b69a00e858aefea2249a89ec7c20c1aed5  vectors/messages.ndjson
 4edac54f39746f6464d5b2711111720c5b658b5e  vectors/primitives.ndjson
 f2cb29da8b2443e29211ed71c267ce7458783104  vectors/slice.ndjson
