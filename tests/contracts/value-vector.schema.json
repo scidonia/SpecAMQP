@@ -1,119 +1,295 @@
 {
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://specamqp.invalid/contracts/value-vector.schema.json",
-  "title": "AMQP 1.0 type-system vector",
-  "description": "One NDJSON line of a type-system vector, run by `lake exe amqp-ref`. Vectors are authored from OASIS clauses and the artifacts' worked examples, never produced by running the implementation or the specification: a corpus generated from the thing under test proves only that it equals itself. The value vocabulary below is the corpus's own, independent of either implementation's internal types, so agreement is about the wire format rather than about a shared representation.",
-  "type": "object",
-  "required": ["vector", "kind", "clauses", "bytes"],
-  "additionalProperties": false,
-  "properties": {
-    "vector": {
-      "type": "string",
-      "pattern": "^[a-z0-9][a-z0-9._-]*$",
-      "description": "Stable identifier, unique within the corpus and quoted in verdict reports."
+ "$defs": {
+  "value": {
+   "description": "The corpus's value vocabulary. Integers are given as JSON numbers with their width named by `type`, so a vector cannot be ambiguous about which encoding width it means. Float, double and the three decimals carry their payload as raw hex rather than as a number: what the specification fixes is the framing of those encodings, and a JSON number would lose the exact octets a vector exists to pin down.",
+   "properties": {
+    "codepoint": {
+     "description": "The code point for char, encoded as UTF-32BE.",
+     "maximum": 1114111,
+     "minimum": 0,
+     "type": "integer"
     },
-    "kind": {
-      "enum": ["decode", "encode", "reject", "property"],
-      "description": "decode: the octets must decode to `value`, consuming all of them. encode: `value` must encode to exactly `bytes`. reject: the octets must fail to decode with the named condition. property: a law that needs no expected answer, so an exhaustive input domain can be swept instead of sampled."
+    "constructor": {
+     "description": "The element constructor octet for array, which the wire format requires and which a reader must honour.",
+     "pattern": "^[0-9a-f]{2}$",
+     "type": "string"
     },
-    "clauses": {
-      "type": "array",
-      "minItems": 1,
-      "items": { "type": "string" },
-      "description": "Clause or figure ids this vector tests, as they appear in the ledger (`ledger/clauses.json`) or the picture register (`ledger/pictures.json`). A vector citing nothing cannot be reviewed, and one citing a figure that does not exist cannot be trusted.",
-      "examples": [["amqp-core-types-v1.0-os.xml#picture.1"]]
+    "descriptor": {
+     "$ref": "#/$defs/value"
     },
-    "bytes": {
-      "type": "string",
-      "pattern": "^([0-9a-f]{2})+$",
-      "description": "Lowercase hex, no separators. For decode and reject this is the input; for encode it is the required output."
+    "hex": {
+     "description": "The payload for binary.",
+     "pattern": "^([0-9a-f]{2})*$",
+     "type": "string"
+    },
+    "items": {
+     "description": "The elements for list and array.",
+     "items": {
+      "$ref": "#/$defs/value"
+     },
+     "type": "array"
+    },
+    "milliseconds": {
+     "description": "Milliseconds since the Unix epoch for timestamp.",
+     "type": "integer"
+    },
+    "pairs": {
+     "description": "Key-value pairs for map, in wire order. Part 1 requires maps to be treated as ordered unless known to be otherwise, so order is significant and a reader that reorders a map it does not interpret changes the value.",
+     "items": {
+      "items": {
+       "$ref": "#/$defs/value"
+      },
+      "maxItems": 2,
+      "minItems": 2,
+      "type": "array"
+     },
+     "type": "array"
+    },
+    "text": {
+     "description": "The payload for string and symbol.",
+     "type": "string"
+    },
+    "type": {
+     "enum": [
+      "null",
+      "boolean",
+      "ubyte",
+      "ushort",
+      "uint",
+      "ulong",
+      "byte",
+      "short",
+      "int",
+      "long",
+      "string",
+      "symbol",
+      "binary",
+      "list",
+      "array",
+      "described",
+      "float",
+      "double",
+      "decimal32",
+      "decimal64",
+      "decimal128",
+      "char",
+      "timestamp",
+      "uuid",
+      "map"
+     ]
     },
     "value": {
-      "$ref": "#/$defs/value",
-      "description": "Required for kind=decode and kind=encode."
-    },
-    "canonical": {
-      "type": "boolean",
-      "description": "kind=decode only: when true, the decoded value must re-encode to exactly `bytes`. Used where the encoding is the narrowest form, so the vector checks specificity as well as round-tripping."
-    },
-    "expectError": {
-      "type": "object",
-      "description": "Required for kind=reject.",
-      "required": ["condition", "endpoint"],
-      "additionalProperties": false,
-      "properties": {
-        "condition": {
-          "type": "string",
-          "pattern": "^amqp:",
-          "description": "The mandated error condition. A malformed encoding is amqp:decode-error; a mandated close for protocol reasons names its own condition."
-        },
-        "endpoint": { "enum": ["connection", "session", "link"] }
+     "anyOf": [
+      {
+       "type": "boolean"
+      },
+      {
+       "type": "integer"
+      },
+      {
+       "$ref": "#/$defs/value"
       }
-    },
-    "note": {
-      "type": "string",
-      "description": "Why this vector exists, usually the artifact text it was read from, or the decision it tests."
-    },
-    "property": {
-      "enum": ["decode-stable"],
-      "description": "kind=property only. decode-stable: if the octets decode to a value, encoding that value must decode to the same value. Inputs that fail to decode make no claim, which is what makes an exhaustive sweep possible without an oracle."
+     ],
+     "description": "The payload: a boolean or integer for the scalar types, or a nested value for a described value."
     }
-  },
-  "allOf": [
-    {
-      "if": { "properties": { "kind": { "enum": ["decode", "encode"] } }, "required": ["kind"] },
-      "then": { "required": ["value"] }
-    },
-    {
-      "if": { "properties": { "kind": { "const": "reject" } }, "required": ["kind"] },
-      "then": { "required": ["expectError"] }
-    },
-    {
-      "if": { "properties": { "kind": { "const": "reject" } }, "required": ["kind"] },
-      "then": { "not": { "required": ["canonical"] } }
-    },
-    {
-      "if": { "properties": { "kind": { "const": "property" } }, "required": ["kind"] },
-      "then": { "required": ["property"] }
-    },
-    {
-      "if": { "properties": { "kind": { "const": "property" } }, "required": ["kind"] },
-      "then": { "not": { "required": ["value"] } }
-    }
-  ],
-  "$defs": {
-    "value": {
-      "type": "object",
-      "required": ["type"],
-      "description": "The corpus's value vocabulary. Integers are given as JSON numbers with their width named by `type`, so a vector cannot be ambiguous about which encoding width it means. Float, double and the three decimals carry their payload as raw hex rather than as a number: what the specification fixes is the framing of those encodings, and a JSON number would lose the exact octets a vector exists to pin down.",
-      "properties": {
-        "type": {
-          "enum": ["null", "boolean", "ubyte", "ushort", "uint", "ulong", "byte", "short",
-                   "int", "long", "string", "symbol", "binary", "list", "array", "described",
-                   "float", "double", "decimal32", "decimal64", "decimal128", "char",
-                   "timestamp", "uuid", "map"]
-        },
-        "value": {
-          "description": "The payload: a boolean or integer for the scalar types, or a nested value for a described value.",
-          "anyOf": [
-            { "type": "boolean" },
-            { "type": "integer" },
-            { "$ref": "#/$defs/value" }
-          ]
-        },
-        "text": { "type": "string", "description": "The payload for string and symbol." },
-        "hex": { "type": "string", "pattern": "^([0-9a-f]{2})*$", "description": "The payload for binary." },
-        "items": { "type": "array", "items": { "$ref": "#/$defs/value" }, "description": "The elements for list and array." },
-        "constructor": { "type": "string", "pattern": "^[0-9a-f]{2}$", "description": "The element constructor octet for array, which the wire format requires and which a reader must honour." },
-        "descriptor": { "$ref": "#/$defs/value" },
-        "codepoint": { "type": "integer", "minimum": 0, "maximum": 1114111, "description": "The code point for char, encoded as UTF-32BE." },
-        "milliseconds": { "type": "integer", "description": "Milliseconds since the Unix epoch for timestamp." },
-        "pairs": {
-          "type": "array",
-          "description": "Key-value pairs for map, in wire order. Part 1 requires maps to be treated as ordered unless known to be otherwise, so order is significant and a reader that reorders a map it does not interpret changes the value.",
-          "items": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "$ref": "#/$defs/value" } }
-        }
-      }
-    }
+   },
+   "required": [
+    "type"
+   ],
+   "type": "object"
   }
+ },
+ "$id": "https://specamqp.invalid/contracts/value-vector.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "additionalProperties": false,
+ "allOf": [
+  {
+   "if": {
+    "properties": {
+     "kind": {
+      "enum": [
+       "decode",
+       "encode"
+      ]
+     }
+    },
+    "required": [
+     "kind"
+    ]
+   },
+   "then": {
+    "required": [
+     "value"
+    ]
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "kind": {
+      "const": "reject"
+     }
+    },
+    "required": [
+     "kind"
+    ]
+   },
+   "then": {
+    "required": [
+     "expectError"
+    ]
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "kind": {
+      "const": "reject"
+     }
+    },
+    "required": [
+     "kind"
+    ]
+   },
+   "then": {
+    "not": {
+     "required": [
+      "canonical"
+     ]
+    }
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "kind": {
+      "const": "property"
+     }
+    },
+    "required": [
+     "kind"
+    ]
+   },
+   "then": {
+    "required": [
+     "property"
+    ]
+   }
+  },
+  {
+   "if": {
+    "properties": {
+     "kind": {
+      "const": "property"
+     }
+    },
+    "required": [
+     "kind"
+    ]
+   },
+   "then": {
+    "not": {
+     "required": [
+      "value"
+     ]
+    }
+   }
+  }
+ ],
+ "description": "One NDJSON line of a type-system vector, run by `lake exe amqp-ref`. Vectors are authored from OASIS clauses and the artifacts' worked examples, never produced by running the implementation or the specification: a corpus generated from the thing under test proves only that it equals itself. The value vocabulary below is the corpus's own, independent of either implementation's internal types, so agreement is about the wire format rather than about a shared representation.",
+ "properties": {
+  "bytes": {
+   "description": "Lowercase hex, no separators. For decode and reject this is the input; for encode it is the required output.",
+   "pattern": "^([0-9a-f]{2})+$",
+   "type": "string"
+  },
+  "canonical": {
+   "description": "kind=decode only: when true, the decoded value must re-encode to exactly `bytes`. Used where the encoding is the narrowest form, so the vector checks specificity as well as round-tripping.",
+   "type": "boolean"
+  },
+  "clauses": {
+   "description": "Clause or figure ids this vector tests, as they appear in the ledger (`ledger/clauses.json`) or the picture register (`ledger/pictures.json`). A vector citing nothing cannot be reviewed, and one citing a figure that does not exist cannot be trusted.",
+   "examples": [
+    [
+     "amqp-core-types-v1.0-os.xml#picture.1"
+    ]
+   ],
+   "items": {
+    "type": "string"
+   },
+   "minItems": 1,
+   "type": "array"
+  },
+  "expectError": {
+   "additionalProperties": false,
+   "description": "Required for kind=reject. `condition` is the protocol-level consequence; `reason` optionally pins the implementation's named reason class.",
+   "properties": {
+    "condition": {
+     "description": "The mandated error condition. A malformed encoding is amqp:decode-error; a mandated close for protocol reasons names its own condition.",
+     "pattern": "^amqp:",
+     "type": "string"
+    },
+    "endpoint": {
+     "enum": [
+      "connection",
+      "session",
+      "link"
+     ]
+    },
+    "reason": {
+     "description": "The named reason class the artefact must report, as the leading token of its detail (`<class>: <prose>`). Optional: a rejection whose reason is not pinned still has to name a class both artefacts agree on, which the differential contract checks. Distinct from `condition`, which is the protocol-level amqp:decode-error the peer sees; this one is the taxonomy the implementation reports, so a gap in a reader is never mistaken for a claim about the grammar.",
+     "enum": [
+      "truncated",
+      "unassigned",
+      "unsupported",
+      "sizeMismatch",
+      "malformed",
+      "limit"
+     ],
+     "type": "string"
+    }
+   },
+   "required": [
+    "condition",
+    "endpoint"
+   ],
+   "type": "object"
+  },
+  "kind": {
+   "description": "decode: the octets must decode to `value`, consuming all of them. encode: `value` must encode to exactly `bytes`. reject: the octets must fail to decode with the named condition. property: a law that needs no expected answer, so an exhaustive input domain can be swept instead of sampled.",
+   "enum": [
+    "decode",
+    "encode",
+    "reject",
+    "property"
+   ]
+  },
+  "note": {
+   "description": "Why this vector exists, usually the artifact text it was read from, or the decision it tests.",
+   "type": "string"
+  },
+  "property": {
+   "description": "kind=property only. decode-stable: if the octets decode to a value, encoding that value must decode to the same value. Inputs that fail to decode make no claim, which is what makes an exhaustive sweep possible without an oracle.",
+   "enum": [
+    "decode-stable"
+   ]
+  },
+  "value": {
+   "$ref": "#/$defs/value",
+   "description": "Required for kind=decode and kind=encode."
+  },
+  "vector": {
+   "description": "Stable identifier, unique within the corpus and quoted in verdict reports.",
+   "pattern": "^[a-z0-9][a-z0-9._-]*$",
+   "type": "string"
+  }
+ },
+ "required": [
+  "vector",
+  "kind",
+  "clauses",
+  "bytes"
+ ],
+ "title": "AMQP 1.0 type-system vector",
+ "type": "object"
 }

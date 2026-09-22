@@ -1,0 +1,31 @@
+{
+ "adopted": "Named materialisation limit, shared by both artefacts",
+ "clauses": [
+  "amqp-core-types-v1.0-os.xml#amqp:types/section:encodings.1"
+ ],
+ "consequences": [
+  "The reader iterates array elements on the header's count, structurally, so no array whose element count is itself bounded is refused however few octets it occupies. A count is not a resource bound and must not be used as one.",
+  "Materialising the elements is bounded by a named constant (`arrayElementLimit`, 65536) which both artefacts carry, because a limit that differed between them would make the differential contract compare two different specifications.",
+  "Exceeding the limit is a named, loud failure distinct from a grammar error (`limit`), never a silent truncation and never an implicit bound smuggled in through whatever recursion device the reader happens to use. That last point is the defect this record exists for: with the octet count doubling as fuel, an array of ten nulls in a four-octet buffer was refused as truncated, which is a legal encoding.",
+  "The Rust implementation mirrors the constant, and the conformance statement includes it, so the limit is part of what is claimed rather than an accident of an implementation."
+ ],
+ "evidence": "Part 1 fixes the array encoding as size, count, element constructor, then count elements in the element constructor's form (`section:encodings.1`), and its own encoding table assigns width 0 to six constructors that are legal as element data: 0x40 null, 0x41 true, 0x42 false, 0x43 uint0, 0x44 ulong0, 0x45 list0 — verified in the artifact's machine-readable file as `width=\"0\"` on each. Those two rules together admit an encoding that declares 2^31-1 elements in ten octets: the count is bounded by the width of the count field and by nothing in the data. No implementation can materialise such an array as a list of values, so a specification that models arrays as lists must either bound the count or accept an unbounded memory obligation. The bound is therefore declared rather than discovered, and it is declared in one place both artefacts read.",
+ "id": "zero-width-array-count",
+ "open": false,
+ "question": "The artifact admits arrays of zero-width element constructors with element counts far beyond what the buffer can hold. Does a conformant reader accept them, and at what cost?",
+ "readings": [
+  {
+   "name": "Materialise whatever the count says",
+   "statement": "The reader is conformant without qualification, and an array of 2^31-1 nulls decodes to a list of 2^31-1 values. Rejected: it makes a ten-octet input an unbounded memory and time obligation, and it is not a property any caller can rely on."
+  },
+  {
+   "name": "Named materialisation limit, shared by both artefacts",
+   "statement": "The specification accepts every zero-width-element array up to `arrayElementLimit` elements, and refuses beyond it with a distinct `limit` error. The limit is a declared part of the specification, identical in both artefacts, and mirrored by the Rust implementation."
+  },
+  {
+   "name": "Compact representation of repeated constants",
+   "statement": "The array value carries a count and one constructor rather than a list, so the artifact is accepted without qualification and nothing is materialised. Rejected for now: it changes the value domain's shape for a case no encoder can produce (our writer builds arrays from a materialised list), and every consumer — canonicality, the corpus vocabulary, the Rust representation — pays for it."
+  }
+ ],
+ "schema_version": 1
+}

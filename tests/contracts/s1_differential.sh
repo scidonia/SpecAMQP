@@ -58,7 +58,7 @@ for corpus in "$worked" "$generated"; do
   esac
   run amqp-ref "$corpus" "$tmp/ref-$name.log"
   run amqp-spec "$corpus" "$tmp/spec-$name.log"
-  python3 - "$tmp/ref-$name.log" "$tmp/spec-$name.log" "$name" <<'PYCMP' || exit 1
+  python3 - "$tmp/ref-$name.log" "$tmp/spec-$name.log" "$name" "$corpus" <<'PYCMP' || exit 1
 import json, pathlib, sys
 
 def verdicts(path):
@@ -87,6 +87,59 @@ if disagreements:
         problems.append(f"{ident}: reference {left} ({ldetail[:70]}) vs "
                         f"specification {right} ({rdetail[:70]})")
     problems.insert(0, f"{len(disagreements)} vector(s) where the artefacts disagree")
+
+# Agreement on *that* a vector is refused is half the claim. Two artefacts can both
+# refuse for different reasons — one because the encoding is truncated, the other
+# because it exceeds a limit — and a status-only comparison calls that agreement.
+# So every rejection must name its reason class as the leading token of the detail,
+# both artefacts must name the same class, and where the vector pins `reason` both
+# must match the pin. A refusal nobody can name is a failure, not a detail.
+CLASSES = ("truncated", "unassigned", "unsupported", "sizeMismatch", "malformed", "limit")
+
+def reason_class(entry):
+    detail = entry.get("detail", "")
+    head = detail.split(":", 1)[0].strip()
+    return head if head in CLASSES else None
+
+pinned = {}
+for line in pathlib.Path(sys.argv[4]).read_text().splitlines():
+    if not line.strip():
+        continue
+    vector = json.loads(line)
+    entry = vector.get("expectError") or {}
+    if vector.get("kind") == "reject" and entry.get("reason"):
+        pinned[vector["vector"]] = entry["reason"]
+
+pin_problems = []
+for ident, expected in sorted(pinned.items()):
+    for label, verdict in (("reference", reference.get(ident)),
+                           ("specification", specification.get(ident))):
+        if verdict is None:
+            pin_problems.append(f"{ident}: {label} produced no verdict for a pinned vector")
+        elif reason_class(verdict) != expected:
+            pin_problems.append(
+                f"{ident}: {label} reports {reason_class(verdict)} where the vector pins {expected}")
+if pin_problems:
+    problems.extend(pin_problems[:6])
+    problems.insert(0, f"{len(pin_problems)} pinned reason(s) not matched")
+
+reason_problems = []
+for ident in sorted(set(reference) & set(specification)):
+    left, right = reference[ident], specification[ident]
+    if left["status"] != "reject":
+        continue
+    lclass, rclass = reason_class(left), reason_class(right)
+    if lclass is None or rclass is None:
+        reason_problems.append(
+            f"{ident}: a rejection must name its reason class as the leading token "
+            f"({', '.join(CLASSES)}); reference says {left['detail'][:50]!r}, "
+            f"specification says {right['detail'][:50]!r}")
+    elif lclass != rclass:
+        reason_problems.append(
+            f"{ident}: refused for different reasons — reference {lclass}, specification {rclass}")
+if reason_problems:
+    problems.extend(reason_problems[:6])
+    problems.insert(0, f"{len(reason_problems)} rejection(s) whose reason class does not agree")
 for problem in problems:
     print(f"  differential: {problem}")
 if problems:
