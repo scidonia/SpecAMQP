@@ -1,0 +1,27 @@
+{
+ "adopted": "A second open is refused, and the table's `*` is not a licence for it",
+ "clauses": [
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections.2",
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:framing.3"
+ ],
+ "consequences": [
+  "The implementations are stricter than the state table read literally, and both are stricter in the same way, so no corpus vector generated from the table alone can tell the difference between a rule and an accident.",
+  "The refusal is `illegalState` with a connection condition, which is the class the taxonomy reserves for octets that are well formed and a moment that is wrong \u2014 the same shape as a `begin` before the connection is open.",
+  "The specification is not amended to match the table, because the table's `*` says which frames a state *permits* and a second `open` is excluded by the performative's own semantics rather than by the state. The distinction is recorded here so that a future reader does not discover the stricter rule by finding a vector that pins it."
+ ],
+ "evidence": "The Connection State Table gives OPENED `*` for both legal sends and legal receives, and OPEN_SENT `**` \u2014 any frame known a priori to conform. Sending a second `open` is excluded by the performative's semantics (a connection is opened once, and the fields carry the container's identity) rather than by the state column, and the artifact states no rule about it in either place. Exercising it took a hand-written vector: the state table offers nothing, and both implementations refused with `illegalState`, so the corpus could not have found the rule because there was nothing for the two to disagree about.",
+ "id": "second-open-refusal",
+ "open": false,
+ "question": "May a peer send a second `open` once the connection is open, given that the state table permits any frame in OPENED?",
+ "readings": [
+  {
+   "name": "A second open is refused, and the table's `*` is not a licence for it",
+   "statement": "Adopted, and both artefacts already behave this way. The table's `*` describes the state's permissions, not a suspension of each performative's own rules: `open` carries the container's identity and a connection is opened once."
+  },
+  {
+   "name": "OPENED permits any well-formed frame, so a second open is admitted",
+   "statement": "Rejected: it reads the state column as overriding the performative semantics, which would make `open` idempotent and lose the very field \u2014 container-id \u2014 whose absence the neighbouring vector pins as a refusal."
+  }
+ ],
+ "schema_version": 1
+}

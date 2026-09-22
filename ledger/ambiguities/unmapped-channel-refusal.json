@@ -1,0 +1,30 @@
+{
+ "adopted": "amqp:connection:framing-error with class illegalState, and the state stands",
+ "clauses": [
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions.1"
+ ],
+ "consequences": [
+  "A frame arriving on a channel that no session is mapped to is refused with `amqp:connection:framing-error` and the reason class `illegalState`, and the peer's state does not advance: a session cannot even END on a channel that is not its own, so there is no transition the frame could drive.",
+  "The refusal reports what the peer observed and what it did about it, rather than naming a condition the artifact does not offer: the session-error values are `errant-link`, `handle-in-use`, `unattached-handle` and `window-violation`, none of which means \"there is no session here\".",
+  "No vector exercises a frame on an unmapped channel beyond the refusal, because the artifact states no rule for what a peer should do next."
+ ],
+ "evidence": "The artifact's session section describes the mapping (a channel becomes mapped when `begin` is sent, unmapped when `end` completes) and its state table needs a channel to talk about, but the ledger holds no clause stating what a peer does with a frame for a channel that is not mapped. The generated choice table confirms the gap from the other side: `amqp:session:unmapped` does not exist, and the four session-error values name conditions inside a session rather than the absence of one.",
+ "id": "unmapped-channel-refusal",
+ "open": true,
+ "question": "What does a peer do with a frame that arrives on a channel no session is mapped to, and what condition does it report?",
+ "readings": [
+  {
+   "name": "amqp:connection:framing-error with class illegalState, and the state stands",
+   "statement": "Adopted. The frame is well formed and addressed to something that is not there, which is a wire-level failure rather than a session-level one, and the connection's error set is the only one that fits. `illegalState` carries the distinction the condition cannot: the octets are fine and the moment is wrong."
+  },
+  {
+   "name": "A session error, on the grounds that the frame is session-addressed",
+   "statement": "Rejected: no session exists to raise it. A session error presumes the session, and the artifact's four values all describe conditions inside one — an errant link, a handle in use, an unattached handle, a window violation — so using one here would name a session state that the channel does not have."
+  },
+  {
+   "name": "Discard the frame silently",
+   "statement": "Rejected on principle rather than on text: this repository's rule is that a failure is reported where it happens rather than swallowed, and a frame nobody acts on is the case a reader most needs to know about. Silence would also make the exchange corpus unable to distinguish a peer that discards from one that never received."
+  }
+ ],
+ "schema_version": 1
+}
