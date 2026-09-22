@@ -187,7 +187,7 @@ note "no sorry, admit, native_decide, partial, axiom, opaque, unsafe or extern i
 # failure reads like a missing theorem rather than a missing build.
 ( cd "$root/lean" && LAKE_NO_CACHE=1 lake build Contracts.Codec Contracts.FrameCodec \
     Contracts.FrameCodecAcceptance Contracts.TypeSystem Proofs.CodecFrameLaws \
-    Proofs.CodecRoundTrip Proofs.CodecRoundTripVariable Spec.ReadLaws ) >"$tmp/axiombuild.log" 2>&1 ||
+    Proofs.CodecRoundTrip Proofs.CodecRoundTripCompound Proofs.CodecRoundTripVariable Spec.ReadLaws ) >"$tmp/axiombuild.log" 2>&1 ||
   die "building the modules the axiom probe reads failed: $(tail -3 "$tmp/axiombuild.log")"
 
 cat >"$tmp/Axioms.lean" <<'AXIOMS'
@@ -195,6 +195,7 @@ import Contracts.FrameCodec
 import Contracts.FrameCodecAcceptance
 import Contracts.TypeSystem
 import Proofs.CodecRoundTrip
+import Proofs.CodecRoundTripCompound
 import Proofs.CodecRoundTripVariable
 import Spec.ReadLaws
 
@@ -207,6 +208,14 @@ import Spec.ReadLaws
 #print axioms SpecAMQP.Proofs.go_foldr_value
 #print axioms SpecAMQP.Proofs.bigEndianFieldValue
 #print axioms SpecAMQP.Proofs.fieldValueRoundTrip
+#print axioms SpecAMQP.Proofs.widthChoice_narrow
+#print axioms SpecAMQP.Proofs.widthChoice_wide
+#print axioms SpecAMQP.Proofs.lengthWidthOf_eq_widthChoice
+#print axioms SpecAMQP.Proofs.sizeWidthOf_eq_widthChoice
+#print axioms SpecAMQP.Proofs.compoundOctets_eq
+#print axioms SpecAMQP.Proofs.arrayOctets_eq
+#print axioms SpecAMQP.Proofs.compoundOctets_ok_length
+#print axioms SpecAMQP.Proofs.arrayOctets_ok_length
 #print axioms SpecAMQP.Contracts.accepted_frames_carry_performatives
 #print axioms SpecAMQP.Contracts.consumed_is_the_declared_size
 #print axioms SpecAMQP.Contracts.frame_round_trip_public
@@ -238,6 +247,10 @@ for theorem in "$accepted_theorem" extended_header_width body_starts_after_the_h
                SpecAMQP.Proofs.beOctets_length SpecAMQP.Proofs.go_length \
                SpecAMQP.Proofs.mod_mul_base SpecAMQP.Proofs.go_foldr_value \
                SpecAMQP.Proofs.bigEndianFieldValue SpecAMQP.Proofs.fieldValueRoundTrip \
+               SpecAMQP.Proofs.widthChoice_narrow SpecAMQP.Proofs.widthChoice_wide \
+               SpecAMQP.Proofs.lengthWidthOf_eq_widthChoice SpecAMQP.Proofs.sizeWidthOf_eq_widthChoice \
+               SpecAMQP.Proofs.compoundOctets_eq SpecAMQP.Proofs.arrayOctets_eq \
+               SpecAMQP.Proofs.compoundOctets_ok_length SpecAMQP.Proofs.arrayOctets_ok_length \
                SpecAMQP.Proofs.lengthWidthOf_narrow SpecAMQP.Proofs.lengthWidthOf_wide \
                SpecAMQP.Proofs.two_pow_eight_mul SpecAMQP.Proofs.lengthPrefixed_eq \
                SpecAMQP.Proofs.lengthPrefixed_ok SpecAMQP.Proofs.takeBe_beOctets \
