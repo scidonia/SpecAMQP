@@ -188,7 +188,7 @@ note "no sorry, admit, native_decide, partial, axiom, opaque, unsafe or extern i
 ( cd "$root/lean" && LAKE_NO_CACHE=1 lake build Contracts.Codec Contracts.FrameCodec \
     Contracts.FrameCodecAcceptance Contracts.TypeSystem Proofs.CodecFrameLaws \
     Proofs.CodecRoundTrip Proofs.CodecRoundTripCompound Proofs.CodecRoundTripDescribed \
-    Proofs.CodecRoundTripVariable Spec.ReadLaws ) >"$tmp/axiombuild.log" 2>&1 ||
+    Proofs.CodecRoundTripNarrowest Proofs.CodecRoundTripVariable Spec.ReadLaws ) >"$tmp/axiombuild.log" 2>&1 ||
   die "building the modules the axiom probe reads failed: $(tail -3 "$tmp/axiombuild.log")"
 
 cat >"$tmp/Axioms.lean" <<'AXIOMS'
@@ -198,6 +198,7 @@ import Contracts.TypeSystem
 import Proofs.CodecRoundTrip
 import Proofs.CodecRoundTripCompound
 import Proofs.CodecRoundTripDescribed
+import Proofs.CodecRoundTripNarrowest
 import Proofs.CodecRoundTripVariable
 import Spec.ReadLaws
 
@@ -210,6 +211,9 @@ import Spec.ReadLaws
 #print axioms SpecAMQP.Proofs.go_foldr_value
 #print axioms SpecAMQP.Proofs.bigEndianFieldValue
 #print axioms SpecAMQP.Proofs.fieldValueRoundTrip
+#print axioms SpecAMQP.Proofs.widthChoice_le_of_fits
+#print axioms SpecAMQP.Proofs.widthChoice_narrow_iff
+#print axioms SpecAMQP.Proofs.lengthPrefixed_canonical_size
 #print axioms SpecAMQP.Proofs.descriptorPrefix_length
 #print axioms SpecAMQP.Proofs.described_overhead
 #print axioms SpecAMQP.Proofs.writeValue_described
@@ -252,6 +256,8 @@ for theorem in "$accepted_theorem" extended_header_width body_starts_after_the_h
                SpecAMQP.Proofs.beOctets_length SpecAMQP.Proofs.go_length \
                SpecAMQP.Proofs.mod_mul_base SpecAMQP.Proofs.go_foldr_value \
                SpecAMQP.Proofs.bigEndianFieldValue SpecAMQP.Proofs.fieldValueRoundTrip \
+               SpecAMQP.Proofs.widthChoice_le_of_fits SpecAMQP.Proofs.widthChoice_narrow_iff \
+               SpecAMQP.Proofs.lengthPrefixed_canonical_size \
                SpecAMQP.Proofs.descriptorPrefix_length SpecAMQP.Proofs.described_overhead \
                SpecAMQP.Proofs.writeValue_described \
                SpecAMQP.Proofs.widthChoice_narrow SpecAMQP.Proofs.widthChoice_wide \
