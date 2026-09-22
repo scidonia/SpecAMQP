@@ -472,3 +472,62 @@ Recorded now, scheduled later, implemented in TemperMint rather than here:
 5. **Corpus dimension in replay.** Preserving TemperMint's property that replay regenerates and compares *all* claim-bearing inputs byte-identically, extended to the trace corpus and vectors.
 
 The specification repository keeps these artifacts in the shape these requirements expect: separate descriptor files per unit, content-addressed corpora, and no assumption that one certificate covers one function.
+
+## 23. How the two implementations are obtained (operational procedure)
+
+Both are produced from the same pinned tables and the same frozen seams; they differ in purpose. The **reference** is optimised for auditability and proof: it is the conformance oracle, and clarity outranks speed everywhere in it. The **fast implementation** is the artifact that ships, and it exists only as *seam-local candidates*, each re-proved against the identical specification. Neither is generated from the other, and neither is generated from the specification: a generated fast implementation would require the generator itself to be verified, and a generated reference would make the differential tiers vacuous. The premise the whole design rests on is TemperMint's: the *search* need not be verified, and a candidate needs no certified transformation history — only the accepted result must be proved against a stable specification.
+
+### 23.1 What both share, and is therefore frozen first
+
+- **Generated tables** (`§6`) from the pinned XML: descriptor codes, field order, mandatory flags, defaults, choices, encodings, error conditions. No hand-typed code or symbol anywhere in `lean/Spec`, `lean/Proofs`, or the core crates.
+- **Seams**: named functions with frozen signatures — `wire::decode_value`, `wire::encode_value`, `wire::frame_decode`, `wire::frame_encode`, `performative::{decode,encode}`, `engine::step_connection`, `engine::step_session`, `engine::step_link`, `engine::step_tx`, `sasl::step`. A seam is the only place implementations may differ; changing a signature invalidates every certificate that names it. Frozen at S0/S1 by contract.
+- **The specification is the fixed target.** Everything else — layouts, iteration order, buffering, batching — is an implementation choice a candidate may change.
+- **Per-unit extraction, proof, audit, certificate.** Identity, freshness, and regeneration checks exactly as TemperMint's `check`/`mint`/`replay` define them; correctness evidence and performance evidence never mix in one artifact.
+
+### 23.2 Obtaining the reference implementation
+
+1. **Land the tables.** `scripts/gen-oasis-rust.py` → `rust/amqp-codegen-generated`; regeneration byte-identical; the mutated-vendor-copy control fires.
+2. **Freeze the seams** (§23.1) and the trace schema. Record the S0 spike's outcome: which of the three plausible state shapes survives the pinned pair — caller-owned `&mut [T]` slab with explicit `len`, `[T; N]` (Aeneas documents `Array T n`), or `Vec<T>`. The spike decides; the plan does not.
+3. **Write each seam from the clause text**, in milestone order (S1 → S7), *not* by reading the Lean specification — the reference is the second independent transcription of the OASIS prose, and its evidential value comes from that independence. House style: flat explicit loops, no allocation, no early-exit cleverness, explicit state records, every error a named protocol error condition, every arithmetic operation already bounded by a stated invariant.
+4. **Failure first, per seam.** The planner lands the fixture and its Expected Failure note; the coder records the actual diagnostic before implementing. A seam with no observed initial failure is not yet a contract.
+5. **Immediate checks.** `cargo test --test <seam>_contract` at the caller boundary; `python3 scripts/replay-traces.py <corpus>` diffing the reference against the executable specification.
+6. **Extract.**
+   ```sh
+   (cd rust && charon cargo --preset=aeneas --dest-file target/amqp-core.llbc)
+   aeneas -backend lean -loops-to-rec -split-files \
+     -dest lean/Generated/Core rust/target/amqp-core.llbc
+   ```
+   `-split-files` matters at this size: `Types.lean`/`Funs.lean` are generated, while `TypesExternal.lean`/`FunsExternal.lean` are hand-maintained models for anything opaque and are the only permitted hand-written part of the model. Every external model is named in the certificate's trust disclosure; a generated declaration with no explanation fails the M1-style generated-declaration audit. Generated files are never edited, and a second extraction must be byte-identical.
+7. **Prove.** L2 equality per codec function (whole-function, over the full byte domain), L3 refinement per endpoint feature, L1 internal theorems where the specification itself needs them. Then the audits: token-aware `sorry` scan, `#print axioms` per public theorem, no reachable `sorryAx`, no undisclosed trust addition.
+8. **Certify.** One descriptor per unit; `tempermint check` then `tempermint mint`; the package lands in `certificates/`. Where a native artifact is named, its build identity (target, features, profile, overflow settings, rustflags) is recorded with it.
+9. **Interop.** `amqp-ref` plus the recording procedure produce the third-party corpus (≥2 independent peers) with provenance; admission by the specification is part of the acceptance, not an afterthought.
+10. **Reference done when**: corpus replay is byte-identical against the executable specification, the declared proof levels are closed, the audit is clean, the certificate is minted, and two independent peers are recorded.
+
+### 23.3 Obtaining the fast implementation
+
+1. **Measure and profile the reference first.** Artifact-bound native build, exactly one allowed CPU, quiet probes taken at most three times, predeclared workloads in `bench/workloads.toml`. Per-frame cost in AMQP is dominated by syscalls, copies, and message size, so the profile — not intuition — decides which seams are worth touching. A candidate with no profile evidence behind it is rejected at review.
+2. **Declare the candidate.** One seam, one transformation, one stated hypothesis about the cost it removes. Candidate implementations live in `rust/candidates/<seam>-<transform>/`; the engine skeleton is not forked, because duplicating the state machine would multiply the proof surface and destroy maintainability.
+3. **Stay inside the fragment.** Safe, sequential, no `async`, no `dyn`, no allocation in the core, no threads, no SIMD intrinsics (they would need semantics supplied and proved). "Fast" therefore means algorithmically and representationally fast within safe sequential Rust — plus architectural wins in the disclosed I/O layer, which are measured but never claimed as verified.
+4. **Implement the transformation.** The catalogue that this problem admits:
+
+| Seam | Transformation | What it removes |
+| --- | --- | --- |
+| `frame_decode` | bound the body once, hand the cursor down; split header-then-body reads | repeated per-field bounds checks; double buffering |
+| `performative::decode` | dispatch on descriptor once, decode fields to a fixed record; skip absent trailing fields by count | per-field option plumbing; re-dispatch |
+| `performative::encode` | emit the mandatory prefix and truncate trailing nulls in one pass | intermediate field vectors |
+| `wire::decode_value` | table-driven descriptor → decoder, small-int fast paths (`0x40`–`0x56`, `0x43`/`0x44` zero forms) | branch chains on encoding code |
+| `wire::encode_value` | specificity-preserving writer that picks the narrowest encoding in one pass | decode-then-re-encode round trips |
+| `engine::step_link` | maintain credit and delivery-count as explicit fields updated in the step, instead of recomputing from windows | repeated window arithmetic per transfer |
+| `engine::step_session` | keep handle allocation as a free-list index, not a scan | linear scans in attach/detach |
+| `engine::step_connection` | precompute decisions fixed at `open` (max-frame-size, channel-max, idle threshold) into the state record | re-derivation per frame |
+| relay paths | pass payload bytes through by borrowing rather than copying into a result buffer | one full message copy per hop |
+| driver (unproved) | coalesce outbound frames into one write; reuse buffers; batch flush | syscalls per frame |
+
+5. **Run the conformance battery, in this order, and accept only on all of it**: byte-identical corpus diff against the reference → D4 mutation controls still fire (a candidate that weakens a check must be caught, not accommodated) → extraction → the *same-spec* theorems re-proved for the changed seam (L2/L3, unchanged statements — a candidate never gets a weaker specification) → regeneration freshness → audit → measurement against the reference on the predeclared workloads → certificate plus a **separate** measurement attachment bound to the artifact hash.
+6. **Search policy.** Candidates may be proposed by a human or an agent; rejection costs nothing and leaves nothing in the tree; only accepted candidates are committed with their evidence. A candidate inherits no trust from the reference: the reference's proof justifies the reference, and the candidate is proved against the specification itself.
+7. **Report honestly.** Correctness and performance are separate artifacts. A correct-but-slow candidate gets a correctness certificate; a fast candidate whose seam proof is incomplete is reported as differentially covered, with the gap named. Performance targets are outcomes, never gates, and thresholds are never tuned after seeing ratios.
+8. **Fast implementation done when**: every changed seam has its own conformance theorem against the frozen specification, the composed core passes the full corpus, the native artifact is bound by hash to the recorded build identity, measurements are attached separately, and the unproved I/O layer's obligations are disclosed item by item.
+
+### 23.4 The endgame composition
+
+The shipped fast implementation is the composition of (i) accepted seam candidates over the reference skeleton, (ii) the disclosed I/O layer, and (iii) per-seam `Refines` theorems. A downstream Rust programme written by anyone else is obtained the same way: it presents the same seams, and its proof is the same `Refines` instance — which is why the interface was frozen in §9 before any implementation work began.
