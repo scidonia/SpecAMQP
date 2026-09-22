@@ -91,11 +91,21 @@ if disagreements:
 
 # The condition, not just the status: a refusal nobody can name is a failure, and two
 # artefacts refusing for different reasons have not agreed about anything.
+# Refusals are stated per step in an exchange corpus: `steps[i].expect.status == "refused"`
+# with its condition and reason. `expectError` is the *value* corpus's whole-vector vocabulary —
+# s1_differential.sh reads that because its corpora are value corpora, and reading it here leaves
+# `refusing` empty and the non-vacuity guard firing on a corpus that does exercise refusals.
 refusing, pinned = set(), {}
 for line in corpus.read_text().splitlines():
     if not line.strip():
         continue
     vector = json.loads(line)
+    for index, step in enumerate(vector.get("steps") or [], 1):
+        expect = (step or {}).get("expect") or {}
+        if expect.get("status") == "refused":
+            ident = f"{vector['vector']}#{index}"
+            refusing.add(ident)
+            pinned[ident] = expect.get("condition")
     entry = vector.get("expectError") or {}
     if entry:
         refusing.add(vector["vector"]); pinned[vector["vector"]] = entry.get("condition")
