@@ -186,12 +186,18 @@ cat >"$tmp/Axioms.lean" <<'AXIOMS'
 import Contracts.FrameCodec
 import Contracts.TypeSystem
 import Proofs.CodecRoundTrip
+import Spec.ReadLaws
 
 #print axioms SpecAMQP.Contracts.constructor_grammar_public
 #print axioms SpecAMQP.Contracts.extended_header_width
 #print axioms SpecAMQP.Contracts.body_starts_after_the_header
 #print axioms SpecAMQP.Proofs.beOctets_length
 #print axioms SpecAMQP.Proofs.go_length
+#print axioms SpecAMQP.Proofs.mod_mul_base
+#print axioms SpecAMQP.Proofs.go_foldr_value
+#print axioms SpecAMQP.Proofs.bigEndianFieldValue
+#print axioms SpecAMQP.Proofs.fieldValueRoundTrip
+#print axioms SpecAMQP.Spec.ReadLaws.takeBe_eq_fold
 AXIOMS
 ( cd "$root/lean" && LAKE_NO_CACHE=1 lake env lean "$tmp/Axioms.lean" ) >"$tmp/axioms.log" 2>&1 ||
   die "could not print the accepted theorem's axioms: $(tail -3 "$tmp/axioms.log")"
@@ -202,7 +208,10 @@ grep -q "ofReduceBool" "$tmp/axioms.log" &&
 grep -q "sorryAx" "$tmp/scan.log" && die "an accepted theorem is missing from the inventory"
 sed 's/^/     /' "$tmp/axioms.log" | grep "depends on axioms" | sed 's/^     //'
 for theorem in "$accepted_theorem" extended_header_width body_starts_after_the_header \
-               SpecAMQP.Proofs.beOctets_length SpecAMQP.Proofs.go_length; do
+               SpecAMQP.Proofs.beOctets_length SpecAMQP.Proofs.go_length \
+               SpecAMQP.Proofs.mod_mul_base SpecAMQP.Proofs.go_foldr_value \
+               SpecAMQP.Proofs.bigEndianFieldValue SpecAMQP.Proofs.fieldValueRoundTrip \
+               SpecAMQP.Spec.ReadLaws.takeBe_eq_fold; do
   grep -q "$theorem' depends on axioms" "$tmp/axioms.log" ||
     die "$theorem was not inventoried — the inventory names a theorem the kernel did not print"
 done
