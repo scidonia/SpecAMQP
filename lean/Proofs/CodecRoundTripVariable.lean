@@ -1,5 +1,6 @@
 import Spec.ReadLaws
 import Proofs.CodecRoundTrip
+import Proofs.ExceptMap
 
 /-!
 # The value codec's round trip: R2, the variable-width families
@@ -141,15 +142,18 @@ writer can have produced. -/
 theorem lengthPrefixed_ok (decl : EncodingDecl) (payload : List UInt8) (out : List UInt8)
     (h : lengthPrefixed decl payload = .ok out) :
     out.length = decl.width + payload.length := by
-  by_cases hfit : payload.length < 2 ^ (8 * decl.width)
-  · rw [lengthPrefixed_eq decl payload hfit] at h
+  cases hf : filled decl.width payload.length with
+  | error e => simp [lengthPrefixed, hf] at h
+  | ok field =>
+    have hfield : field = beOctets decl.width payload.length := by
+      by_cases hfit : payload.length < 2 ^ (8 * decl.width)
+      · have h' := hf
+        simp [filled, hfit] at h'
+        exact h'.symm
+      · simp [filled, hfit] at hf
+    simp only [lengthPrefixed, hf, hfield] at h
     rw [← Except.ok.inj h]
     simp [List.length_append, beOctets_length]
-  · -- `filled` refuses, so the write is a refusal and cannot be `.ok out`
-    have hbad : filled decl.width payload.length = .error
-        s!"{payload.length} does not fit in {decl.width} big-endian octet(s)" := by
-      simp [filled, hfit]
-    simp [lengthPrefixed, hbad] at h
 
 /-! ## The reader's half of the length agreement -/
 

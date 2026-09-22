@@ -57,6 +57,7 @@ namespace SpecAMQP.Proofs
 
 open SpecAMQP.Spec.Codec
 open SpecAMQP.Spec.ReadLaws
+open SpecAMQP.Generated.Oasis (EncodingDecl encodings)
 open SpecAMQP.Harness (Octets)
 
 /-! ## The rule as an inequality -/
@@ -319,6 +320,220 @@ theorem takeBytes_advances (n : Nat) (c : Cursor)
   · -- the reader refuses, so nothing was accepted
     simp only [takeBytes, if_neg h] at hb
     exact absurd hb (by simp)
+
+/-! ## The dispatch step, specified
+
+What is left for the law is a case analysis over `readValue`'s own dispatch, and it must
+reconcile three things — the family lemmas above are *within-family* inequalities about a
+size, while the law quantifies over all values and compares `canonical.size ≤ bytes.size`:
+
+1. **which family the accepted buffer's first octet selects** — a fact about the declared
+   surface, `Spec.Codec.dataDecl` for the row an octet names;
+2. **that family's field width**, which for the two width-choosing families is one or four —
+   again a table fact, since the widths are the rows the surface declares;
+3. **that the accepted size is the field plus the quantity the family's inequality talks
+   about** — the reader's own arithmetic, which is now in hand: `takeBe_advances` gives the
+   field read's advance out of the read's own success, `takeBytes_advances` gives a payload
+   read's advance and its size, and `takeBe_lt` bounds the length a field carried. The
+   variable-width family's instance of that step is `readVariable_consumes` below, and
+   `readVariable_canonical_le` is it composed with the family inequality.
+
+Two things here look like blockers and are not. A proof that seems to need the cursor's check
+as a hypothesis is a proof whose earlier statement is not in the shape it should be: `takeBe_lt`,
+`takeBe_advances` and `takeBytes_advances` all take only the *result* of the read and derive
+the check from it, so supplying the check means something upstream was stated wrong. And
+`lengthPrefixed_ok` is already the success form — `out.length = decl.width + payload.length`
+from `lengthPrefixed decl payload = .ok out` — so a family's step needs no fit hypothesis about
+the payload's length: the write's own success *is* the hypothesis, and that is what the law's
+statement supplies.
+
+The first lemma is therefore the second family's reading-off step, and it is landed below:
+`readVariable_consumes` reads the accepted size off the reader's own consumption — the row's
+width plus the field's length — and `readVariable_canonical_le` is it composed with the family
+inequality, through `variable_row_width` for the row's width. `readVariable_ok` is the row's read
+taken apart, which is what the other families' steps will want too.
+
+What is still open in the dispatch is the same step for the other families — the compound
+families' size and count, and the described case, whose arithmetic R4 already supplies — and the
+array case's element-constructor lookup, which is the one *genuine* `<$>` site in the codec
+(`Spec.Codec.elementDecl?`), reachable through `except_map_ok` from `Proofs/ExceptMap`. A module
+that wants those reductions must import that file, since a `@[simp]` lemma that exists is not one
+`simp` can see.
+
+One fact the law needs is **not** available in this closure, and it is named rather than assumed:
+the writer's payload for `string` and `symbol` is `text.toUTF8.toList`, while the reader's payload
+is the octets `utf8Of` decoded, so comparing the two families' canonical size against an accepted
+size needs "octets that decode to a text re-encode to those octets" — a fact about the standard
+library's UTF-8 reader (`String.fromUTF8?` / `String.toUTF8`). Core states no such theorem, and
+batteries does not either. The `binary` family needs no such fact, so its size comparison is the
+one this module's lemmas close outright.
+-/
+
+/-! ## The variable family's reading-off step
+
+Three things, in the order the dispatch needs them: the field read's advance without its check
+(`takeBe_advances` — the fact `takeBe_eq_fold` could only state with the offset's check as a
+hypothesis, derived here from the read's own success), the row's read taken apart
+(`readVariable_ok`), and the recorded reading-off step itself (`readVariable_consumes`: the
+accepted size is the row's width plus the payload's length, that length is below `256 ^ width`,
+and the value carries the payload the reader took).
+
+The table's half is `variable_row_width`: a row whose owner is one of the three variable-width
+families has one of the table's two widths. That is a fact about the declared surface rather
+than about the reader, and it is decided over the generated table — the same rows `encodingOf`
+returns, so no code is transcribed here.
+
+`readVariable_canonical_le` is those three composed: the canonical size the family's inequality
+compares against is no larger than what the read consumed. What it is *not* is the law: it says
+nothing about the writer's octets, which is the step below it. -/
+
+/-- **A successful field read advances the cursor by the field's width.**
+
+`takeBe` is a `do`-block over `takeBytes`, so its success is `takeBytes`' success and the cursor
+it returns is the one `takeBytes` returned. The offset's check is not a precondition: where the
+octets are not there the block refuses, and a refusal contradicts the success this statement is
+given. `takeBe_eq_fold` states the same advance, but only at an offset whose check is already in
+hand; this is the form a composition site wants, because the reader's own success is what it
+has. -/
+theorem takeBe_advances (width : Nat) (c : Cursor) (v : Nat) (c' : Cursor)
+    (hv : takeBe width c = .ok (v, c')) : c'.pos = c.pos + width := by
+  by_cases h : c.pos + width ≤ c.data.size
+  · simp only [takeBe, takeBytes, if_pos h, except_bind_ok] at hv
+    have hcur : (⟨c.data, c.pos + width⟩ : Cursor) = c' := (Prod.mk.inj (Except.ok.inj hv)).2
+    rw [← hcur]
+  · simp only [takeBe, takeBytes, if_neg h, except_bind_error] at hv
+    exact absurd hv (by simp)
+
+/-- **The payload a variable-width row's value carries.**
+
+The reader's three cases, as a statement rather than as the `match` they come from: a `binary`
+value *is* the octets the row took, and a `string` or `symbol` value is what those octets decode
+to under the codec's own UTF-8 reader. Saying it this way lets the family's size argument name
+the payload — the quantity both the writer's `lengthPrefixed` and the reader's field talk about —
+without going through the text. -/
+def ValueCarries (value : Value) (payload : Octets) : Prop :=
+  value = .binary payload ∨
+    (∃ text : String, value = .string text ∧ utf8Of payload "string" = .ok text) ∨
+      (∃ text : String, value = .symbol text ∧ utf8Of payload "symbol" = .ok text)
+
+/-- **A variable-width row's read, taken apart.**
+
+The row reads a field, then that many octets, then hands both to its owner's case. Inverting that
+is two cases on the `do`-block's left sides — which is what `Proofs/ExceptMap.lean`'s reductions
+make possible without the offset's check — and one case on the owner the row names. Each case's
+equations are *obtained* rather than substituted, so the components the conclusion names are the
+same terms the caller will use: a `cases hb : e` inside the goal would rewrite `e` away and leave
+the fact about `e` unusable in the very place it is needed. -/
+theorem readVariable_ok (decl : EncodingDecl) (c : Cursor) (value : Value) (c' : Cursor)
+    (h : readVariable decl c = .ok (value, c')) :
+    ∃ length : Nat, ∃ c₁ : Cursor, ∃ payload : Octets, ∃ c₂ : Cursor,
+      takeBe decl.width c = .ok (length, c₁) ∧
+      takeBytes length c₁ = .ok (payload, c₂) ∧
+      c₂ = c' ∧ ValueCarries value payload := by
+  obtain ⟨length, c₁, hbe⟩ : ∃ l : Nat, ∃ cc : Cursor, takeBe decl.width c = .ok (l, cc) := by
+    cases hb : takeBe decl.width c with
+    | error e =>
+      exfalso
+      simp only [readVariable, hb, except_bind_error] at h
+      exact absurd h (by simp)
+    | ok v => exact ⟨v.1, v.2, rfl⟩
+  unfold readVariable at h
+  rw [hbe] at h
+  simp only [except_bind_ok] at h
+  obtain ⟨payload, c₂, hbp⟩ : ∃ p : Octets, ∃ cc : Cursor, takeBytes length c₁ = .ok (p, cc) := by
+    cases hb : takeBytes length c₁ with
+    | error e =>
+      exfalso
+      simp only [hb, except_bind_error] at h
+      exact absurd h (by simp)
+    | ok w => exact ⟨w.1, w.2, rfl⟩
+  rw [hbp] at h
+  simp only [except_bind_ok] at h
+  have hrec : c₂ = c' ∧ ValueCarries value payload := by
+    split at h
+    · simp only [Except.ok.injEq, Prod.mk.injEq] at h
+      exact ⟨h.2, Or.inl h.1.symm⟩
+    · cases hu : utf8Of payload "string" with
+      | error e => simp only [hu, except_bind_error] at h; exact absurd h (by simp)
+      | ok text =>
+        simp only [hu, except_bind_ok, except_pure_ok, Except.ok.injEq, Prod.mk.injEq] at h
+        exact ⟨h.2, Or.inr (Or.inl ⟨text, h.1.symm, hu⟩)⟩
+    · cases hu : utf8Of payload "symbol" with
+      | error e => simp only [hu, except_bind_error] at h; exact absurd h (by simp)
+      | ok text =>
+        simp only [hu, except_bind_ok, except_pure_ok, Except.ok.injEq, Prod.mk.injEq] at h
+        exact ⟨h.2, Or.inr (Or.inr ⟨text, h.1.symm, hu⟩)⟩
+    · -- the row's owner is none of the three, so the reader refused
+      simp at h
+  exact ⟨length, c₁, payload, c₂, hbe, hbp, hrec.1, hrec.2⟩
+
+/-- **The variable family's reading-off step.**
+
+An accepted read from a variable-width row consumed the row's width plus the length its field
+carried, that length is below `256 ^ width` (so an accepted field carries a quantity the rule can
+compare against), and the value carries exactly the payload the reader took — the octets the
+field's length counts. This is the fact the dispatch was missing: it reads the reader's own
+numbers off the reader's own consumption, and it is composed of `takeBe_advances`,
+`takeBytes_advances` and `takeBe_lt`, none of which needs the offset's check. -/
+theorem readVariable_consumes (decl : EncodingDecl) (c : Cursor) (value : Value) (c' : Cursor)
+    (h : readVariable decl c = .ok (value, c')) :
+    ∃ length : Nat, ∃ payload : Octets,
+      payload.size = length ∧
+      length < 2 ^ (8 * decl.width) ∧
+      c'.pos = c.pos + decl.width + length ∧
+      ValueCarries value payload := by
+  obtain ⟨length, c₁, payload, c₂, hbe, hbp, hc, hcarries⟩ := readVariable_ok decl c value c' h
+  obtain ⟨hpos, hsize⟩ := takeBytes_advances length c₁ payload c₂ hbp
+  refine ⟨length, payload, hsize, ?_, ?_, hcarries⟩
+  · rw [two_pow_eight_mul]
+    exact takeBe_lt decl.width c length c₁ hbe
+  have hfield : c₁.pos = c.pos + decl.width := takeBe_advances decl.width c length c₁ hbe
+  rw [← hc]
+  omega
+
+/-- **The widths a variable-width row offers, decided over the table.**
+
+The declared surface assigns each variable-width family two rows, one of one octet and one of
+four, and this is that fact read off the generated table rather than transcribed: the rows whose
+owner is one of the three families all have one of the two widths. -/
+theorem variable_owners_have_two_widths :
+    (encodings.filter (fun decl => decl.owner = "binary" ∨ decl.owner = "string" ∨
+      decl.owner = "symbol")).all (fun decl => decl.width = 1 ∨ decl.width = 4) = true := by
+  decide
+
+/-- **A row of a variable-width family has one of the table's two widths.** -/
+theorem variable_row_width (decl : EncodingDecl) (hmem : decl ∈ encodings)
+    (howner : decl.owner = "binary" ∨ decl.owner = "string" ∨ decl.owner = "symbol") :
+    decl.width = 1 ∨ decl.width = 4 := by
+  have hall := variable_owners_have_two_widths
+  rw [List.all_eq_true] at hall
+  have hfilter : decl ∈ encodings.filter (fun decl => decl.owner = "binary" ∨
+      decl.owner = "string" ∨ decl.owner = "symbol") := by
+    rw [List.mem_filter]
+    exact ⟨hmem, by simpa using howner⟩
+  simpa using hall decl hfilter
+
+/-- **An accepted variable-width read is no shorter than the canonical encoding of what it
+read.**
+
+The composition the dispatch needs for this family: the size the reader consumed is the row's
+width plus the payload's length, the canonical size for that payload is the rule's width plus the
+same length (`lengthPrefixed_canonical_size`), and the rule's width is no wider than the row's
+(`variable_family_canonical_le` at `variable_row_width`). -/
+theorem readVariable_canonical_le (decl : EncodingDecl) (c : Cursor) (value : Value) (c' : Cursor)
+    (h : readVariable decl c = .ok (value, c')) (hmem : decl ∈ encodings)
+    (howner : decl.owner = "binary" ∨ decl.owner = "string" ∨ decl.owner = "symbol") :
+    ∃ length : Nat, ∃ payload : Octets,
+      payload.size = length ∧
+      ValueCarries value payload ∧
+      lengthWidthOf length + length ≤ c'.pos - c.pos := by
+  obtain ⟨length, payload, hsize, hbound, hpos, hcarries⟩ :=
+    readVariable_consumes decl c value c' h
+  refine ⟨length, payload, hsize, hcarries, ?_⟩
+  have hsub : c'.pos - c.pos = decl.width + length := by omega
+  rw [hsub]
+  exact variable_family_canonical_le length decl.width
+    (variable_row_width decl hmem howner) hbound
 
 /-! ## The rung's claim -/
 
