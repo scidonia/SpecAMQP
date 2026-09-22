@@ -88,9 +88,12 @@ for corpus in sys.argv[1:3]:   # argv[1:3] are the corpora; argv[3] is the schem
         # vector that simply forgot.
         refusing_encode = entry.get("kind") == "encode" and entry.get("expectError")
         octets = entry.get("bytes", "")
+        # Two independent facts: bytes must be present unless the encoder is being asked to refuse,
+        # and whatever is present must be lowercase hex. Conflating them let a refusal vector carry
+        # malformed bytes untouched, which the fabricated-case check below caught.
         if not octets and not refusing_encode:
             problems.append(f"{where}: no bytes, and only an encode refusal may omit them")
-        if not octets or len(octets) % 2 or any(c not in "0123456789abcdef" for c in octets):
+        if octets and (len(octets) % 2 or any(c not in "0123456789abcdef" for c in octets)):
             problems.append(f"{where}: bytes are not lowercase hex pairs")
     print(f"     {pathlib.Path(corpus).name}: {len(lines)} vectors, each citing a source")
 for problem in problems[:20]:
