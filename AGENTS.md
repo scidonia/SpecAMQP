@@ -132,6 +132,9 @@ alias shell='nix --extra-experimental-features "nix-command flakes" develop --of
 shell bash tests/contracts/s0_sources_ledger.sh      # vendored identity, ledger, dispositions
 shell bash tests/contracts/s0_tables_fidelity.sh     # generated tables current and load-bearing
 shell bash tests/contracts/s0_lean_environment.sh    # pinned toolchain, mathlib, offline resolution
+shell bash tests/contracts/s0_spec_manifest.sh       # planner-owned files as the manifest records them
+shell bash tests/contracts/s0_vector_citations.sh    # every citation in the corpus resolves
+shell bash tests/contracts/s0_generator_fidelity.sh  # each corpus is what its generator produces
 
 shell python3 scripts/clause-ledger.py check         # ledger + audit + reconciliation
 shell python3 scripts/gen-oasis-lean.py --check      # generated tables current
