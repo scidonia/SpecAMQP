@@ -199,7 +199,7 @@
  "description": "One NDJSON line of a type-system vector, run by `lake exe amqp-ref`. Vectors are authored from OASIS clauses and the artifacts' worked examples, never produced by running the implementation or the specification: a corpus generated from the thing under test proves only that it equals itself. The value vocabulary below is the corpus's own, independent of either implementation's internal types, so agreement is about the wire format rather than about a shared representation.",
  "properties": {
   "bytes": {
-   "description": "Lowercase hex, no separators. For decode and reject this is the input; for encode it is the required output.",
+   "description": "Lowercase hex, no separators. For decode and reject this is the input; for encode it is the required output. Absent on an encode vector that carries `expectError`: there is no expected encoding when the encoder must refuse, and requiring one would be requiring the vector to state the very output the refusal says does not exist.",
    "pattern": "^([0-9a-f]{2})+$",
    "type": "string"
   },
@@ -287,8 +287,7 @@
  "required": [
   "vector",
   "kind",
-  "clauses",
-  "bytes"
+  "clauses"
  ],
  "title": "AMQP 1.0 type-system vector",
  "type": "object"
