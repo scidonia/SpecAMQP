@@ -1,7 +1,7 @@
 {
  "conventions": {
   "deferred:": "A real obligation the plan carries later; the suffix names the milestone, and the note names the gap that keeps it out of the carrier set.",
-  "formalized:": "A Lean declaration path that carries this clause's meaning. The register writes these both fully qualified (`SpecAMQP.Spec.Session.stepBegin`) and module-relative (`Spec.Frame.decodeFrame`); both name declarations that exist in the tree, and every path recorded here was resolved against the module it names.",
+  "formalized:": "A Lean declaration path that carries this clause's meaning: every path recorded here is verified present in the module it names, and every `test:` id against the vector corpora, rather than asserted of the carrier's name.",
   "informative": "A statement of what a conformant implementation is rather than a rule this specification enforces: there is no wire obligation to carry.",
   "kind": "The clause's keyword kind, `MUST` or `MUST NOT`, taken from the ledger's own clause. `class` is the conformance class the coverage gate counts; the two coincide for `MUST` and diverge for `MUST NOT`, so `kind` must be read from the clause rather than inferred from the class.",
   "path-spelling": "The register carries both spellings of a declaration path: the module-relative form the earlier files use (`Spec.Session.afterEnd`, dropping the root namespace) and the fully-qualified form (`Spec.Connection.stepAmqpFrame`, `Spec.Connection.Submission.frame`). Both resolve and neither is a stale path, so a reader \u2014 or an existence gate \u2014 should accept either rather than report one as the other.",
@@ -143,7 +143,7 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections/doc:doc-idle-time-out.7": {
    "clause_text": "Implementations MUST be prepared to handle empty frames arriving on any valid channel, though implementations SHOULD use channel 0 when sending empty frames, and MUST use channel 0 if a maximum channel number has not yet been negotiated (i.e., before an \u00abopen\u00bb frame has been received).",
-   "disposition": "formalized:Spec.Frame.decodeFrame; formalized:Spec.Connection.step; formalized:Spec.Connection.Submission.frame; test:frame-decode-empty-frame",
+   "disposition": "formalized:Spec.Frame.decodeFrame; formalized:Spec.Connection.step; formalized:Spec.Connection.Submission; test:frame-decode-empty-frame",
    "kind": "MUST",
    "note": "Carried in three places, and the clause is about *handling* arriving frames rather than about decoding them, so the dispatcher matters as much as the decoder. The decode path decides the empty case on the frame's own window (size = headerOctets with doff at its minimum) before any body region is taken, so a header-only frame decodes to a frame the session can answer without acting; the dispatcher's `| none =>` case answers it with the endpoint unchanged and nothing written, in both the receive and send routes, with the reference's twins doing the same; and the vector witnesses both \u2014 eight octets of header alone on channel 0, expectation `body: []`, passing in both artefacts, which settles the bodyless vocabulary empirically rather than by proposal. The writers still refuse to send an empty frame, which is the clause's MAY rather than its MUST. Until the change this was a gap: the decoder refused, translating the truncated body read into sizeMismatch.",
    "text_sha256": "a841484728ed46b719b13151d11f227da41ef8f0e0cf917c603424dadc56c5eb"
