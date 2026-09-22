@@ -237,6 +237,19 @@ transaction to name, and therefore the `unknown-id` refusal. -/
 def Layer.retireAll (layer : Layer) : Layer :=
   { layer with transactions := layer.transactions.map Transaction.retired }
 
+/-- The refusal for a transaction composite arriving as a message on the control link.
+
+"No transactional work is allowed on the control link": the declare and discharge messages
+"do not represent the demarcation of transactional work", so what the link carries is that
+dialogue and nothing else. The condition is the artifact's own for input its rules do not
+admit at the moment it arrives — `illegal-state`, "The peer sent a frame that is not
+permitted in the current state" — and no clause names a condition for this sentence, so the
+failure-mode taxonomy's existing value is the one used rather than a new one. -/
+def notTheControlDialogue (typeName : String) : Refusal :=
+  refusal illegalStateCondition "illegalState"
+    s!"the control link carries the declare and discharge messages and no transactional \
+      work, and this message carries a {typeName}"
+
 /-- The coordinator's capabilities, as `global-id`'s rule needs them.
 
 A declare travels from the controller to the resource, so the end that receives an
@@ -320,19 +333,37 @@ def declared (layer : Layer) (outbound : Bool) (txnId : Nat) : Layer :=
 
 /-! ## The dispatch -/
 
+/-- Where a transaction value arrived, which decides what it may be.
+
+The control link carries one dialogue: "The «declare» and «discharge» messages are sent by
+the transactional controller over the control link to allocate and complete transactions
+respectively (they do not represent the demarcation of transactional work)", and "No
+transactional work is allowed on the control link." A transfer's payload is a message, and
+a disposition's `state` is the outcome a coordinator answers a declare with — the same
+composite means different things in the two, so the carrier is an input to the dispatch
+rather than something the dispatch guesses. -/
+inductive Carrier where
+  /-- A transfer's payload: the declare and discharge messages' carrier. -/
+  | payload
+  /-- A disposition's `state`: the `declared` outcome's carrier. -/
+  | state
+deriving Repr, BEq, DecidableEq
+
 /-- One transaction value, dispatched by the declared type its descriptor names.
 
-The two message bodies are what a control link's transfer payload carries; the two
-outcomes are what a disposition's `state` carries. `settled` is the settlement of the
-transfer the value arrived in, as `transfer/field:settled.4` interprets it, and only the
-two message bodies travel in a transfer, so the outcomes ignore it.
+`settled` is the settlement of the transfer the value arrived in, as
+`transfer/field:settled.4` interprets it, and only the two message bodies travel in a
+transfer, so the outcomes ignore it. `carrier` says which frame carried the value, which is
+what makes "No transactional work is allowed on the control link" checkable: the two control
+messages are what the link is for, and any other transaction composite arriving as a
+*message* is work being carried where the section says none is.
 
 The declared surface's mandatory rule comes first because it is the same rule at both
 sites: a composite that does not carry a field the artifact marks mandatory is not the
 composite its descriptor names, which is what `discharge`'s, `declared`'s and
 `transactional-state`'s `txn-id` are. -/
-def step (layer : Layer) (outbound : Bool) (value : Value) (settled : Bool) :
-    Except Refusal Layer := do
+def step (layer : Layer) (carrier : Carrier) (outbound : Bool) (value : Value)
+    (settled : Bool) : Except Refusal Layer := do
   let performative := Performative.ofValue value
   let typeName :=
     match performative with
@@ -368,10 +399,24 @@ def step (layer : Layer) (outbound : Bool) (value : Value) (settled : Bool) :
         "the discharge's txn-id is not an integer identifier, and this coordinator \
           allocates integer identifiers")
   | .declared =>
-    match (fieldValue "declared" "txn-id" value).bind valueNat with
-    | some txnId => return declared layer outbound txnId
-    | none => return layer
-  | .transactionalState => return layer
+    match carrier with
+    | .payload =>
+      -- a transaction composite arriving as a message on the control link, which carries
+      -- the declare and discharge messages and no transactional work
+      .error (notTheControlDialogue typeName)
+    | .state =>
+      match (fieldValue "declared" "txn-id" value).bind valueNat with
+      | some txnId => return declared layer outbound txnId
+      | none => return layer
+  | .transactionalState =>
+    match carrier with
+    | .payload => .error (notTheControlDialogue typeName)
+    | .state =>
+      -- the delivery-state layer's: `transactional-state` "combines a txn-id together with
+      -- one of the terminal delivery states" and its obligations are the txn-work clauses',
+      -- which are about posting, acquiring and retiring rather than about this machine's
+      -- declare/discharge lifecycle. Carried here, and dispositioned to that layer.
+      return layer
   | .other => return layer
 
 end SpecAMQP.Spec.Transactions

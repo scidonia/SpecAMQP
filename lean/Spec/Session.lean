@@ -954,12 +954,12 @@ ask for them. -/
 Nothing is decided here: whether the value is a transaction performative at all is the
 layer's question, and a value that is not one is carried. A refusal is placed the way the
 link's other refusals are, by the caller. -/
-def stepTransaction (session : Session) (outbound : Bool) (value : Value) (settled : Bool) :
-    Except Refusal Session := do
+def stepTransaction (session : Session) (carrier : Transactions.Carrier) (outbound : Bool)
+    (value : Value) (settled : Bool) : Except Refusal Session := do
   match session.transactions with
   | none => return session
   | some layer =>
-    match Transactions.step layer outbound value settled with
+    match Transactions.step layer carrier outbound value settled with
     | .ok layer => return { session with transactions := some layer }
     | .error reason =>
       .error { condition := reason.condition, detail := reason.detail, state := none,
@@ -986,7 +986,7 @@ def stepTransactionPayload (session : Session) (outbound : Bool) (payload : Octe
   | some _ =>
     match Message.bodyValue Message.Policy.empty payload with
     | .error _ => return session
-    | .ok value => stepTransaction session outbound value settled
+    | .ok value => stepTransaction session .payload outbound value settled
 
 /-- The transaction layer's step for a disposition's `state`, which is where a coordinator's
 answer arrives: "If the declaration is successful, the coordinator responds with a
@@ -996,7 +996,7 @@ transfer's, so the value is handed over unsettled. -/
 def stepTransactionState (session : Session) (outbound : Bool) (body : Value) :
     Except Refusal Session :=
   match fieldValue "disposition" "state" body with
-  | some state => stepTransaction session outbound state false
+  | some state => stepTransaction session .state outbound state false
   | none => .ok session
 
 /-! ## Applying a step -/
