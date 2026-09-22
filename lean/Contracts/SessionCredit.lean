@@ -69,6 +69,13 @@ every operation that leaves `role`, `position`, `peerCount` and `peerCredit` whe
 sets both sides of the equation to zero), `flowLink` (whose sender's branch rebuilds the credit with
 `Position.creditFor`) and `transferLink` (whose delivery-beginning transfer decrements the credit and
 increments the delivery-count) — and the proof module names them rather than sketching them.
+`attachLink` is **partially** landed: three of its nine branches have named lemmas
+(`attachLink_established_sender`, `attachLink_established_receiver`, `attachLink_peer_sender`), which
+is progress on the reduction and not a preservation lemma. **A partial set of branches is not a
+theorem, and no acceptance declaration may take anything from the proof module until all three
+operations are complete** — a declaration that did would claim the law holds for every transition
+when only some are covered, which is the error this plan has spent the session learning to name:
+a claim sourced from something other than what it is about.
 
 **So this file carries no acceptance theorem, and that is the state of the art rather than an
 oversight**: a declaration taking a name that does not exist would be a claim nobody can defend.
