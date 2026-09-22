@@ -53,7 +53,8 @@ namespace SpecAMQP.Spec.Session
 open SpecAMQP.Generated.Oasis (TypeDecl)
 open SpecAMQP.Spec.Codec (Value)
 open SpecAMQP.Spec.Connection
-  (choiceValue? fieldValue fieldSet framingError invalidField missingMandatory valueNat)
+  (choiceValue? fieldDefault fieldValue fieldSet framingError invalidField missingMandatory
+   valueNat)
 
 /-! ## The session state machine (picture 30, "State Transitions") -/
 
@@ -162,6 +163,10 @@ structure Refusal where
   detail : String
   /-- The state the refusal leaves the session in, or `none` where it leaves it alone. -/
   state : Option State
+  /-- Whether the peer's response is to close the *connection* rather than end the
+  session: `attach/field:handle.2` and `begin/field:handle-max.2` both mandate an
+  immediate connection close, which is the connection layer's move to make. -/
+  closesConnection : Bool := false
 deriving Repr
 
 /-- The condition an END carries when the session cannot process what it received: the
@@ -188,7 +193,31 @@ def windowViolation : String :=
 
 /-- A refusal of a given class, which leaves the state alone. -/
 def refusal (condition reasonClass prose : String) : Refusal :=
-  ⟨condition, s!"{reasonClass}: {prose}", none⟩
+  ⟨condition, s!"{reasonClass}: {prose}", none, false⟩
+
+/-- A refusal whose consequence is the connection's close, per `attach/field:handle.2`
+("MUST be responded to with an immediate «close» carrying a handle-in-use session-error")
+and `begin/field:handle-max.2` ("MUST close the connection with the framing-error
+error-code"). The session layer cannot write the close — the connection layer owns that
+frame — so the refusal says what must follow and the codec performs it. -/
+def closingRefusal (condition reasonClass prose : String) : Refusal :=
+  ⟨condition, s!"{reasonClass}: {prose}", none, true⟩
+
+/-- The condition for a link error, read from the generated `session-error` choice table:
+the family is where the artifact keeps the session's own errors; a link-level *session*
+error — `unattached-handle` — is one of them, while the link-error family carries the
+errors a detach names. -/
+def sessionErrorCondition (choice : String) : String :=
+  match choiceValue? "session-error" choice with
+  | some value => value
+  | none => s!"the session-error choice declares no {choice}"
+
+/-- The condition for an attach or flow naming a link this endpoint does not have. -/
+def unattachedHandle : String := sessionErrorCondition "unattached-handle"
+
+/-- The condition for an attach whose handle is already in use, per
+`attach/field:handle.2`. -/
+def handleInUse : String := sessionErrorCondition "handle-in-use"
 
 /-- Refuse unless a condition holds. -/
 def refuseUnless (condition : Bool) (reason : Refusal) : Except Refusal Unit :=
@@ -300,6 +329,87 @@ def Windows.afterReceivingFlow (windows : Windows) (frameNextOutgoing frameIncom
       remoteIncomingWindow :=
         (incomingId + frameIncoming) % serialModulus - windows.nextOutgoingId }
 
+/-! ## The link machine (`link-handles`, the performatives, doc `flow-control`) -/
+
+/-- The role a link endpoint attached as: "the role of the link endpoint", which decides
+which end sends transfers and which receives them. -/
+inductive LinkRole where
+  | sender
+  | receiver
+deriving Repr, BEq, DecidableEq
+
+def LinkRole.name : LinkRole → String
+  | .sender => "sender"
+  | .receiver => "receiver"
+
+/-- The role an `attach`'s or `disposition`'s `role` field names. The field is declared
+`role`, a restricted `boolean`, and its two values are `sender` and `receiver`; which
+boolean means which is read from the generated choice table rather than typed, so a table
+that changes the mapping takes this with it. A table that mapped both names to one value
+determines no role at all, and that is `none` rather than a guess. -/
+def LinkRole.ofValue (value : Value) : Option LinkRole :=
+  match value with
+  | .boolean bit =>
+    let sender := (choiceValue? "role" "sender").getD "false" == "true"
+    let receiver := (choiceValue? "role" "receiver").getD "true" == "true"
+    if bit == sender && bit != receiver then some .sender
+    else if bit == receiver && bit != sender then some .receiver
+    else none
+  | _ => none
+
+/-- The doc's two per-link flow variables: `delivery-count`, which "despite its name ...
+is not a count but a sequence number initialized at an arbitrary point by the sender", and
+`link-credit`, "the current maximum legal amount that the delivery-count can be increased
+by". A link that has not been attached carries neither. -/
+structure Position where
+  deliveryCount : Nat
+  credit : Nat
+deriving Repr, BEq, DecidableEq
+
+/-- A link that has not been attached, and the credit a sender has before the receiver's
+first flow: "Only the receiver can independently choose a value for this field", so a
+sender begins with nothing to spend. -/
+def Position.unattached : Position := ⟨0, 0⟩
+
+/-- The doc's formula for a sender's `link-credit`: `link-credit_snd :=
+delivery-count_rcv + link-credit_rcv - delivery-count_snd`. It is a conservation law
+rather than an update rule — the sender's credit is whatever the receiver's pair leaves
+room for — and `Proofs/` states it as one.
+
+The subtraction is over the naturals and truncates: a receiver whose numbers leave the
+sender no room grants credit zero, which fails the next send loudly, rather than a
+negative credit the doc does not describe. -/
+def Position.creditFor (receivedCount receivedCredit sentCount : Nat) : Nat :=
+  receivedCount + receivedCredit - sentCount
+
+/-- The arithmetic a transfer that begins a delivery needs: incrementing the delivery-count
+lowers what the receiver's pair leaves room for by exactly one, because the subtraction
+truncates at zero rather than wrapping. This is the fact the credit invariant's transfer
+case rests on, and it lives beside the constructor it is about so the two cannot drift. -/
+theorem Position.creditFor_succ (count credit sent : Nat) :
+    Position.creditFor count credit (sent + 1) = Position.creditFor count credit sent - 1 := by
+  unfold Position.creditFor
+  omega
+
+/-- The delivery a transfer carries. `delivery-id` names it in a disposition, and
+`settled` is the transfer clauses' *interpretation* rather than the field of the last
+frame that carried it: "If not set on the first (or only) transfer for a (multi-transfer)
+delivery, then the settled flag MUST be interpreted as being false", and for a subsequent
+transfer "true if and only if the value of the settled flag on any of the preceding
+transfers was true". -/
+structure Delivery where
+  id : Nat
+  settled : Bool
+deriving Repr, BEq, DecidableEq
+
+/-- The interpretation the two `settled` clauses give: `or` accumulates the flag across a
+delivery's transfers, and false is the first transfer's value when the field is unset. -/
+def Delivery.step (current : Option Delivery) (deliveryId : Nat) (settled : Bool) :
+    Delivery :=
+  match current with
+  | some delivery => { delivery with settled := delivery.settled || settled }
+  | none => ⟨deliveryId, settled⟩
+
 /-! ## The session endpoint -/
 
 /-- One session endpoint: the state, the outgoing channel it is assigned to, the
@@ -317,6 +427,38 @@ structure Session where
   peerBegun : Bool
   /-- The session's flow-control state. -/
   windows : Windows
+  /-- The role this endpoint's attach declared. -/
+  role : Option LinkRole
+  /-- The role the partner's attach declared. -/
+  peerRole : Option LinkRole
+  /-- The handle this endpoint assigned: the doc's "output handle". -/
+  handle : Option Nat
+  /-- The handle the partner assigned: the "input handle" a received frame names. -/
+  peerHandle : Option Nat
+  /-- Every handle this endpoint has claimed, newest first. `attach/field:handle.1` —
+  "The handle MUST NOT be used for other open links" — is checked against this list, and
+  the uniqueness invariant this field owes is one of the four the slice's acceptance list
+  names: no module in `Proofs/` states it yet, so the docstring says what is owed rather
+  than what exists. -/
+  handles : List Nat
+  /-- Every handle the partner has claimed, on the same terms. -/
+  peerHandles : List Nat
+  /-- The highest handle this endpoint's own begin announced it would accept, defaulting
+  to the value the generated field table declares for `handle-max`. -/
+  handleMax : Nat
+  /-- The highest handle the partner's begin announced. -/
+  peerHandleMax : Nat
+  /-- The link's flow state, once attached. -/
+  position : Option Position
+  /-- The partner's delivery-count and link-credit, as the last flow from it reported
+  them. -/
+  peerCount : Nat
+  peerCredit : Nat
+  /-- Whether the settlement mode in force for this link's sender side is
+  `sender-settle-mode`, which is what `transfer/field:settled.4` turns on. -/
+  senderSettleMode : Bool
+  /-- The delivery a transfer is carrying, while one is in progress. -/
+  delivery : Option Delivery
 deriving Repr
 
 /-- The policy the two MAY-decrements of the doc's update paragraphs are subject to.
@@ -324,13 +466,37 @@ Held as a value rather than compiled in, so the choice is visible: this is the r
 corpus runs with, and the other branch is conforming too. -/
 def startPolicy : Bool := true
 
-/-- A session endpoint that has been created and has not begun. -/
-def Session.initial : Session := ⟨.unmapped, none, none, false, Windows.start⟩
-
 /-- The lowest channel number a session can be assigned: "it is RECOMMENDED that
 implementations always assign the lowest available unused channel number", and channel
 zero is the connection's under the register's reading, so this is one. -/
 def startChannel : Nat := 1
+
+/-- The handle maximum this endpoint announces in its begin: the value the generated field
+table declares as `handle-max`'s default, read rather than typed so that a table change
+moves it. -/
+def startHandleMax : Nat := (fieldDefault "begin" "handle-max").getD 0
+
+/-- A session endpoint that has been created and has not begun, with no link attached and
+the handle maximum its begin will announce. -/
+def Session.initial : Session where
+  state := .unmapped
+  outgoing := none
+  incoming := none
+  peerBegun := false
+  windows := Windows.start
+  role := none
+  peerRole := none
+  handle := none
+  peerHandle := none
+  handles := []
+  peerHandles := []
+  handleMax := startHandleMax
+  peerHandleMax := startHandleMax
+  position := none
+  peerCount := 0
+  peerCredit := 0
+  senderSettleMode := false
+  delivery := none
 
 /-- The session a state name starts at, with the channels its own description says it
 has: "UNMAPPED ... is not mapped to any incoming or outgoing channels", `BEGIN_SENT` "is
@@ -343,14 +509,388 @@ and `DISCARDING` is "a variant of the END_SENT state". Whether the partner's beg
 arrived follows the same sentences: every state a begin had reached has one, and the two
 that a begin has not — `UNMAPPED` and `BEGIN_SENT` — do not. -/
 def Session.atState (state : State) : Session :=
+  let base : Session := Session.initial
   match state with
-  | .unmapped => ⟨.unmapped, none, none, false, Windows.start⟩
-  | .beginSent => ⟨.beginSent, some startChannel, none, false, Windows.start⟩
-  | .beginRcvd => ⟨.beginRcvd, none, some startChannel, true, Windows.start⟩
-  | .mapped => ⟨.mapped, some startChannel, some startChannel, true, Windows.start⟩
-  | .endSent => ⟨.endSent, none, some startChannel, true, Windows.start⟩
-  | .endRcvd => ⟨.endRcvd, some startChannel, none, true, Windows.start⟩
-  | .discarding => ⟨.discarding, none, some startChannel, true, Windows.start⟩
+  | .unmapped => { base with state := .unmapped }
+  | .beginSent => { base with state := .beginSent, outgoing := some startChannel }
+  | .beginRcvd => { base with state := .beginRcvd, incoming := some startChannel,
+                              peerBegun := true }
+  | .mapped => { base with state := .mapped, outgoing := some startChannel,
+                           incoming := some startChannel, peerBegun := true }
+  | .endSent => { base with state := .endSent, incoming := some startChannel,
+                            peerBegun := true }
+  | .endRcvd => { base with state := .endRcvd, outgoing := some startChannel,
+                            peerBegun := true }
+  | .discarding => { base with state := .discarding, incoming := some startChannel,
+                               peerBegun := true }
+
+/-- The handle a frame names, in the direction it travels: a received frame names the
+handle the *peer* assigned, and a sent frame names ours, which is the meaning `link-handles`
+gives the two — "the locally chosen handle is referred to as the output handle", "the
+remotely chosen handle is referred to as the input handle", and the handle "is used by the
+peer as a shorthand to refer to the link in all frames that reference the link".
+
+A frame that names a handle other than the attached one is refused with the
+`unattached-handle` session error, which is `flow/field:handle.1`'s rule: "If set to a
+handle that is not currently associated with an attached link, the recipient MUST respond
+by ending the session with a «session-error» session error."
+
+A frame that names *no* handle is left to the declared surface: `flow/field:handle` is not
+mandatory (a flow carrying only the session's windows is legal), while `attach`, `detach`
+and `transfer` are, and `missingMandatory` is what refuses those. What a handle-less flow
+must not do is carry the link's fields, and `flowLink` enforces the four clauses that say
+so. -/
+def linkHandleOf (session : Session) (outbound : Bool) (typeName : String) (body : Value) :
+    Except Refusal Unit := do
+  match fieldValue typeName "handle" body with
+  | none | some .null => return ()
+  | some value =>
+    let handle ←
+      match valueNat value with
+      | some handle => pure handle
+      | none => .error (refusal invalidField "malformed"
+          s!"the {typeName}'s handle field is not an integer")
+    let mine ←
+      match (if outbound then session.handle else session.peerHandle) with
+      | some mine => pure mine
+      | none => .error (refusal unattachedHandle "illegalState"
+          s!"a {typeName} names handle {handle}, and this endpoint has no attached link")
+    refuseUnless (handle == mine)
+      (refusal unattachedHandle "illegalState"
+        s!"the {typeName} names handle {handle}, and this endpoint's link is handle {mine}")
+
+/-- The delivery-count a `flow` must carry in each direction: `flow/field:delivery-count.2`
+— "When the handle identifies that the flow state is being sent from the sender link
+endpoint to receiver link endpoint this field MUST be set to the current delivery-count of
+the link endpoint" — and `.3`, the same field sent the other way, which "MUST be set to
+the last known value of the corresponding sending endpoint". -/
+def flowCountRefusal? (session : Session) (outbound : Bool) (body : Value) :
+    Option Refusal :=
+  match session.position, fieldValue "flow" "delivery-count" body with
+  | some current, some value =>
+    let ours := if outbound then session.role == some LinkRole.sender
+                else session.role == some LinkRole.receiver
+    if !ours then none
+    else
+      match valueNat value with
+      | none => some (refusal invalidField "malformed"
+          "the flow's delivery-count is not an integer")
+      | some carried =>
+        if carried == current.deliveryCount then none
+        else some (refusal invalidField "malformed"
+          s!"the flow carries delivery-count {carried}, and this endpoint's \
+            {if outbound then "current" else "last known"} count is \
+            {current.deliveryCount}")
+  | _, _ => none
+
+/-- The attach exchange: the handle rules (`attach/field:handle.1` — "The handle MUST NOT
+be used for other open links" — with `.2`'s mandated close, and `begin/field:handle-max`
+in both directions), the delivery-count the sender's attach must carry
+(`attach/field:initial-delivery-count.1` — "This MUST NOT be null if role is sender"),
+and the flow state the doc's `flow-control` defines for a fresh link. -/
+def attachLink (session : Session) (outbound : Bool) (body : Value) :
+    Except Refusal Session := do
+  let role ←
+    match (fieldValue "attach" "role" body).bind LinkRole.ofValue with
+    | some role => pure role
+    | none => .error (refusal invalidField "malformed"
+        "the attach must carry a role, and it must be one of the values the declared \
+          role type names")
+  let handle ←
+    match (fieldValue "attach" "handle" body).bind valueNat with
+    | some handle => pure handle
+    | none => .error (refusal invalidField "malformed"
+        "the attach must carry an integer handle")
+  let claimed := if outbound then session.handles else session.peerHandles
+  let bound := if outbound then session.peerHandleMax else session.handleMax
+  -- `begin/field:handle-max.1/.2`: a peer MUST NOT attach outside its partner's range,
+  -- and a peer that receives one MUST close the connection with the framing-error. The
+  -- condition is the artifact's own for an out-of-range value in the `open`'s doc; the
+  -- class names the bound.
+  refuseUnless (handle ≤ bound)
+    (if outbound then
+      closingRefusal framingError "limit"
+        s!"the handle {handle} is outside the range {session.peerHandleMax} the partner's \
+          begin declared it would accept"
+     else
+      closingRefusal framingError "limit"
+        s!"handle {handle} is outside the range {session.handleMax} this endpoint's begin \
+          declared")
+  -- `attach/field:handle.2`: an attach using a handle already associated with a link is
+  -- answered with an immediate close carrying a handle-in-use session error
+  refuseUnless (!claimed.contains handle)
+    (closingRefusal handleInUse "illegalState"
+      s!"handle {handle} is already associated with a link, and a handle MUST NOT be used \
+        for other open links")
+  let initialCount ←
+    match (fieldValue "attach" "initial-delivery-count" body).bind valueNat with
+    | some count => pure count
+    | none =>
+      if role == LinkRole.sender then
+        .error (refusal invalidField "malformed"
+          "a sender's attach MUST carry its initial delivery-count")
+      else pure 0
+  let senderSettle :=
+    -- `transfer/field:settled.4` speaks of "the negotiated value for snd-settle-mode" being
+    -- `sender-settle-mode`, which is the `unsettled` value of the field's declared type:
+    -- the mode in which the sender carries the settling. The number is the table's.
+    let unsettled :=
+      ((choiceValue? "sender-settle-mode" "unsettled").bind String.toNat?).getD 0
+    match fieldValue "attach" "snd-settle-mode" body with
+    | some value => valueNat value == some unsettled
+    | none => false
+  let position : Option Position :=
+    match role with
+    | LinkRole.sender => some ⟨initialCount, 0⟩
+    | LinkRole.receiver => some ⟨0, 0⟩
+  if outbound then
+    -- a link that is being established starts with nothing agreed: the credit is the
+    -- partner's to grant and the partner's count is its own announcement, so until this
+    -- link's first flow arrives this endpoint's view of both is empty
+    return { session with
+               handle := some handle, handles := handle :: session.handles,
+               role := some role, position, peerCount := 0, peerCredit := 0, delivery := none,
+               senderSettleMode := if role == LinkRole.sender then senderSettle else session.senderSettleMode }
+  else
+    return { session with
+               peerHandle := some handle, peerHandles := handle :: session.peerHandles,
+               -- the partner's delivery-count is a quantity its owner announces: it is
+               -- the sender's ("Only the sender MAY independently modify this field", and
+               -- its `initial-delivery-count` "MUST NOT be null if role is sender"), so a
+               -- received attach sets this endpoint's view of it only when the partner is
+               -- the link's sender and this endpoint is its receiver
+               peerRole := some role,
+               peerCount := (if role == LinkRole.sender && session.role == some LinkRole.receiver
+                             then initialCount else session.peerCount),
+               position := (if role == LinkRole.sender || session.position.isSome then
+                              session.position
+                            else position),
+               delivery := none,
+               senderSettleMode := if role == LinkRole.sender then senderSettle else session.senderSettleMode }
+
+/-- The flow exchange: the flow's own fields against the link's state. The windows'
+arithmetic lives at the session, above; what is here is the link's half of the doc's
+`flow-control` — the credit formula in the sender's direction, the delivery-count a flow
+carries in each direction, and the handle it must name. -/
+def flowLink (session : Session) (outbound : Bool) (body : Value) :
+    Except Refusal Session := do
+  -- the five clauses that couple the link's fields to the handle: `available`, `drain`,
+  -- `delivery-count`, `link-credit` and `properties` each say "When the handle field is
+  -- not set, this field MUST NOT be set", so a flow carrying only the session's state
+  -- carries none of them. `echo` is not among them: its own clause says that set with no
+  -- handle it asks for the *session's* state, which is the case it exists for.
+  if !fieldSet "flow" "handle" body then
+    let linkFields :=
+      [("delivery-count", fieldSet "flow" "delivery-count" body),
+       ("link-credit", fieldSet "flow" "link-credit" body),
+       ("available", fieldSet "flow" "available" body),
+       ("drain", fieldSet "flow" "drain" body),
+       ("properties", fieldSet "flow" "properties" body)]
+    let carried := (linkFields.filter (fun entry => entry.2)).map (fun entry => entry.1)
+    refuseUnless carried.isEmpty
+      (refusal invalidField "malformed"
+        s!"a flow that does not set the handle MUST NOT set {carried}, and this one carries \
+          the link's fields without naming the link")
+  let _ ← linkHandleOf session outbound "flow" body
+  refuseUnless ((flowCountRefusal? session outbound body).isNone)
+    ((flowCountRefusal? session outbound body).getD
+      (refusal invalidField "malformed" "the flow's delivery-count is wrong"))
+  if !fieldSet "flow" "handle" body then
+    -- a flow that names no link carries the session's windows and nothing of the link's:
+    -- the four field clauses forbid it carrying the link's fields, so nothing here reads
+    -- them and the link's own accounting is left where it was
+    return session
+  if outbound then
+    -- a receiver's or sender's flow carries its own grant; nothing here recomputes it
+    return session
+  else
+    let receivedCredit ←
+      match (fieldValue "flow" "link-credit" body).bind valueNat with
+      | some credit => pure credit
+      | none => pure 0
+    let receivedCount ←
+      match (fieldValue "flow" "delivery-count" body).bind valueNat with
+      | some count => pure count
+      | none => pure 0
+    if session.role == some LinkRole.sender then
+      -- the doc's formula, applied where a sender's credit is set
+      let position : Option Position :=
+        match session.position with
+        | some current => some { current with
+            credit := Position.creditFor receivedCount receivedCredit current.deliveryCount }
+        | none => session.position
+      return { session with position, peerCount := receivedCount, peerCredit := receivedCredit }
+    else
+      match session.position with
+      | some current =>
+        -- the ownership sentence the doc's `link-credit` carries: "Only the receiver
+        -- endpoint can independently set this value. The sender endpoint sets this to the
+        -- last known value seen from the receiver" — so a flow from the sender that
+        -- names a different credit than this endpoint last granted is inventing the other
+        -- side's quantity rather than echoing it
+        refuseUnless (receivedCredit == current.credit)
+          (refusal invalidField "malformed"
+            s!"a flow from the link's sender carries link-credit {receivedCredit}, and               this receiver's last known value for it is {current.credit}: only the               receiver sets that quantity, and the sender echoes what it was sent")
+        -- "The receiver's value is calculated based on the last known value from the
+        -- sender and any subsequent messages received on the link"
+        return { session with
+                   position := some { current with deliveryCount := receivedCount },
+                   peerCredit := receivedCredit }
+      | none => return session
+
+/-- The transfer exchange. What is here is what the transfer clauses and the doc's
+`flow-control` make checkable per frame: the role the direction requires, the credit a
+sender spends, the first-transfer fields `delivery-id`, `delivery-tag` and
+`message-format` require ("MUST be supplied on the first transfer of a multi-transfer
+delivery", "MUST be specified for the first transfer of a multi-transfer message and can
+only be omitted for continuation transfers"), the `settled` interpretation, `settled.4`'s
+obligation at the end of a delivery, and `aborted`'s discard. -/
+def transferLink (session : Session) (outbound : Bool) (body : Value) :
+    Except Refusal Session := do
+  let _ ← linkHandleOf session outbound "transfer" body
+  -- the direction the role fixes: a transfer is the sender's frame
+  let sender := session.role == some LinkRole.sender
+  refuseUnless (outbound == sender)
+    (refusal illegalStateCondition "illegalState"
+      s!"a transfer is the sender's frame, and this endpoint attached as \
+        {(session.role.getD LinkRole.receiver).name}")
+  let continued := session.delivery.isSome
+  let id ←
+    match (fieldValue "transfer" "delivery-id" body).bind valueNat with
+    | some id => pure id
+    | none =>
+      match session.delivery with
+      | some delivery => pure delivery.id
+      | none => .error (refusal invalidField "malformed"
+          "the first transfer of a delivery MUST carry its delivery-id")
+  -- `delivery-tag.1` and `message-format.1`: both "MUST be specified for the first
+  -- transfer of a multi-transfer message and can only be omitted for continuation
+  -- transfers"
+  refuseUnless (continued || (fieldSet "transfer" "delivery-tag" body &&
+                              fieldSet "transfer" "message-format" body))
+    (refusal invalidField "malformed"
+      "a first transfer MUST carry its delivery-tag and message-format, which only a \
+        continuation transfer may omit")
+  let settled := fieldSet "transfer" "settled" body
+  let aborted := fieldSet "transfer" "aborted" body
+  -- `more` decides whether this transfer completes the delivery; `aborted` discards it
+  -- ("Aborted messages SHOULD be discarded by the recipient")
+  let more := !aborted && fieldSet "transfer" "more" body
+  let delivery : Except Refusal (Option Delivery) :=
+    if aborted then pure none
+    else if more then pure (some (Delivery.step session.delivery id settled))
+    else
+      -- the delivery completes here: `settled.4` obliges a sender whose negotiated mode
+      -- is sender-settle-mode to settle it in at least one of its transfers
+      let completed := Delivery.step session.delivery id settled
+      if session.senderSettleMode && !completed.settled then
+        .error (refusal invalidField "malformed"
+          s!"the negotiated settlement mode is sender-settle-mode, so a delivery MUST be \
+            settled in at least one of its transfers, and delivery {id} is not")
+      else pure none
+  let delivery ← delivery
+  match session.position with
+  | none => return { session with delivery }
+  | some current =>
+      -- what the credit bounds is *messages*, not frames: `link-credit` is "the current
+      -- maximum number of messages that can be handled at the receiver endpoint" and "the
+      -- maximum legal amount that the delivery-count can be increased by", and the
+      -- delivery-count "is incremented whenever a message is sent". So both move on the
+      -- transfer that *begins* a delivery, and a continuation transfer of a delivery
+      -- already counted moves neither and needs no credit to proceed.
+      let starting := !continued
+      if sender then
+        refuseUnless (!starting || current.credit > 0)
+          (refusal framingError "limit"
+            "the link has no credit left: the sender's delivery-count has reached the \
+              delivery-limit the receiver granted, and this transfer begins a delivery")
+        let position : Position :=
+          { current with
+              credit := if starting then current.credit - 1 else current.credit,
+              deliveryCount :=
+                if starting then current.deliveryCount + 1 else current.deliveryCount }
+        return { session with position := some position, delivery }
+      else
+        -- the receiver's count follows the sender's: "any subsequent messages received"
+        let position : Position :=
+          { current with
+              deliveryCount :=
+                if starting then current.deliveryCount + 1 else current.deliveryCount }
+        return { session with position := some position, delivery }
+
+/-- Whether a body is a disposition performative. The dispatch table gives it to the
+session endpoint; this module's `Performative` names only the frames the session state
+machine itself turns on, so the disposition is recognised by its declared type here. -/
+def isDisposition (body : Value) : Bool :=
+  match body with
+  | .described descriptor _ =>
+    match SpecAMQP.Spec.Frame.typeOfDescriptor descriptor with
+    | some declaration => declaration.name == "disposition"
+    | none => false
+  | _ => false
+
+/-- The detach exchange: the handle rules, and the effect `link-handles` gives a detach —
+"this handle ... remains in use until the link is detached", so a detach releases it, and
+a later frame that names it is refused with `unattached-handle`. A detach carrying an
+`error` ends the link with that error, whose details this layer carries rather than
+judges.
+
+A detach is the one frame the links section excepts from its rule about input for a
+detached link endpoint, which reads "other than a detach": a detach naming a handle this
+endpoint does not have is therefore admitted, and it releases the link only when the
+handle is the attached one. -/
+def detachLink (session : Session) (outbound : Bool) (body : Value) :
+    Except Refusal Session := do
+  let named := ((fieldValue "detach" "handle" body).bind valueNat)
+  let releasable := named == (if outbound then session.handle else session.peerHandle)
+  if !releasable then return session
+  if outbound then
+    -- a released link takes its flow state with it: the credit is a quantity the partner
+    -- granted for this link, and the partner's own count is its announcement about it, so
+    -- neither outlives the link they are about
+    return { session with handle := none, role := none, position := none,
+                          peerCount := 0, peerCredit := 0, delivery := none }
+  else
+    return { session with peerHandle := none, peerRole := none,
+                          peerCount := 0, peerCredit := 0, delivery := none }
+
+/-- The disposition exchange: `disposition.1/.2`'s directionality ("all links MUST have
+the directionality indicated by the specified role"), the range `first`/`last` name, and
+the settlement a disposition carries — which, when it settles the delivery this endpoint
+is holding, releases it. -/
+def dispositionLink (session : Session) (outbound : Bool) (body : Value) :
+    Except Refusal Session := do
+  let _ ← linkHandleOf session outbound "disposition" body
+  let role ←
+    match (fieldValue "disposition" "role" body).bind LinkRole.ofValue with
+    | some role => pure role
+    | none => .error (refusal invalidField "malformed"
+        "the disposition must carry a role, and it must be one of the values the \
+          declared role type names")
+  -- the disposition is sent by the end the role names, so a disposition whose role is not
+  -- the sender's is one this endpoint may not be holding at all
+  refuseUnless (role == session.role.getD LinkRole.sender)
+    (refusal invalidField "malformed"
+      s!"the disposition names the {role.name}'s deliveries, and this endpoint is the \
+        {(session.role.getD LinkRole.sender).name}")
+  let first ←
+    match (fieldValue "disposition" "first" body).bind valueNat with
+    | some first => pure first
+    | none => pure 0
+  let last ←
+    match (fieldValue "disposition" "last" body).bind valueNat with
+    | some last => pure last
+    | none => pure first
+  refuseUnless (first ≤ last)
+    (refusal invalidField "malformed"
+      s!"the disposition's range runs from delivery {first} to {last}, which is not a \
+        range")
+  match session.delivery with
+  | some delivery =>
+    if fieldSet "disposition" "settled" body && first ≤ delivery.id && delivery.id ≤ last then
+      return { session with delivery := none }
+    else return session
+  | none => return session
 
 /-! ## Applying a step -/
 
@@ -377,7 +917,12 @@ def stepBegin (session : Session) (outbound : Bool) (channel : Nat) (body : Valu
       let windows :=
         session.windows.afterSendingBegin (fieldNumber "begin" body "next-outgoing-id")
           (fieldNumber "begin" body "incoming-window") (fieldNumber "begin" body "outgoing-window")
-      return { session with state := .beginSent, outgoing := some channel, windows }
+      -- the handle maximum this endpoint announces, which `begin/field:handle-max.1`
+      -- makes the bound its partner may not attach outside; a begin that leaves it unset
+      -- announces the declared default
+      let handleMax :=
+        ((fieldValue "begin" "handle-max" body).bind valueNat).getD startHandleMax
+      return { session with state := .beginSent, outgoing := some channel, windows, handleMax }
     | .beginRcvd =>
       match session.incoming, fieldValue "begin" "remote-channel" body with
       | some theirChannel, some value =>
@@ -388,7 +933,9 @@ def stepBegin (session : Session) (outbound : Bool) (channel : Nat) (body : Valu
         let windows :=
           session.windows.afterSendingBegin (fieldNumber "begin" body "next-outgoing-id")
             (fieldNumber "begin" body "incoming-window") (fieldNumber "begin" body "outgoing-window")
-        return { session with state := .mapped, outgoing := some channel, windows }
+        let handleMax :=
+          ((fieldValue "begin" "handle-max" body).bind valueNat).getD startHandleMax
+        return { session with state := .mapped, outgoing := some channel, windows, handleMax }
       | _, _ =>
         .error (refusal invalidField "malformed"
           "a begin answering a remotely initiated session MUST set the remote-channel, \
@@ -401,13 +948,17 @@ def stepBegin (session : Session) (outbound : Bool) (channel : Nat) (body : Valu
     | .unmapped =>
       let windows := session.windows.afterReceivingBegin (fieldNumber "begin" body "next-outgoing-id")
         (fieldNumber "begin" body "incoming-window") (fieldNumber "begin" body "outgoing-window")
+      let peerHandleMax :=
+        ((fieldValue "begin" "handle-max" body).bind valueNat).getD startHandleMax
       return { session with state := .beginRcvd, incoming := some channel, peerBegun := true,
-                            windows }
+                            windows, peerHandleMax }
     | .beginSent =>
       let windows := session.windows.afterReceivingBegin (fieldNumber "begin" body "next-outgoing-id")
         (fieldNumber "begin" body "incoming-window") (fieldNumber "begin" body "outgoing-window")
+      let peerHandleMax :=
+        ((fieldValue "begin" "handle-max" body).bind valueNat).getD startHandleMax
       return { session with state := .mapped, incoming := some channel, peerBegun := true,
-                            windows }
+                            windows, peerHandleMax }
     | other =>
       .error (refusal illegalStateCondition "illegalState"
         s!"a session receives one begin, and this one is already {other.name}")
@@ -424,6 +975,12 @@ def Session.afterEnd (session : Session) (outbound : Bool) (withError : Bool) : 
     | .endRcvd =>
       { session with state := .unmapped, outgoing := none, incoming := none,
                      peerBegun := false }
+    | .beginSent =>
+      -- the diagram's BEGIN_SENT --S:END--> END_SENT arrow: the label moves with the
+      -- channel the end releases, because BEGIN_SENT's description claims that outgoing
+      -- channel while END_SENT's claims no outgoing number and an incoming entry — the
+      -- maps this record has
+      { session with state := .endSent, outgoing := none }
     | other => { session with state := other, outgoing := none }
   else
     match session.state with
@@ -446,7 +1003,8 @@ def step (session : Session) (outbound : Bool) (channel : Nat) (body : Value) :
   let typeName :=
     match performative with
     | .begin => "begin" | .end => "end" | .attach => "attach" | .detach => "detach"
-    | .flow => "flow" | .transfer => "transfer" | .other => ""
+    | .flow => "flow" | .transfer => "transfer"
+    | .other => if isDisposition body then "disposition" else ""
   -- "any incoming frames on the session MUST be silently discarded until the peer's end
   -- frame is received": in the error-triggered close of DISCARDING what arrives is
   -- discarded without being looked at, and only the peer's end is answered
@@ -471,8 +1029,32 @@ def step (session : Session) (outbound : Bool) (channel : Nat) (body : Value) :
       -- the section's answer to input it cannot process: an END with an error, which the
       -- diagram draws from MAPPED to DISCARDING, and which a state that cannot send at
       -- all cannot issue
+      -- `sessions.5` obliges an END with an error and `sessions.6` then obliges the
+      -- session to discard incoming frames until the peer's end, so the phase is reached
+      -- from every state that can still *receive*, not only from MAPPED: `END_SENT` may
+      -- receive and so must reach it, while the states that cannot receive cannot issue
+      -- the END at all and so stand where they are
       { refusal condition reasonClass prose with
-          state := if session.state == .mapped then some State.discarding else none }
+          state := if session.state.mayReceive then some State.discarding else none }
+  -- a refusal the link raises is placed the way every session refusal is: the section
+  -- answers input it cannot process with the END an error, which is the diagram's
+  -- MAPPED --S:END(error)--> DISCARDING arrow
+  -- Three sites place a refusal, and each behaves differently, which is worth knowing
+  -- before adding a rule: a *wire-level* refusal (the channel map, and the frames the
+  -- decoder cannot read at all) is raised outside this path and leaves the state where it
+  -- is; a *session-level* one goes through `placed` below; and a *link-level* one — the
+  -- rules `flowLink`, `transferLink` and `detachLink` raise — goes through `place` here.
+  -- The corpus reached this third site only once it had a vector whose refusal a channel
+  -- map could not answer, so a rule added at the link level wants a vector keyed on that
+  -- rule rather than on the channel it arrives by.
+  let place (reason : Refusal) : Refusal :=
+    if reason.closesConnection || outbound then reason
+    else
+      -- the same phase rule as `placed` below, for the refusals the link raises: a link
+      -- refusal is input this session cannot process, so `sessions.6`'s discard reaches it
+      -- from every state that can receive, not only from MAPPED
+      { reason with
+          state := if session.state.mayReceive then some State.discarding else reason.state }
   refuseUnless permitted
     (placed illegalStateCondition "illegalState"
       s!"{session.state.name} does not permit this session to \
@@ -484,6 +1066,14 @@ def step (session : Session) (outbound : Bool) (channel : Nat) (body : Value) :
         and the declared surface marks it mandatory")
   match performative with
   | .begin => stepBegin session outbound channel body
+  | .attach =>
+    match attachLink session outbound body with
+    | .ok session => pure session
+    | .error reason => .error (place reason)
+  | .detach =>
+    match detachLink session outbound body with
+    | .ok session => pure session
+    | .error reason => .error (place reason)
   | .end => return session.afterEnd outbound (fieldSet "end" "error" body)
   | .flow =>
     -- "This value MUST be set if the peer has received the begin frame for the session,
@@ -494,6 +1084,11 @@ def step (session : Session) (outbound : Bool) (channel : Nat) (body : Value) :
         s!"a flow's next-incoming-id must be set exactly when the partner's begin has \
           arrived, and it is {if set then "set" else "unset"} while the begin has \
           {if session.peerBegun then "" else "not "}arrived")
+    -- the link's half of the flow: the handle it names and the delivery-count it carries
+    let session ←
+      match flowLink session outbound body with
+      | .ok session => pure session
+      | .error reason => .error (place reason)
     if outbound then return session
     else
       -- "When the endpoint receives a «flow» frame from its peer, it MUST update the
@@ -514,6 +1109,12 @@ def step (session : Session) (outbound : Bool) (channel : Nat) (body : Value) :
         (placed windowViolation "limit" "this session's outgoing window is exhausted, so           it may not send another transfer")
       refuseUnless (session.windows.remoteIncomingWindow > 0)
         (placed windowViolation "limit" "the partner's incoming window is exhausted, so           it can accept no further transfers")
+      -- the link's half: the role the direction requires, the credit the delivery spends,
+      -- and the delivery the transfer carries
+      let session ←
+        match transferLink session outbound body with
+        | .ok session => pure session
+        | .error reason => .error (place reason)
       return { session with
                  windows := session.windows.afterSendingTransfer startPolicy }
     else do
@@ -521,14 +1122,21 @@ def step (session : Session) (outbound : Bool) (channel : Nat) (body : Value) :
         (placed windowViolation "limit" "this session's incoming window is exhausted, so           it cannot receive another transfer")
       -- "the implicit transfer-id of the incoming transfer": the id the partner assigned
       -- it, which is the one this session expected
+      let session ←
+        match transferLink session outbound body with
+        | .ok session => pure session
+        | .error reason => .error (place reason)
       return { session with
                  windows := session.windows.afterReceivingTransfer
                    session.windows.nextIncomingId startPolicy }
-  | .attach | .detach => return session
   | .other =>
-    -- a performative the dispatch table gives a session and this slice does not model —
-    -- a disposition, whose link is S4's — is carried rather than judged: the session's
-    -- own state and channel rules still apply, and nothing here decides a link's moment
-    return session
+    if isDisposition body then
+      match dispositionLink session outbound body with
+      | .ok session => pure session
+      | .error reason => .error (place reason)
+    -- a performative this slice does not model is carried rather than judged: the
+    -- session's own state and channel rules still apply, and nothing here decides a
+    -- moment the artifact leaves to a layer that is not here
+    else return session
 
 end SpecAMQP.Spec.Session

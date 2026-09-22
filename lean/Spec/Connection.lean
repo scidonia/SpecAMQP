@@ -364,6 +364,27 @@ artifact's own `invalid-field` condition. -/
 def fieldRefusal (reasonClass prose : String) : Refusal :=
   ⟨invalidField, s!"{reasonClass}: {prose}", none, []⟩
 
+/-- The condition for a frame that is perfectly well formed and arrives in a state that
+does not permit it: the `amqp-error` family's `illegal-state`, whose definition in the
+artifact is exactly "The peer sent a frame that is not permitted in the current state".
+
+It is deliberately not `framing-error`: that condition's definition is "A valid frame
+header cannot be formed from the incoming byte stream", which is a different failure
+about the octets rather than about the moment. A peer acts on which one it is told, so
+conflating them tells it the wrong thing. The distinction is drawn where it applies: the
+open's doc mandates `framing-error` for an oversized frame and for a channel number
+outside the supported range, and those keep it. -/
+def illegalState : String :=
+  match (errorConditionsOf "amqp-error").find?
+      (fun choice => choice.name == "illegal-state") with
+  | some choice => choice.value
+  | none => "the amqp-error choice declares no illegal-state"
+
+/-- A refusal whose cause is the moment rather than the octets, carrying the artifact's
+own `illegal-state` condition. -/
+def stateRefusal (reasonClass prose : String) : Refusal :=
+  ⟨illegalState, s!"{reasonClass}: {prose}", none, []⟩
+
 /-- Refuse unless a condition holds: the guards below are all of this shape, and
 spelling them out keeps each one's diagnostic at the check that raised it. -/
 def refuseUnless (condition : Bool) (reason : Refusal) : Except Refusal Unit :=
@@ -469,7 +490,10 @@ which is the connection layer's own question, so `.arriving` is decoded here rat
 than by the caller. -/
 inductive Submission where
   | header (header : ProtocolHeader)
-  | frame (channel : Nat) (octets : Octets) (body : Value)
+  /-- A frame the peer is asked to send, or one that arrived: `body` is `none` for the
+  empty frame of `idle-time-out.7`, which carries no performative and so nothing to
+  dispatch. -/
+  | frame (channel : Nat) (octets : Octets) (body : Option Value)
   | arriving (octets : Octets)
 
 /-! ## The declared surface as this layer reads it -/
@@ -771,11 +795,13 @@ def Refusal.withPlace (endpoint : Endpoint) (outbound : Bool) (reason : Refusal)
     else if endpoint.layer == Layer.sasl then { reason with state := some .end }
     else { reason with state := some .discarding }
 
-/-- Whether the table's send column permits a role to be sent from a state.
+/-- Whether the table's send column permits a role to be sent in a state.
 
-`open` appears in the column only where the column *is* OPEN: in the `*` and `**` rows
-the frames a peer may send are frames other than its own `open`, which the artifact
-sends once, as the first frame on the connection. -/
+A second `open` is not admitted by the `*` and `**` rows either, but that exclusion is
+*not* a transcription: the artifact says the first frame in each direction contains an
+`open`, which implies at most one without forbidding a second. The rule is the register's,
+recorded with its scope in `ledger/ambiguities/second-open-refusal.json`, and it is cited
+here so that a reader does not take it for something the table states. -/
 def permitsSend (state : State) (role : FrameRole) : Bool :=
   match state.sendClass with
   | .nothing => false
@@ -785,7 +811,7 @@ def permitsSend (state : State) (role : FrameRole) : Bool :=
   | .conforming => role != .open
 
 /-- Whether the table's receive column permits a role to be received in a state, on the
-same terms: a second `open` is not a frame the table's `*` rows admit. -/
+same terms as `permitsSend` and with the same citation for the second-`open` exclusion. -/
 def permitsReceive (state : State) (role : FrameRole) : Bool :=
   match state.receiveClass with
   | .nothing => false
@@ -881,14 +907,14 @@ def stepHeader (endpoint : Endpoint) (outbound : Bool) (header : ProtocolHeader)
         id is one this peer does not speak")
   if outbound then
     refuseUnless (endpoint.state.sendClass == .header)
-      (refusal "illegalState" s!"{endpoint.state.name}'s legal sends are the table's \
+      (stateRefusal "illegalState" s!"{endpoint.state.name}'s legal sends are the table's \
         {endpoint.state.sendClass.name} column, and a protocol header is what HDR names")
     let state := if endpoint.state == .start then .hdrSent else .hdrExch
     let endpoint := Endpoint.afterHeaderExchange { endpoint with state, layer }
     return ⟨endpoint, [header.octets]⟩
   else
     refuseUnless (endpoint.state.receiveClass == .header)
-      (refusal "illegalState" s!"{endpoint.state.name}'s legal receives are the table's \
+      (stateRefusal "illegalState" s!"{endpoint.state.name}'s legal receives are the table's \
         {endpoint.state.receiveClass.name} column, and a protocol header is what HDR \
         names")
     if endpoint.state != .start then
@@ -929,7 +955,7 @@ def stepSaslFrame (endpoint : Endpoint) (outbound : Bool) (size : Nat) (body : V
   match endpoint.phase with
   | .awaitingMechanisms =>
     refuseUnless (frame == .mechanisms)
-      (refusal "illegalState" "the SASL dialogue is waiting for the partner's \
+      (stateRefusal "illegalState" "the SASL dialogue is waiting for the partner's \
         sasl-mechanisms frame")
     let announced :=
       symbolsOf (fieldValue "sasl-mechanisms" "sasl-server-mechanisms" body |>.getD .null)
@@ -942,7 +968,7 @@ def stepSaslFrame (endpoint : Endpoint) (outbound : Bool) (size : Nat) (body : V
     return reporting endpoint
   | .mechanismsKnown =>
     refuseUnless (frame == .init)
-      (refusal "illegalState" "the SASL dialogue knows the partner's mechanisms and is \
+      (stateRefusal "illegalState" "the SASL dialogue knows the partner's mechanisms and is \
         waiting for the sasl-init that chooses one")
     let mechanism :=
       match fieldValue "sasl-init" "mechanism" body with
@@ -950,7 +976,7 @@ def stepSaslFrame (endpoint : Endpoint) (outbound : Bool) (size : Nat) (body : V
       | _ => ""
     refuseUnless (!((outbound && endpoint.role == some SaslRole.server) ||
         (!outbound && endpoint.role == some SaslRole.client)))
-      (refusal "illegalState" "the peer that announced the mechanisms is the SASL \
+      (stateRefusal "illegalState" "the peer that announced the mechanisms is the SASL \
         server, and the security section gives the init to its partner")
     refuseUnless (endpoint.mechanisms.contains mechanism)
       (refusal "unsupported" s!"the mechanism {mechanism} is not one the partner \
@@ -965,19 +991,19 @@ def stepSaslFrame (endpoint : Endpoint) (outbound : Bool) (size : Nat) (body : V
     let server := endpoint.role == some SaslRole.server
     if frame == .challenge then
       refuseUnless (outbound == server)
-        (refusal "illegalState" "the sasl-challenge is the SASL server's to send, and \
+        (stateRefusal "illegalState" "the sasl-challenge is the SASL server's to send, and \
           this peer is not the server")
       return reporting endpoint
     if frame == .response then
       refuseUnless (outbound != server)
-        (refusal "illegalState" "the sasl-response is the SASL client's to send, and this \
+        (stateRefusal "illegalState" "the sasl-response is the SASL client's to send, and this \
           peer is not the client")
       return reporting endpoint
     refuseUnless (frame == .outcome)
-      (refusal "illegalState" "the SASL dialogue is waiting for the outcome of the \
+      (stateRefusal "illegalState" "the SASL dialogue is waiting for the outcome of the \
         exchange the init began")
     refuseUnless (outbound == server)
-      (refusal "illegalState" "the sasl-outcome is the SASL server's to send, and this \
+      (stateRefusal "illegalState" "the sasl-outcome is the SASL server's to send, and this \
         peer is not the server")
     let code := (fieldValue "sasl-outcome" "code" body).bind valueNat
     if code == saslOk then
@@ -994,7 +1020,7 @@ def stepSaslFrame (endpoint : Endpoint) (outbound : Bool) (size : Nat) (body : V
       -- so the close is recorded as the state it leaves and no condition is invented.
       return ⟨{ endpoint with state := .end }, []⟩
   | _ =>
-    .error (refusal "illegalState" s!"the SASL layer is not in a place for a SASL \
+    .error (stateRefusal "illegalState" s!"the SASL layer is not in a place for a SASL \
       performative: the dialogue is {endpoint.phase.name}")
 
 /-- One AMQP-layer frame, applied to the state table.
@@ -1006,13 +1032,13 @@ def stepAmqpFrame (endpoint : Endpoint) (outbound : Bool) (channel size : Nat)
     (body : Value) (wrote : Octets) : Except Refusal Outcome := do
   let role := roleOfBody body
   refuseUnless (role != .sasl)
-    (refusal "illegalState" "a SASL performative belongs to the SASL layer's dialogue, \
+    (stateRefusal "illegalState" "a SASL performative belongs to the SASL layer's dialogue, \
       and this exchange is the AMQP layer's until protocol id three is negotiated")
   let column :=
     if outbound then endpoint.state.sendClass.name else endpoint.state.receiveClass.name
   refuseUnless (if outbound then permitsSend endpoint.state role
                 else permitsReceive endpoint.state role)
-    (refusal "illegalState" s!"{endpoint.state.name} does not permit a {role.name} frame \
+    (stateRefusal "illegalState" s!"{endpoint.state.name} does not permit a {role.name} frame \
       to be {if outbound then "sent" else "received"}: the table's legal \
       {if outbound then "sends" else "receives"} column is {column}")
   refuseUnless (role != .open || channel == 0)
@@ -1051,11 +1077,15 @@ def step (endpoint : Endpoint) (outbound : Bool) (submission : Submission) :
     match submission with
     | .header header => stepHeader endpoint outbound header
     | .frame channel octets body =>
-      if endpoint.layer == Layer.sasl then
-
-        stepSaslFrame endpoint outbound octets.size body octets
-      else
-        stepAmqpFrame endpoint outbound channel octets.size body octets
+      -- a bodyless frame reaches this path too, and the clause's reading is the same one
+      -- the receive seam applies: nothing to dispatch, so the endpoint is unchanged
+      match body with
+      | none => .ok ⟨endpoint, []⟩
+      | some body =>
+        if endpoint.layer == Layer.sasl then
+          stepSaslFrame endpoint outbound octets.size body octets
+        else
+          stepAmqpFrame endpoint outbound channel octets.size body octets
     | .arriving octets =>
       if outbound then
         .error (refusal "illegalState" "a send carries the frame the peer chose, which \
@@ -1078,10 +1108,16 @@ def step (endpoint : Endpoint) (outbound : Bool) (submission : Submission) :
             match SpecAMQP.Spec.Frame.decodeFrame octets with
             | .error message => .error ⟨framingError, message, none, []⟩
             | .ok (frame, consumed) =>
-              if endpoint.layer == Layer.sasl then
-                stepSaslFrame endpoint false consumed frame.body #[]
-              else
-                stepAmqpFrame endpoint false frame.channel consumed frame.body #[]
+              -- an empty frame carries no performative — "apart from this use, empty frames
+              -- have no meaning" — so the endpoint is left as it was and nothing is
+              -- written, which is what the reference layer does for the same input
+              match frame.body with
+              | none => .ok ⟨endpoint, []⟩
+              | some body =>
+                if endpoint.layer == Layer.sasl then
+                  stepSaslFrame endpoint false consumed body #[]
+                else
+                  stepAmqpFrame endpoint false frame.channel consumed body #[]
   match dispatched with
   | .ok outcome => .ok outcome
   | .error reason => .error (Refusal.withPlace endpoint outbound reason)

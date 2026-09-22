@@ -182,4 +182,85 @@ nine are the unchanged-session cases (`exact h`), and the rest instantiate
 statement here claims them: this note exists so the remaining step is written down where the
 next reader finds it, and nothing in this module uses `sorry`. -/
 
+/-! ## `attachLink`'s branch shapes, one lemma each
+
+Each surviving branch of the reduction is a record, and each record's `SenderCreditState`
+is provable from the record alone — no other branch is needed — so the branches are landed
+as named lemmas and the operation's theorem will be a case split applying them. Naming them
+also documents the branch structure: which shapes exist, and which of them need only the
+identity. -/
+
+/-- The branch where **this endpoint establishes the link as its sender**: the record sets
+the four quantities the law's establishing case needs, so the credit is zero against a
+partner this endpoint has heard nothing from. -/
+theorem attachLink_established_sender {s s' : Session} (handle initialCount : Nat)
+    (hstep : (Except.ok ({ s with
+                            role := some LinkRole.sender, handle := some handle,
+                            handles := handle :: s.handles,
+                            position := some ⟨initialCount, 0⟩,
+                            peerCount := 0, peerCredit := 0,
+                            delivery := none } : Session) : Except Refusal Session) = .ok s') :
+    SenderCreditState s' := by
+  cases hstep
+  refine ⟨fresh_link_sender_credit LinkRole.sender initialCount _ rfl rfl rfl rfl, ?_⟩
+  intro h
+  simp at h
+
+/-- The branch where **this endpoint establishes the link as its receiver**: the law's
+sender clause is vacuous at that role, and the strengthened clause is vacuous because a
+position is set. -/
+theorem attachLink_established_receiver {s s' : Session} (handle : Nat)
+    (hstep : (Except.ok ({ s with
+                            role := some LinkRole.receiver, handle := some handle,
+                            handles := handle :: s.handles,
+                            position := some ⟨0, 0⟩,
+                            peerCount := 0, peerCredit := 0,
+                            delivery := none } : Session) : Except Refusal Session) = .ok s') :
+    SenderCreditState s' := by
+  cases hstep
+  refine ⟨?_, ?_⟩
+  · intro h
+    simp at h
+  · intro h
+    simp at h
+
+/-! ### The branch stated over the reachable state, and what it taught
+
+The partner-sender branch records the partner's count as this endpoint's view of it while
+leaving the position alone where there is none, so *stated over an arbitrary session* the
+record violates the strengthened clause — an endpoint with no link and the partner's count
+at once is what `position = none → peerCount = 0 ∧ peerCredit = 0` forbids.
+
+It is unreachable, and the branch's own guard is why: it records the count only when this
+endpoint is the link's **receiver**, and this endpoint's role is written in exactly two
+places — its own `attach`, which always returns a position because its match on the role
+returns one or the other and never `none`, with `Session.initial` the only
+`position = none` state and it has no role; and `detachLink`, which clears the role and the
+position together. So receiver implies position. No implementation change was needed, and
+none was made.
+
+The lesson is in the shape of the hypothesis rather than in the reachability: stating it as
+`s.position.isSome` — a *proposition* mentioning the field — blocks `cases hstep` on the
+successor equality, because the elimination becomes dependent on the very field the
+successor was built from. Stating it as `s.position = some p`, an equation to a *value*,
+lets the same proof through unchanged. Both forms say the same thing; only one is usable. -/
+
+/-- The partner-sender branch, over the reachable state: this endpoint is the link's
+receiver, so it has a link, and both of the law's clauses are vacuous at that role. -/
+theorem attachLink_peer_sender {s s' : Session} (peerHandle initialCount : Nat) (p : Position)
+    (hrole : s.role = some LinkRole.receiver) (hp : s.position = some p)
+    (hstep : (Except.ok ({ s with peerRole := some LinkRole.sender,
+                                   peerHandle := some peerHandle,
+                                   peerHandles := peerHandle :: s.peerHandles,
+                                   peerCount := initialCount,
+                                   delivery := none } : Session) : Except Refusal Session) = .ok s') :
+    SenderCreditState s' := by
+  cases hstep
+  refine ⟨?_, ?_⟩
+  · intro h
+    simp [hrole] at h
+  · intro h
+    rw [hp] at h
+    simp at h
+
 end SpecAMQP.Proofs.SessionCredit
