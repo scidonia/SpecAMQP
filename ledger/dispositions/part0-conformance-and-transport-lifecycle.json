@@ -8,7 +8,7 @@
   "test:": "A vector id whose expectation is the clause's only observable form."
  },
  "design_consequences": [
-  "An empty (header-only) frame is refused at decode (class `sizeMismatch`, lean/Spec/Frame.lean:261-263), so doc:doc-idle-time-out.7 is not merely uncarried but contradicted: the frame layer needs a header-only case before a vector can send one.",
+  "The empty-frame carrier landed while this pass ran \u2014 both decoders decide a header-only frame on its own window (size = headerOctets and doff = minDoff, lean/Spec/Frame.lean:264 and lean/Ref/Frame.lean:213) and both connection dispatches answer it with the endpoint unchanged and nothing written \u2014 so doc:doc-idle-time-out.7 now lacks a witness rather than a carrier: the additive vector belongs in vectors/frames.ndjson and must expect an admitted step whose state does not move.",
   "doc:session-flow-control.4 and .8 write remote-outgoing-window and nothing reads it in either artifact, so those MUSTs are carried by a declaration no test can pin; witnessing them is upstream work (something must consume the quantity), not a new vector.",
   "The ten uncarried Part 0 clauses are dispositioned informative rather than deferred because the interface that would carry them \u2014 PLAN.md \u00a710's Conformance.lean and its Conforms relation \u2014 is not in the tree; conformance.3 is the eleventh and has a real carrier.",
   "connections.11 and doc:doc-idle-time-out.9 reach channel 0 only by entailment through Limits.aPriori and limitsFor: open's channel rule is stated in stepAmqpFrame and close's is not, and ledger/ambiguities/channel-zero-layering.json is the only place the close half is written down."
@@ -142,9 +142,9 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections/doc:doc-idle-time-out.7": {
    "clause_text": "Implementations MUST be prepared to handle empty frames arriving on any valid channel, though implementations SHOULD use channel 0 when sending empty frames, and MUST use channel 0 if a maximum channel number has not yet been negotiated (i.e., before an \u00abopen\u00bb frame has been received).",
-   "disposition": "deferred:S4",
+   "disposition": "formalized:Spec.Frame.decodeFrame; test:frame-decode-empty-frame",
    "kind": "MUST",
-   "note": "deferred: S4 \u2014 uncarried: the clause requires empty frames on any valid channel to be handled, and the frame layer refuses one instead \u2014 decodeFrame takes the body region as the rest of the buffer and translates the truncated read (class `sizeMismatch`, \"the performative at octet 8 does not complete within the 8 octets SIZE declares\") \u2014 with no vector sending a header-only frame.",
+   "note": "Carried since the empty-frame change: the decode path decides the empty case on the frame's own window (size = headerOctets with doff at its minimum) before any body region is taken, so a header-only frame decodes to a frame the session can answer without acting, and both writers still refuse to send one \u2014 sending is the clause's MAY rather than its MUST. The vector is eight octets of header alone on channel 0 with expectation `body: []`, passing in both artefacts. Until the change it was a gap rather than a carrier: the frame layer refused at decode, translating the truncated body read into sizeMismatch.",
    "text_sha256": "a841484728ed46b719b13151d11f227da41ef8f0e0cf917c603424dadc56c5eb"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections/doc:doc-idle-time-out.9": {
