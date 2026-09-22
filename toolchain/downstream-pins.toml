@@ -1,0 +1,41 @@
+# Identities the downstream implementation work uses, recorded here so the
+# handoff (PLAN.md §22) names exact revisions. This repository does not use, and
+# does not require, any of them: it holds the specification, not an
+# implementation. The values mirror `../TemperMint/toolchain/pins.toml`, which
+# stays the canonical record for the implementation toolchain.
+#
+# Only the Lean and mathlib identities are shared requirements, and
+# `tests/contracts/s0_lean_environment.sh` checks that agreement rather than
+# trusting this comment: a module proved here must be requirable by downstream
+# proofs without version surgery.
+
+schema_version = 1
+
+[charon]
+repository = "https://github.com/AeneasVerif/charon"
+revision = "a5591f6b94c8575a6ba2ae71090614a722f2b011"
+llbc_version = "0.1.263"
+
+[aeneas]
+repository = "https://github.com/AeneasVerif/aeneas"
+revision = "227f4e7ac70d687a6b1a4871b3304f5a1c6994bf"
+release_tag = "nightly-2026.09.21-227f4e7"
+lean_library_subdirectory = "backends/lean"
+
+[rust]
+toolchain = "nightly-2026-09-17"
+
+[shared_with_this_repository.lean]
+toolchain = "leanprover/lean4:v4.31.0"
+mathlib_revision = "fabf563a7c95a166b8d7b6efca11c8b4dc9d911f"
+
+# What the specification provides to an implementation effort, per PLAN.md §22:
+# the frozen interface alphabet and conformance relation, the clause ledger and
+# coverage report in shared coverage units, the vector corpus with its schema,
+# the executable specification as the differential oracle, and the Lean/mathlib
+# pin agreement above.
+[provides_to_downstream]
+frozen_interface = "lean/Spec/Conformance.lean"
+clause_ledger = "ledger/clauses.json"
+coverage_report = "ledger/coverage.json"
+vector_schema = "tests/contracts/vector.schema.json"

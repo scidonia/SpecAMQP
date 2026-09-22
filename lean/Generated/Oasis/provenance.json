@@ -1,0 +1,20 @@
+{
+ "artifacts": {
+  "amqp-core-messaging-v1.0-os.xml": "35830a7ea489b2453ba5eb5dfdab3d8b5b865002f2cff7d57c9a9f43861b94cf",
+  "amqp-core-overview-v1.0-os.xml": "cc182e09635730ddacb3527c00d0b247c21b32963c9bba7ebdc9b6f67a61c1f8",
+  "amqp-core-security-v1.0-os.xml": "3d9faab5bb56d71741e4a85dcbf5c007b25a006c06e769b2ba57f647ccf04716",
+  "amqp-core-transactions-v1.0-os.xml": "6f6e2112d24bb81a285f6e1ed5acc015804a3f6a434fe74cdacc86a9fb6618ff",
+  "amqp-core-transport-v1.0-os.xml": "9cd32460d1730975ff0a9dbb66573ff456cbd53ffd8d4f6899c497f02867f637",
+  "amqp-core-types-v1.0-os.xml": "2ccf30b2c55924aaa5291cc34430a91b75c85d11d34bc008c36fc7ca7574d28c"
+ },
+ "counts": {
+  "choices": 54,
+  "constants": 13,
+  "descriptors": 40,
+  "encodings": 39,
+  "fields": 125,
+  "types": 96
+ },
+ "generator": "scripts/gen-oasis-lean.py",
+ "note": "Counts are of records emitted into lean/Generated/Oasis; they are the declared surface, not a clause count (see ledger/clauses.json)."
+}

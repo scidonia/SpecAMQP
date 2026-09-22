@@ -96,15 +96,28 @@ Three independence rules keep the evidence meaningful, and each has a gate (§17
 
 ## 7. Generated definition tables
 
-`scripts/gen-oasis-lean.py` reads the pinned bytes and emits `lean/Generated/Oasis/*.lean`: descriptor codes as literals, field order and codes, `Option`-typed nullable fields, declared defaults, mandatory flags, choice sets with their error-condition symbols, and the encoding table (39 entries with code/category/width).
+`scripts/gen-oasis-lean.py` reads the pinned bytes and emits `lean/Generated/Oasis/`, one module per declaration kind:
 
-Contracts:
+| Module | Contents | Records |
+| --- | --- | --- |
+| `Constants.lean` | the `<definition>` constants, with `constantValue?` lookup | 13 |
+| `Types.lean` | declared types, their class, source, semantic `provides` roles, descriptor, and artifact anchor path | 96 |
+| `Fields.lean` | fields in wire order with owner, index, type, mandatory flag, declared default, `multiple`/`requires`, plus `fieldsOf`/`mandatoryFields` | 125 |
+| `Encodings.lean` | the 39 encodings with constructor octet, category, size width, and `encodingOf` | 39 |
+| `Choices.lean` | declared choices, the error-condition families, and `errorConditionsOf` | 54 |
+| `provenance.json` | the artifact digests and record counts the modules were derived from | — |
 
-- regeneration is byte-identical (§17);
-- no file under `lean/Spec`, `lean/Contracts`, or `lean/Proofs` may contain a literal descriptor code or an `amqp:`-shaped symbol — the scan requires them to come from the generated module;
-- **the mutation control**: edit a copy of one vendor file's `code="0x00000000:0x00000014"` to a wrong value, regenerate, and require the generated output to change and the affected contract to fail.
+Contracts, all enforced by `tests/contracts/s0_tables_fidelity.sh`:
 
-The generated tables are reviewed data, not a specification of record: a reviewer can diff them against the OASIS text directly, which is exactly what the mutation control demonstrates is load-bearing.
+- **currency**: a fresh generation is byte-identical to the committed modules, so the tables are derived rather than transcribed;
+- **load-bearing**: replacing `amqp:transfer:list`'s code with `disposition`'s in a scratch copy of Part 2 changes the generated tables and makes the currency check fail — the gate is not vacuous;
+- **counts**: an independent count of the pinned artifacts equals the generated record counts;
+- **no smuggling**: no file under `lean/Spec`, `lean/Contracts` or `lean/Proofs` may contain a literal descriptor code or an `amqp:`-shaped symbol — they come from these modules;
+- **compilation**: the generated modules build against the pinned closure.
+
+Two normalisations are deliberate and documented in the generator. Labels — the human-readable attribute text — have whitespace runs collapsed so generated diffs stay stable; no data field (value, code, flag, default) is touched. And each declaration carries the anchor path it came from, which is what links a generated record to the clause ledger's identifier for the same element.
+
+Module naming is path-derived (`lean/Generated/Oasis/Types.lean` → `Generated.Oasis.Types`), and each generated module is self-contained: `Choices.lean` imports `Types.lean` because the error-condition lookup needs the type table, and nothing else.
 
 ## 8. Ambiguity register
 
@@ -226,9 +239,11 @@ Contracts: `tests/contracts/s0_sources_ledger.sh` (hashes, ledger generation, re
 
 Expected failure: `scripts/fetch-oasis.sh` fails on a missing pin; `clause-ledger.py` fails on an unresolved import; the tables contract fails because no generator exists.
 
-**Progress.** The source and ledger half of S0 is landed and verified: the six artifacts are vendored with hashes and notice; `scripts/fetch-oasis.sh` verifies them offline and refuses a one-bit mutation; `scripts/clause-ledger.py` generates 401 clauses over 230 MUST-class statements across 116 anchors with the token census clean; the baseline reconciliation is recorded; and 39 clauses of connection establishment (framing, version negotiation, `open`) carry their first dispositions. `tests/contracts/s0_sources_ledger.sh` is the observable contract and passes, having first failed on a real defect it caught: `revhistory` is a section *name*, so exclusion by element tag alone silently kept revision-history prose in the ledger.
+**Progress.** S0 is essentially landed. Verified so far: the six artifacts are vendored with hashes and notice, and `scripts/fetch-oasis.sh` refuses a one-bit mutation; `scripts/clause-ledger.py` generates 401 clauses over 230 MUST-class statements across 116 anchor paths with the token census clean and the baseline reconciliation recorded; 39 connection-establishment clauses carry their first dispositions; `scripts/gen-oasis-lean.py` emits the declared surface (13 constants, 96 types, 40 descriptors, 125 fields, 39 encodings, 54 choices) and all five modules compile; the `spec` shell realizes the pinned Lean 4.31.0 + mathlib closure (741 MB store path, 3m35s once, offline afterwards) and provisions a writable copy into the gitignored `lean/.lake`; the vector schema and `toolchain/downstream-pins.toml` are written. Three contracts pass: `s0_sources_ledger.sh`, `s0_tables_fidelity.sh`, `s0_lean_environment.sh`.
 
-Still open in S0: the generated definition tables and their mutation control, the vector schema, the flake and its cold realization, `AGENTS.md`, and the executable driver's skeleton. Two design consequences of the first disposition pass are already fixed and recorded there: the endpoint interface must carry a role (client or server), and progress-shaped SHOULDs need the fairness-qualified progress form rather than a MUST-style obligation.
+Each contract first failed on a real defect, which is why they are worth having: `revhistory` is a section *name* rather than an element tag, so exclusion by tag alone silently kept revision-history prose in the ledger; the tables contract's own independent recount assumed every encoding carries a `name` when 11 do not; and the generated Lean did not compile until `class` (a Lean keyword) became `typeClass` and list elements were separated. The environment contract also caught that the mathlib probe needed `Mathlib.Algebra.Order.BigOperators.Group.List`, the module carrying the `List.Sublist.sum_le_sum` bound that the specification's later aggregation arguments rely on.
+
+Still open in S0: the executable driver's skeleton, which is genuinely the first S1 artifact — `Spec/Value.lean` plus the driver that turns a vector file into a verdict — so the milestone boundary is deliberate rather than a gap.
 
 Acceptance: ledger generated offline from the vendored bytes; every §1 count reconciled with recorded reasons; regeneration byte-identical; sources and ledger gates green with their negative controls observed failing first.
 
@@ -385,9 +400,10 @@ alias shell='nix --extra-experimental-features "nix-command flakes" develop --of
 nix --extra-experimental-features 'nix-command flakes' flake metadata --no-update-lock-file
 nix --extra-experimental-features 'nix-command flakes' develop --no-update-lock-file .#spec --command true
 
-# S0 — sources, ledger, tables
+# S0 — sources, ledger, tables, environment
 shell bash tests/contracts/s0_sources_ledger.sh
 shell bash tests/contracts/s0_tables_fidelity.sh
+shell bash tests/contracts/s0_lean_environment.sh
 git diff --exit-code -- lean/Generated    # regeneration determinism
 
 # S1–S7 — specification claims and corpus, per milestone

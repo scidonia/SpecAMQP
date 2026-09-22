@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specamqp.invalid/contracts/vector.schema.json",
+  "title": "AMQP 1.0 specification test vector",
+  "description": "One NDJSON line of a specification test vector. Vectors are authored from OASIS clauses or from recorded third-party exchanges, never produced by running the executable specification (PLAN.md §5 rule 2), and replay uses logical time only: `tick` steps are ordering tags, never wall-clock readings, so a replay is deterministic on any machine. The executable specification (S1 onward) consumes this format and reports a verdict per vector, naming the error condition it expects for negative vectors.",
+  "type": "object",
+  "required": ["vector", "kind", "role", "steps"],
+  "additionalProperties": false,
+  "properties": {
+    "vector": {
+      "type": "string",
+      "description": "Stable identifier, unique within the corpus. Appears in dispositions and coverage reports, so it is part of the contract.",
+      "pattern": "^[a-z0-9][a-z0-9._-]*$"
+    },
+    "kind": {
+      "enum": ["positive", "negative", "recorded"],
+      "description": "positive: must be admitted, with the named outputs. negative: must be rejected with the named error condition. recorded: captured from a third-party implementation and used to test the specification's adequacy."
+    },
+    "role": {
+      "enum": ["client", "server"],
+      "description": "The role the endpoint under test plays. The specification binds roles on both sides of the version negotiation, so a vector without a role is under-specified."
+    },
+    "clauses": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" },
+      "description": "Clause ids this vector is testing, as they appear in ledger/clauses.json. The coverage report cross-checks these against the ledger, so vectors cannot accumulate free of the clauses they claim to exercise.",
+      "examples": [["amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.9"]]
+    },
+    "config": {
+      "type": "object",
+      "description": "Negotiable values in force for this vector. Absent fields take the value the specification declares as a default, which is generated, not transcribed.",
+      "additionalProperties": false,
+      "properties": {
+        "containerId": { "type": "string" },
+        "channelMax": { "type": "integer", "minimum": 0, "maximum": 65535 },
+        "maxFrameSize": { "type": "integer", "minimum": 512 },
+        "idleTimeOut": { "type": ["integer", "null"], "minimum": 0 },
+        "outcome": { "type": ["string", "null"], "description": "The outcome the endpoint is configured to send, where a clause lets it choose." }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "description": "Required for kind=recorded, and forbidden otherwise: a clause-authored vector cites clauses, an observed one cites the implementation it observed.",
+      "required": ["peer", "version", "method", "date", "recorder", "transcriptSha256"],
+      "additionalProperties": false,
+      "properties": {
+        "peer": { "type": "string", "description": "The implementation observed, e.g. \"Apache Qpid Proton\"." },
+        "version": { "type": "string" },
+        "method": { "enum": ["recorded"], "description": "All third-party vectors are captures; a synthesised third-party vector would be a fabrication." },
+        "date": { "type": "string", "format": "date" },
+        "recorder": { "type": "string", "description": "Who captured it: the reviewer must be able to ask them how." },
+        "transcriptSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$", "description": "Digest of the full session transcript kept out of tree. Establishes that the steps are an excerpt of a real exchange rather than a construction." },
+        "note": { "type": "string" }
+      }
+    },
+    "expectError": {
+      "type": "object",
+      "description": "Required for kind=negative: \"it fails\" is not a specification. A mandated refusal names the error condition and the endpoint that must close.",
+      "required": ["condition", "endpoint"],
+      "additionalProperties": false,
+      "properties": {
+        "condition": {
+          "type": "string",
+          "pattern": "^amqp:",
+          "description": "An error-condition symbol from the generated table, e.g. amqp:connection:framing-error."
+        },
+        "endpoint": { "enum": ["connection", "session", "link"] },
+        "clause": { "type": "string", "description": "The clause that mandates this refusal, when the vector tests a refusal rather than a decode error." }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "description": "The exchange. Steps are ordered; nothing is implied by position beyond that ordering.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "dir": {
+            "enum": ["in", "out"],
+            "description": "in: peer to endpoint. out: endpoint to peer."
+          },
+          "bytes": {
+            "type": "string",
+            "pattern": "^([0-9a-f]{2})+$",
+            "description": "Frame bytes, lowercase hex, no separators. For dir=out with expect=bytes this is the required exact output; the specification fixes those bytes."
+          },
+          "expect": {
+            "enum": ["bytes", "action"],
+            "description": "bytes: the endpoint's output is fixed octet-for-octet. action: the specification permits latitude (fragmentation split points, credit values, ordering where a clause allows a choice) and the step names what must happen instead."
+          },
+          "action": {
+            "type": "object",
+            "description": "Present when expect=action.",
+            "required": ["kind"],
+            "additionalProperties": true,
+            "properties": {
+              "kind": { "enum": ["credit", "drain", "echo", "disposition", "detach", "end", "close", "tick", "none"] },
+              "link": { "type": "integer", "minimum": 0 },
+              "handle": { "type": "integer", "minimum": 0 },
+              "channel": { "type": "integer", "minimum": 0, "maximum": 65535 },
+              "value": { "type": "integer" }
+            }
+          },
+          "env": {
+            "type": "object",
+            "description": "An environment event rather than an exchange: a logical tick, end of stream, or a partial read. Modelling these as explicit steps is what keeps replay deterministic.",
+            "additionalProperties": false,
+            "properties": {
+              "tick": { "type": "integer", "minimum": 0, "description": "Logical milliseconds since the previous step. Never a wall-clock reading." },
+              "eof": { "type": "boolean" },
+              "partial": { "type": "integer", "minimum": 1, "description": "Deliver only this many octets of the next available input, so a decoder's incremental behaviour is exercised." }
+            }
+          }
+        },
+        "oneOf": [
+          { "required": ["dir", "bytes"] },
+          { "required": ["dir", "expect", "action"] },
+          { "required": ["env"] }
+        ]
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "const": "recorded" } }, "required": ["kind"] },
+      "then": { "required": ["provenance"] }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "negative" } }, "required": ["kind"] },
+      "then": { "required": ["expectError"] }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "recorded" } }, "required": ["kind"] },
+      "then": { "not": { "required": ["expectError"] } }
+    }
+  ]
+}
