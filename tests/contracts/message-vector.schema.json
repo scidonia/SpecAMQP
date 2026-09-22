@@ -1,0 +1,384 @@
+{
+ "$defs": {
+  "expectError": {
+   "additionalProperties": false,
+   "description": "The condition and reason the refusal must name. Both are required: a codec that refuses for the wrong reason fails this vector, which is the point of separating refusal from decoding.",
+   "properties": {
+    "condition": {
+     "type": "string"
+    },
+    "endpoint": {
+     "type": "string"
+    },
+    "reason": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "condition",
+    "reason"
+   ],
+   "type": "object"
+  },
+  "hexbytes": {
+   "description": "The octets, hex without separators. A `-reject` vector's octets are the ones that must be refused, and a `-decode` vector's are the canonical encoding of the value it must recover.",
+   "pattern": "^([0-9a-f]{2})*$",
+   "type": "string"
+  }
+ },
+ "$id": "https://scidonia.example/specamqp/message-vector.schema.json",
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
+ "description": "A message-layer vector: one section, one message, or a delivery's state, encoded, decoded or refused. The layer's three questions are separate kinds rather than one flag \u2014 whether the codec produces the right octets, whether it recovers the right value from octets, and whether it refuses octets for the right reason \u2014 because a corpus that conflated them could not fail a codec that round-trips an encoding it should have refused.",
+ "oneOf": [
+  {
+   "additionalProperties": false,
+   "description": "One section's octets decoded into the value it carries.",
+   "properties": {
+    "bytes": {
+     "description": "The octets, hex without separators. A `-reject` vector's octets are the ones that must be refused, and a `-decode` vector's are the canonical encoding of the value it must recover.",
+     "pattern": "^([0-9a-f]{2})*$",
+     "type": "string"
+    },
+    "canonical": {
+     "description": "Whether these octets are the canonical encoding, so the decoder is exercised through a form no encoder produces.",
+     "type": "boolean"
+    },
+    "clauses": {
+     "description": "The clauses or pictures this vector is authored from, as ids in the ledger's id space.",
+     "items": {
+      "type": "string"
+     },
+     "minItems": 1,
+     "type": "array"
+    },
+    "kind": {
+     "const": "section-decode"
+    },
+    "note": {
+     "description": "Why the vector exists, in the author's words \u2014 the reading it pins and what would make it wrong.",
+     "type": "string"
+    },
+    "policy": {
+     "description": "The annotation policy in force, when the vector depends on one \u2014 a reserved symbolic key is only understood if the policy names it.",
+     "type": "object"
+    },
+    "section": {
+     "description": "The section the octets must decode as or encode from: a section kind with its fields, pairs, items or payload, in the corpus's own value notation.",
+     "type": "object"
+    },
+    "vector": {
+     "description": "The vector's name, unique across the corpus.",
+     "type": "string"
+    }
+   },
+   "required": [
+    "vector",
+    "kind",
+    "clauses",
+    "note",
+    "bytes",
+    "canonical",
+    "section"
+   ]
+  },
+  {
+   "additionalProperties": false,
+   "description": "One section's value encoded into the octets it must produce.",
+   "properties": {
+    "bytes": {
+     "description": "The octets, hex without separators. A `-reject` vector's octets are the ones that must be refused, and a `-decode` vector's are the canonical encoding of the value it must recover.",
+     "pattern": "^([0-9a-f]{2})*$",
+     "type": "string"
+    },
+    "clauses": {
+     "description": "The clauses or pictures this vector is authored from, as ids in the ledger's id space.",
+     "items": {
+      "type": "string"
+     },
+     "minItems": 1,
+     "type": "array"
+    },
+    "kind": {
+     "const": "section-encode"
+    },
+    "note": {
+     "description": "Why the vector exists, in the author's words \u2014 the reading it pins and what would make it wrong.",
+     "type": "string"
+    },
+    "section": {
+     "description": "The section the octets must decode as or encode from: a section kind with its fields, pairs, items or payload, in the corpus's own value notation.",
+     "type": "object"
+    },
+    "vector": {
+     "description": "The vector's name, unique across the corpus.",
+     "type": "string"
+    }
+   },
+   "required": [
+    "vector",
+    "kind",
+    "clauses",
+    "note",
+    "bytes",
+    "section"
+   ]
+  },
+  {
+   "additionalProperties": false,
+   "description": "Octets that must be refused rather than decoded.",
+   "properties": {
+    "bytes": {
+     "description": "The octets, hex without separators. A `-reject` vector's octets are the ones that must be refused, and a `-decode` vector's are the canonical encoding of the value it must recover.",
+     "pattern": "^([0-9a-f]{2})*$",
+     "type": "string"
+    },
+    "clauses": {
+     "description": "The clauses or pictures this vector is authored from, as ids in the ledger's id space.",
+     "items": {
+      "type": "string"
+     },
+     "minItems": 1,
+     "type": "array"
+    },
+    "expectError": {
+     "additionalProperties": false,
+     "description": "The condition and reason the refusal must name. Both are required: a codec that refuses for the wrong reason fails this vector, which is the point of separating refusal from decoding.",
+     "properties": {
+      "condition": {
+       "type": "string"
+      },
+      "endpoint": {
+       "type": "string"
+      },
+      "reason": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "condition",
+      "reason"
+     ],
+     "type": "object"
+    },
+    "kind": {
+     "const": "section-reject"
+    },
+    "note": {
+     "description": "Why the vector exists, in the author's words \u2014 the reading it pins and what would make it wrong.",
+     "type": "string"
+    },
+    "policy": {
+     "type": "object"
+    },
+    "vector": {
+     "description": "The vector's name, unique across the corpus.",
+     "type": "string"
+    }
+   },
+   "required": [
+    "vector",
+    "kind",
+    "clauses",
+    "note",
+    "bytes",
+    "expectError"
+   ]
+  },
+  {
+   "additionalProperties": false,
+   "description": "A message's sections decoded into the values they carry.",
+   "properties": {
+    "bytes": {
+     "description": "The octets, hex without separators. A `-reject` vector's octets are the ones that must be refused, and a `-decode` vector's are the canonical encoding of the value it must recover.",
+     "pattern": "^([0-9a-f]{2})*$",
+     "type": "string"
+    },
+    "canonical": {
+     "type": "boolean"
+    },
+    "clauses": {
+     "description": "The clauses or pictures this vector is authored from, as ids in the ledger's id space.",
+     "items": {
+      "type": "string"
+     },
+     "minItems": 1,
+     "type": "array"
+    },
+    "kind": {
+     "const": "message-decode"
+    },
+    "note": {
+     "description": "Why the vector exists, in the author's words \u2014 the reading it pins and what would make it wrong.",
+     "type": "string"
+    },
+    "sections": {
+     "description": "The sections the message must decode to or encode from, in order, each a section kind with its fields or payload. Empty is legal and pinned by a vector: a zero-octet payload is a message with no sections at all, which the artifact neither requires nor forbids and peers do send.",
+     "items": {
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "vector": {
+     "description": "The vector's name, unique across the corpus.",
+     "type": "string"
+    }
+   },
+   "required": [
+    "vector",
+    "kind",
+    "clauses",
+    "note",
+    "bytes",
+    "canonical",
+    "sections"
+   ]
+  },
+  {
+   "additionalProperties": false,
+   "description": "A message's sections encoded into the octets they must produce.",
+   "properties": {
+    "bytes": {
+     "description": "The octets, hex without separators. A `-reject` vector's octets are the ones that must be refused, and a `-decode` vector's are the canonical encoding of the value it must recover.",
+     "pattern": "^([0-9a-f]{2})*$",
+     "type": "string"
+    },
+    "clauses": {
+     "description": "The clauses or pictures this vector is authored from, as ids in the ledger's id space.",
+     "items": {
+      "type": "string"
+     },
+     "minItems": 1,
+     "type": "array"
+    },
+    "kind": {
+     "const": "message-encode"
+    },
+    "note": {
+     "description": "Why the vector exists, in the author's words \u2014 the reading it pins and what would make it wrong.",
+     "type": "string"
+    },
+    "sections": {
+     "description": "The sections the message must decode to or encode from, in order, each a section kind with its fields or payload. Empty is legal and pinned by a vector: a zero-octet payload is a message with no sections at all, which the artifact neither requires nor forbids and peers do send.",
+     "items": {
+      "type": "object"
+     },
+     "type": "array"
+    },
+    "vector": {
+     "description": "The vector's name, unique across the corpus.",
+     "type": "string"
+    }
+   },
+   "required": [
+    "vector",
+    "kind",
+    "clauses",
+    "note",
+    "bytes",
+    "sections"
+   ]
+  },
+  {
+   "additionalProperties": false,
+   "description": "A message's octets that must be refused as a whole.",
+   "properties": {
+    "bytes": {
+     "description": "The octets, hex without separators. A `-reject` vector's octets are the ones that must be refused, and a `-decode` vector's are the canonical encoding of the value it must recover.",
+     "pattern": "^([0-9a-f]{2})*$",
+     "type": "string"
+    },
+    "clauses": {
+     "description": "The clauses or pictures this vector is authored from, as ids in the ledger's id space.",
+     "items": {
+      "type": "string"
+     },
+     "minItems": 1,
+     "type": "array"
+    },
+    "expectError": {
+     "additionalProperties": false,
+     "description": "The condition and reason the refusal must name. Both are required: a codec that refuses for the wrong reason fails this vector, which is the point of separating refusal from decoding.",
+     "properties": {
+      "condition": {
+       "type": "string"
+      },
+      "endpoint": {
+       "type": "string"
+      },
+      "reason": {
+       "type": "string"
+      }
+     },
+     "required": [
+      "condition",
+      "reason"
+     ],
+     "type": "object"
+    },
+    "kind": {
+     "const": "message-reject"
+    },
+    "note": {
+     "description": "Why the vector exists, in the author's words \u2014 the reading it pins and what would make it wrong.",
+     "type": "string"
+    },
+    "vector": {
+     "description": "The vector's name, unique across the corpus.",
+     "type": "string"
+    }
+   },
+   "required": [
+    "vector",
+    "kind",
+    "clauses",
+    "note",
+    "bytes",
+    "expectError"
+   ]
+  },
+  {
+   "additionalProperties": false,
+   "description": "A delivery's state across the steps that move it, with the outcome each step must have and the state it must leave.",
+   "properties": {
+    "clauses": {
+     "description": "The clauses or pictures this vector is authored from, as ids in the ledger's id space.",
+     "items": {
+      "type": "string"
+     },
+     "minItems": 1,
+     "type": "array"
+    },
+    "kind": {
+     "const": "delivery"
+    },
+    "note": {
+     "description": "Why the vector exists, in the author's words \u2014 the reading it pins and what would make it wrong.",
+     "type": "string"
+    },
+    "start": {
+     "description": "The delivery state before the first step, layer-prefixed like the exchange corpus's start states.",
+     "type": "string"
+    },
+    "steps": {
+     "items": {
+      "type": "object"
+     },
+     "minItems": 1,
+     "type": "array"
+    },
+    "vector": {
+     "description": "The vector's name, unique across the corpus.",
+     "type": "string"
+    }
+   },
+   "required": [
+    "vector",
+    "kind",
+    "clauses",
+    "note",
+    "start",
+    "steps"
+   ]
+  }
+ ]
+}
