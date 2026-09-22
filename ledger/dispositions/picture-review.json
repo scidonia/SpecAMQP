@@ -75,6 +75,14 @@
    "note": "The Connection State Table: fourteen states with the frames each permits and the connection action each implies. It is the only normative statement of the connection lifecycle anywhere in the artifacts \u2014 the section has clauses for individual rules (channel zero, close ordering, idle timeouts) and no clause for the state dimension itself \u2014 so it is not a diagram to be summarised but the machine's source. S3 formalizes it as the state type and its transition relation, and this disposition moves to a `formalized:` path then.",
    "text_sha256": "89f7ebaafe83027e033673a5ae7982a24e08e69a127608d15f02e60a6d4c5c64"
   },
+  "amqp-core-transport-v1.0-os.xml#picture.30": {
+   "clause_text": "UNMAPPED<-------------------+ | | +-------+-------+ | S:BEGIN | | R:BEGIN | | | | \\|/ \\|/ | BEGIN_SENT BEGIN_RCVD | | | | | | | R:BEGIN | | S:BEGIN | +------...",
+   "content_sha256": "8018713d5c080c919b5ce0c589d9d61e13a9534f31c3d7f808f5e40a1d172cb3",
+   "disposition": "formalized:SpecAMQP.Spec.Session.atState",
+   "kind": "PICTURE",
+   "note": "The session state machine's only statement in the artifact: the states are `atState`'s branches, the transitions are the `Session.after*` family (`afterBegin`, `afterEnd` among them), and its ten edges are the model the session sweep was built from and the machine both artefacts implement. Disposed although the text scan flags it `looks_normative: false`, because that scan keys on grammar and normative keywords and a graph has neither: the diagram's content is structural, which is the one class the flag cannot see. Recorded here so the exclusion is a decision rather than an artifact of the flag.",
+   "text_sha256": "8018713d5c080c919b5ce0c589d9d61e13a9534f31c3d7f808f5e40a1d172cb3"
+  },
   "amqp-core-transport-v1.0-os.xml#picture.57": {
    "clause_text": "+------------+ S:XFR(M=1,A=0) +------| NOT_SENT |------+ | +------------+ | | | | S:XFR(M=0,A=0) | | | S:XFR(M=1,A=0) | | +----------+ | | | | | \\|/ \\|/ | | ...",
    "disposition": "deferred:S4",

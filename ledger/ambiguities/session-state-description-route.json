@@ -1,0 +1,33 @@
+{
+ "adopted": "The descriptions characterise the ordinary route; the label is the phase",
+ "clauses": [
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions.10",
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions.11",
+  "amqp-core-transport-v1.0-os.xml#picture.30"
+ ],
+ "consequences": [
+  "On `BEGIN_SENT --S:END--> END_SENT` the label moves to `END_SENT` and the outgoing channel is released; the incoming entry is whatever the route left, so a session that never received a begin has none, and the next received frame is refused by the channel map with `amqp:connection:framing-error`. That refusal is correct: an unmapped incoming channel cannot carry a frame, and the label names the phase the endpoint is in rather than which channels exist.",
+  "Read the descriptions as characterisations of the ordinary route \u2014 `MAPPED --S:END--> END_SENT` and its mirror \u2014 rather than as invariants of the label. The first clause of each states what the transition does to a channel; the second states what the route produced.",
+  "A model derived from the descriptions must read the second clause as route-dependent, or it will expect an admission where the machine correctly refuses. The session sweep's six deviations were exactly that expectation, and the expectation is the thing to adjust rather than the layer.",
+  "Not settled by this reading and recorded separately: a session error raised in `END_SENT` clears the incoming channel while the label stays `END_SENT`, which is inconsistent in the other direction, since a session error ends the session and the label should reach the discarding phase."
+ ],
+ "evidence": "Picture 30 draws `BEGIN_SENT --S:END--> END_SENT`. `BEGIN_SENT`'s description is \"assigned an outgoing channel number, but there is no entry in the incoming channel map\"; `END_SENT`'s is \"has an entry in the incoming channel map, but is no longer assigned an outgoing channel number\". On that arrow the two cannot both hold: the session never received a begin, so no incoming entry exists to be carried into `END_SENT`. The state descriptions are not clauses the ledger holds \u2014 they carry no keyword and no listed phrase, the third class of statement the phrase scan cannot see \u2014 so they are reconciled by reading rather than by citation, and the reading that makes the diagram, the descriptions and the machines agree is the one adopted. Neither artefact changes for it and no description is edited: the descriptions are the artifact's and the reading is ours to record.",
+ "id": "session-state-description-route",
+ "open": false,
+ "question": "Picture 30 draws `BEGIN_SENT --S:END--> END_SENT`, while `BEGIN_SENT`'s description says it has no incoming entry and `END_SENT`'s says it has one. Which governs?",
+ "readings": [
+  {
+   "name": "The descriptions characterise the ordinary route; the label is the phase",
+   "statement": "Adopted. The first clause of each description is the machine's guarantee about what the transition releases, the second characterises the route that normally produces the state, and the label names the phase rather than the channel bookkeeping."
+  },
+  {
+   "name": "The descriptions are invariants of the label",
+   "statement": "Rejected: it makes the diagram's own arrow land in a state the artifact forbids, and requires an incoming entry to appear from nowhere, since the session never received a begin."
+  },
+  {
+   "name": "The label should not move on that route",
+   "statement": "Rejected: the endpoint has sent its end, which is what the label names, so leaving it in `BEGIN_SENT` would state a phase the session is no longer in."
+  }
+ ],
+ "schema_version": 1
+}
