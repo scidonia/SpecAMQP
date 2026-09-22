@@ -76,7 +76,7 @@ def valueOfJson (fuel : Nat) (json : Json) : Except String Value :=
                 return (.long (Int64.ofBitVec (BitVec.ofNat 64 (n % 18446744073709551616).toNat)))
     | "char" =>
       let n ← boundedField json "codepoint" 0 1114111
-      return (.char n.toUInt32)
+      return (.char n.toNat.toUInt32)
     | "timestamp" =>
       let n ← boundedField json "milliseconds" (-(2 ^ 63)) (2 ^ 63 - 1)
       return (.timestamp (Int64.ofBitVec (BitVec.ofNat 64 (n % 18446744073709551616).toNat)))
@@ -117,10 +117,20 @@ def valueOfJson (fuel : Nat) (json : Json) : Except String Value :=
       return (.described descriptor value)
     | other => .error s!"unknown value type '{other}'"
 
+/-!
+This implementation's values, written in the corpus's vocabulary, so a verdict
+report names what it actually saw.
+
+A `mutual` block with `sizeOf` measures, because a map's pair sequence is the one
+place where the recursion is not into an immediate subterm: `jsonOfPair` takes a
+pair apart, so the pair itself carries the measure.
+-/
+
+mutual
+
 /-- This implementation's values, written in the corpus's vocabulary so a verdict
 report names what it actually saw. -/
-def jsonOfValue (value : Value) : Json :=
-  match value with
+def jsonOfValue : Value → Json
   | .null => Json.mkObj [("type", "null")]
   | .boolean b => Json.mkObj [("type", "boolean"), ("value", b)]
   | .ubyte n => Json.mkObj [("type", "ubyte"), ("value", n.toNat)]
@@ -144,14 +154,22 @@ def jsonOfValue (value : Value) : Json :=
   | .binary b => Json.mkObj [("type", "binary"), ("hex", toHex b.toArray)]
   | .list items => Json.mkObj [("type", "list"), ("items", Json.arr (items.map jsonOfValue).toArray)]
   | .map pairs =>
-    Json.mkObj [("type", "map"), ("pairs", Json.arr (pairs.map (fun (key, value) =>
-      Json.arr #[jsonOfValue key, jsonOfValue value])).toArray)]
+    Json.mkObj [("type", "map"), ("pairs", Json.arr (pairs.map jsonOfPair).toArray)]
   | .array constructor items =>
     Json.mkObj [("type", "array"), ("constructor", toHex #[constructor]),
                 ("items", Json.arr (items.map jsonOfValue).toArray)]
   | .described descriptor value =>
     Json.mkObj [("type", "described"), ("descriptor", jsonOfValue descriptor),
                 ("value", jsonOfValue value)]
+termination_by value => sizeOf value
+
+/-- One map pair as the corpus's two-element array, keeping the order the wire
+carried: a corpus that lost it could not test that a reader preserves it. -/
+def jsonOfPair : Value × Value → Json
+  | (key, value) => Json.arr #[jsonOfValue key, jsonOfValue value]
+termination_by pair => sizeOf pair
+
+end
 
 /-- The reference implementation behind the corpus interface. -/
 def refCodec : Codec where

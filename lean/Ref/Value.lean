@@ -463,9 +463,11 @@ def dataOf (value : Value) : Octets :=
 
 mutual
 
-/-- The constructor-and-data encoding of a value. -/
-def encode (value : Value) : Octets :=
-  match value with
+/-- The constructor-and-data encoding of a value. Equation-style clauses rather
+than a `match`: a mutual block's `termination_by` hint binds the function's
+parameters, and a body that abstracts them itself leaves the hint with nothing to
+bind. -/
+def encode : Value → Octets
   | .null => #[0x40]
   | .boolean true => #[0x41]
   | .boolean false => #[0x42]
@@ -516,15 +518,21 @@ def encode (value : Value) : Octets :=
     else
       #[0xF0] ++ u32be (5 + body.size) ++ u32be count ++ #[constructor] ++ body
   | .described descriptor value => #[0x00] ++ encode descriptor ++ encode value
+termination_by value => sizeOf value
 
-/-- Items concatenated in order. -/
-def encodeAll (items : List Value) : Octets :=
-  items.foldl (fun acc item => acc ++ encode item) #[]
+/-- Items concatenated in order. Structural recursion over the list, so that the
+mutual block's measure is `sizeOf` on each function's own argument. -/
+def encodeAll : List Value → Octets
+  | [] => #[]
+  | item :: rest => encode item ++ encodeAll rest
+termination_by items => sizeOf items
 
 /-- A map's items concatenated in order: each key followed by its value, both with
 their own constructors, exactly as a compound's items are written. -/
-def encodePairs (pairs : List (Value × Value)) : Octets :=
-  pairs.foldl (fun acc (key, value) => acc ++ encode key ++ encode value) #[]
+def encodePairs : List (Value × Value) → Octets
+  | [] => #[]
+  | (key, value) :: rest => encode key ++ encode value ++ encodePairs rest
+termination_by pairs => sizeOf pairs
 
 /-- Array element data, written in the array's declared constructor form.
 
