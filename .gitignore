@@ -1,0 +1,17 @@
+# Provisioned Lean workspace: the pinned mathlib closure is copied here by the
+# development shell, is writable, and is not source.
+/lean/.lake/
+/lean/build/
+
+# Nix and editor state.
+/result
+/result-*
+.direnv/
+*.swp
+
+# Partially downloaded artifacts from scripts/fetch-oasis.sh.
+/spec/oasis/.fetch-*
+
+# Python bytecode from diagnostics or tooling.
+__pycache__/
+*.pyc

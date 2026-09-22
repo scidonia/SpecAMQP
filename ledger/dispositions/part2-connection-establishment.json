@@ -1,0 +1,290 @@
+{
+ "conventions": {
+  "environment:": "An assumption the specification rests on, named so that a claim can state that it depends on it.",
+  "formalized:": "A Lean declaration path that carries this clause's meaning. At S0 the declaration does not exist yet: the disposition is a commitment made by the plan, and becomes checkable when lean/Spec lands (a declaration-existence gate is added at S1).",
+  "informative": "The keyword is not a conformance keyword (for example it is used as an adjective).",
+  "out-of-scope:": "Deliberately outside core AMQP 1.0 as this specification bounds it, with the reason."
+ },
+ "design_consequences": [
+  "The endpoint interface must carry a role (client or server): version-negotiation.5 binds the TCP client, .6 the server, and both orders of the header exchange are permitted.",
+  "A SHOULD expressed as progress (version-negotiation.4) needs the fairness-qualified progress form of the conformance relation, not a MUST-style obligation.",
+  "Adjective uses of REQUIRED/OPTIONAL are real: the disposition value `informative` exists for them, and coverage reports them apart from requirements."
+ ],
+ "dispositions": {
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:framing.1": {
+   "clause_text": "This is an unsigned 32-bit integer that MUST contain the total frame size of the frame header, extended header, and frame body.",
+   "disposition": "formalized:Spec.Wire.frameSize",
+   "kind": "MUST",
+   "note": "The size field spans frame header, extended header and body; the ledger resolves the neighbouring constants so the rule reads as arithmetic rather than prose.",
+   "text_sha256": "5e6cff1dc670ff02cd898dcdd2af444574fe3661a50c6b487a83fcdaf80e1e08"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:framing.2": {
+   "clause_text": "The subsequent bytes in the frame header MAY be interpreted differently depending on the type of the frame.",
+   "disposition": "formalized:Spec.Wire.FrameType",
+   "kind": "MAY",
+   "note": "Latitude: header bytes beyond DOFF are interpreted per frame type. The extended header is ignored by this specification, so the freedom is modelled as nondeterminism in the relation rather than as a fixed reading.",
+   "text_sha256": "77236ad97c495f4d354eb5f4b574988328e374a6a3eb67821cd290bf4a56bb5a"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:framing.3": {
+   "clause_text": "The performative MUST be one of those defined in \u00abperformatives\u00bb and is encoded as a described type in the AMQP type system.",
+   "disposition": "formalized:Spec.Wire.frameBody",
+   "kind": "MUST",
+   "note": "Body = exactly one described-type performative drawn from the performative table, followed by an opaque payload.",
+   "text_sha256": "a6edb0f229b13fc32915655bfcfb72805e7dc6e181133649114849a9fbec90e2"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:framing.4": {
+   "clause_text": "An AMQP frame with no body MAY be used to generate artificial traffic as needed to satisfy any negotiated idle timeout interval (see \u00abdoc-idle-time-out\u00bb).",
+   "disposition": "formalized:Spec.Wire.emptyFrame",
+   "kind": "MAY",
+   "note": "Permitted artificial traffic for idle-timeout satisfaction. A MAY: it licenses a frame shape, and imposes nothing.",
+   "text_sha256": "532974365bcc582efbaa01ca5f9992b0bb92c5f39a368f8dd0606c1ad3a45eb8"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open.1": {
+   "clause_text": "The first frame sent on a connection in either direction MUST contain an open performative.",
+   "disposition": "formalized:Spec.Endpoint.openFirst",
+   "kind": "MUST",
+   "note": "Initial-state obligation of the connection machine; a negative vector covers a first frame that is not open.",
+   "text_sha256": "0d993e1d21d782f3e69fb9d11f4e7ca6a334460cc402a69979f28bc141de7f5d"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:channel-max.1": {
+   "clause_text": "A peer MUST not use channel numbers outside the range that its partner can handle.",
+   "disposition": "formalized:Spec.Endpoint.channelBound",
+   "kind": "MUST",
+   "note": "The OASIS text writes \"MUST not\" here (lowercase not); read as MUST NOT with the reading recorded in the ambiguity register.",
+   "text_sha256": "c7674d7c23f3de3d292f4fdaefb3d523666307e9e8ff2a1377e5caf7e2a7a6da"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:channel-max.2": {
+   "clause_text": "A peer that receives a channel number outside the supported range MUST close the connection with the framing-error error-code.",
+   "disposition": "formalized:Spec.Endpoint.channelBoundError",
+   "kind": "MUST",
+   "note": "Mandated refusal: close the connection with amqp:connection:framing-error. Error-condition mapping is generated, not hand-typed.",
+   "text_sha256": "4887644757ff77308cbfab034297ee55d934d2ce9256307769c2be6e1b9f76c4"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:desired-capabilities.1": {
+   "clause_text": "The desired-capability list defines which extension capabilities the sender MAY use if the receiver offers them (i.e., they are in the offered-capabilities list received by the sender of the desired-capabilities).",
+   "disposition": "formalized:Spec.Endpoint.capabilityDesire",
+   "kind": "MAY",
+   "note": "Latitude over which offered capabilities may be used. The semantics of individual capabilities belong to the extensions that define them, which are out of scope.",
+   "text_sha256": "f5b4a30566b6bbb2de71a84029f36f23f92f51d01985926b2cfcae21629f2c3d"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:desired-capabilities.2": {
+   "clause_text": "The sender MUST NOT attempt to use any capabilities it did not declare in the desired-capabilities field.",
+   "disposition": "formalized:Spec.Endpoint.capabilityUse",
+   "kind": "MUST NOT",
+   "note": "MUST NOT use an undeclared capability: an obligation over the declared capability set, independent of what any particular capability means.",
+   "text_sha256": "6922bb1f1fab8ecb9295003d3c3102dbb847c33e3248fa4434cb428991e2c1ac"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:hostname.1": {
+   "clause_text": "If no hostname is provided the receiving peer SHOULD select a default based on its own configuration.",
+   "disposition": "environment:server-hostname-default",
+   "kind": "SHOULD",
+   "note": "Binds the receiving peer to a local configuration choice. No protocol-visible obligation follows: a null hostname must simply be acceptable.",
+   "text_sha256": "ca31a639c2787647a165b71763d0b56cf1981a18acc0c0ad20758493f2ec07b9"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:hostname.2": {
+   "clause_text": "This field MAY already have been specified by the \u00absasl-init\u00bb frame, if a SASL layer is used, or, the server name indication extension as described in RFC-4366, if a TLS layer is used, in which case this field SHOULD be null or contain the same value.",
+   "disposition": "environment:sasl-sni-hostname",
+   "kind": "MAY",
+   "note": "Interaction between the SASL layer, TLS server-name indication and this field. Both layers are opaque here; the ledger records the assumption rather than formalizing it.",
+   "text_sha256": "ee92e00304f14bf95d078d1df74a689a8adae42e370d7d94368378eb8ee9a2bd"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:hostname.3": {
+   "clause_text": "This field MAY already have been specified by the \u00absasl-init\u00bb frame, if a SASL layer is used, or, the server name indication extension as described in RFC-4366, if a TLS layer is used, in which case this field SHOULD be null or contain the same value.",
+   "disposition": "environment:sni-hostname",
+   "kind": "SHOULD",
+   "note": "SHOULD-class guidance for a value already supplied out of band. The specification fixes no observable behaviour for a differing value, and the clause itself says it is undefined.",
+   "text_sha256": "ee92e00304f14bf95d078d1df74a689a8adae42e370d7d94368378eb8ee9a2bd"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:idle-time-out.1": {
+   "clause_text": "The idle timeout REQUIRED by the sender (see \u00abdoc-idle-time-out\u00bb).",
+   "disposition": "informative",
+   "kind": "REQUIRED",
+   "note": "Keyword used as an adjective (\"the idle timeout REQUIRED by the sender\"), not as a conformance keyword. Recorded so the ledger count is not mistaken for a requirement.",
+   "text_sha256": "f7829561dca73a47c8af2e0fa6c24f2ac2b9f4c29eb84a12db97d6e5f2e75031"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:idle-time-out.2": {
+   "clause_text": "If the receiver is unable or unwilling to support the idle time-out then it SHOULD close the connection with an error explaining why (e.g., because it is too small).",
+   "disposition": "formalized:Spec.Endpoint.idleTimeoutRefusal",
+   "kind": "SHOULD",
+   "note": "SHOULD-class refusal path: close the connection with an error explaining why the proposed timeout is unsupportable.",
+   "text_sha256": "94ccd6792da1a8e4b928fc5e8c06896e38b88f4365a85e77460b6dc4c137feba"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:idle-time-out.3": {
+   "clause_text": "However, senders doing this SHOULD be aware that implementations MAY choose to use an internal default to efficiently manage a peer's resources.",
+   "disposition": "environment:implementation-idle-policy",
+   "kind": "SHOULD",
+   "note": "Internal defaulting policy of a peer that sends no timeout of its own. Not protocol-visible, hence an assumption rather than an obligation.",
+   "text_sha256": "a1df5bb3f0f4344af397eb2abac8d26296a9bcace53c90ff0fe75db5c9ec9d34"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:idle-time-out.4": {
+   "clause_text": "However, senders doing this SHOULD be aware that implementations MAY choose to use an internal default to efficiently manage a peer's resources.",
+   "disposition": "environment:implementation-idle-policy",
+   "kind": "MAY",
+   "note": "Same clause, MAY half: implementations may keep an internal default to manage a partner. Environment assumption.",
+   "text_sha256": "a1df5bb3f0f4344af397eb2abac8d26296a9bcace53c90ff0fe75db5c9ec9d34"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:incoming-locales.1": {
+   "clause_text": "A peer MAY determine which of the permitted incoming locales is chosen by examining the partner's supported locales as specified in the outgoing-locales field.",
+   "disposition": "environment:locale-policy",
+   "kind": "MAY",
+   "note": "Which locale a peer selects. Observable only through the strings it chooses to send, which are ordinary field values.",
+   "text_sha256": "f1435f878430d1354120c668e8e06ea4d5f00731e1ec2304c76e0a25d3313844"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:max-frame-size.1": {
+   "clause_text": "A peer MUST NOT send frames larger than its partner can handle.",
+   "disposition": "formalized:Spec.Endpoint.maxFrameSizeSend",
+   "kind": "MUST NOT",
+   "note": "Send-side bound derived from the partner value exchanged in open.",
+   "text_sha256": "97783ab79b63d57287d31eb65e403938c09edc83c89c1ec888d1c69fdd310c0a"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:max-frame-size.2": {
+   "clause_text": "A peer that receives an oversized frame MUST close the connection with the framing-error error-code.",
+   "disposition": "formalized:Spec.Endpoint.oversizedFrameError",
+   "kind": "MUST",
+   "note": "Mandated refusal: close the connection with amqp:connection:framing-error.",
+   "text_sha256": "07922771984e5e856068151b683da3457cd5179081dbcd38f239c1ae28ef647f"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:max-frame-size.3": {
+   "clause_text": "Both peers MUST accept frames of up to 512 octets.",
+   "disposition": "formalized:Spec.Wire.MIN_MAX_FRAME_SIZE",
+   "kind": "MUST",
+   "note": "The ledger renders the MIN-MAX-FRAME-SIZE constant as 512 through the generated constant table, so the obligation is stated with its value and a vector can exercise exactly that boundary.",
+   "text_sha256": "3f3fe60800a169856dcfd89d5ef85a88118f9d9a9c8966c6d0ccec1576813f7d"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:offered-capabilities.1": {
+   "clause_text": "If the receiver of the offered-capabilities requires an extension capability which is not present in the offered-capability list then it MUST close the connection.",
+   "disposition": "formalized:Spec.Endpoint.capabilityRequired",
+   "kind": "MUST",
+   "note": "Mandated close when a capability the receiver needs is absent from the offered list; the error condition comes from the generated table.",
+   "text_sha256": "750de4333bb10ef1531c79a495ef1ac2b6866640e6881ade5203137d0106ea2c"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:outgoing-locales.1": {
+   "clause_text": "A peer MUST support at least the en-US locale (see \u00abietf-language-tag\u00bb).",
+   "disposition": "formalized:Spec.Endpoint.localeSupportEnUS",
+   "kind": "MUST",
+   "note": "At least en-US must be supported; the value is a generated constant rather than a literal in the specification.",
+   "text_sha256": "37a0bda27b26896d11e65317cc9e592a41a96e0bd676aec809b261b9bb338ccf"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:transport.1": {
+   "clause_text": "Each container MAY hold many nodes.",
+   "disposition": "out-of-scope:container-node-topology",
+   "kind": "MAY",
+   "note": "Containers and nodes are deployment concepts. Core fixes no protocol-visible obligation here; the container-id field itself is formalized at Spec.Performative.open.",
+   "text_sha256": "4a56d5ecef67cad01bffe507158e33490dcc9244cc4f78251f3618f5296e8d91"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:transport.2": {
+   "clause_text": "The precise requirement for a connection is that if the n th frame arrives, all frames prior to n MUST also have arrived.",
+   "disposition": "formalized:Spec.Wire.WellFormedFrame",
+   "kind": "MUST",
+   "note": "Descriptive sentence carrying the negotiated-maximum-frame-size requirement that makes defragmentation into complete frames well defined.",
+   "text_sha256": "f6bf3e16e55de5eaeb4933806536756a9c393c196483ffb98f41a14e631e4358"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:transport.3": {
+   "clause_text": "A single connection MAY have multiple independent sessions active simultaneously, up to the negotiated channel limit.",
+   "disposition": "formalized:Spec.Endpoint.sessionMultiplexing",
+   "kind": "MAY",
+   "note": "Sessions are multiplexed on channels, bounded by the negotiated channel-max; the bound is formalized with the channel-max field.",
+   "text_sha256": "3ad2324126690f77cf30dea7b2b28afa2113ffb344c78d2dc71ebd43cdc61be3"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.1": {
+   "clause_text": "Prior to sending any frames on a connection, each peer MUST start by sending a protocol header that indicates the protocol version used on the connection.",
+   "disposition": "formalized:Spec.Wire.CONNECTION_HEADER",
+   "kind": "MUST",
+   "note": "Precedes any frame: the header is not itself a frame. Formalized together with the initial state of the connection machine.",
+   "text_sha256": "407a874a85162f5a3c3b841b3dc51b8c1b585d974ae9edfc61bfbbd3d641b67d"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.10": {
+   "clause_text": "When choosing a protocol version to respond with, the server SHOULD choose the highest supported version that is less than or equal to the requested version.",
+   "disposition": "formalized:Spec.Endpoint.versionSelection",
+   "kind": "SHOULD",
+   "note": "SHOULD-class preference: highest supported version not exceeding the requested one.",
+   "text_sha256": "4fc8b58260b3e14b62c79dd66952f673c0d74279fc91ee4538ed6e612c2a4eaf"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.11": {
+   "clause_text": "If no such version exists, the server SHOULD respond with the highest supported version.",
+   "disposition": "formalized:Spec.Endpoint.versionSelection",
+   "kind": "SHOULD",
+   "note": "SHOULD-class fallback when no supported version is below the request.",
+   "text_sha256": "bd453117a5e57bd925dbe94a640322a42cfa99e4eac1b02db6c1e18d72d6aa7d"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.12": {
+   "clause_text": "If the server cannot parse the protocol header, the server MUST send a valid protocol header with a supported protocol version and then close the socket.",
+   "disposition": "formalized:Spec.Endpoint.serverUnparsableHeader",
+   "kind": "MUST",
+   "note": "Unparsable header still receives a valid header before the close, so the failure is legible to the peer.",
+   "text_sha256": "fc8c04d1983f22d50a5f1bfeacbe5afc066fa7c0ae1dc4852b48d054e4a8fea8"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.13": {
+   "clause_text": "In this case, the server MUST send a protocol header with an acceptable protocol id (and version) and then close the socket.",
+   "disposition": "formalized:Spec.Endpoint.serverUnacceptableProtocolId",
+   "kind": "MUST",
+   "note": "Unacceptable protocol id: announce an acceptable id and version, then close.",
+   "text_sha256": "8a181c1a874dfca9fb9218040d2771351d4ceda6259742a4888d7410bfc311bf"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.14": {
+   "clause_text": "It MAY choose any protocol id.",
+   "disposition": "formalized:Spec.Endpoint.serverProtocolIdLatitude",
+   "kind": "MAY",
+   "note": "MAY: any protocol id may be chosen. Recorded as nondeterminism in the relation, not as a fixed choice.",
+   "text_sha256": "c88c08975aa9f13d1a681446a98c408e35409eb7b1b2a740eda9a79c92ca9442"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.2": {
+   "clause_text": "Any data appearing beyond the protocol header MUST match the version indicated by the protocol header.",
+   "disposition": "formalized:Spec.Wire.protocolHeaderVersion",
+   "kind": "MUST",
+   "note": "Everything after the header must belong to the version the header announced.",
+   "text_sha256": "f5791d0809ed6e76db11214f1a7a76e95e7a9d1ae43bd009b07f7351585a6322"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.3": {
+   "clause_text": "If the incoming and outgoing protocol headers do not match, both peers MUST close their outgoing stream and SHOULD read the incoming stream until it is terminated.",
+   "disposition": "formalized:Spec.Endpoint.protocolHeaderMismatch",
+   "kind": "MUST",
+   "note": "MUST half: both peers close their outgoing stream.",
+   "text_sha256": "b7d98bf73aede5725151eef296e35dd8b2e487e3a38420cbeae8e9f35ece1405"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.4": {
+   "clause_text": "If the incoming and outgoing protocol headers do not match, both peers MUST close their outgoing stream and SHOULD read the incoming stream until it is terminated.",
+   "disposition": "formalized:Spec.Endpoint.protocolHeaderMismatchProgress",
+   "kind": "SHOULD",
+   "note": "SHOULD half: keep reading the incoming stream until it closes. Expressed as a fairness-qualified progress obligation, never as a MUST.",
+   "text_sha256": "b7d98bf73aede5725151eef296e35dd8b2e487e3a38420cbeae8e9f35ece1405"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.5": {
+   "clause_text": "The AMQP peer which acted in the role of the TCP client (i.e. the peer that actively opened the connection) MUST immediately send its outgoing protocol header on establishment of the TCP connection.",
+   "disposition": "formalized:Spec.Endpoint.roleIsClient",
+   "kind": "MUST",
+   "note": "Role-dependent obligation: the TCP client sends its header immediately, without waiting.",
+   "text_sha256": "01f0f3515a82eb2ccf330c8dcd185804e0df245885055223f7d7b1aa5d11dac5"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.6": {
+   "clause_text": "The AMQP peer which acted in the role of the TCP server MAY elect to wait until receiving the incoming protocol header before sending its own outgoing protocol header.",
+   "disposition": "formalized:Spec.Endpoint.roleIsServer",
+   "kind": "MAY",
+   "note": "Latitude that makes the handshake nondeterministic: the server may wait or may send first. The relation admits both orders.",
+   "text_sha256": "0b763924ee5657cf8d85f448153e11c57247e1b9d7b03ea078d53989071b6eaf"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.7": {
+   "clause_text": "When the client opens a new socket connection to a server, it MUST send a protocol header with the client's preferred protocol version.",
+   "disposition": "formalized:Spec.Endpoint.clientHeaderObligation",
+   "kind": "MUST",
+   "note": "Client sends a header announcing its preferred version.",
+   "text_sha256": "db8ae9144909e93dba3c8cb313b7880f32cc542eb64f25e119510e408d3d115f"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.8": {
+   "clause_text": "If the requested protocol version is supported, the server MUST send its own protocol header with the requested version to the socket, and then proceed according to the protocol definition.",
+   "disposition": "formalized:Spec.Endpoint.serverAcceptsVersion",
+   "kind": "MUST",
+   "note": "When the requested version is supported, the server echoes that version and proceeds to the open exchange.",
+   "text_sha256": "a11bccdbc4556e45344cecfd4eb11442a689e4bc0a38c2ecea44886f8c79f3c8"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.9": {
+   "clause_text": "If the requested protocol version is not supported, the server MUST send a protocol header with a supported protocol version and then close the socket.",
+   "disposition": "formalized:Spec.Endpoint.serverRefusesVersion",
+   "kind": "MUST",
+   "note": "When it is not supported, the server announces a supported version and closes: a mandated refusal with a negative vector.",
+   "text_sha256": "8115b15ced04f446da2b928ca8b8aea515ebee3e5dc6042378c78513ed96e387"
+  }
+ },
+ "schema_version": 1,
+ "scope": "Part 2 connection establishment: section framing, section version-negotiation, section transport, and the open performative with its fields."
+}

@@ -1,0 +1,658 @@
+{
+ "by_disposition": {
+  "environment": 6,
+  "formalized": 31,
+  "informative": 1,
+  "out-of-scope": 1
+ },
+ "by_kind": {
+  "MAY": {
+   "dispositioned": 10,
+   "total": 88
+  },
+  "MUST": {
+   "dispositioned": 19,
+   "total": 181
+  },
+  "MUST NOT": {
+   "dispositioned": 2,
+   "total": 49
+  },
+  "RECOMMENDED": {
+   "dispositioned": 0,
+   "total": 7
+  },
+  "REQUIRED": {
+   "dispositioned": 1,
+   "total": 4
+  },
+  "SHOULD": {
+   "dispositioned": 7,
+   "total": 60
+  },
+  "SHOULD NOT": {
+   "dispositioned": 0,
+   "total": 12
+  }
+ },
+ "lowercase_keyword_statements": 0,
+ "must_class_undispositioned": 209,
+ "must_class_undispositioned_by_anchor": {
+  "amqp:messaging/section:addressing": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing.1",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing.2",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing.3"
+  ],
+  "amqp:messaging/section:addressing/type:filter-set": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:filter-set.1",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:filter-set.2"
+  ],
+  "amqp:messaging/section:addressing/type:node-properties": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:node-properties.1",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:node-properties.2",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:node-properties.3"
+  ],
+  "amqp:messaging/section:addressing/type:source/field:address": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:source/field:address.1",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:source/field:address.2"
+  ],
+  "amqp:messaging/section:addressing/type:source/field:default-outcome": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:source/field:default-outcome.1"
+  ],
+  "amqp:messaging/section:addressing/type:source/field:distribution-mode": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:source/field:distribution-mode.1"
+  ],
+  "amqp:messaging/section:addressing/type:source/field:dynamic": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:source/field:dynamic.1"
+  ],
+  "amqp:messaging/section:addressing/type:source/field:dynamic-node-properties": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:source/field:dynamic-node-properties.1"
+  ],
+  "amqp:messaging/section:addressing/type:source/field:filter": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:source/field:filter.1"
+  ],
+  "amqp:messaging/section:addressing/type:source/field:outcomes": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:source/field:outcomes.2",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:source/field:outcomes.3"
+  ],
+  "amqp:messaging/section:addressing/type:target/field:address": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:target/field:address.1",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:target/field:address.2"
+  ],
+  "amqp:messaging/section:addressing/type:target/field:dynamic": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:target/field:dynamic.1"
+  ],
+  "amqp:messaging/section:addressing/type:target/field:dynamic-node-properties": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:target/field:dynamic-node-properties.1"
+  ],
+  "amqp:messaging/section:delivery-state/doc:more-resuming-deliveries": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.1",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.2",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.3",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.6",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.7",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.12",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.13",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.15",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.16",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.17",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.19"
+  ],
+  "amqp:messaging/section:delivery-state/type:modified/field:delivery-failed": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/type:modified/field:delivery-failed.1"
+  ],
+  "amqp:messaging/section:delivery-state/type:modified/field:undeliverable-here": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/type:modified/field:undeliverable-here.1"
+  ],
+  "amqp:messaging/section:delivery-state/type:received": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/type:received.1"
+  ],
+  "amqp:messaging/section:delivery-state/type:released": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/type:released.1"
+  ],
+  "amqp:messaging/section:message-format": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format.1",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format.2"
+  ],
+  "amqp:messaging/section:message-format/type:annotations": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:annotations.1",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:annotations.2"
+  ],
+  "amqp:messaging/section:message-format/type:delivery-annotations": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:delivery-annotations.2"
+  ],
+  "amqp:messaging/section:message-format/type:header": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header.1"
+  ],
+  "amqp:messaging/section:message-format/type:header/field:durable": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:durable.1",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:durable.2",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:durable.4"
+  ],
+  "amqp:messaging/section:message-format/type:header/field:priority": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:priority.2",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:priority.3",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:priority.4",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:priority.5",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:priority.6",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:priority.7",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:priority.8",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:priority.9"
+  ],
+  "amqp:messaging/section:message-format/type:message-annotations": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:message-annotations.2"
+  ],
+  "amqp:messaging/section:message-format/type:properties": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:properties.1"
+  ],
+  "amqp:messaging/section:message-format/type:properties/field:content-encoding": [
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:properties/field:content-encoding.1",
+   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:properties/field:content-encoding.2"
+  ],
+  "amqp:overview/section:conformance": [
+   "amqp-core-overview-v1.0-os.xml#amqp:overview/section:conformance.1",
+   "amqp-core-overview-v1.0-os.xml#amqp:overview/section:conformance.2",
+   "amqp-core-overview-v1.0-os.xml#amqp:overview/section:conformance.3",
+   "amqp-core-overview-v1.0-os.xml#amqp:overview/section:conformance.4",
+   "amqp-core-overview-v1.0-os.xml#amqp:overview/section:conformance.6",
+   "amqp-core-overview-v1.0-os.xml#amqp:overview/section:conformance.7",
+   "amqp-core-overview-v1.0-os.xml#amqp:overview/section:conformance.8",
+   "amqp-core-overview-v1.0-os.xml#amqp:overview/section:conformance.9",
+   "amqp-core-overview-v1.0-os.xml#amqp:overview/section:conformance.10",
+   "amqp-core-overview-v1.0-os.xml#amqp:overview/section:conformance.15"
+  ],
+  "amqp:overview/section:intro": [
+   "amqp-core-overview-v1.0-os.xml#amqp:overview/section:intro.1"
+  ],
+  "amqp:security/section:sasl": [
+   "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl.1",
+   "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl.4",
+   "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl.5",
+   "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl.6",
+   "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl.7",
+   "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl.8"
+  ],
+  "amqp:security/section:sasl/type:sasl-init/field:mechanism": [
+   "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl/type:sasl-init/field:mechanism.1",
+   "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl/type:sasl-init/field:mechanism.2"
+  ],
+  "amqp:security/section:sasl/type:sasl-outcome": [
+   "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl/type:sasl-outcome.1"
+  ],
+  "amqp:security/section:security-layers": [
+   "amqp-core-security-v1.0-os.xml#amqp:security/section:security-layers.1"
+  ],
+  "amqp:security/section:tls": [
+   "amqp-core-security-v1.0-os.xml#amqp:security/section:tls.1",
+   "amqp-core-security-v1.0-os.xml#amqp:security/section:tls.3"
+  ],
+  "amqp:transactions/section:coordination/type:declare/field:global-id": [
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:coordination/type:declare/field:global-id.1",
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:coordination/type:declare/field:global-id.2"
+  ],
+  "amqp:transactions/section:txn-declare": [
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-declare.2",
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-declare.5",
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-declare.6",
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-declare.7"
+  ],
+  "amqp:transactions/section:txn-discharge": [
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-discharge.1",
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-discharge.2",
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-discharge.3",
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-discharge.4"
+  ],
+  "amqp:transactions/section:txn-work": [
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.1",
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.2",
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.3",
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.4",
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.5",
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.6",
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.7",
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.8",
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.9",
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.11",
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.12",
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.13",
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.14",
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.15",
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.16",
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.17",
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.18",
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.21"
+  ],
+  "amqp:transactions/section:txn-work/doc:transactional-acquisition": [
+   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work/doc:transactional-acquisition.1"
+  ],
+  "amqp:transport/section:connections": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections.1",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections.2",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections.5",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections.6",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections.11",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections.16"
+  ],
+  "amqp:transport/section:connections/doc:doc-idle-time-out": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections/doc:doc-idle-time-out.7",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections/doc:doc-idle-time-out.9",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections/doc:doc-idle-time-out.10"
+  ],
+  "amqp:transport/section:definitions/definition:MIN-MAX-FRAME-SIZE": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/definition:MIN-MAX-FRAME-SIZE.1"
+  ],
+  "amqp:transport/section:links": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.1",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.2",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.4",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.5",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.7",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.8",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.10",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.13",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.14",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.15",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.16",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.17",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.18",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.22",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.23",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.31",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.33"
+  ],
+  "amqp:transport/section:links/doc:closing-a-link": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:closing-a-link.2"
+  ],
+  "amqp:transport/section:links/doc:flow-control": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:flow-control.2",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:flow-control.3",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:flow-control.4",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:flow-control.5",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:flow-control.7",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:flow-control.9",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:flow-control.11"
+  ],
+  "amqp:transport/section:links/doc:resuming-deliveries": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:resuming-deliveries.2",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:resuming-deliveries.3",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:resuming-deliveries.4",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:resuming-deliveries.5",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:resuming-deliveries.6",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:resuming-deliveries.7",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:resuming-deliveries.8"
+  ],
+  "amqp:transport/section:performatives/type:attach/field:desired-capabilities": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:attach/field:desired-capabilities.1"
+  ],
+  "amqp:transport/section:performatives/type:attach/field:handle": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:attach/field:handle.1",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:attach/field:handle.2"
+  ],
+  "amqp:transport/section:performatives/type:attach/field:incomplete-unsettled": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:attach/field:incomplete-unsettled.1",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:attach/field:incomplete-unsettled.2",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:attach/field:incomplete-unsettled.3"
+  ],
+  "amqp:transport/section:performatives/type:attach/field:initial-delivery-count": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:attach/field:initial-delivery-count.1"
+  ],
+  "amqp:transport/section:performatives/type:attach/field:unsettled": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:attach/field:unsettled.1",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:attach/field:unsettled.5",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:attach/field:unsettled.6"
+  ],
+  "amqp:transport/section:performatives/type:begin/field:desired-capabilities": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:begin/field:desired-capabilities.1"
+  ],
+  "amqp:transport/section:performatives/type:begin/field:handle-max": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:begin/field:handle-max.1",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:begin/field:handle-max.2"
+  ],
+  "amqp:transport/section:performatives/type:begin/field:remote-channel": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:begin/field:remote-channel.1",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:begin/field:remote-channel.2"
+  ],
+  "amqp:transport/section:performatives/type:close": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:close.1"
+  ],
+  "amqp:transport/section:performatives/type:disposition": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:disposition.2",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:disposition.4"
+  ],
+  "amqp:transport/section:performatives/type:flow/field:available": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:available.1"
+  ],
+  "amqp:transport/section:performatives/type:flow/field:delivery-count": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:delivery-count.1",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:delivery-count.2",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:delivery-count.3",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:delivery-count.4"
+  ],
+  "amqp:transport/section:performatives/type:flow/field:drain": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:drain.1"
+  ],
+  "amqp:transport/section:performatives/type:flow/field:handle": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:handle.1"
+  ],
+  "amqp:transport/section:performatives/type:flow/field:link-credit": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:link-credit.1"
+  ],
+  "amqp:transport/section:performatives/type:flow/field:next-incoming-id": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:next-incoming-id.1",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:next-incoming-id.2"
+  ],
+  "amqp:transport/section:performatives/type:flow/field:properties": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:properties.1"
+  ],
+  "amqp:transport/section:performatives/type:transfer/field:aborted": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:aborted.2"
+  ],
+  "amqp:transport/section:performatives/type:transfer/field:delivery-id": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:delivery-id.1"
+  ],
+  "amqp:transport/section:performatives/type:transfer/field:delivery-tag": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:delivery-tag.1"
+  ],
+  "amqp:transport/section:performatives/type:transfer/field:message-format": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:message-format.1"
+  ],
+  "amqp:transport/section:performatives/type:transfer/field:rcv-settle-mode": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:rcv-settle-mode.1",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:rcv-settle-mode.2"
+  ],
+  "amqp:transport/section:performatives/type:transfer/field:resume": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:resume.1",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:resume.2",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:resume.3"
+  ],
+  "amqp:transport/section:performatives/type:transfer/field:settled": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:settled.1",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:settled.2",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:settled.3",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:settled.4",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:settled.5",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:settled.6"
+  ],
+  "amqp:transport/section:sessions": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions.1",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions.3",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions.4",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions.5",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions.6",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions.12"
+  ],
+  "amqp:transport/section:sessions/doc:session-flow-control": [
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions/doc:session-flow-control.2",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions/doc:session-flow-control.4",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions/doc:session-flow-control.7",
+   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions/doc:session-flow-control.8"
+  ],
+  "amqp:types/section:composite-type-representation": [
+   "amqp-core-types-v1.0-os.xml#amqp:types/section:composite-type-representation.2",
+   "amqp-core-types-v1.0-os.xml#amqp:types/section:composite-type-representation.3"
+  ],
+  "amqp:types/section:primitive-type-definitions/type:map": [
+   "amqp-core-types-v1.0-os.xml#amqp:types/section:primitive-type-definitions/type:map.1",
+   "amqp-core-types-v1.0-os.xml#amqp:types/section:primitive-type-definitions/type:map.2"
+  ]
+ },
+ "per_artifact": {
+  "amqp-core-messaging-v1.0-os.xml": {
+   "anchors": 34,
+   "audit": {
+    "excluded": {
+     "MAY": 0,
+     "MUST": 3,
+     "OPTIONAL": 0,
+     "RECOMMENDED": 0,
+     "REQUIRED": 0,
+     "SHOULD": 0
+    },
+    "ledger": {
+     "MAY": 12,
+     "MUST": 57,
+     "OPTIONAL": 0,
+     "RECOMMENDED": 1,
+     "REQUIRED": 0,
+     "SHOULD": 20
+    },
+    "mismatches": {},
+    "prose": {
+     "MAY": 12,
+     "MUST": 57,
+     "OPTIONAL": 0,
+     "RECOMMENDED": 1,
+     "REQUIRED": 0,
+     "SHOULD": 20
+    },
+    "unledgered_text": []
+   },
+   "bytes": 84370,
+   "kinds": {
+    "MAY": 12,
+    "MUST": 38,
+    "MUST NOT": 19,
+    "RECOMMENDED": 1,
+    "SHOULD": 13,
+    "SHOULD NOT": 7
+   },
+   "must_class": 57,
+   "sha256": "35830a7ea489b2453ba5eb5dfdab3d8b5b865002f2cff7d57c9a9f43861b94cf",
+   "statements": 90
+  },
+  "amqp-core-overview-v1.0-os.xml": {
+   "anchors": 2,
+   "audit": {
+    "excluded": {
+     "MAY": 0,
+     "MUST": 0,
+     "OPTIONAL": 0,
+     "RECOMMENDED": 0,
+     "REQUIRED": 0,
+     "SHOULD": 0
+    },
+    "ledger": {
+     "MAY": 2,
+     "MUST": 11,
+     "OPTIONAL": 0,
+     "RECOMMENDED": 4,
+     "REQUIRED": 0,
+     "SHOULD": 4
+    },
+    "mismatches": {},
+    "prose": {
+     "MAY": 2,
+     "MUST": 11,
+     "OPTIONAL": 0,
+     "RECOMMENDED": 4,
+     "REQUIRED": 0,
+     "SHOULD": 4
+    },
+    "unledgered_text": []
+   },
+   "bytes": 38010,
+   "kinds": {
+    "MAY": 2,
+    "MUST": 9,
+    "MUST NOT": 2,
+    "RECOMMENDED": 4,
+    "SHOULD": 4
+   },
+   "must_class": 11,
+   "sha256": "cc182e09635730ddacb3527c00d0b247c21b32963c9bba7ebdc9b6f67a61c1f8",
+   "statements": 21
+  },
+  "amqp-core-security-v1.0-os.xml": {
+   "anchors": 8,
+   "audit": {
+    "excluded": {
+     "MAY": 0,
+     "MUST": 0,
+     "OPTIONAL": 0,
+     "RECOMMENDED": 0,
+     "REQUIRED": 0,
+     "SHOULD": 2
+    },
+    "ledger": {
+     "MAY": 4,
+     "MUST": 12,
+     "OPTIONAL": 0,
+     "RECOMMENDED": 0,
+     "REQUIRED": 0,
+     "SHOULD": 6
+    },
+    "mismatches": {},
+    "prose": {
+     "MAY": 4,
+     "MUST": 12,
+     "OPTIONAL": 0,
+     "RECOMMENDED": 0,
+     "REQUIRED": 0,
+     "SHOULD": 6
+    },
+    "unledgered_text": []
+   },
+   "bytes": 26270,
+   "kinds": {
+    "MAY": 4,
+    "MUST": 12,
+    "SHOULD": 6
+   },
+   "must_class": 12,
+   "sha256": "3d9faab5bb56d71741e4a85dcbf5c007b25a006c06e769b2ba57f647ccf04716",
+   "statements": 22
+  },
+  "amqp-core-transactions-v1.0-os.xml": {
+   "anchors": 5,
+   "audit": {
+    "excluded": {
+     "MAY": 0,
+     "MUST": 0,
+     "OPTIONAL": 0,
+     "RECOMMENDED": 0,
+     "REQUIRED": 0,
+     "SHOULD": 0
+    },
+    "ledger": {
+     "MAY": 0,
+     "MUST": 29,
+     "OPTIONAL": 0,
+     "RECOMMENDED": 0,
+     "REQUIRED": 1,
+     "SHOULD": 6
+    },
+    "mismatches": {},
+    "prose": {
+     "MAY": 0,
+     "MUST": 29,
+     "OPTIONAL": 0,
+     "RECOMMENDED": 0,
+     "REQUIRED": 1,
+     "SHOULD": 6
+    },
+    "unledgered_text": []
+   },
+   "bytes": 42507,
+   "kinds": {
+    "MUST": 24,
+    "MUST NOT": 5,
+    "REQUIRED": 1,
+    "SHOULD": 5,
+    "SHOULD NOT": 1
+   },
+   "must_class": 29,
+   "sha256": "6f6e2112d24bb81a285f6e1ed5acc015804a3f6a434fe74cdacc86a9fb6618ff",
+   "statements": 36
+  },
+  "amqp-core-transport-v1.0-os.xml": {
+   "anchors": 64,
+   "audit": {
+    "excluded": {
+     "MAY": 0,
+     "MUST": 0,
+     "OPTIONAL": 2,
+     "RECOMMENDED": 0,
+     "REQUIRED": 1,
+     "SHOULD": 0
+    },
+    "ledger": {
+     "MAY": 69,
+     "MUST": 117,
+     "OPTIONAL": 0,
+     "RECOMMENDED": 2,
+     "REQUIRED": 2,
+     "SHOULD": 36
+    },
+    "mismatches": {},
+    "prose": {
+     "MAY": 69,
+     "MUST": 117,
+     "OPTIONAL": 0,
+     "RECOMMENDED": 2,
+     "REQUIRED": 2,
+     "SHOULD": 36
+    },
+    "unledgered_text": []
+   },
+   "bytes": 184207,
+   "kinds": {
+    "MAY": 69,
+    "MUST": 94,
+    "MUST NOT": 23,
+    "RECOMMENDED": 2,
+    "REQUIRED": 2,
+    "SHOULD": 32,
+    "SHOULD NOT": 4
+   },
+   "must_class": 117,
+   "sha256": "9cd32460d1730975ff0a9dbb66573ff456cbd53ffd8d4f6899c497f02867f637",
+   "statements": 226
+  },
+  "amqp-core-types-v1.0-os.xml": {
+   "anchors": 3,
+   "audit": {
+    "excluded": {
+     "MAY": 0,
+     "MUST": 0,
+     "OPTIONAL": 0,
+     "RECOMMENDED": 0,
+     "REQUIRED": 0,
+     "SHOULD": 0
+    },
+    "ledger": {
+     "MAY": 1,
+     "MUST": 4,
+     "OPTIONAL": 0,
+     "RECOMMENDED": 0,
+     "REQUIRED": 1,
+     "SHOULD": 0
+    },
+    "mismatches": {},
+    "prose": {
+     "MAY": 1,
+     "MUST": 4,
+     "OPTIONAL": 0,
+     "RECOMMENDED": 0,
+     "REQUIRED": 1,
+     "SHOULD": 0
+    },
+    "unledgered_text": []
+   },
+   "bytes": 48704,
+   "kinds": {
+    "MAY": 1,
+    "MUST": 4,
+    "REQUIRED": 1
+   },
+   "must_class": 4,
+   "sha256": "2ccf30b2c55924aaa5291cc34430a91b75c85d11d34bc008c36fc7ca7574d28c",
+   "statements": 6
+  }
+ },
+ "schema_version": 1,
+ "totals": {
+  "anchors": 116,
+  "clauses": 401,
+  "must_class": 230
+ }
+}

@@ -1,0 +1,4 @@
+{
+ "note": "Statements with no uppercase RFC 2119 keyword but lowercase must/should/may: a review signal, never clauses.",
+ "statements": []
+}

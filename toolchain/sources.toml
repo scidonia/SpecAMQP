@@ -1,0 +1,54 @@
+# Canonical machine-readable identity of the vendored normative source.
+#
+# These are the OASIS Standard artifacts for AMQP 1.0 core, published 29 October
+# 2012. The copies under `spec/oasis/` are byte-identical to these files, are
+# committed, and are never edited: the clause ledger (§6), the generated
+# definition tables (§7) and every vector citation depend on their bytes.
+#
+# `scripts/fetch-oasis.sh --verify` re-checks the committed copies against these
+# hashes offline; without `--verify` it fetches missing artifacts from
+# `base_url` and refuses to proceed on any mismatch.
+
+schema_version = 1
+standard = "OASIS Advanced Message Queuing Protocol (AMQP) Version 1.0"
+status = "OASIS Standard"
+published = "2012-10-29"
+base_url = "https://docs.oasis-open.org/amqp/core/v1.0/os"
+
+[artifacts."amqp-core-types-v1.0-os.xml"]
+part = "Part 1: Types"
+bytes = 48704
+sha256 = "2ccf30b2c55924aaa5291cc34430a91b75c85d11d34bc008c36fc7ca7574d28c"
+
+[artifacts."amqp-core-transport-v1.0-os.xml"]
+part = "Part 2: Transport"
+bytes = 184207
+sha256 = "9cd32460d1730975ff0a9dbb66573ff456cbd53ffd8d4f6899c497f02867f637"
+
+[artifacts."amqp-core-messaging-v1.0-os.xml"]
+part = "Part 3: Messaging"
+bytes = 84370
+sha256 = "35830a7ea489b2453ba5eb5dfdab3d8b5b865002f2cff7d57c9a9f43861b94cf"
+
+[artifacts."amqp-core-transactions-v1.0-os.xml"]
+part = "Part 4: Transactions"
+bytes = 42507
+sha256 = "6f6e2112d24bb81a285f6e1ed5acc015804a3f6a434fe74cdacc86a9fb6618ff"
+
+[artifacts."amqp-core-security-v1.0-os.xml"]
+part = "Part 5: Security"
+bytes = 26270
+sha256 = "3d9faab5bb56d71741e4a85dcbf5c007b25a006c06e769b2ba57f647ccf04716"
+
+[artifacts."amqp-core-overview-v1.0-os.xml"]
+part = "Part 0: Overview"
+bytes = 38010
+sha256 = "cc182e09635730ddacb3527c00d0b247c21b32963c9bba7ebdc9b6f67a61c1f8"
+
+# The "additional artifacts" the OASIS notice names for every part (the HTML
+# rendering and the complete PDF) are not vendored: they carry no information
+# the XML artifacts above do not, and the specification is built only from the
+# authoritative XML.
+[not_vendored]
+class = "rendered and combined formats"
+reason = "The authoritative XML is the source; HTML and PDF renderings add no normative content."

@@ -1,0 +1,54 @@
+<?xml version="1.0"?>
+<!--
+  Planted-control artifact for the S0 ledger contract.
+
+  Every case here exists because a plausible ledger implementation gets it wrong:
+  a keyword wrapped in inline emphasis, a keyword pair split across source lines,
+  keywords inside a <picture> diagram, a keyword inside the revhistory section,
+  lowercase prose that only looks normative, an adjective use of REQUIRED, a
+  named constant reached through an <xref>, and a clause inside a field's doc.
+  This file is a contract fixture, not a specification artifact.
+-->
+<amqp name="planted" label="planted controls">
+
+  <section name="alpha" label="plain prose with inline markup">
+    <doc>
+      <p>The peer <b>MUST</b> send a header before any frame.</p>
+      <p>It MUST
+NOT exceed <xref name="LIMIT"/> frames in one batch.</p>
+    </doc>
+    <picture title="ignored diagram">
+     peer A  MUST      MUST
+     peer B  MUST      MUST
+    </picture>
+  </section>
+
+  <section name="beta" label="lowercase prose is not normative">
+    <doc>
+      <p>Implementations must handle this case, and should never block.</p>
+    </doc>
+  </section>
+
+  <section name="revhistory" label="not normative">
+    <doc>
+      <p>The editor MUST reconcile the revision history.</p>
+    </doc>
+  </section>
+
+  <section name="gamma" label="restricted types and fields">
+    <type class="restricted" name="flagged" source="boolean" label="a planted flag">
+      <doc>
+        <p>This value SHOULD be null when unspecified.</p>
+      </doc>
+    </type>
+    <type class="composite" name="planted-open" source="list" provides="frame" label="a planted performative">
+      <descriptor name="planted:open:list" code="0x00000000:0x00000099"/>
+      <field name="container-id" type="string" mandatory="true" label="the id of the source container"/>
+    </type>
+    <definition name="LIMIT" value="512" label="the planted batch limit"/>
+    <doc name="doc-adjective" title="Adjective use">
+      <p>The timeout REQUIRED by the sender is not a conformance keyword here.</p>
+    </doc>
+  </section>
+
+</amqp>

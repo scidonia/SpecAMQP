@@ -1,0 +1,174 @@
+{
+ "artifacts": {
+  "amqp-core-messaging-v1.0-os.xml": {
+   "baseline": {
+    "may": 12,
+    "must": 60,
+    "must_not": 19,
+    "note": "the baseline MUST count includes occurrences inside MUST NOT",
+    "scan": "crude raw-text keyword scan (PLAN.md \u00a71)",
+    "should": 20
+   },
+   "differences": [
+    {
+     "baseline": 60,
+     "classes": "MUST tokens",
+     "explained_by": [
+      "excluded-subtrees"
+     ],
+     "ledger": 57
+    }
+   ],
+   "ledger": {
+    "may": 12,
+    "must": 38,
+    "must_class": 57,
+    "must_not": 19,
+    "recommended": 1,
+    "required": 0,
+    "should": 13,
+    "should_not": 7,
+    "statements": 90
+   }
+  },
+  "amqp-core-overview-v1.0-os.xml": {
+   "baseline": {
+    "scan": "not performed"
+   },
+   "differences": [
+    {
+     "baseline": "not scanned",
+     "classes": "all",
+     "explained_by": [
+      "overview-not-scanned"
+     ],
+     "ledger": "21 statements"
+    }
+   ],
+   "ledger": {
+    "may": 2,
+    "must": 9,
+    "must_class": 11,
+    "must_not": 2,
+    "recommended": 4,
+    "required": 0,
+    "should": 4,
+    "should_not": 0,
+    "statements": 21
+   }
+  },
+  "amqp-core-security-v1.0-os.xml": {
+   "baseline": {
+    "may": 4,
+    "must": 12,
+    "must_not": 0,
+    "note": "the baseline MUST count includes occurrences inside MUST NOT",
+    "scan": "crude raw-text keyword scan (PLAN.md \u00a71)",
+    "should": 8
+   },
+   "differences": [
+    {
+     "baseline": 8,
+     "classes": "SHOULD tokens",
+     "explained_by": [
+      "excluded-subtrees"
+     ],
+     "ledger": 6
+    }
+   ],
+   "ledger": {
+    "may": 4,
+    "must": 12,
+    "must_class": 12,
+    "must_not": 0,
+    "recommended": 0,
+    "required": 0,
+    "should": 6,
+    "should_not": 0,
+    "statements": 22
+   }
+  },
+  "amqp-core-transactions-v1.0-os.xml": {
+   "baseline": {
+    "may": 0,
+    "must": 29,
+    "must_not": 4,
+    "note": "the baseline MUST count includes occurrences inside MUST NOT",
+    "scan": "crude raw-text keyword scan (PLAN.md \u00a71)",
+    "should": 6
+   },
+   "differences": [
+    {
+     "baseline": 4,
+     "classes": "MUST NOT split",
+     "explained_by": [
+      "wrapped-keyword"
+     ],
+     "ledger": 5
+    }
+   ],
+   "ledger": {
+    "may": 0,
+    "must": 24,
+    "must_class": 29,
+    "must_not": 5,
+    "recommended": 0,
+    "required": 1,
+    "should": 5,
+    "should_not": 1,
+    "statements": 36
+   }
+  },
+  "amqp-core-transport-v1.0-os.xml": {
+   "baseline": {
+    "may": 69,
+    "must": 117,
+    "must_not": 23,
+    "note": "the baseline MUST count includes occurrences inside MUST NOT",
+    "scan": "crude raw-text keyword scan (PLAN.md \u00a71)",
+    "should": 36
+   },
+   "differences": [],
+   "ledger": {
+    "may": 69,
+    "must": 94,
+    "must_class": 117,
+    "must_not": 23,
+    "recommended": 2,
+    "required": 2,
+    "should": 32,
+    "should_not": 4,
+    "statements": 226
+   }
+  },
+  "amqp-core-types-v1.0-os.xml": {
+   "baseline": {
+    "may": 1,
+    "must": 4,
+    "must_not": 0,
+    "note": "the baseline MUST count includes occurrences inside MUST NOT",
+    "scan": "crude raw-text keyword scan (PLAN.md \u00a71)",
+    "should": 0
+   },
+   "differences": [],
+   "ledger": {
+    "may": 1,
+    "must": 4,
+    "must_class": 4,
+    "must_not": 0,
+    "recommended": 0,
+    "required": 1,
+    "should": 0,
+    "should_not": 0,
+    "statements": 6
+   }
+  }
+ },
+ "mechanisms": {
+  "excluded-subtrees": "The baseline matched raw file text, including <picture> diagrams and the revhistory/acknowledgements sections. Those carry no normative statements, so the ledger excludes them; the per-artifact audit records the excluded keyword census so the exclusion is visible rather than silent.",
+  "overview-not-scanned": "Part 1-5 only were scanned for the baseline. Part 0 (Overview) carries normative statements about containers, nodes, negotiated frame size and connection concurrency; those clauses appear here for the first time.",
+  "wrapped-keyword": "A `MUST NOT` (or `SHOULD NOT`) broken across source lines is one clause. The baseline's raw-text pattern missed the wrap and counted the leading MUST as a plain MUST, so the MUST/MUST NOT split differs while the total is unchanged."
+ },
+ "purpose": "Reconcile the token-aware ledger against the crude baseline scan recorded in PLAN.md \u00a71. `clause-ledger.py check` verifies that the ledger numbers recorded here still match the generated ledger, so this record cannot drift silently.",
+ "schema_version": 1
+}

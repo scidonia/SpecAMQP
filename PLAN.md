@@ -18,23 +18,22 @@ Correctness of a specification is not a vibe, and it is not "it type-checks". Fi
 | **Discrimination** | the specification is neither vacuous nor over-permissive: it admits the legal and rejects the illegal, with named error conditions | witness/counter-witness vector pairs (§11), specification-mutation controls (§12 V4) |
 | **Usability** | the specification is executable, and conformance is defined precisely enough that a third party can be checked against it | executable driver (§9), conformance interface (§10) |
 
-Completeness is measured against the pinned artifacts, never asserted. A crude baseline scan of them, recorded here and **superseded by the S0 ledger**:
+Completeness is measured against the pinned artifacts, never asserted. The ledger (§6) is generated from the vendored bytes; these are its numbers:
 
-| Measure | types | transport | messaging | transactions | security | total |
-| --- | --- | --- | --- | --- | --- | --- |
-| bytes | 48 704 | 184 207 | 84 370 | 42 507 | 26 270 | 386 058 |
-| MUST-class (incl. MUST NOT) | 4 | 117 | 60 | 29 | 12 | **222** |
-| — of which MUST NOT | 0 | 23 | 19 | 4 | 0 | 46 |
-| SHOULD | 0 | 36 | 20 | 6 | 8 | **70** |
-| MAY | 1 | 69 | 12 | 0 | 4 | **85** |
-| `<type class=…>` | 24 | 27 | 31 | 8 | 6 | 96 |
-| `<field>` | 0 | 68 | 42 | 7 | 8 | 125 |
-| `<choice>` | 0 | 32 | 9 | 8 | 5 | 54 |
-| `<descriptor>` | 0 | 10 | 20 | 5 | 5 | 40 |
+| Measure | types | transport | messaging | transactions | security | overview | total |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| clauses | 6 | 226 | 90 | 36 | 22 | 21 | **401** |
+| MUST-class | 4 | 117 | 57 | 29 | 12 | 11 | **230** |
+| — MUST / MUST NOT | 4 / 0 | 94 / 23 | 38 / 19 | 24 / 5 | 12 / 0 | 9 / 2 | 181 / 49 |
+| SHOULD / SHOULD NOT | 0 / 0 | 32 / 4 | 13 / 7 | 5 / 1 | 6 / 0 | 4 / 0 | 60 / 12 |
+| MAY | 1 | 69 | 12 | 0 | 4 | 2 | **88** |
+| RECOMMENDED / REQUIRED | 0 / 0 | 3 / 1 | 0 / 0 | 1 / 1 | 0 / 0 | 3 / 2 | 7 / 4 |
 
-Further coverage units from the same scan: 39 distinct `<encoding>` specifications (all in Part 1), 26 `mandatory="true"` fields, 28 declared `default=` values, 31 distinct `<choice>` values in Part 2 — of which 25 are error conditions (`amqp-error` 13, `link-error` 5, `session-error` 4, `connection-error` 3) and 6 are enumerated type choices (`role`, both settle modes, terminus durability, distribution mode, lifetime policy).
+The declared surface, from the same parse of the pinned bytes (not a text scan): **96 types** (24 primitive, 39 restricted, 33 composite), **125 fields** (25 `mandatory="true"`, 27 with a declared `default`, 13 `multiple`, 19 `requires`), **54 choices**, **40 descriptors**, **39 encodings**, **13 named constants** (`<definition>`), 31 sections, and 5 types providing error conditions holding 25 error-condition symbols.
 
-The scan is crude: it counts keyword occurrences in prose without markup normalisation, so it includes occurrences that are illustrative rather than normative. The S0 ledger replaces these numbers, and the S0 contract pins the reconciliation — every difference from this table has a recorded reason. These numbers size the work; they are not the work.
+A crude keyword scan of the raw files — the numbers this programme was originally sized with: 222 MUST-class, 70 SHOULD, 85 MAY over Parts 1–5 — is reconciled against the ledger in `ledger/reconciliation.json`, with every difference attributed to a named mechanism: Part 0 was outside that scan; keywords inside `<picture>` diagrams and the `revhistory`/`acknowledgements` sections are not normative statements; and a `MUST NOT` broken across source lines was counted as a plain MUST. Two further crude-scan artifacts are recorded in this section rather than in that file, because they concern the declared surface rather than clause counts: the scan's field count included an *escaped documentation example* (`&lt;field … mandatory="true" …&gt;`, Part 1's illustration of a book type) that the parse correctly ignores, which is why this plan lists 25 mandatory fields where the scan said 26; and the scan's `REQUIRED` count included an adjective use ("the idle timeout REQUIRED by the sender"), now dispositioned `informative`.
+
+Scan numbers size the work; the ledger is the work.
 
 **Done** means: every clause dispositioned; every MUST-class clause formalized or explicitly assumed, with reviewer sign-off; the declared surface covered by generated tables rather than transcription; the vector corpus passing with the executable specification and with third-party admissions; the mutation controls firing; and no `sorry`, no `noncomputable` definition, and no unaudited axiom.
 
@@ -85,12 +84,15 @@ Three independence rules keep the evidence meaningful, and each has a gate (§17
 
 `scripts/clause-ledger.py` reads only the pinned artifacts and emits `ledger/clauses.json`: one record per normative statement, deterministically ordered.
 
-- **Identifier**: `<artifact>#<anchor>.<n>`, e.g. `amqp-core-transport-v1.0-os.xml#sessions.42`, where `<anchor>` is the `name` attribute of the nearest enclosing element carrying one (`section`, `type`, `field`, `choice`, `doc`) and `<n>` is the 1-based index of the statement within that anchor in document order.
-- **Fields**: artifact, anchor, index, kind (`MUST` | `MUST NOT` | `SHOULD` | `SHOULD NOT` | `MAY` | `REQUIRED` | `OPTIONAL`), normalised text, text SHA-256, and the enclosing type/field/choice path where applicable.
+- **Identifier**: `<artifact>#<anchor path>.<n>`, e.g. `amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions.42`. The anchor path is the chain of enclosing named elements (`section:framing`, `type:open`, `field:max-frame-size`, `doc:doc-idle-time-out`), because a bare `name` is not unique — `field name="value"` occurs inside many types — and `<n>` is the 1-based index of the statement within that anchor in document order. Anchor paths are what make ids stable under unrelated edits elsewhere in the artifact.
+- **Fields**: artifact, anchor, index, kind (`MUST` | `MUST NOT` | `SHOULD` | `SHOULD NOT` | `MAY` | `REQUIRED` | `OPTIONAL` | `RECOMMENDED` | `NOT RECOMMENDED`), class (`MUST` for both MUST forms, else the kind), normalised text, text SHA-256, statement SHA-256, and the names of any `<xref>` elements the statement cites.
+- **Cross-references are resolved for the reader**: `<xref name="MIN-MAX-FRAME-SIZE"/>` renders as `512` through the generated `<definition>` constant table (13 constants, resolved across artifacts because Part 5 cites a Part 2 constant), while a reference to a named element renders as `«open»`. A constant's value changing changes the clause text, so its disposition goes stale — which is the intended behaviour, since that is a semantic change. Cross-artifact references are recorded per clause so the link survives resolution.
 - **Normalisation** must handle the real markup: inline emphasis around the keyword (`<b>MUST</b>`), keywords split across source lines (`MUST\nNOT`), entity-encoded text, and must not treat `<picture>` diagram text, `revhistory`, or `acknowledgements` content as normative. This is a token-aware scan, not a regular-expression grep, and it is verified by planted negative controls (§17).
 - **Dispositions** (`ledger/dispositions/*.json`, planner-authored) key on `(id, text_sha256)`, so a source change that alters a clause's text makes its disposition stale and fails the contract — the mechanism that prevents silent drift between the OASIS source and the formalisation.
 - **Disposition values**: `formalized:<Lean declaration>`, `environment:<id>` (an assumption discharged by the environment model, e.g. "TCP delivers an ordered byte stream"), `out-of-scope:<reason>`, `informative` (explanatory, with justification), `test:<vector id>` (a statement whose only observable form is a vector expectation), `superseded:<decision id>` (decided by an entry in the ambiguity register, §8).
 - **Coverage report** (`ledger/coverage.json`) aggregates per artifact and per anchor, and is regenerated per milestone; acceptance commands diff it against the previous milestone's report so a coverage regression is visible rather than merely regrettable.
+- **No clause can escape the ledger.** A crude token census (every text node, split by whether it sits in an excluded subtree) is compared against what the ledger accounted for, per artifact and per keyword; a keyword token in non-excluded prose that produced no clause fails `check` and names the offending element and text. This gate is what makes the ledger's completeness a measurement of the walk rather than a property of its author.
+- **The baseline reconciliation cannot drift.** `ledger/reconciliation.json` records the crude-scan numbers per artifact, this ledger's numbers, and the named mechanism explaining every difference; `check` fails if the recorded numbers stop matching the generated ledger, so revising the ledger means revising the record deliberately.
 
 ## 7. Generated definition tables
 
@@ -223,6 +225,10 @@ Work: vendor the artifacts and notice; write `AGENTS.md` recording repository in
 Contracts: `tests/contracts/s0_sources_ledger.sh` (hashes, ledger generation, reconciliation with the §1 baseline, planted-negative controls), `tests/contracts/vector.schema.json`, `tests/contracts/s0_tables_fidelity.sh` (regeneration determinism and the mutated-vendor-copy control).
 
 Expected failure: `scripts/fetch-oasis.sh` fails on a missing pin; `clause-ledger.py` fails on an unresolved import; the tables contract fails because no generator exists.
+
+**Progress.** The source and ledger half of S0 is landed and verified: the six artifacts are vendored with hashes and notice; `scripts/fetch-oasis.sh` verifies them offline and refuses a one-bit mutation; `scripts/clause-ledger.py` generates 401 clauses over 230 MUST-class statements across 116 anchors with the token census clean; the baseline reconciliation is recorded; and 39 clauses of connection establishment (framing, version negotiation, `open`) carry their first dispositions. `tests/contracts/s0_sources_ledger.sh` is the observable contract and passes, having first failed on a real defect it caught: `revhistory` is a section *name*, so exclusion by element tag alone silently kept revision-history prose in the ledger.
+
+Still open in S0: the generated definition tables and their mutation control, the vector schema, the flake and its cold realization, `AGENTS.md`, and the executable driver's skeleton. Two design consequences of the first disposition pass are already fixed and recorded there: the endpoint interface must carry a role (client or server), and progress-shaped SHOULDs need the fairness-qualified progress form rather than a MUST-style obligation.
 
 Acceptance: ledger generated offline from the vendored bytes; every §1 count reconciled with recorded reasons; regeneration byte-identical; sources and ledger gates green with their negative controls observed failing first.
 

@@ -1,0 +1,74 @@
+OASIS AMQP 1.0 core specification artifacts, vendored verbatim
+=============================================================
+
+The XML files in this directory are unmodified copies of the OASIS Standard
+artifacts for AMQP 1.0 core, published 29 October 2012. Their byte identity is
+pinned by SHA-256 in `toolchain/sources.toml` and checked by
+`scripts/fetch-oasis.sh --verify`.
+
+They MUST NOT be edited. Every clause identifier, disposition, generated table
+and vector citation in this repository refers to these bytes; a local edit would
+silently invalidate the evidence that depends on them.
+
+Copyright and citation
+----------------------
+
+Copyright (c) OASIS Open 2012. All Rights Reserved.
+
+The OASIS notice accompanying these documents states that the specification and
+translations of it may be copied and furnished to others, and that derivative
+works that comment on or otherwise explain it or assist in its implementation
+may be prepared, copied, published and distributed, in whole or in part, without
+restriction, provided that the copyright notice and the notice's own section are
+included on all such copies and derivative works. The documents themselves may
+not be modified, including by removing the copyright notice, except as needed
+for developing OASIS deliverables or as required to translate them into other
+languages.
+
+The citation formats the documents themselves specify:
+
+    [amqp-core-overview-v1.0]
+    OASIS Advanced Message Queuing Protocol (AMQP) Version 1.0 Part 0: Overview.
+    29 October 2012. OASIS Standard.
+
+    [amqp-core-types-v1.0]
+    OASIS Advanced Message Queuing Protocol (AMQP) Version 1.0 Part 1: Types.
+    29 October 2012. OASIS Standard.
+
+    [amqp-core-transport-v1.0]
+    OASIS Advanced Message Queuing Protocol (AMQP) Version 1.0 Part 2: Transport.
+    29 October 2012. OASIS Standard.
+
+    [amqp-core-messaging-v1.0]
+    OASIS Advanced Message Queuing Protocol (AMQP) Version 1.0 Part 3: Messaging.
+    29 October 2012. OASIS Standard.
+
+    [amqp-core-transactions-v1.0]
+    OASIS Advanced Message Queuing Protocol (AMQP) Version 1.0 Part 4: Transactions.
+    29 October 2012. OASIS Standard.
+
+    [amqp-core-security-v1.0]
+    OASIS Advanced Message Queuing Protocol (AMQP) Version 1.0 Part 5: Security.
+    29 October 2012. OASIS Standard.
+
+Canonical locations:
+
+    https://docs.oasis-open.org/amqp/core/v1.0/os/amqp-core-overview-v1.0-os.xml
+    https://docs.oasis-open.org/amqp/core/v1.0/os/amqp-core-types-v1.0-os.xml
+    https://docs.oasis-open.org/amqp/core/v1.0/os/amqp-core-transport-v1.0-os.xml
+    https://docs.oasis-open.org/amqp/core/v1.0/os/amqp-core-messaging-v1.0-os.xml
+    https://docs.oasis-open.org/amqp/core/v1.0/os/amqp-core-transactions-v1.0-os.xml
+    https://docs.oasis-open.org/amqp/core/v1.0/os/amqp-core-security-v1.0-os.xml
+
+Technical committee: OASIS Advanced Message Queuing Protocol (AMQP) TC,
+http://www.oasis-open.org/committees/amqp/
+
+Scope note
+----------
+
+These artifacts are AMQP 1.0 core (Parts 0-5). The OASIS TC's repository
+`oasis-tcs/amqp-specs` additionally publishes working drafts for protocol
+extensions — addressing, management (`amqp-man`), claims-based security
+(`amqp-cbs`), filter expressions (`filtex`), HTTP-over-AMQP, event streams and
+connection-info. Those are outside this specification's scope; they are not part
+of the OASIS Standard for core AMQP 1.0 and are not vendored here.
