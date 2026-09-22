@@ -1,4 +1,5 @@
 import Harness.Runner
+import Ref.Message
 import Ref.SessionCodec
 import Ref.Vectors
 
@@ -13,8 +14,16 @@ outcome. Nothing here touches the network, a clock, or a random source.
 -/
 
 open SpecAMQP.Harness
+open SpecAMQP.Ref.Message (refDeliveryCodec refMessageCodec)
 open SpecAMQP.Ref.SessionCodec
 open SpecAMQP.Ref.Vectors
+
+/-- The reference implementation's codecs, one per layer of the vocabulary, bound together
+so the corpus runner dispatches every vector kind to the layer that owns it. -/
+def artefact : Artefact :=
+  { name := "reference", values := refCodec, frames := refFrameCodec,
+    exchanges := refExchangeCodec, messages := refMessageCodec,
+    deliveries := refDeliveryCodec }
 
 def main (args : List String) : IO UInt32 := do
   let quiet := args.contains "--quiet"
@@ -30,7 +39,7 @@ def main (args : List String) : IO UInt32 := do
       catch e =>
         IO.eprintln s!"amqp-ref: cannot read {path}: {e}"
         return (2 : UInt32)
-    match runCorpusWith refCodec refFrameCodec refExchangeCodec text with
+    match runCorpusArtefact artefact text with
     | .error message =>
       IO.eprintln s!"amqp-ref: {message}"
       return (2 : UInt32)

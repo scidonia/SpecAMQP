@@ -456,20 +456,338 @@ def runExchange (codec : ExchangeCodec) (json : Json) : Except String (List Verd
     names := rememberState names outcome.state
   return verdicts.reverse
 
-/-- Run one line: an exchange yields one verdict per step, and every other kind yields
-the single verdict its codec comparison produces. -/
-def runLineWith (codec : Codec) (frames : FrameCodec) (exchange : ExchangeCodec)
-    (json : Json) : Except String (List Verdict) :=
+/-! ## The message layer's corpus interface
+
+The Part 3 layer's boundary is different from the frame layer's in one way that matters to
+the vocabulary: a section or a delivery state can be *well formed and refused*, and the
+refusal names a protocol condition. The frame layer's `FrameCodec` returns a bare `String`
+detail because its own refusals all carry one condition; a message refusal carries the
+condition the corpus compares, so the pair travels together. -/
+
+/-- A refusal in the corpus vocabulary: the protocol condition, from the generated choice
+table, and the detail, which leads with a reason class the runner reads. -/
+structure Refusal where
+  condition : String
+  detail : String
+deriving Repr
+
+/-- The interface a message corpus needs from an artefact's Part 3 layer, on the same terms
+as `Codec` and `FrameCodec`: a section and a message in the corpus vocabulary, so the
+comparison happens in the vocabulary rather than between two artefacts' section types.
+
+`policy` is the endpoint's own knowledge, made an explicit input rather than a hidden
+decision: the annotations text mandates a detach for an annotation key the receiver does
+not understand, so "which keys does this endpoint implement" has to come from outside the
+decoder, and both artefacts must be handed the same answer to be comparable. -/
+structure MessageCodec where
+  name : String
+  /-- One section from octets, under the endpoint's policy, and how many octets it consumed. -/
+  decodeSection : Json → Octets → Except Refusal (Json × Nat)
+  /-- One section back to octets. -/
+  encodeSection : Json → Except String Octets
+  /-- A whole payload's sections, in the order they appear. -/
+  decodeMessage : Json → Octets → Except Refusal (List Json)
+  /-- A whole payload's sections back to octets. -/
+  encodeMessage : Json → Except String Octets
+
+/-- The message layer a runner with no Part 3 layer carries: message vectors fail loudly
+instead of being read as frames. -/
+def noMessageCodec : MessageCodec where
+  name := "none"
+  decodeSection := fun _ _ => .error ⟨"", "this runner carries no message layer"⟩
+  encodeSection := fun _ => .error "this runner carries no message layer"
+  decodeMessage := fun _ _ => .error ⟨"", "this runner carries no message layer"⟩
+  encodeMessage := fun _ => .error "this runner carries no message layer"
+
+/-- What applying one delivery state to a delivery did, in the corpus vocabulary:
+whether the state was applied, the delivery's state and settlement afterwards, the
+delivery-count and resume point it now carries, whether its message may be delivered to
+this link again, and — on a refusal — the condition and the class-led detail.
+
+Every one of these is an observable the corpus compares, because each is a quantity the
+artifact's rules move: a machine that recorded a state and not the count it increments,
+or a resume point it no longer reports once the delivery is terminal, would be
+indistinguishable from a correct one if only the state's name were reported. -/
+structure DeliveryOutcome where
+  admitted : Bool
+  state : String
+  deliveryCount : Nat
+  settled : Bool
+  sectionNumber : Option Nat
+  sectionOffset : Option Nat
+  redeliveryAllowed : Bool
+  condition : Option String
+  detail : String
+deriving Repr
+
+/-- An artefact's delivery-state machine behind the corpus interface, on the same terms as
+`ExchangeCodec`: the peer's own state is its own type, and the codec translates at the
+boundary and nothing else. -/
+structure DeliveryCodec where
+  name : String
+  /-- The delivery machine's own state. -/
+  St : Type
+  /-- The machine a state name from the corpus denotes. -/
+  start : String → Except String St
+  /-- Apply one delivery step to the machine. The step is the corpus's step object: its
+  `apply` carries the delivery state as a corpus value, and its `settled` states whether
+  the state is settled. -/
+  apply : St → Json → Except String (DeliveryOutcome × St)
+
+/-- The delivery layer a runner with no outcome machine carries. -/
+def noDeliveryCodec : DeliveryCodec where
+  name := "none"
+  St := Unit
+  start := fun _ => .error "this runner carries no delivery state machine"
+  apply := fun _ _ => .error "this runner carries no delivery state machine"
+
+/-- The codecs one artefact brings to a corpus. Naming them together is what lets one
+runner dispatch every kind to the layer that owns it, and what makes an artefact's
+coverage of the vocabulary a stated fact rather than an implied one. -/
+structure Artefact where
+  name : String
+  values : Codec
+  frames : FrameCodec
+  exchanges : ExchangeCodec
+  messages : MessageCodec
+  deliveries : DeliveryCodec
+
+/-- The policy a vector hands the message layer: the annotation keys this endpoint
+implements, absent meaning none. -/
+def policyOf (json : Json) : Json :=
+  (json.getObjVal? "policy").toOption.getD (Json.mkObj [])
+
+/-- The verdict for a vector that expected a refusal and got a value. -/
+def unexpectedValue (id kind what : String) : Verdict :=
+  ⟨id, kind, false, s!"expected a refusal, {what}"⟩
+
+/-- The verdict for a refusal, compared on *both* its condition and its reason class. The
+message layer is where a well-formed section can be refused, so two artefacts that refuse
+for different reasons, or under different conditions, have not agreed about the artifact —
+and a comparison that looked only at "it failed" would accept either. -/
+def checkRefusal (id kind : String) (json : Json) (reason : Refusal) : Except String Verdict := do
+  let expect ← json.getObjVal? "expectError"
+  let expectedCondition := (expect.getObjValAs? String "condition").toOption.getD ""
+  let expectedReason := (expect.getObjValAs? String "reason").toOption.getD ""
+  let observed := (reasonClassOf reason.detail).getD ""
+  if reason.condition != expectedCondition then
+    return ⟨id, kind, false,
+      s!"refused with condition {reason.condition}, and the vector names {expectedCondition}: \
+        {reason.detail}"⟩
+  else if observed != expectedReason then
+    return ⟨id, kind, false,
+      s!"refused as {observed}, and the vector names {expectedReason}: {reason.detail}"⟩
+  else
+    return ⟨id, kind, true, s!"refused with {expectedCondition} and {observed}: {reason.detail}"⟩
+
+/-- A `section-decode` vector: the section must be the one the vector writes, every octet
+must be consumed, and `canonical` additionally requires re-encoding to the same octets. -/
+def checkSectionDecode (codec : MessageCodec) (id kind : String) (json policy : Json)
+    (bytes : Octets) : Except String Verdict := do
+  let expected ← json.getObjVal? "section"
+  let canonical := (json.getObjValAs? Bool "canonical").toOption.getD false
+  match codec.decodeSection policy bytes with
+  | .error reason =>
+    return ⟨id, kind, false, s!"expected a section, got {reason.condition} {reason.detail}"⟩
+  | .ok (decoded, consumed) =>
+    if consumed != bytes.size then
+      return ⟨id, kind, false, s!"consumed {consumed} of {bytes.size} octets"⟩
+    else if decoded != expected then
+      return ⟨id, kind, false, s!"decoded {decoded.compress}, expected {expected.compress}"⟩
+    else if canonical then
+      match codec.encodeSection decoded with
+      | .error e => return ⟨id, kind, false, s!"could not re-encode: {e}"⟩
+      | .ok re =>
+        if re != bytes then
+          return ⟨id, kind, false,
+            s!"re-encodes to {toHexBrief re}, not {toHexBrief bytes}"⟩
+        else return ⟨id, kind, true, "decoded and re-encoded to the same octets"⟩
+    else return ⟨id, kind, true, "decoded"⟩
+
+/-- A `section-encode` vector: the writer must produce the vector's octets. -/
+def checkSectionEncode (codec : MessageCodec) (id kind : String) (json : Json) :
+    Except String Verdict := do
+  let expected ← json.getObjVal? "section"
+  let bytes ← octetsOf json
+  match codec.encodeSection expected with
+  | .error e => return ⟨id, kind, false, s!"could not encode: {e}"⟩
+  | .ok produced =>
+    if produced == bytes then return ⟨id, kind, true, "encoded to the expected octets"⟩
+    else
+      return ⟨id, kind, false,
+        s!"encoded to {toHexBrief produced}, expected {toHexBrief bytes}"⟩
+
+/-- A `message-decode` vector, on the terms `section-decode` sets for one section: the
+section list must be the one the vector writes, every octet consumed, and `canonical`
+requiring the same octets back. -/
+def checkMessageDecode (codec : MessageCodec) (id kind : String) (json policy : Json)
+    (bytes : Octets) : Except String Verdict := do
+  let expected ← json.getObjValAs? (Array Json) "sections"
+  let canonical := (json.getObjValAs? Bool "canonical").toOption.getD false
+  match codec.decodeMessage policy bytes with
+  | .error reason =>
+    return ⟨id, kind, false, s!"expected sections, got {reason.condition} {reason.detail}"⟩
+  | .ok sections =>
+    if sections.toArray != expected then
+      return ⟨id, kind, false,
+        s!"decoded {(Json.arr sections.toArray).compress}, expected \
+          {(Json.arr expected).compress}"⟩
+    else if canonical then
+      match codec.encodeMessage (Json.arr sections.toArray) with
+      | .error e => return ⟨id, kind, false, s!"could not re-encode: {e}"⟩
+      | .ok re =>
+        if re != bytes then
+          return ⟨id, kind, false,
+            s!"re-encodes to {toHexBrief re}, not {toHexBrief bytes}"⟩
+        else return ⟨id, kind, true, "decoded and re-encoded to the same octets"⟩
+    else return ⟨id, kind, true, s!"decoded {sections.length} section(s)"⟩
+
+/-- A `message-encode` vector: the writer must produce the vector's octets. -/
+def checkMessageEncode (codec : MessageCodec) (id kind : String) (json : Json) :
+    Except String Verdict := do
+  let sections ← json.getObjVal? "sections"
+  let bytes ← octetsOf json
+  match codec.encodeMessage sections with
+  | .error e => return ⟨id, kind, false, s!"could not encode: {e}"⟩
+  | .ok produced =>
+    if produced == bytes then return ⟨id, kind, true, "encoded to the expected octets"⟩
+    else
+      return ⟨id, kind, false,
+        s!"encoded to {toHexBrief produced}, expected {toHexBrief bytes}"⟩
+
+/-- One message vector's expectation against a codec: the kinds are the message layer's
+own, and each is checked above on the terms its direction sets. -/
+def runMessageVector (codec : MessageCodec) (json : Json) : Except String Verdict := do
+  let id ← json.getObjValAs? String "vector"
+  let kind ← json.getObjValAs? String "kind"
+  let policy := policyOf json
+  match kind with
+  | "section-decode" =>
+    checkSectionDecode codec id kind json policy (← octetsOf json)
+  | "section-encode" => checkSectionEncode codec id kind json
+  | "section-reject" =>
+    match codec.decodeSection policy (← octetsOf json) with
+    | .error reason => checkRefusal id kind json reason
+    | .ok _ => return unexpectedValue id kind "decoded the section"
+  | "message-decode" =>
+    checkMessageDecode codec id kind json policy (← octetsOf json)
+  | "message-encode" => checkMessageEncode codec id kind json
+  | "message-reject" =>
+    match codec.decodeMessage policy (← octetsOf json) with
+    | .error reason => checkRefusal id kind json reason
+    | .ok _ => return unexpectedValue id kind "decoded the message"
+  | other => .error s!"unknown vector kind '{other}'"
+
+/-- One delivery step's verdict, compared in the corpus vocabulary. The step writes the
+state to apply and whether it is settled; the expectation names the status, the state
+afterwards and every quantity the rules move, so a machine that applied the state but
+mis-counted the delivery, or kept a resume point past the point the delivery can be
+resumed, fails here rather than passing on the state's name alone. -/
+def checkDeliveryStep (id : String) (index : Nat) (expect : Json)
+    (outcome : DeliveryOutcome) : Verdict :=
+  let name := s!"{id}#{index + 1}"
+  let failed (detail : String) : Verdict := ⟨name, "delivery", false, detail⟩
+  let wanted := (expect.getObjValAs? String "status").toOption.getD ""
+  let quantity (key : String) (observed : Nat) : Except String Unit :=
+    match (expect.getObjValAs? Nat key).toOption with
+    | some expected =>
+      if observed == expected then .ok ()
+      else .error s!"the {key} is {observed}, and the vector names {expected}"
+    | none => .ok ()
+  let compare : Except String Unit := do
+    quantity "delivery-count" outcome.deliveryCount
+    match (expect.getObjValAs? Bool "settled").toOption with
+    | some expected =>
+      if outcome.settled == expected then .ok ()
+      else .error s!"settled is {outcome.settled}, and the vector names {expected}"
+    | none => .ok ()
+    match (expect.getObjValAs? Bool "redelivery-allowed").toOption with
+    | some expected =>
+      if outcome.redeliveryAllowed == expected then .ok ()
+      else .error s!"redelivery-allowed is {outcome.redeliveryAllowed}, and the vector names {expected}"
+    | none => .ok ()
+    match (expect.getObjValAs? Nat "section-number").toOption with
+    | some expected =>
+      match outcome.sectionNumber with
+      | some observed =>
+        if observed == expected then .ok ()
+        else .error s!"the section-number is {observed}, and the vector names {expected}"
+      | none => .error "the resume point is not reported, and the vector names one"
+    | none => .ok ()
+    match (expect.getObjValAs? Nat "section-offset").toOption with
+    | some expected =>
+      match outcome.sectionOffset with
+      | some observed =>
+        if observed == expected then .ok ()
+        else .error s!"the section-offset is {observed}, and the vector names {expected}"
+      | none => .error "the resume point is not reported, and the vector names one"
+    | none => .ok ()
+  let stateMatches : Except String Unit :=
+    if outcome.state == (expect.getObjValAs? String "state").toOption.getD "" then .ok ()
+    else .error s!"the delivery is in {outcome.state}, and the vector names \
+      {(expect.getObjValAs? String "state").toOption.getD ""}"
+  let observed : Except String Unit := do
+    compare
+    stateMatches
+  if wanted == "admitted" then
+    if !outcome.admitted then failed s!"the delivery refused the state: {outcome.detail}"
+    else match observed with
+      | .error detail => failed detail
+      | .ok () => ⟨name, "delivery", true, s!"applied; {outcome.detail}"⟩
+  else if wanted == "refused" then
+    if outcome.admitted then failed s!"the delivery applied the state: {outcome.detail}"
+    else
+      let expectedCondition := (expect.getObjValAs? String "condition").toOption.getD ""
+      let expectedReason := (expect.getObjValAs? String "reason").toOption.getD ""
+      let observedReason := (reasonClassOf outcome.detail).getD ""
+      if outcome.condition.getD "" != expectedCondition then
+        failed s!"refused with condition {outcome.condition.getD ""}, and the vector names \
+          {expectedCondition}: {outcome.detail}"
+      else if observedReason != expectedReason then
+        failed s!"refused as {observedReason}, and the vector names {expectedReason}: \
+          {outcome.detail}"
+      else match observed with
+        | .error detail => failed detail
+        | .ok () =>
+          ⟨name, "delivery", true, s!"refused with {expectedCondition} and {observedReason}"⟩
+  else failed s!"an expectation's status is `admitted` or `refused`, not '{wanted}'"
+
+/-- Run one delivery vector: the start state, then the states applied to it in order, one
+verdict per step. The machine is carried between steps by the codec, so a corpus says
+"this state, now" rather than restating the machine — and the observable quantities are
+compared at every step, which is what makes a state machine a sequence of measurements
+rather than a sequence of names. -/
+def runDelivery (codec : DeliveryCodec) (json : Json) : Except String (List Verdict) := do
+  let id ← json.getObjValAs? String "vector"
+  let startName ← json.getObjValAs? String "start"
+  let steps ← json.getObjValAs? (Array Json) "steps"
+  if steps.isEmpty then .error "a delivery vector applies at least one state"
+  let mut state ← codec.start startName
+  let mut verdicts : List Verdict := []
+  for (stepJson, index) in steps.toList.zipIdx do
+    let expect ← stepJson.getObjVal? "expect"
+    let (outcome, next) ← codec.apply state stepJson
+    verdicts := checkDeliveryStep id index expect outcome :: verdicts
+    state := next
+  return verdicts.reverse
+
+/-- Run one line: a delivery or an exchange yields one verdict per step, a message-layer
+kind yields one verdict, and every remaining kind yields the single verdict its codec
+comparison produces. -/
+def runLineWith (art : Artefact) (json : Json) : Except String (List Verdict) :=
   match (json.getObjValAs? String "kind").toOption with
-  | some "exchange" => runExchange exchange json
+  | some "exchange" => runExchange art.exchanges json
+  | some "delivery" => runDelivery art.deliveries json
+  | some "section-decode" | some "section-encode" | some "section-reject"
+  | some "message-decode" | some "message-encode" | some "message-reject" =>
+    return [← runMessageVector art.messages json]
   | _ => do
-    let verdict ← runVectorWith codec frames json
+    let verdict ← runVectorWith art.values art.frames json
     return [verdict]
 
-/-- Run every line with all three codecs, returning the verdicts and whether all of
+/-- Run every line with one artefact's codecs, returning the verdicts and whether all of
 them passed. -/
-def runCorpusWith (codec : Codec) (frames : FrameCodec) (exchange : ExchangeCodec)
-    (text : String) : Except String (List Verdict × Bool) := do
+def runCorpusArtefact (art : Artefact) (text : String) : Except String (List Verdict × Bool) := do
   let mut verdicts : List Verdict := []
   let mut allOk := true
   for (line, index) in text.splitOn "\n" |>.zipIdx do
@@ -478,7 +796,7 @@ def runCorpusWith (codec : Codec) (frames : FrameCodec) (exchange : ExchangeCode
     match Json.parse trimmed with
     | .error e => .error s!"line {index + 1}: not valid JSON: {e}"
     | .ok json =>
-      match runLineWith codec frames exchange json with
+      match runLineWith art json with
       | .error e => .error s!"line {index + 1}: {e}"
       | .ok lineVerdicts =>
         for verdict in lineVerdicts do
@@ -486,8 +804,12 @@ def runCorpusWith (codec : Codec) (frames : FrameCodec) (exchange : ExchangeCode
           if !verdict.ok then allOk := false   -- of tens of thousands is not a place
   return (verdicts.reverse, allOk)             -- for quadratic list append
 
-/-- Run every line of a value corpus. -/
+/-- Run every line of a value corpus with an artefact that carries only a value codec,
+which is what a corpus of type-system vectors needs. -/
 def runCorpus (codec : Codec) (text : String) : Except String (List Verdict × Bool) :=
-  runCorpusWith codec noFrameCodec noExchangeCodec text
+  runCorpusArtefact
+    { name := codec.name, values := codec, frames := noFrameCodec,
+      exchanges := noExchangeCodec, messages := noMessageCodec,
+      deliveries := noDeliveryCodec } text
 
 end SpecAMQP.Harness

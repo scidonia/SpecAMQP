@@ -1,6 +1,7 @@
 import Harness.Runner
 import Spec.Codec
 import Spec.FrameCodec
+import Spec.Message
 import Spec.SessionCodec
 
 /-!
@@ -16,7 +17,15 @@ outcome. Nothing here touches the network, a clock, or a random source.
 open SpecAMQP.Harness
 open SpecAMQP.Spec.Codec
 open SpecAMQP.Spec.FrameCodec
+open SpecAMQP.Spec.Message (specDeliveryCodec specMessageCodec)
 open SpecAMQP.Spec.SessionCodec
+
+/-- The specification's codecs, one per layer of the vocabulary, bound together so the
+corpus runner dispatches every vector kind to the layer that owns it. -/
+def artefact : Artefact :=
+  { name := "specification", values := specCodec, frames := specFrameCodec,
+    exchanges := specExchangeCodec, messages := specMessageCodec,
+    deliveries := specDeliveryCodec }
 
 def main (args : List String) : IO UInt32 := do
   let quiet := args.contains "--quiet"
@@ -32,7 +41,7 @@ def main (args : List String) : IO UInt32 := do
       catch e =>
         IO.eprintln s!"amqp-spec: cannot read {path}: {e}"
         return (2 : UInt32)
-    match runCorpusWith specCodec specFrameCodec specExchangeCodec text with
+    match runCorpusArtefact artefact text with
     | .error message =>
       IO.eprintln s!"amqp-spec: {message}"
       return (2 : UInt32)

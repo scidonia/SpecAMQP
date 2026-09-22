@@ -4,7 +4,7 @@ cd53ded13c0c31f2d6bacd3d04e3195f5c091b76  lean/Spec/Codec.lean
 fdb7124d119e3a66f6ab521d7c0dc22d34ed6fd4  lean/Spec/Frame.lean
 31e43aed7900e071a7a1615d739be50f716b5b74  lean/Spec/FrameCodec.lean
 7c2fc8950376880dfbba4beb86a052316ea8b589  lean/Spec/Main.lean
-4939c1effcaaba735a72d4b06d4ee0a63523bce9  lean/Spec/Message.lean
+d217340efec24e26245f21f2cfb4d04e9b140242  lean/Spec/Message.lean
 9fa46bb63a4e3b09f04c9d89689b74a676356783  lean/Spec/ReadLaws.lean
 7cfa8dcce0c773084e5c3a9ae6bd250fec01ff04  lean/Spec/Session.lean
 0d21912c7627dddca29799f8b7a224fe91907b05  lean/Spec/SessionCodec.lean
@@ -25,7 +25,7 @@ b22dd480096d2126ee8d6b764e03fc0540521cdb  vectors/generated.ndjson
 a8412a12ec4d84fe97a3c52f624d21e408d28df6  vectors/isolation.md
 2c6eb7f4cfd6e68184c967a121928251f346e669  vectors/message/deliveries.ndjson
 56025501f1567db480e31b5d76f8b00761951b75  vectors/message/generated.ndjson
-33ee0e4776bf60f9c70417c1b240b921346b75b1  vectors/message/messages-negative.ndjson
+d488702b9362fdcd2b3e182af1b58627dd5a3f28  vectors/message/messages-negative.ndjson
 9a5c3bcfad7dec093bed663dd6641f9d6551547c  vectors/message/messages.ndjson
 ded98608246d60bdf425b26c60206902995a4e30  vectors/message/sections-negative.ndjson
 c876f69bb22065b406c11b423b5ffb93d4d18426  vectors/message/sections.ndjson
