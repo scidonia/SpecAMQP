@@ -7,7 +7,10 @@
 `generate` walks the pinned XML in document order and emits one record per
 normative statement, plus a coverage report. `check` validates the disposition
 files against the generated ledger and reports undispositioned MUST-class
-clauses; it exits non-zero on any problem.
+clauses; it also resolves the declarations and vectors those dispositions name
+against `lean/**` and `vectors/*.ndjson`, so a claim about a carrier that does not
+exist fails rather than sitting in the record unnoticed. It exits non-zero on any
+problem.
 
 Why a token-aware walk rather than a keyword grep (§6 of PLAN.md):
 
@@ -133,6 +136,52 @@ DISPOSITION_PREFIXES = (
     "test:",
     "superseded:",
 )
+
+# Dispositions make two claims about the tree they sit beside: `formalized:` names
+# the declaration that carries a clause, and `test:` names the vector that witnesses
+# it. Neither claim was checked, so a declaration renamed or a vector never generated
+# left a disposition pointing at nothing while every gate stayed green — the one such
+# claim found so far was found by reading the code, which was the only tier that
+# could find it. These two gates read the thing that would have to exist.
+FORMALIZED_PREFIX = "formalized:"
+TEST_PREFIX = "test:"
+
+# A file's conventions block declares what its own vocabulary means, including
+# whether its `formalized:` values are claims about the tree present now or promises
+# the plan carries later. `part1-types.json` writes "the value domain and codec that
+# the remaining dispositions name land with the rest of S1"; `part0` writes that its
+# declarations were "verified present in the module it names". A commitment has
+# nothing in the tree to resolve against, so it is exempt; the declaration is read
+# from the record, never from a list of file names here, so the exemption ends when
+# the file's own words are rewritten. A file that documents the vocabulary without
+# declaring a commitment is making the existence claim, and a file that carries
+# `formalized:` values while documenting nothing is reported by name.
+FORWARD_COMMITMENT_MARKERS = ("commitment", "does not exist yet", "land with", "lands with")
+
+# Declaration forms a `formalized:` carrier can take. Attributes and modifiers sit in
+# front of the keyword, so the scan reads through them rather than missing an
+# `@[simp] theorem` or a `private def`. The kind is captured because an `inductive`'s
+# constructors are declarations too: `Spec.Connection.Submission.frame` names a
+# constructor of `Submission`, and a scan that only read `inductive Submission` would
+# file a false positive against a correct entry. `axiom` and `constant` are
+# deliberately not collected — a carrier declared as an axiom is not a declaration
+# this record accepts (the trust scan forbids them), so naming one must fail.
+LEAN_DECLARATION_PATTERN = re.compile(
+    r"^\s*(?:@\[[^\]]*\]\s*)*"
+    r"(?:private\s+|protected\s+|noncomputable\s+|partial\s+|unsafe\s+|scoped\s+)*"
+    r"(def|theorem|lemma|structure|inductive|abbrev|class|instance|opaque)\s+"
+    r"([A-Za-z_][\w.']*)"
+)
+LEAN_CONSTRUCTOR_PATTERN = re.compile(r"^\s*\|\s*([A-Za-z_][\w.']*)")
+LEAN_NAMESPACE_PATTERN = re.compile(r"^\s*namespace\s+([A-Za-z_][\w.']*)")
+LEAN_SECTION_PATTERN = re.compile(r"^\s*section(?:\s+([A-Za-z_][\w.']*))?\s*$")
+LEAN_END_PATTERN = re.compile(r"^\s*end(?:\s+([A-Za-z_][\w.']*))?\s*(?:--.*)?$")
+
+# The other spelling a `formalized:` value may take: the module itself, with an
+# optional anchor — `lean/Spec/Session.lean`, `…#step`, `…:940-942`.
+LEAN_MODULE_PATTERN = re.compile(r"^(?:lean/)?([A-Za-z0-9_./-]+\.lean)([#:].*)?$")
+LEAN_ANCHOR_NAME_PATTERN = re.compile(r"^#([A-Za-z_][\w.']*)$")
+LEAN_ANCHOR_LINES_PATTERN = re.compile(r"^:L?(\d+)(?:-L?(\d+))?$")
 
 # Keywords counted by the audit. Multi-token keywords (`MUST NOT`) are counted
 # through their first token, so the ledger-derived expectation for `MUST` is
@@ -746,6 +795,316 @@ def check_dispositions(report: dict, dispositions: dict[str, dict]) -> list[str]
     return problems
 
 
+def disposition_values(entry: dict, prefix: str) -> list[str]:
+    """The values of one disposition's `prefix:` claims, in the order written.
+
+    A disposition is a `;`-separated set of decisions (`formalized:X; test:y`), so a
+    value is read by prefix rather than by taking the whole string.
+    """
+    return [
+        token.strip()[len(prefix):]
+        for token in entry.get("disposition", "").split(";")
+        if token.strip().startswith(prefix)
+    ]
+
+
+def declaration_spellings(namespace: list[str], written: list[str]) -> set[str]:
+    """Every spelling a disposition may use for one declaration, and no other.
+
+    Lean stores a declaration under its enclosing namespace joined to the name as
+    written: `def Session.atState` inside `namespace SpecAMQP.Spec.Session` is
+    `SpecAMQP.Spec.Session.Session.atState`. A disposition quotes the path a reader
+    would write, and the ledger abbreviates in exactly two ways — it drops the root
+    namespace (`Spec.Session.afterEnd`), and it writes the join once where the
+    declaration repeats the namespace segment (`SpecAMQP.Spec.Session.atState`). Both
+    are derived from the declaration here, because a rule that ignored the namespace
+    would accept a path that names nothing at all.
+    """
+    paths = [namespace + written]
+    if namespace:
+        paths.append(namespace[1:] + written)
+        if written and written[0] == namespace[-1]:
+            paths.append(namespace + written[1:])
+            paths.append(namespace[1:] + written[1:])
+    return {".".join(path) for path in paths}
+
+
+def lean_code_lines(text: str) -> list[tuple[int, str]]:
+    """A module's lines as `(indent, code)`, with comments removed.
+
+    Structure is read from code rather than quoted from documentation, so a
+    constructor drawn in a docstring and a `| error e =>` arm inside a proof are both
+    invisible here. Lean's block comments nest and docstrings are block comments, so
+    this tracks depth rather than matching delimiters.
+    """
+    lines: list[tuple[int, str]] = []
+    depth = 0
+    for line in text.splitlines():
+        code: list[str] = []
+        index = 0
+        while index < len(line):
+            if depth == 0 and line.startswith("--", index):
+                break
+            if line.startswith("/-", index):
+                depth += 1
+                index += 2
+                continue
+            if depth and line.startswith("-/", index):
+                depth -= 1
+                index += 2
+                continue
+            if depth == 0:
+                code.append(line[index])
+            index += 1
+        stripped = "".join(code)
+        lines.append((len(stripped) - len(stripped.lstrip()), stripped))
+    return lines
+
+
+def lean_declarations(root: Path) -> dict[Path, set[str]]:
+    """Declarations under `lean/**`, keyed by module, in every accepted spelling.
+
+    The modules are read rather than the build: a name that is not in the tree the
+    dispositions point at does not exist, however recently it was proved. The build
+    directory is skipped — the sources under it belong to dependencies, not to this
+    ledger. Constructors are declarations too: `Spec.Connection.Submission.frame`
+    names the constructor `frame` of `inductive Submission`, and a scan that stopped
+    at the inductive's own name would reject a correct disposition.
+    """
+    modules: dict[Path, set[str]] = {}
+    for path in sorted(root.rglob("*.lean")):
+        if ".lake" in path.parts:
+            continue
+        stack: list[tuple[str, list[str]]] = []
+        names: set[str] = set()
+        inductive: tuple[int, list[str], list[str]] | None = None
+        for indent, code in lean_code_lines(path.read_text(encoding="utf-8")):
+            if not code.strip():
+                continue
+            constructor = LEAN_CONSTRUCTOR_PATTERN.match(code)
+            if inductive is not None and constructor is not None:
+                names.update(
+                    declaration_spellings(inductive[1], inductive[2] + [constructor.group(1)])
+                )
+                continue
+            if inductive is not None and indent <= inductive[0]:
+                inductive = None
+            namespace = LEAN_NAMESPACE_PATTERN.match(code)
+            if namespace:
+                stack.append(("namespace", namespace.group(1).split(".")))
+                continue
+            section = LEAN_SECTION_PATTERN.match(code)
+            if section:
+                stack.append(("section", [section.group(1)] if section.group(1) else []))
+                continue
+            end = LEAN_END_PATTERN.match(code)
+            if end:
+                closing = end.group(1)
+                if closing:
+                    for index in range(len(stack) - 1, -1, -1):
+                        if ".".join(stack[index][1]) == closing:
+                            del stack[index:]
+                            break
+                elif stack:
+                    stack.pop()
+                continue
+            declaration = LEAN_DECLARATION_PATTERN.match(code)
+            if declaration is None:
+                continue
+            enclosing = [
+                segment for kind, frame in stack if kind == "namespace" for segment in frame
+            ]
+            written = declaration.group(2).split(".")
+            names.update(declaration_spellings(enclosing, written))
+            if declaration.group(1) == "inductive":
+                inductive = (indent, enclosing, written)
+        modules[path] = names
+    return modules
+
+
+def unresolved_module(value: str, root: Path, modules: dict[Path, set[str]]) -> str | None:
+    """Why a module-spelled `formalized:` value names nothing, or None when it does."""
+    match = LEAN_MODULE_PATTERN.match(value)
+    if match is None:
+        return (
+            f"names neither a declaration nor a module under {root.name}/** — a module "
+            "reference reads `lean/<path>.lean`, with an optional #declaration or :line anchor"
+        )
+    module = root / match.group(1)
+    anchor = match.group(2) or ""
+    if not module.is_file():
+        return f"names no module under {root.name}/** — {match.group(1)} does not exist"
+    if not anchor:
+        return None
+    named = LEAN_ANCHOR_NAME_PATTERN.match(anchor)
+    if named:
+        target = named.group(1)
+        # The anchor is bounded by the module it names, so a declaration may be
+        # written short (`#step`) or qualified (`#Session.atState`) — a spelling the
+        # module does not declare, but whose tail names one of its declarations.
+        if any(
+            spelling == target or spelling.endswith("." + target)
+            for spelling in modules.get(module, set())
+        ):
+            return None
+        return f"names {match.group(1)}{anchor}, which declares no declaration by that name"
+    lines = LEAN_ANCHOR_LINES_PATTERN.match(anchor)
+    if lines:
+        count = len(module.read_text(encoding="utf-8").splitlines())
+        if int(lines.group(1)) <= int(lines.group(2) or lines.group(1)) <= count:
+            return None
+        return f"names {match.group(1)}{anchor}, but the module has {count} line(s)"
+    return f"names {match.group(1)} with an anchor this check cannot read: {anchor}"
+
+
+def unresolved_declaration(
+    value: str, root: Path, declared: set[str], modules: dict[Path, set[str]]
+) -> str | None:
+    """Why `value` names no declaration under `lean/**`, or None when it does."""
+    if "/" in value:
+        return unresolved_module(value, root, modules)
+    if value in declared:
+        return None
+    return (
+        f"names no declaration under {root.name}/**: no def, theorem, structure, "
+        "inductive or constructor declares it — correct the path, or declare the "
+        "file's formalized: values commitments in its conventions block"
+    )
+
+
+def formalized_conventions(directory: Path) -> dict[str, str]:
+    """Each disposition file's own statement of what a `formalized:` value means."""
+    statements: dict[str, str] = {}
+    for path in disposition_files(directory):
+        try:
+            conventions = json.loads(path.read_text(encoding="utf-8")).get("conventions") or {}
+        except json.JSONDecodeError:
+            continue  # load_dispositions reports the unreadable file
+        statements[path.name] = conventions.get(FORMALIZED_PREFIX, "")
+    return statements
+
+
+def formalized_claims(
+    dispositions: dict[str, dict], directory: Path
+) -> list[tuple[str, str, str, str]]:
+    """Every `formalized:` claim, with the standing its own file gives it.
+
+    Returns `(standing, file, ref, value)`. The standing is read from the file's own
+    conventions block: `commitment` when it declares the values promises the plan
+    lands later (nothing in the tree to resolve against), `present` when it documents
+    the vocabulary without such a declaration — that is the existence claim this gate
+    resolves — and `undeclared` when the file carries `formalized:` values while
+    documenting no `formalized:` convention at all, which the check output reports by
+    name rather than assuming either way.
+    """
+    conventions = formalized_conventions(directory)
+    claims: list[tuple[str, str, str, str]] = []
+    for ref, entry in sorted(dispositions.items()):
+        declared = conventions.get(entry["file"], "")
+        if any(marker in declared for marker in FORWARD_COMMITMENT_MARKERS):
+            standing = "commitment"
+        elif declared:
+            standing = "present"
+        else:
+            standing = "undeclared"
+        for value in disposition_values(entry, FORMALIZED_PREFIX):
+            claims.append((standing, entry["file"], ref, value))
+    return claims
+
+
+def formalized_census(
+    dispositions: dict[str, dict], directory: Path
+) -> tuple[int, int, dict[str, int]]:
+    """What the gate resolves, what the record exempts, and what declares nothing.
+
+    Returns `(checked, commitments, undeclared)`: the number of values the gate
+    resolves, the number exempt as commitments, and the count per file of values in a
+    file that documents no `formalized:` convention. A commitment is a property of the
+    claim rather than of the file it sits in, so the declaration counts wherever the
+    value is written. The counts are printed by `check`, because an exemption nobody
+    can see is the failure this file exists to remove.
+    """
+    claims = formalized_claims(dispositions, directory)
+    committed = {value for standing, _, _, value in claims if standing == "commitment"}
+    checked = sum(
+        1
+        for standing, _, _, value in claims
+        if standing != "commitment" and value not in committed
+    )
+    commitments = sum(1 for _, _, _, value in claims if value in committed)
+    undeclared: dict[str, int] = {}
+    for standing, file, _, value in claims:
+        if standing == "undeclared":
+            undeclared[file] = undeclared.get(file, 0) + 1
+    return checked, commitments, undeclared
+
+
+def check_resolves(
+    dispositions: dict[str, dict], directory: Path, lean_root: Path, required: bool
+) -> list[str]:
+    """Every `formalized:` value declared present must name a declaration that exists.
+
+    This is the claim no other gate can see: the text hash still matches, the picture
+    is still reviewed, the coverage report still counts the clause as decided — and
+    the declaration the disposition points at is not in the tree. The gate reads the
+    repository's own modules, and a fixture ledger has no tree beside it, so the rule
+    is stated where it can be read, like the baseline reconciliation.
+    """
+    if not required:
+        return []
+    if not lean_root.is_dir():
+        return [f"{lean_root}: the module tree every formalized: value claims is missing"]
+    modules = lean_declarations(lean_root)
+    declared = set().union(*modules.values()) if modules else set()
+    claims = formalized_claims(dispositions, directory)
+    committed = {value for standing, _, _, value in claims if standing == "commitment"}
+    problems: list[str] = []
+    for standing, file, ref, value in claims:
+        if standing == "commitment" or value in committed:
+            continue
+        reason = unresolved_declaration(value, lean_root, declared, modules)
+        if reason is not None:
+            problems.append(f"{file}: {ref}: formalized:{value} {reason}")
+    return problems
+
+
+def vector_ids(directory: Path) -> set[str]:
+    """Every `vector` id in the corpus: one JSON object per line, one id per vector."""
+    ids: set[str] = set()
+    for path in sorted(directory.glob("*.ndjson")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                identifier = json.loads(line).get("vector")
+                if identifier:
+                    ids.add(identifier)
+    return ids
+
+
+def check_carries(dispositions: dict[str, dict], vectors_dir: Path, required: bool) -> list[str]:
+    """Every `test:` value must name a vector that exists in `vectors/*.ndjson`.
+
+    A vector id is the ledger's handle on an observable: the disposition says the
+    clause is witnessed by that vector's verdict. A vector renamed or never generated
+    leaves the claim unwitnessed while the disposition still reads as decided. There
+    is no exemption here, because a `test:` value names something the repository
+    already commits to: it resolves or it is wrong.
+    """
+    if not required:
+        return []
+    if not vectors_dir.is_dir():
+        return [f"{vectors_dir}: the vector corpus every test: value claims is missing"]
+    ids = vector_ids(vectors_dir)
+    problems: list[str] = []
+    for ref, entry in sorted(dispositions.items()):
+        for value in disposition_values(entry, TEST_PREFIX):
+            if value not in ids:
+                problems.append(
+                    f"{entry['file']}: {ref}: test:{value} is no vector in "
+                    f"{vectors_dir.name}/*.ndjson"
+                )
+    return problems
+
+
 def check_ambiguities(report: dict, dispositions: dict[str, dict], path: Path) -> list[str]:
     """Validate the ambiguity register against the ledger it cites.
 
@@ -868,7 +1227,8 @@ def command_check(args: argparse.Namespace) -> int:
     problems.extend(check_pictures(report, dispositions))
     problems.extend(check_unkeyed(report, dispositions))
     problems.extend(check_ambiguities(report, dispositions, Path(Path(args.out) / "ambiguities")))
-    repository_artifacts = (Path(__file__).resolve().parent.parent / "spec" / "oasis").resolve()
+    repository = Path(__file__).resolve().parent.parent
+    repository_artifacts = (repository / "spec" / "oasis").resolve()
     problems.extend(
         check_reconciliation(
             report,
@@ -876,6 +1236,17 @@ def command_check(args: argparse.Namespace) -> int:
             required=Path(args.artifacts).resolve() == repository_artifacts,
         )
     )
+    # The existence gates read the tree beside the ledger. A fixture ledger is about a
+    # planted artifact rather than about this tree, so the rules are stated for the
+    # repository's own record — the shape the reconciliation check already uses.
+    repository_dispositions = (repository / "ledger" / "dispositions").resolve()
+    dispositions_required = Path(args.dispositions).resolve() == repository_dispositions
+    problems.extend(
+        check_resolves(
+            dispositions, Path(args.dispositions), repository / "lean", dispositions_required
+        )
+    )
+    problems.extend(check_carries(dispositions, repository / "vectors", dispositions_required))
 
     for name, entry in sorted(report["per_artifact"].items()):
         audit = entry["audit"]
@@ -897,6 +1268,19 @@ def command_check(args: argparse.Namespace) -> int:
         print("undispositioned must-class clauses by anchor (largest first):")
         for anchor, refs in list(summary["must_class_undispositioned_by_anchor"].items())[:12]:
             print(f"  {len(refs):>3}  {anchor}")
+    if dispositions_required:
+        checked, commitments, undeclared = formalized_census(dispositions, Path(args.dispositions))
+        print(
+            f"formalized: {checked} checked against lean/**, "
+            f"{commitments} forward commitment(s) exempt by the record"
+        )
+        for name, count in sorted(undeclared.items()):
+            print(
+                f"formalized: {name}: {count} value(s) in a file documenting no "
+                "formalized: convention"
+            )
+        tests = sum(len(disposition_values(entry, TEST_PREFIX)) for entry in dispositions.values())
+        print(f"test: {tests} vector id(s) checked against vectors/*.ndjson")
 
     if problems:
         print("")
