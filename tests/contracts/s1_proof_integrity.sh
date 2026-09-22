@@ -186,6 +186,7 @@ cat >"$tmp/Axioms.lean" <<'AXIOMS'
 import Contracts.FrameCodec
 import Contracts.TypeSystem
 import Proofs.CodecRoundTrip
+import Proofs.CodecRoundTripVariable
 import Spec.ReadLaws
 
 #print axioms SpecAMQP.Contracts.constructor_grammar_public
@@ -197,6 +198,12 @@ import Spec.ReadLaws
 #print axioms SpecAMQP.Proofs.go_foldr_value
 #print axioms SpecAMQP.Proofs.bigEndianFieldValue
 #print axioms SpecAMQP.Proofs.fieldValueRoundTrip
+#print axioms SpecAMQP.Proofs.lengthWidthOf_narrow
+#print axioms SpecAMQP.Proofs.lengthWidthOf_wide
+#print axioms SpecAMQP.Proofs.two_pow_eight_mul
+#print axioms SpecAMQP.Proofs.lengthPrefixed_eq
+#print axioms SpecAMQP.Proofs.lengthPrefixed_ok
+#print axioms SpecAMQP.Proofs.takeBe_beOctets
 #print axioms SpecAMQP.Spec.ReadLaws.extract_toList_eq_drop_take
 #print axioms SpecAMQP.Spec.ReadLaws.takeBe_eq_fold
 AXIOMS
@@ -212,6 +219,9 @@ for theorem in "$accepted_theorem" extended_header_width body_starts_after_the_h
                SpecAMQP.Proofs.beOctets_length SpecAMQP.Proofs.go_length \
                SpecAMQP.Proofs.mod_mul_base SpecAMQP.Proofs.go_foldr_value \
                SpecAMQP.Proofs.bigEndianFieldValue SpecAMQP.Proofs.fieldValueRoundTrip \
+               SpecAMQP.Proofs.lengthWidthOf_narrow SpecAMQP.Proofs.lengthWidthOf_wide \
+               SpecAMQP.Proofs.two_pow_eight_mul SpecAMQP.Proofs.lengthPrefixed_eq \
+               SpecAMQP.Proofs.lengthPrefixed_ok SpecAMQP.Proofs.takeBe_beOctets \
                SpecAMQP.Spec.ReadLaws.extract_toList_eq_drop_take \
                SpecAMQP.Spec.ReadLaws.takeBe_eq_fold; do
   grep -q "$theorem' depends on axioms" "$tmp/axioms.log" ||

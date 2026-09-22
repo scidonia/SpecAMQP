@@ -38,7 +38,7 @@ octet the body begins at, `headerOctets` is the fixed eight, and the artifact's 
 diagram labels the difference `(DOFF * 4 - 8)`. A codec that counted the extended header
 from the wrong end, or read `DOFF` as octets rather than words, would satisfy every vector
 that has no extended header and fail this. -/
-theorem extended_header_width (doff : Nat) (h : minDoff ≤ doff) :
+theorem extended_header_width (doff : Nat) (_h : minDoff ≤ doff) :
     bodyStart doff - headerOctets = (doff - minDoff) * doffWord := by
   simp [bodyStart, headerOctets, minDoff, doffWord]
   omega
