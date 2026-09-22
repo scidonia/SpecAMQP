@@ -274,7 +274,51 @@ def decode (bytes : Octets) : Except DecodeError (Value × Nat) :=
 /-! ## Writing
 
 Encoders emit the narrowest encoding that carries the value, and sizes count the
-octets that follow the size field, exactly as the reader requires. -/
+octets that follow the size field — the count field (whose width depends on the
+form), the array element constructor, then the items — exactly as the reader
+requires. -/
+
+/-- A variable-width encoding: the narrow form when the payload fits its octet,
+the wide form otherwise, constructor included. -/
+def variableData (narrow wide : UInt8) (payload : List UInt8) : Octets :=
+  if payload.length ≤ 255 then
+    #[narrow, payload.length.toUInt8] ++ payload.toArray
+  else
+    #[wide] ++ u32be payload.length ++ payload.toArray
+
+/-- Variable-width element data, whose length width is the array's constructor's,
+not the element's preference: an array of `str8` elements carries one-octet
+lengths, an array of `str32` elements four-octet ones. -/
+def elementVariableData (constructor : UInt8) (payload : List UInt8) : Octets :=
+  match constructor with
+  | 0xB0 | 0xB1 | 0xB3 => u32be payload.length ++ payload.toArray
+  | _ => #[payload.length.toUInt8] ++ payload.toArray
+
+/-- A value's data octets in its own narrowest form, without a constructor octet.
+Used where an array's declared constructor does not match an element's type: such
+an element cannot be written faithfully, so it is written with empty data, which a
+reader rejects loudly rather than accepting a plausible-looking array. -/
+def dataOf (value : Value) : Octets :=
+  match value with
+  | .null => #[]
+  | .boolean _ => #[]
+  | .ubyte n => #[n]
+  | .byte n => #[(n.toBitVec.toNat % 256).toUInt8]
+  | .ushort n => u16be n.toNat
+  | .short n => u16be (n.toBitVec.toNat % 65536)
+  | .uint 0 => #[]
+  | .uint n => if n.toNat ≤ 255 then #[n.toUInt8] else u32be n.toNat
+  | .int n => u32be (n.toBitVec.toNat % 4294967296)
+  | .ulong 0 => #[]
+  | .ulong n => if n.toNat ≤ 255 then #[n.toUInt8] else u64be n.toNat
+  | .long n => u64be (n.toBitVec.toNat % 18446744073709551616)
+  | .binary b => (variableData 0xA0 0xB0 b).extract 1
+                   (variableData 0xA0 0xB0 b).size
+  | .string s => (variableData 0xA1 0xB1 s.toUTF8.toList).extract 1
+                   (variableData 0xA1 0xB1 s.toUTF8.toList).size
+  | .symbol s => (variableData 0xA3 0xB3 s.toUTF8.toList).extract 1
+                   (variableData 0xA3 0xB3 s.toUTF8.toList).size
+  | _ => #[]
 
 mutual
 
@@ -294,45 +338,50 @@ def encode (value : Value) : Octets :=
   | .ulong 0 => #[0x44]
   | .ulong n => if n.toNat ≤ 255 then #[0x53, n.toUInt8] else #[0x80] ++ u64be n.toNat
   | .long n => #[0x81] ++ u64be (n.toBitVec.toNat % 18446744073709551616)
-  | .binary b => encodeVariable 0xA0 0xB0 b
-  | .string s => encodeVariable 0xA1 0xB1 s.toUTF8.toList
-  | .symbol s => encodeVariable 0xA3 0xB3 s.toUTF8.toList
+  | .binary b => variableData 0xA0 0xB0 b
+  | .string s => variableData 0xA1 0xB1 s.toUTF8.toList
+  | .symbol s => variableData 0xA3 0xB3 s.toUTF8.toList
   | .list [] => #[0x45]
   | .list items =>
     let body := encodeAll items
     let count := items.length
-    let size := 1 + body.size
-    if size ≤ 255 && count ≤ 255 then
-      #[0xC0, size.toUInt8, count.toUInt8] ++ body
+    if 1 + body.size ≤ 255 && count ≤ 255 then
+      #[0xC0, (1 + body.size).toUInt8, count.toUInt8] ++ body
     else
-      #[0xD0] ++ u32be size ++ u32be count ++ body
+      #[0xD0] ++ u32be (4 + body.size) ++ u32be count ++ body
   | .array constructor items =>
     let body := items.foldl (fun acc item => acc ++ arrayElement constructor item) #[]
     let count := items.length
-    let size := 2 + body.size
-    if size ≤ 255 && count ≤ 255 then
-      #[0xE0, size.toUInt8, count.toUInt8, constructor] ++ body
+    if 2 + body.size ≤ 255 && count ≤ 255 then
+      #[0xE0, (2 + body.size).toUInt8, count.toUInt8, constructor] ++ body
     else
-      #[0xF0] ++ u32be size ++ u32be count ++ #[constructor] ++ body
+      #[0xF0] ++ u32be (5 + body.size) ++ u32be count ++ #[constructor] ++ body
   | .described descriptor value => #[0x00] ++ encode descriptor ++ encode value
 
 /-- Items concatenated in order. -/
 def encodeAll (items : List Value) : Octets :=
   items.foldl (fun acc item => acc ++ encode item) #[]
 
-/-- A variable-width encoding: a narrow form when the payload fits its octet, the
-wide form otherwise. -/
-def encodeVariable (narrow wide : UInt8) (payload : List UInt8) : Octets :=
-  if payload.length ≤ 255 then
-    #[narrow, payload.length.toUInt8] ++ payload.toArray
-  else
-    #[wide] ++ u32be payload.length ++ payload.toArray
+/-- Array element data, written in the array's declared constructor form.
 
-/-- Array element data, without the element constructor. -/
+An array states its element constructor once, so every element's data must be in
+that form: writing each element in whatever form it would choose alone produces
+an array no reader can follow, which the corpus caught. -/
 def arrayElement (constructor : UInt8) (value : Value) : Octets :=
-  match constructor with
-  | 0x40 | 0x41 | 0x42 => #[]
-  | _ => let full := encode value; full.extract 1 full.size
+  match constructor, value with
+  | 0x40, _ | 0x41, _ | 0x42, _ => #[]
+  | 0x50, .ubyte n => #[n]
+  | 0x51, .byte n => #[(n.toBitVec.toNat % 256).toUInt8]
+  | 0x60, .ushort n => u16be n.toNat
+  | 0x70, .uint n => u32be n.toNat
+  | 0x80, .ulong n => u64be n.toNat
+  | 0xA0, .binary b => elementVariableData 0xA0 b
+  | 0xB0, .binary b => elementVariableData 0xB0 b
+  | 0xA1, .string s => elementVariableData 0xA1 s.toUTF8.toList
+  | 0xB1, .string s => elementVariableData 0xB1 s.toUTF8.toList
+  | 0xA3, .symbol s => elementVariableData 0xA3 s.toUTF8.toList
+  | 0xB3, .symbol s => elementVariableData 0xB3 s.toUTF8.toList
+  | _, _ => dataOf value
 
 end
 

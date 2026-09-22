@@ -50,8 +50,13 @@ def ofHex (s : String) : Except String Octets := do
 def toHex (bytes : Octets) : String :=
   let digit (n : Nat) : Char :=
     if n < 10 then Char.ofNat (48 + n) else Char.ofNat (87 + n)
-  String.ofList (bytes.toList.foldl (fun acc b =>
-    acc ++ [digit (b.toNat / 16), digit (b.toNat % 16)]) [])
+  String.ofList (bytes.toList.flatMap (fun b => [digit (b.toNat / 16), digit (b.toNat % 16)]))
+
+/-- A short hex rendering for a failure message, so a mismatch on a large payload
+reports where it diverges rather than printing kilobytes. -/
+def toHexBrief (bytes : Octets) (limit : Nat := 48) : String :=
+  let brief := toHex (bytes.extract 0 (min limit bytes.size))
+  if bytes.size > limit then brief ++ s!"… ({bytes.size} octets)" else brief
 
 /-- An unsigned field of a given width, with the range checked rather than
 truncated: a vector that asks for `uint 4294967296` is a corpus defect, not a
@@ -171,8 +176,9 @@ def runVector (json : Json) : Except String Verdict := do
           s!"decoded {jsonOfValue value |>.compress}, expected {jsonOfValue expected |>.compress}"⟩
       else if canonical then
         let re := encode value
-        if toHex re != toHex bytes then
-          return ⟨id, kind, false, s!"re-encodes to {toHex re}, not {toHex bytes}"⟩
+        if re != bytes then
+          return ⟨id, kind, false,
+            s!"re-encodes to {toHexBrief re}, not {toHexBrief bytes}"⟩
         else
           return ⟨id, kind, true, "decoded and re-encoded to the same octets"⟩
       else
@@ -180,16 +186,36 @@ def runVector (json : Json) : Except String Verdict := do
   | "encode" =>
     let value ← valueOfJson 64 (← json.getObjVal? "value")
     let produced := encode value
-    if toHex produced == toHex bytes then
+    if produced == bytes then
       return ⟨id, kind, true, "encoded to the expected octets"⟩
     else
-      return ⟨id, kind, false, s!"encoded to {toHex produced}, expected {toHex bytes}"⟩
+      return ⟨id, kind, false,
+        s!"encoded to {toHexBrief produced}, expected {toHexBrief bytes}"⟩
   | "reject" =>
     let condition ← (← json.getObjVal? "expectError").getObjValAs? String "condition"
     match decode bytes with
     | .error _ => return ⟨id, kind, true, s!"rejected with {condition}"⟩
     | .ok (value, _) =>
       return ⟨id, kind, false, s!"expected rejection, decoded {jsonOfValue value |>.compress}"⟩
+  | "property" =>
+    -- A law rather than an expectation, so the input domain can be closed instead
+    -- of sampled: no answer is written down for the bytes, only a constraint on
+    -- what may happen to the value they decode to.
+    let property ← json.getObjValAs? String "property"
+    match property with
+    | "decode-stable" =>
+      match decode bytes with
+      | .error _ => return ⟨id, kind, true, "no value claimed for these octets"⟩
+      | .ok (value, _) =>
+        match decode (encode value) with
+        | .error e => return ⟨id, kind, false, s!"re-encoding lost the value: {repr e}"⟩
+        | .ok (again, _) =>
+          if again == value then
+            return ⟨id, kind, true, "re-encoding decoded to the same value"⟩
+          else
+            return ⟨id, kind, false,
+              s!"re-encoding decoded to {jsonOfValue again |>.compress}"⟩
+    | other => .error s!"unknown property '{other}'"
   | other => .error s!"unknown vector kind '{other}'"
 
 /-- Run every line, returning the verdicts and whether all of them passed. -/
@@ -205,8 +231,8 @@ def runCorpus (text : String) : Except String (List Verdict × Bool) := do
       match runVector json with
       | .error e => .error s!"line {index + 1}: {e}"
       | .ok verdict =>
-        verdicts := verdicts ++ [verdict]
-        if !verdict.ok then allOk := false
-  return (verdicts, allOk)
+        verdicts := verdict :: verdicts        -- prepend, then reverse once: a corpus
+        if !verdict.ok then allOk := false     -- of tens of thousands is not a place
+  return (verdicts.reverse, allOk)             -- for quadratic list append
 
 end SpecAMQP.Ref.Vectors

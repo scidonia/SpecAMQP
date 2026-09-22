@@ -13,8 +13,8 @@
       "description": "Stable identifier, unique within the corpus and quoted in verdict reports."
     },
     "kind": {
-      "enum": ["decode", "encode", "reject"],
-      "description": "decode: the octets must decode to `value`, consuming all of them. encode: `value` must encode to exactly `bytes`. reject: the octets must fail to decode with the named condition."
+      "enum": ["decode", "encode", "reject", "property"],
+      "description": "decode: the octets must decode to `value`, consuming all of them. encode: `value` must encode to exactly `bytes`. reject: the octets must fail to decode with the named condition. property: a law that needs no expected answer, so an exhaustive input domain can be swept instead of sampled."
     },
     "clauses": {
       "type": "array",
@@ -53,6 +53,10 @@
     "note": {
       "type": "string",
       "description": "Why this vector exists, usually the artifact text it was read from, or the decision it tests."
+    },
+    "property": {
+      "enum": ["decode-stable"],
+      "description": "kind=property only. decode-stable: if the octets decode to a value, encoding that value must decode to the same value. Inputs that fail to decode make no claim, which is what makes an exhaustive sweep possible without an oracle."
     }
   },
   "allOf": [
@@ -67,6 +71,14 @@
     {
       "if": { "properties": { "kind": { "const": "reject" } }, "required": ["kind"] },
       "then": { "not": { "required": ["canonical"] } }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "property" } }, "required": ["kind"] },
+      "then": { "required": ["property"] }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "property" } }, "required": ["kind"] },
+      "then": { "not": { "required": ["value"] } }
     }
   ],
   "$defs": {

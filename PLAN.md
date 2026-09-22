@@ -287,6 +287,17 @@ The corpus earned its place immediately, finding three things rather than confir
 * the size check for compound values and arrays measured from the wrong offset, omitting the count field (and, for arrays, the element constructor) that the size counts;
 * my own reading of the published composite example was wrong — I had claimed its size octet was a documentation defect, having under-counted the authors array by one octet. The encoder agreed with the artifact octet for octet; the vector was corrected, not the artifact, and `ledger/ambiguities/compound-size-field.json` now records the withdrawal with the corrected arithmetic and closes the question.
 
+**The generated corpus.** `scripts/gen-value-vectors.py` emits 66,517 further vectors and is checked two ways: its encoder must reproduce the artifact's published examples octet for octet, and the committed corpus must reproduce byte-for-byte from the generator. Its families are golden vectors (integer and length boundaries, compound counts across the 8-bit boundary, nesting, both descriptor forms), reject vectors (every reserved octet, every escape octet, every proper prefix of every short golden encoding, and size fields moved by one), and a **property sweep over every one- and two-octet input** — 65,792 vectors asserting that whatever decodes must re-decode to the same value. The sweep needs no oracle, which is what lets the domain be closed rather than sampled.
+
+The corpus paid for itself within the hour, finding four defects rather than confirming the implementation:
+
+* the wide-form size field omitted the four-octet count field, so `list32`/`array32` declared a size three octets short of their content;
+* array elements were written in whatever form each element would choose alone, instead of the array's declared element constructor — the array said `uint32` while the elements were one-octet small-uints;
+* a refactor dropped the wide-constructor selection, so a 256-octet string announced `str8` with a four-octet length;
+* two performance defects that made the corpus unusable before they were found: an accumulator that appended to the end of a list (quadratic in the corpus size) and a hex renderer that appended two characters at a time (quadratic in the payload). Both are now linear, and 66,517 vectors run in 0.4 s.
+
+The first two are the interesting ones methodologically: the **generator and the implementation shared them**, which is exactly the correlated-error risk §19 names, and what caught them was not agreement between two encoders but the *reader's* independent measurement of its own size window. An implementation that trusted the declared size would have accepted both.
+
 Remaining in S1: the rest of the primitive surface (floats, decimals, char, timestamp, uuid, maps), the round-trip and canonicality theorems stated in `Contracts/TypeSystem` as propositions about the specification rather than about the implementation, and dispositions for the Part 1 clauses the new vectors cite.
 
 Acceptance: round trips proved on the canonical domain; every encoding row exercised by a vector; the ABNF/table agreement checked; ledger coverage complete for Part 1's normative clauses.
@@ -426,7 +437,7 @@ Test forms:
 | Formalisation scale | S4–S7 (flow control, messaging, transactions, SASL) are large and the ledger is unforgiving | milestone order closes the vertical slice first; coverage reported per anchor so partial progress is visible and measurable |
 | Executability cost | the executable specification becomes too slow to run the corpus | the corpus is a specification test suite, not a benchmark: vector count in the hundreds, not millions; if a definition resists computation, that is a design smell in the definition, reported rather than worked around |
 | Corpus acquisition | no access to a second implementation for V3 | capture is off-gate; clause-authored vectors land first, recorded vectors are added as they become available without blocking milestones |
-| Correlated misreadings | a second transcription repeats the same error, so cross-checking two of our own developments reports agreement | third-party admission (§12 V3) is the independent evidence, because its independence is in authorship and experience rather than in language; a second prover is a cross-check, never an oracle (§12) |
+| Correlated misreadings | a second transcription repeats the same error, so cross-checking two of our own developments reports agreement | third-party admission (§12 V3) is the independent evidence, because its independence is in authorship and experience rather than in language; a second prover is a cross-check, never an oracle (§12). Observed in practice at S1: the corpus generator and the implementation shared two encoding defects, and what caught them was the *reader's* independent arithmetic — a size window measured rather than trusted — not agreement between the two writers |
 | Scope creep toward implementation | Rust creeps back in because it is the natural next step | §3 and §22: implementation work is scheduled in TemperMint; this repository stops at the handoff |
 
 ## 20. Acceptance commands
