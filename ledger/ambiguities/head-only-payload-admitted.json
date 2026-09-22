@@ -1,0 +1,22 @@
+{
+ "adopted": "A payload carrying a head section and no body is not a message, and is refused",
+ "consequences": [
+  "The two artefacts diverged here and the corpus could not see it: the specification never required a body, the reference required one for any non-empty payload, and every vector stayed green because none carries a head section without a body.",
+  "msg-neg-head-without-body is the isolating vector, refused under this reading and admitted under the other, so the divergence becomes a verdict rather than a note.",
+  "The zero-octet case keeps its own vector, whose note already records it as a reading: a payload of no octets is admitted as a message with no sections, under either reading of this question."
+ ],
+ "evidence": "The messaging artifact presents the bare message as a sequence: zero or one of each head section, then \"The body consists of one of the following three choices: one or more data sections, one or more amqp-sequence sections, or a single amqp-value section\", then zero or one footer. It names no condition for a payload that carries a head and nothing else, so the question is how that sequence is read rather than what it says.",
+ "id": "head-only-payload-admitted",
+ "open": true,
+ "question": "Must a payload that carries any section carry a body, or does the body list only constrain which section kinds may appear as one?",
+ "readings": [
+  {
+   "name": "The list is a grammar, so a head-only payload is not a message",
+   "statement": "Adopted. The list is presented as a sequence \u2014 head, body, tail \u2014 and reading the body clause as a constraint on kinds rather than as an element of that sequence leaves the sequence with a hole only that reading needs. A payload carrying a header and nothing else is therefore not a message and is refused, while the zero-octet payload stays admitted because a transfer with no payload carries no message at all, which is a different thing from a message missing its body."
+  },
+  {
+   "name": "The body list constrains only the kinds that may appear as a body, so a head-only payload is admitted",
+   "statement": "Rejected. Defensible on the text taken as a list of permitted sections rather than as a sequence, and it admits a message with no body, which no clause describes and no peer is known to send."
+  }
+ ]
+}

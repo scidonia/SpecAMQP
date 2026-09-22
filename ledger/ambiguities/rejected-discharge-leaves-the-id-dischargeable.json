@@ -1,0 +1,21 @@
+{
+ "adopted": "Whether a refused discharge leaves the transaction id dischargeable again",
+ "consequences": [
+  "The artifact's wording is about the deliveries rather than the id, which is why nothing is enforced here rather than because a reading was chosen.",
+  "The readings differ observably on a second discharge of the same id: admitted, or refused with amqp:transaction:unknown-id."
+ ],
+ "evidence": "Nothing is enforced: a rejected discharge's outcome is carried and the id's state is left as it was, because the artifact says what happens to the deliveries and not to the id.",
+ "id": "rejected-discharge-leaves-the-id-dischargeable",
+ "open": true,
+ "question": "After a discharge naming a live id is unsuccessful, may the same id be discharged again?",
+ "readings": [
+  {
+   "name": "The id stays live and dischargeable: the artifact's sentence says the outcome is not applied and the deliveries stay live, and says nothing about retiring the id, so the id is exactly as it was.",
+   "statement": "The id stays live and dischargeable: the artifact's sentence says the outcome is not applied and the deliveries stay live, and says nothing about retiring the id, so the id is exactly as it was. The artifact's wording is about the deliveries rather than the id, which is why nothing is enforced here rather than because a reading was chosen."
+  },
+  {
+   "name": "The id is spent by the attempt: a discharge ends the transaction in the controller's view whether or not the outcome was applied, so a second attempt is an unknown id.",
+   "statement": "The id is spent by the attempt: a discharge ends the transaction in the controller's view whether or not the outcome was applied, so a second attempt is an unknown id. The readings differ observably on a second discharge of the same id: admitted, or refused with amqp:transaction:unknown-id."
+  }
+ ]
+}
