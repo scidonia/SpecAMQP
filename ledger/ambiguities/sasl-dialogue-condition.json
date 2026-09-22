@@ -1,0 +1,27 @@
+{
+ "adopted": "amqp:illegal-state for a frame the SASL dialogue does not permit",
+ "clauses": [
+  "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl.3",
+  "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl.8"
+ ],
+ "consequences": [
+  "A SASL frame sent by the wrong peer \u2014 a challenge from the client, a response from the server \u2014 is refused with `amqp:illegal-state` and class `illegalState`, the same condition and class the connection state machine's 159 measured permission refusals use.",
+  "The mechanism *content* failures stay distinct: an empty mechanism list and an unoffered mechanism are field-value failures and carry `amqp:invalid-field`. A role failure and a content failure are different observations and the peer is told which happened.",
+  "`amqp:not-allowed` is the near neighbour and is not used: its definition covers using a frame 'in a manner inconsistent with the semantics defined in the specification', which fits a wrong-direction frame, but the artifact's own uses of it concern access and unimplemented functionality, and the dialogue's phase and role are part of the state the peers are in."
+ ],
+ "evidence": "The security artifact names no error condition at all \u2014 a search of it for `amqp:` conditions returns only type anchors \u2014 so nothing states which condition a wrong-direction SASL frame carries, and the choice is a reading. Two candidate definitions exist in the transport artifact: `amqp:illegal-state`, 'the peer sent a frame that is not permitted in the current state', and `amqp:not-allowed`, 'the peer tried to use a frame in a manner that is inconsistent with the semantics defined in the specification'. Consistency settles it: the connection's permission refusals already name `illegal-state` for exactly this shape \u2014 well-formed octets in a moment that forbids them \u2014 and the SASL dialogue's phase and role are part of the state the peers are in, so one rule covers both rather than two rules covering the same observation.",
+ "id": "sasl-dialogue-condition",
+ "open": false,
+ "question": "Which condition does a peer report when it receives a well-formed SASL frame that its own role or the dialogue's phase forbids?",
+ "readings": [
+  {
+   "name": "amqp:illegal-state for a frame the SASL dialogue does not permit",
+   "statement": "Adopted. The frame is well formed and the moment or the peer is wrong, which is the definition of illegal-state; the connection's permission refusals use the same condition, so a reader learns one rule."
+  },
+  {
+   "name": "amqp:not-allowed, which fits the wording but not the family",
+   "statement": "Rejected on the artifact's own usage: its instances concern access to entities and unimplemented functionality rather than the timing or direction of a frame, and adopting it would put one observation under two conditions depending on which layer noticed it."
+  }
+ ],
+ "schema_version": 1
+}
