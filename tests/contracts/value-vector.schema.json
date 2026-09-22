@@ -237,7 +237,7 @@
      ]
     },
     "reason": {
-     "description": "The named reason class the artefact must report, as the leading token of its detail (`<class>: <prose>`). Optional: a rejection whose reason is not pinned still has to name a class both artefacts agree on, which the differential contract checks. Distinct from `condition`, which is the protocol-level amqp:decode-error the peer sees; this one is the taxonomy the implementation reports, so a gap in a reader is never mistaken for a claim about the grammar.",
+     "description": "A value outside what a declared field can carry, or outside a declared implementation bound: an array's element count beyond the materialisation limit, a DOFF beyond its one octet, a payload a declared one-octet size or count field cannot announce.",
      "enum": [
       "truncated",
       "unassigned",

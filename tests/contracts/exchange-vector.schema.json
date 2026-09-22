@@ -1,81 +1,111 @@
 {
- "$schema": "https://json-schema.org/draft/2020-12/schema",
  "$id": "https://scidonia.example/specamqp/exchange-vector.schema.json",
- "title": "SpecAMQP exchange vector",
- "description": "A sequence of frames a peer sends and receives, with the outcome each step must have and the state it must leave the peer in. Single-frame vectors cannot express the connection lifecycle, because what a peer may send depends on what it has already sent and received: the corpus has to be able to say 'this frame, now, in this state' and 'this frame, now, is not permitted'.",
- "type": "object",
- "required": ["vector", "kind", "clauses", "steps"],
+ "$schema": "https://json-schema.org/draft/2020-12/schema",
  "additionalProperties": false,
+ "description": "A sequence of frames a peer sends and receives, with the outcome each step must have and the state it must leave the peer in. Single-frame vectors cannot express the connection lifecycle, because what a peer may send depends on what it has already sent and received: the corpus has to be able to say 'this frame, now, in this state' and 'this frame, now, is not permitted'.",
  "properties": {
-  "vector": {
-   "type": "string",
-   "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
-   "description": "Stable vector id. The pattern is the one the contract validates against, so an id cannot drift out of it unnoticed."
+  "clauses": {
+   "description": "The clauses or pictures this exchange is authored from \u2014 the state tables are pictures, and a vector whose sequence comes from a table cites that picture.",
+   "items": {
+    "type": "string"
+   },
+   "minItems": 1,
+   "type": "array"
   },
   "kind": {
    "const": "exchange",
    "description": "One kind only, deliberately. An exchange is not a frame vector with more frames: its expectations are per step and include state."
   },
-  "clauses": {
-   "type": "array",
-   "minItems": 1,
-   "items": { "type": "string" },
-   "description": "The clauses or pictures this exchange is authored from — the state tables are pictures, and a vector whose sequence comes from a table cites that picture."
+  "note": {
+   "type": "string"
   },
   "start": {
-   "type": "string",
-   "description": "The state the peer is in before the first step. Names come from the artifact's own tables; a name the specification's state type does not have is a defect in the vector, not in the model."
+   "description": "The state the peer is in before the first step. Names come from the artifact's own tables; a name the specification's state type does not have is a defect in the vector, not in the model.",
+   "type": "string"
   },
   "steps": {
-   "type": "array",
-   "minItems": 2,
    "items": {
-    "type": "object",
-    "required": ["direction", "expect"],
     "additionalProperties": false,
     "properties": {
-     "direction": {
-      "enum": ["send", "receive"],
-      "description": "`send` offers a frame to this peer's encoder and legality check; `receive` hands octets to its decoder and state machine. The two are different observables and a corpus that conflated them could not fail a peer that answers its own frames."
-     },
      "bytes": {
-      "type": "string",
+      "description": "The frame's octets. Required on `receive` always, and on `send` when the step is admitted, because then the encoder must produce exactly these \u2014 which is how the exchange pins the encoding rather than only the permission.",
       "pattern": "^([0-9a-f]{2})+$",
-      "description": "The frame's octets. Required on `receive` always, and on `send` when the step is admitted, because then the encoder must produce exactly these — which is how the exchange pins the encoding rather than only the permission."
+      "type": "string"
      },
-     "value": {
-      "type": "object",
-      "description": "The frame as a structure, for a `send` step: what the peer is asked to send. Either `bytes` or this, never both: bytes pin the encoding, the structure pins the request."
+     "direction": {
+      "description": "`send` offers a frame to this peer's encoder and legality check; `receive` hands octets to its decoder and state machine. The two are different observables and a corpus that conflated them could not fail a peer that answers its own frames.",
+      "enum": [
+       "send",
+       "receive"
+      ]
      },
      "expect": {
-      "type": "object",
-      "required": ["status"],
       "additionalProperties": false,
       "properties": {
-       "status": {
-        "enum": ["admitted", "refused"],
-        "description": "`admitted` means the peer sends it (producing `bytes`) or accepts it (leaving the state named below). `refused` means the peer must not send it, or must reject it, with the condition and reason class named."
-       },
        "condition": {
-        "type": "string",
+        "description": "Required for a refusal: the protocol-level condition the peer reports or raises. `amqp:connection:framing-error` and the connection-error conditions from the generated choice table are the vocabulary.",
         "pattern": "^amqp:",
-        "description": "Required for a refusal: the protocol-level condition the peer reports or raises. `amqp:connection:framing-error` and the connection-error conditions from the generated choice table are the vocabulary."
+        "type": "string"
        },
        "reason": {
-        "type": "string",
-        "enum": ["truncated", "unassigned", "unsupported", "sizeMismatch", "malformed", "limit", "illegalState"],
-        "description": "The implementation's reason class, as the leading token of the detail. `illegalState` is the class a step uses when the octets are perfectly well formed and the *moment* is wrong — sending `open` twice, or a session frame before `begin` — which is a different failure from anything the encoder or decoder can see on its own."
+        "description": "A value outside what a declared field can carry, or outside a declared implementation bound: an array's element count beyond the materialisation limit, a DOFF beyond its one octet, a payload a declared one-octet size or count field cannot announce.",
+        "enum": [
+         "truncated",
+         "unassigned",
+         "unsupported",
+         "sizeMismatch",
+         "malformed",
+         "limit",
+         "illegalState"
+        ],
+        "type": "string"
        },
        "state": {
-        "type": "string",
-        "description": "The state the peer must be in after the step. Omitted when the step leaves it unchanged."
+        "description": "The state the peer must be in after the step. Omitted when the step leaves it unchanged.",
+        "type": "string"
+       },
+       "status": {
+        "description": "`admitted` means the peer sends it (producing `bytes`) or accepts it (leaving the state named below). `refused` means the peer must not send it, or must reject it, with the condition and reason class named.",
+        "enum": [
+         "admitted",
+         "refused"
+        ]
        }
-      }
+      },
+      "required": [
+       "status"
+      ],
+      "type": "object"
      },
-     "note": { "type": "string" }
-    }
-   }
+     "note": {
+      "type": "string"
+     },
+     "value": {
+      "description": "The frame as a structure, for a `send` step: what the peer is asked to send. Either `bytes` or this, never both: bytes pin the encoding, the structure pins the request.",
+      "type": "object"
+     }
+    },
+    "required": [
+     "direction",
+     "expect"
+    ],
+    "type": "object"
+   },
+   "minItems": 2,
+   "type": "array"
   },
-  "note": { "type": "string" }
- }
+  "vector": {
+   "description": "Stable vector id. The pattern is the one the contract validates against, so an id cannot drift out of it unnoticed.",
+   "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+   "type": "string"
+  }
+ },
+ "required": [
+  "vector",
+  "kind",
+  "clauses",
+  "steps"
+ ],
+ "title": "SpecAMQP exchange vector",
+ "type": "object"
 }
