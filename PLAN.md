@@ -224,7 +224,7 @@ Each milestone: scope, planner contracts, the failure expected before implementa
 
 ### S0 — basis, spike, and freezing the interfaces
 
-Work: vendor the artifacts and notice; write `toolchain/pins.toml` and `toolchain/sources.toml`; implement the ledger generator and the first disposition pass; generate tables for the declared surface; **run the extraction spike** that validates the Rust shape the core needs (mutable state records, enums, nested records, `&mut [u8]` out-buffers, `Result`, explicit loops) against the pinned pair; freeze the interface alphabet, the trace schema, and the error-code mapping.
+Work: vendor the artifacts and notice; write `AGENTS.md` recording repository instructions, contract ownership, and the test-form decisions of §16 (the workflow reads it before choosing an approach); write `toolchain/pins.toml` and `toolchain/sources.toml`; implement the ledger generator and the first disposition pass; generate tables for the declared surface; **run the extraction spike** that validates the Rust shape the core needs (mutable state records, enums, nested records, `&mut [u8]` out-buffers, `Result`, explicit loops) against the pinned pair; freeze the interface alphabet, the trace schema, and the error-code mapping.
 
 Contracts: `tests/contracts/a0_sources_ledger.sh` (hashes, ledger generation, reconciliation of the §1 baseline, planted-negative controls), `tests/contracts/trace.schema.json`, `tests/contracts/a0_extraction_spike.sh`.
 
@@ -412,33 +412,34 @@ Test forms, matching TemperMint's discipline:
 
 ## 20. Acceptance commands
 
-Run in milestone order, offline, inside the pinned shell:
+Run in milestone order. `shell` below abbreviates the offline pinned-shell invocation; the first `develop` realises the pinned closure, everything afterwards is offline and writes only into temporary directories.
 
 ```sh
+alias shell='nix --extra-experimental-features "nix-command flakes" develop --offline --no-update-lock-file .#spec --command'
 nix --extra-experimental-features 'nix-command flakes' flake metadata --no-update-lock-file
 nix --extra-experimental-features 'nix-command flakes' develop --no-update-lock-file .#spec --command true
 
 # S0 — sources, ledger, tables, spike
-nix … develop --offline --no-update-lock-file .#spec --command bash tests/contracts/a0_sources_ledger.sh
-nix … develop --offline --no-update-lock-file .#spec --command bash tests/contracts/a0_extraction_spike.sh
+shell bash tests/contracts/a0_sources_ledger.sh
+shell bash tests/contracts/a0_extraction_spike.sh
 git diff --exit-code -- lean/Generated rust/amqp-codegen-generated   # regeneration determinism
 
 # S1–S7 — specification and reference behaviour, per milestone
-nix … develop --offline --no-update-lock-file .#spec --command bash -c 'cd lean && lake build Contracts.TypeSystem'
-nix … develop --offline --no-update-lock-file .#spec --command cargo test --manifest-path rust/Cargo.toml --test wire_contract
-nix … develop --offline --no-update-lock-file .#spec --command bash scripts/replay-traces.sh fixtures/traces
+shell bash -c 'cd lean && lake build Contracts.TypeSystem'
+shell cargo test --manifest-path rust/Cargo.toml --test wire_contract
+shell bash scripts/replay-traces.sh fixtures/traces
 
 # R2 — extraction and proof audit
-nix … develop --offline --no-update-lock-file .#spec --command bash scripts/extract-core.sh
-nix … develop --offline --no-update-lock-file .#spec --command bash -c 'cd lean && lake build Contracts.CoreRefinement'
-nix … develop --offline --no-update-lock-file .#spec --command bash scripts/check-proof-assumptions.sh
+shell bash scripts/extract-core.sh
+shell bash -c 'cd lean && lake build Contracts.CoreRefinement'
+shell bash scripts/check-proof-assumptions.sh
 
 # D1–D4
-nix … develop --offline --no-update-lock-file .#spec --command bash tests/contracts/d2_trace_replay.feature
-nix … develop --offline --no-update-lock-file .#spec --command bash tests/contracts/d4_mutations.feature
+shell bash tests/contracts/d2_trace_replay.feature
+shell bash tests/contracts/d4_mutations.feature
 ```
 
-The first `develop` realises the pinned closure; everything afterwards is offline and writes only into temporary directories.
+Each milestone's contract list adds the concrete `lake build Contracts.<Module>` and `cargo test --test <name>` targets for that milestone; the block above is the spine, not the full set.
 
 ## 21. Work order and first actions
 
