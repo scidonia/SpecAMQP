@@ -36,10 +36,13 @@ from xml.etree import ElementTree
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 ARTIFACT = ROOT / "spec" / "oasis" / "amqp-core-types-v1.0-os.xml"
 WIDTHS_ANCHOR = "amqp-core-types-v1.0-os.xml#picture.5"
+FIXED_ANCHOR = "amqp-core-types-v1.0-os.xml#picture.6"
 ARRAY_ANCHOR = "amqp-core-types-v1.0-os.xml#picture.9"
 COMPOUND_ANCHOR = "amqp-core-types-v1.0-os.xml#picture.8"
 DESCRIBED_ANCHOR = "amqp-core-types-v1.0-os.xml#picture.2"
 STRING_ANCHOR = "amqp-core-types-v1.0-os.xml#picture.1"
+# Part 1's parity and ordering requirement for maps, as a clause of the ledger.
+MAP_CLAUSE = "amqp:types/section:primitive-type-definitions/type:map.1"
 
 # ---------------------------------------------------------------- the encoder
 
@@ -86,6 +89,19 @@ def enc_variable(narrow: int, wide: int, payload: bytes) -> bytes:
     return bytes([wide]) + be(len(payload), 4) + payload
 
 
+def fixed(label: str, payload_hex: str, width: int) -> bytes:
+    """A fixed-width payload given as hex, checked against the declared width.
+
+    The artifact's encoding table fixes how many octets each of the fixed-width
+    encodings carries; a payload of the wrong length is a malformed vector, not a
+    value, so it is refused here rather than written into the corpus.
+    """
+    payload = bytes.fromhex(payload_hex)
+    if len(payload) != width:
+        raise ValueError(f"{label} payload is {len(payload)} octets, the table declares {width}")
+    return payload
+
+
 def encode(value: dict) -> bytes:
     kind = value["type"]
     if kind == "null":
@@ -108,6 +124,27 @@ def encode(value: dict) -> bytes:
         return enc_ulong(value["value"])
     if kind == "long":
         return enc_long(value["value"])
+    if kind == "float":
+        return bytes([0x72]) + fixed("float", value["hex"], 4)
+    if kind == "double":
+        return bytes([0x82]) + fixed("double", value["hex"], 8)
+    if kind == "decimal32":
+        return bytes([0x74]) + fixed("decimal32", value["hex"], 4)
+    if kind == "decimal64":
+        return bytes([0x84]) + fixed("decimal64", value["hex"], 8)
+    if kind == "decimal128":
+        return bytes([0x94]) + fixed("decimal128", value["hex"], 16)
+    if kind == "char":
+        codepoint = value["codepoint"]
+        if not 0 <= codepoint <= 0x10FFFF:
+            raise ValueError("char code point out of range")
+        return bytes([0x73]) + be(codepoint, 4)
+    if kind == "timestamp":
+        # Two's complement milliseconds since the Unix epoch: a time before the
+        # epoch is a wrapped octet string, not an error.
+        return bytes([0x83]) + be(value["milliseconds"] % 2**64, 8)
+    if kind == "uuid":
+        return bytes([0x98]) + fixed("uuid", value["hex"], 16)
     if kind == "string":
         return enc_variable(0xA1, 0xB1, value["text"].encode())
     if kind == "symbol":
@@ -126,6 +163,16 @@ def encode(value: dict) -> bytes:
         if 1 + len(body) <= 0xFF and count <= 0xFF:
             return bytes([0xC0, 1 + len(body), count]) + body
         return bytes([0xD0]) + be(4 + len(body), 4) + be(count, 4) + body
+    if kind == "map":
+        # Like list, but the count is the number of *items* — two per key/value
+        # pair — and there is no map0 form, so the empty map is map8 with a zero
+        # count. Part 1 requires an even item count; an odd one is not a map.
+        pairs = value["pairs"]
+        body = b"".join(encode(key) + encode(item) for key, item in pairs)
+        count = 2 * len(pairs)
+        if 1 + len(body) <= 0xFF and count <= 0xFF:
+            return bytes([0xC1, 1 + len(body), count]) + body
+        return bytes([0xD1]) + be(4 + len(body), 4) + be(count, 4) + body
     if kind == "array":
         ctor = int(value["constructor"], 16)
         elements = b"".join(element_data(ctor, item) for item in value["items"])
@@ -222,13 +269,14 @@ DESCRIPTOR_ULONG = {"type": "ulong", "value": 0x00000000_00000001}
 def golden() -> list[dict]:
     vectors: list[dict] = []
 
-    def add(name: str, value: dict, anchor: str, note: str) -> None:
+    def add(name: str, value: dict, anchor: str | list[str], note: str) -> None:
+        clauses = [anchor] if isinstance(anchor, str) else list(anchor)
         vectors.append({
-            "vector": f"gen-{name}", "kind": "encode", "clauses": [anchor],
+            "vector": f"gen-{name}", "kind": "encode", "clauses": clauses,
             "bytes": encode(value).hex(), "value": value, "note": note,
         })
         vectors.append({
-            "vector": f"gen-{name}-decode", "kind": "decode", "clauses": [anchor],
+            "vector": f"gen-{name}-decode", "kind": "decode", "clauses": clauses,
             "bytes": encode(value).hex(), "value": value, "canonical": True,
             "note": f"{note} (decoding direction)",
         })
@@ -291,6 +339,77 @@ def golden() -> list[dict]:
     add("described-numeric", {"type": "described", "descriptor": DESCRIPTOR_ULONG,
                               "value": {"type": "list", "items": []}},
         DESCRIBED_ANCHOR, "a described value with a numeric descriptor, wrapping the empty list")
+
+    # The remaining fixed-width encodings. What the artifact's table fixes for
+    # these is the framing — a format code and a declared number of octets — so the
+    # float, double and decimal payloads are carried as raw hex rather than as JSON
+    # numbers, which could not pin the octets a vector exists to pin down.
+    for codepoint in (0, 65, 0x10FFFF):
+        add(f"char-{codepoint:06x}", {"type": "char", "codepoint": codepoint},
+            FIXED_ANCHOR,
+            f"the code point U+{codepoint:04X}, UTF-32BE in four octets")
+    for milliseconds in (0, 1, -(2**63), 2**63 - 1):
+        add(f"timestamp-{milliseconds}", {"type": "timestamp", "milliseconds": milliseconds},
+            FIXED_ANCHOR,
+            f"{milliseconds} milliseconds since the Unix epoch, two's complement in eight octets")
+    for label, payload in (("zero", "00" * 16),
+                           ("rfc4122", "f81d4fae7dec11d0a76500a0c91e6bf6")):
+        add(f"uuid-{label}", {"type": "uuid", "hex": payload}, FIXED_ANCHOR,
+            f"a UUID in sixteen octets, the {label} pattern")
+    for label, payload in (("positive-zero", "00000000"),
+                           ("negative-zero", "80000000"),
+                           ("one", "3f800000"),
+                           ("min-subnormal", "00000001"),
+                           ("max-finite", "7f7fffff"),
+                           ("positive-infinity", "7f800000"),
+                           ("negative-infinity", "ff800000")):
+        add(f"float-{label}", {"type": "float", "hex": payload}, FIXED_ANCHOR,
+            f"binary32 {label}: the sign, exponent and mantissa extremes in four octets")
+    for label, payload in (("positive-zero", "0000000000000000"),
+                           ("negative-zero", "8000000000000000"),
+                           ("one", "3ff0000000000000"),
+                           ("min-subnormal", "0000000000000001"),
+                           ("max-finite", "7fefffffffffffff"),
+                           ("positive-infinity", "7ff0000000000000"),
+                           ("negative-infinity", "fff0000000000000")):
+        add(f"double-{label}", {"type": "double", "hex": payload}, FIXED_ANCHOR,
+            f"binary64 {label}: the sign, exponent and mantissa extremes in eight octets")
+    for decimal, width in (("decimal32", 4), ("decimal64", 8), ("decimal128", 16)):
+        for label, payload in (("zero", "00" * width), ("all-ones", "ff" * width)):
+            add(f"{decimal}-{label}", {"type": decimal, "hex": payload}, FIXED_ANCHOR,
+                f"{decimal} {label}: Binary Integer Decimal in {width} octets, carried as raw hex")
+
+    # Maps. The count field is the number of items — two per pair — and there is no
+    # map0 form, so the empty map is map8 with a zero item count. Keys are symbolic
+    # and values mixed, and the pairs are given in wire order because Part 1 makes
+    # that order semantically significant.
+    def pair(index: int) -> list[dict]:
+        values = ({"type": "null"}, {"type": "boolean", "value": True},
+                  {"type": "ubyte", "value": index % 256},
+                  {"type": "string", "text": f"v{index}"},
+                  {"type": "uint", "value": index})
+        return [{"type": "symbol", "text": f"k{index}"}, values[index % len(values)]]
+
+    add("map-0", {"type": "map", "pairs": []}, MAP_CLAUSE,
+        "the empty map: no map0 form exists, so map8 with a zero item count")
+    add("map-1", {"type": "map", "pairs": [pair(0)]}, MAP_CLAUSE,
+        "one symbolic key mapped to a null value, in wire order")
+    for count in (127, 128, 255, 256):
+        pairs = [pair(i) for i in range(count)]
+        value = {"type": "map", "pairs": pairs}
+        octets = encode(value)
+        body = sum(len(encode(key)) + len(encode(item)) for key, item in pairs)
+        add(f"map-{count}", value, MAP_CLAUSE,
+            f"a map of {count} pairs, {2 * count} items in {len(octets)} octets: the item "
+            f"count {'fits' if 2 * count <= 0xFF else 'does not fit'} the one-octet count "
+            f"field and the body {'fits' if 1 + body <= 0xFF else 'does not fit'} the "
+            f"one-octet size field, so {'map8' if octets[0] == 0xC1 else 'map32'} carries it")
+    add("map-nested", {"type": "map", "pairs": [
+        [{"type": "symbol", "text": "outer"},
+         {"type": "map", "pairs": [[{"type": "symbol", "text": "inner"},
+                                    {"type": "uint", "value": 7}]]}],
+        [{"type": "symbol", "text": "tail"}, {"type": "null"}],
+    ]}, MAP_CLAUSE, "a map with a map as one of its values")
     return vectors
 
 
@@ -313,6 +432,19 @@ def rejects(golden_vectors: list[dict]) -> list[dict]:
             "note": f"0x{code:02X} is an escape octet reserved for future formats",
         })
 
+    # Part 1: a map's items are alternating keys and values, so the count must be
+    # even. The size field here is exactly right, leaving the parity the only
+    # thing wrong with the input.
+    odd = b"".join(encode(item) for item in (
+        {"type": "symbol", "text": "a"}, {"type": "uint", "value": 0}, {"type": "null"}))
+    vectors.append({
+        "vector": "gen-map-odd-items", "kind": "reject", "clauses": [MAP_CLAUSE],
+        "bytes": (bytes([0xC1, 1 + len(odd), 3]) + odd).hex(),
+        "expectError": {"condition": "amqp:decode-error", "endpoint": "connection"},
+        "note": "a map declaring three items: keys and values must come in pairs, "
+                "so an odd item count is not a map",
+    })
+
     # Every proper prefix of every golden encoding must be rejected as truncated.
     for entry in golden_vectors:
         octets = bytes.fromhex(entry["bytes"])
@@ -327,24 +459,32 @@ def rejects(golden_vectors: list[dict]) -> list[dict]:
                 "note": f"the first {cut} of {len(octets)} octets of {entry['vector']}",
             })
 
-    # Size fields perturbed by one octet, for compound and array encodings.
+    # Size fields perturbed by one octet, for the compound encodings. A reader that
+    # trusts the declared size instead of measuring its own window accepts a map
+    # whose size field is short, so this is the control that makes the check bite.
     for entry in golden_vectors:
         octets = bytearray.fromhex(entry["bytes"])
         value = entry.get("value", {})
-        if value.get("type") == "list" and len(octets) >= 3 and octets[0] in (0xC0, 0xD0):
-            for delta in (-1, 1):
-                if octets[0] == 0xC0:
-                    perturbed = bytearray(octets)
-                    perturbed[1] = (perturbed[1] + delta) % 256
-                else:
-                    size = int.from_bytes(octets[1:5], "big") + delta
-                    perturbed = bytearray(octets[:1]) + size.to_bytes(4, "big") + octets[5:]
-                vectors.append({
-                    "vector": f"size{delta:+d}-{entry['vector']}", "kind": "reject",
-                    "clauses": entry["clauses"], "bytes": bytes(perturbed).hex(),
-                    "expectError": {"condition": "amqp:decode-error", "endpoint": "connection"},
-                    "note": f"{entry['vector']} with its size field moved by {delta}",
-                })
+        if value.get("type") not in ("list", "map") or len(octets) < 3:
+            continue
+        if octets[0] not in (0xC0, 0xD0, 0xC1, 0xD1):
+            continue
+        for delta in (-1, 1):
+            # The vector id must satisfy the schema's `^[a-z0-9][a-z0-9._-]*$`, so
+            # the sign is spelled out rather than written as `+`/`-`.
+            direction = "minus1" if delta < 0 else "plus1"
+            if octets[0] in (0xC0, 0xC1):
+                perturbed = bytearray(octets)
+                perturbed[1] = (perturbed[1] + delta) % 256
+            else:
+                size = int.from_bytes(octets[1:5], "big") + delta
+                perturbed = bytearray(octets[:1]) + size.to_bytes(4, "big") + octets[5:]
+            vectors.append({
+                "vector": f"size-{direction}-{entry['vector']}", "kind": "reject",
+                "clauses": entry["clauses"], "bytes": bytes(perturbed).hex(),
+                "expectError": {"condition": "amqp:decode-error", "endpoint": "connection"},
+                "note": f"{entry['vector']} with its size field moved by {delta}",
+            })
     return vectors
 
 

@@ -287,7 +287,7 @@ The corpus earned its place immediately, finding three things rather than confir
 * the size check for compound values and arrays measured from the wrong offset, omitting the count field (and, for arrays, the element constructor) that the size counts;
 * my own reading of the published composite example was wrong — I had claimed its size octet was a documentation defect, having under-counted the authors array by one octet. The encoder agreed with the artifact octet for octet; the vector was corrected, not the artifact, and `ledger/ambiguities/compound-size-field.json` now records the withdrawal with the corrected arithmetic and closes the question.
 
-**The generated corpus.** `scripts/gen-value-vectors.py` emits 66,517 further vectors and is checked two ways: its encoder must reproduce the artifact's published examples octet for octet, and the committed corpus must reproduce byte-for-byte from the generator. Its families are golden vectors (integer and length boundaries, compound counts across the 8-bit boundary, nesting, both descriptor forms), reject vectors (every reserved octet, every escape octet, every proper prefix of every short golden encoding, and size fields moved by one), and a **property sweep over every one- and two-octet input** — 65,792 vectors asserting that whatever decodes must re-decode to the same value. The sweep needs no oracle, which is what lets the domain be closed rather than sampled.
+**The generated corpus.** `scripts/gen-value-vectors.py` emits 66,517 further vectors and is checked two ways: its encoder must reproduce the artifact's published examples octet for octet, and the committed corpus must reproduce byte-for-byte from the generator. Its families are golden vectors (integer and length boundaries, compound counts either side of the one-octet count boundary, which for maps is 127 pairs (254 items) against 128 pairs (256 items) rather than a round number of pairs, nesting, both descriptor forms), reject vectors (every reserved octet, every escape octet, every proper prefix of every short golden encoding, and size fields moved by one), and a **property sweep over every one- and two-octet input** — 65,792 vectors asserting that whatever decodes must re-decode to the same value. The sweep needs no oracle, which is what lets the domain be closed rather than sampled.
 
 The corpus paid for itself within the hour, finding four defects rather than confirming the implementation:
 
@@ -297,6 +297,8 @@ The corpus paid for itself within the hour, finding four defects rather than con
 * two performance defects that made the corpus unusable before they were found: an accumulator that appended to the end of a list (quadratic in the corpus size) and a hex renderer that appended two characters at a time (quadratic in the payload). Both are now linear, and 66,517 vectors run in 0.4 s.
 
 The first two are the interesting ones methodologically: the **generator and the implementation shared them**, which is exactly the correlated-error risk §19 names, and what caught them was not agreement between two encoders but the *reader's* independent measurement of its own size window. An implementation that trusted the declared size would have accepted both.
+
+**Trust accounting is now a gate.** `tests/contracts/s1_proof_integrity.sh` scans the handwritten modules for `sorry`, `admit`, `native_decide`, `partial def`, `axiom`, `constant`, `opaque`, `unsafe`, `extern` and `implemented_by`, with a planted control that hides each construct behind comments and docstrings (so the scanner is shown to read code rather than text), and it prints the accepted theorem's transitive axiom inventory. As of S1 that inventory is `[propext]` — the extensionality axiom the `decide` proofs use, and the expected baseline — with no `sorryAx` and no `native_decide` trust.
 
 Remaining in S1: the rest of the primitive surface (floats, decimals, char, timestamp, uuid, maps), the round-trip and canonicality theorems stated in `Contracts/TypeSystem` as propositions about the specification rather than about the implementation, and dispositions for the Part 1 clauses the new vectors cite.
 
@@ -408,7 +410,7 @@ Test forms:
 | Table fidelity | regeneration byte-identical; tables diffed against the OASIS text | mutate a descriptor code in a vendor copy; generation must change and the contract must fail |
 | No hand-typed codes | scan of `lean/Spec`, `lean/Contracts`, `lean/Proofs` for literal descriptor codes and `amqp:` symbols | plant a literal `0x14` in a proof; the gate must fail |
 | Executability | no `noncomputable`, no `partial`; `lake build Spec.Exec` succeeds | plant a `noncomputable def`; the gate must fail |
-| Proof integrity | token-aware `sorry` scan; `#print axioms` inventory per public theorem; no reachable `sorryAx`; `native_decide` requires disclosure | plant a `sorry`; the gate must fail |
+| Proof integrity | token-aware scan for `sorry`, `admit`, `native_decide`, `partial def`, `axiom`, `constant`, `opaque`, `unsafe`, `extern` and `implemented_by` across the handwritten modules, plus the accepted theorem's `#print axioms` inventory; no `sorryAx`, no `ofReduceBool` | plant a file containing each construct (behind comments and docstrings, to check the stripper) and require the scanner to name every one with file and line |
 | Vector provenance | every vector cites clauses or records provenance; authoring rule (§5) enforced by review plus a scan for executor-generated vectors | add a vector with no `refs` and no provenance; the gate must fail |
 | Picture review | every picture whose content contains formal grammar or a normative keyword carries a disposition keyed to its content digest | plant a `<picture>` containing `%x`; `check` must fail; record a wrong digest; the staleness check must fire |
 | Discriminating power | V4 specification-mutation controls | a mutant no tier detects is reported as a suite defect |
@@ -457,7 +459,9 @@ git diff --exit-code -- lean/Generated    # regeneration determinism
 
 # S1–S7 — specification claims and corpus, per milestone
 shell bash -c 'cd lean && lake build Contracts.TypeSystem'
-shell bash tests/contracts/s1_ref_vectors.sh      # reference implementation over the worked-example corpus
+shell bash tests/contracts/s1_proof_integrity.sh  # no hidden trust in the specification
+shell bash tests/contracts/s1_ref_vectors.sh      # reference implementation over the corpora
+shell bash tests/contracts/s1_differential.sh     # specification vs reference, verdict by verdict
 shell bash scripts/check-proof-assumptions.sh
 
 # V2–V4 — corpus, adequacy, mutations

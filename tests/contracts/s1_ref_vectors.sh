@@ -53,8 +53,10 @@ python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$schema" ||
 note "reference implementation builds as a native executable from Lean"
 
 # 3. Corpus shape, before running it.
-python3 - "$worked" "$generated" <<'PYSHAPE' || exit 1
-import json, pathlib, sys
+python3 - "$worked" "$generated" "$schema" <<'PYSHAPE' || exit 1
+import json, pathlib, re, sys
+schema = json.loads(pathlib.Path(sys.argv[3]).read_text())
+id_pattern = re.compile(schema["properties"]["vector"]["pattern"])
 problems = []
 for corpus in sys.argv[1:]:
     seen = set()
@@ -66,6 +68,9 @@ for corpus in sys.argv[1:]:
         if ident in seen:
             problems.append(f"{where}: duplicate vector id")
         seen.add(ident)
+        if not id_pattern.match(ident):
+            problems.append(f"{where}: vector id breaks its own schema pattern "
+                            f"({schema['properties']['vector']['pattern']})")
         if not entry.get("clauses"):
             problems.append(f"{where}: cites no clause or figure")
         kind = entry.get("kind")

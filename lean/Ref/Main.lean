@@ -1,3 +1,4 @@
+import Harness.Runner
 import Ref.Vectors
 
 /-!
@@ -10,6 +11,7 @@ fails, so the corpus is the contract and the exit status is the observable
 outcome. Nothing here touches the network, a clock, or a random source.
 -/
 
+open SpecAMQP.Harness
 open SpecAMQP.Ref.Vectors
 
 def main (args : List String) : IO UInt32 := do
@@ -26,7 +28,7 @@ def main (args : List String) : IO UInt32 := do
       catch e =>
         IO.eprintln s!"amqp-ref: cannot read {path}: {e}"
         return (2 : UInt32)
-    match runCorpus text with
+    match runCorpus refCodec text with
     | .error message =>
       IO.eprintln s!"amqp-ref: {message}"
       return (2 : UInt32)

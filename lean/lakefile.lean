@@ -30,10 +30,20 @@ lean_lib Spec
 lean_lib Contracts
 
 @[default_target]
+lean_lib Harness
+
+@[default_target]
 lean_lib Ref
 
 /-- The reference implementation as a native executable: `lake exe amqp-ref
 <vector-file.ndjson>`. -/
 lean_exe «amqp-ref» where
   root := `Ref.Main
+  supportInterpreter := true
+
+/-- The specification as an executable over the same corpus: `lake exe amqp-spec
+<vector-file.ndjson>`. Both artefacts run through `Harness.Runner`, so their
+verdicts are directly comparable. -/
+lean_exe «amqp-spec» where
+  root := `Spec.Main
   supportInterpreter := true

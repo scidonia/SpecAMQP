@@ -85,11 +85,13 @@
     "value": {
       "type": "object",
       "required": ["type"],
-      "description": "The corpus's value vocabulary. Integers are given as JSON numbers with their width named by `type`, so a vector cannot be ambiguous about which encoding width it means.",
+      "description": "The corpus's value vocabulary. Integers are given as JSON numbers with their width named by `type`, so a vector cannot be ambiguous about which encoding width it means. Float, double and the three decimals carry their payload as raw hex rather than as a number: what the specification fixes is the framing of those encodings, and a JSON number would lose the exact octets a vector exists to pin down.",
       "properties": {
         "type": {
           "enum": ["null", "boolean", "ubyte", "ushort", "uint", "ulong", "byte", "short",
-                   "int", "long", "string", "symbol", "binary", "list", "array", "described"]
+                   "int", "long", "string", "symbol", "binary", "list", "array", "described",
+                   "float", "double", "decimal32", "decimal64", "decimal128", "char",
+                   "timestamp", "uuid", "map"]
         },
         "value": {
           "description": "The payload: a boolean or integer for the scalar types, or a nested value for a described value.",
@@ -103,7 +105,14 @@
         "hex": { "type": "string", "pattern": "^([0-9a-f]{2})*$", "description": "The payload for binary." },
         "items": { "type": "array", "items": { "$ref": "#/$defs/value" }, "description": "The elements for list and array." },
         "constructor": { "type": "string", "pattern": "^[0-9a-f]{2}$", "description": "The element constructor octet for array, which the wire format requires and which a reader must honour." },
-        "descriptor": { "$ref": "#/$defs/value" }
+        "descriptor": { "$ref": "#/$defs/value" },
+        "codepoint": { "type": "integer", "minimum": 0, "maximum": 1114111, "description": "The code point for char, encoded as UTF-32BE." },
+        "milliseconds": { "type": "integer", "description": "Milliseconds since the Unix epoch for timestamp." },
+        "pairs": {
+          "type": "array",
+          "description": "Key-value pairs for map, in wire order. Part 1 requires maps to be treated as ordered unless known to be otherwise, so order is significant and a reader that reorders a map it does not interpret changes the value.",
+          "items": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "$ref": "#/$defs/value" } }
+        }
       }
     }
   }
