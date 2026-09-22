@@ -26,13 +26,13 @@ its own receiver-facing constructor computes.
 
 ## What discharges it
 
-Two obligations, and neither is in `Proofs/` yet:
+Five obligations: the initial state, the framing case for every operation that touches none of the four quantities, and one each for `attachLink`, `flowLink` and `transferLink`. The first two are discharged in `Proofs/SessionCredit.lean`; the last three are named there and not proved:
 
-1. **Initialisation.** At `attach`, `peerCount` and `peerCredit` are both zero, so the
+* **Initialisation.** At `attach`, `peerCount` and `peerCredit` are both zero, so the
    right side is `0 + 0 - initialDeliveryCount`, which truncates to zero — the state where
    a sender has nothing to spend until the receiver grants credit, which is the ownership
    sentence applied at the moment the link exists.
-2. **Preservation, per transition.** A received flow *sets* the equation, because the
+* **Preservation, per transition.** A received flow *sets* the equation, because the
    credit is built by `Position.creditFor` from the values that flow reported. A transfer
    *preserves* it, because both sides move by one: the credit decrements and the
    delivery-count increments, so the right side loses exactly what the left side does —
@@ -60,29 +60,48 @@ Two obligations, and neither is in `Proofs/` yet:
 
 ## Status
 
-The law is **stated, and true by construction rather than proved**: it holds because of the
-shape of every operation that touches the two quantities, which is a reason and not a
-proof. `SenderCreditInvariant` is the target the one-step preservation lemma proves; until
-that lemma lands in `Proofs/`, this file carries no acceptance theorem and the plan records
-the law as pending rather than established.
+The law is **stated, and true by construction rather than proved**. `lean/Proofs/SessionCredit.lean`
+carries `SenderCreditState` restated on the specification's own `Session` so the proof and the
+constructor cannot drift apart, and discharges two of the five obligations: the initial state
+(`initial_sender_credit`, where both clauses are vacuous because there is no link and no role) and
+every operation that leaves `role`, `position`, `peerCount` and `peerCredit` where they were
+(`frame_sender_credit`). The three that move the quantities are **not proved** — `attachLink` (which
+sets both sides of the equation to zero), `flowLink` (whose sender's branch rebuilds the credit with
+`Position.creditFor`) and `transferLink` (whose delivery-beginning transfer decrements the credit and
+increments the delivery-count) — and the proof module names them rather than sketching them.
+
+**So this file carries no acceptance theorem, and that is the state of the art rather than an
+oversight**: a declaration taking a name that does not exist would be a claim nobody can defend.
+When the three lemmas land, the declaration goes here, taking the conjunction of the five.
 -/
 
 namespace SpecAMQP.Contracts
 
 open SpecAMQP.Spec.Session
 
-/-- **The sender's credit equation.** In a state where this endpoint attached as the link's
-sender and a handle's flow state exists, that state's credit is exactly what the receiver's
-last reported pair leaves room for: `Position.creditFor` of the peer's delivery-count and
-credit against this endpoint's own delivery-count. Stated through the specification's own
-constructor so the two cannot drift apart.
+/-- **The sender's credit law, in the form the induction needs.** Two clauses:
 
-Read as the artifact's ownership sentence: an endpoint never invents the partner's
-quantity, and a sender never invents its own credit. -/
-def SenderCreditInvariant (session : Session) : Prop :=
-  session.role = some LinkRole.sender →
+* the equation — in a state where this endpoint attached as the link's sender and a flow
+  state exists, that state's credit is exactly what the receiver's last reported pair leaves
+  room for: `Position.creditFor` of the peer's delivery-count and credit against this
+  endpoint's own delivery-count, stated through the specification's own constructor so the
+  two cannot drift apart. Read as the artifact's ownership sentence: an endpoint never
+  invents the partner's quantity, and a sender never invents its own credit.
+* the absence clause — an endpoint with no flow state has agreed nothing about the partner's
+  quantities either: `position = none → peerCount = 0 ∧ peerCredit = 0`.
+
+**The second clause is not decoration and the first alone is not the law to state.** The
+equation is vacuous while `position` is `none` — its quantifier ranges over nothing, so it
+constrains neither `peerCount` nor `peerCredit` — and those are exactly the quantities an
+`attach` needs to be zero for the credit it sets to satisfy the equation. An invariant whose
+interesting case is the one it cannot see would be a claim that holds for the wrong reason.
+So the stated form is the one the induction actually preserves, and the equation is its
+first clause. -/
+def SenderCreditState (session : Session) : Prop :=
+  (session.role = some LinkRole.sender →
     ∀ position, session.position = some position →
       position.credit =
-        Position.creditFor session.peerCount session.peerCredit position.deliveryCount
+        Position.creditFor session.peerCount session.peerCredit position.deliveryCount) ∧
+  (session.position = none → session.peerCount = 0 ∧ session.peerCredit = 0)
 
 end SpecAMQP.Contracts
