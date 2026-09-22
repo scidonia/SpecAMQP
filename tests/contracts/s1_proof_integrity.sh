@@ -185,10 +185,13 @@ note "no sorry, admit, native_decide, partial, axiom, opaque, unsafe or extern i
 cat >"$tmp/Axioms.lean" <<'AXIOMS'
 import Contracts.FrameCodec
 import Contracts.TypeSystem
+import Proofs.CodecRoundTrip
 
 #print axioms SpecAMQP.Contracts.constructor_grammar_public
 #print axioms SpecAMQP.Contracts.extended_header_width
 #print axioms SpecAMQP.Contracts.body_starts_after_the_header
+#print axioms SpecAMQP.Proofs.beOctets_length
+#print axioms SpecAMQP.Proofs.go_length
 AXIOMS
 ( cd "$root/lean" && LAKE_NO_CACHE=1 lake env lean "$tmp/Axioms.lean" ) >"$tmp/axioms.log" 2>&1 ||
   die "could not print the accepted theorem's axioms: $(tail -3 "$tmp/axioms.log")"
@@ -198,7 +201,8 @@ grep -q "ofReduceBool" "$tmp/axioms.log" &&
   { cat "$tmp/axioms.log"; die "the accepted theorem depends on native_decide's ofReduceBool"; }
 grep -q "sorryAx" "$tmp/scan.log" && die "an accepted theorem is missing from the inventory"
 sed 's/^/     /' "$tmp/axioms.log" | grep "depends on axioms" | sed 's/^     //'
-for theorem in "$accepted_theorem" extended_header_width body_starts_after_the_header; do
+for theorem in "$accepted_theorem" extended_header_width body_starts_after_the_header \
+               SpecAMQP.Proofs.beOctets_length SpecAMQP.Proofs.go_length; do
   grep -q "$theorem' depends on axioms" "$tmp/axioms.log" ||
     die "$theorem was not inventoried — the inventory names a theorem the kernel did not print"
 done

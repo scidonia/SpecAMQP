@@ -1,0 +1,30 @@
+{
+ "adopted": "amqp:connection:framing-error for every negotiation failure",
+ "clauses": [
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.1"
+ ],
+ "consequences": [
+  "Every negotiation failure the connection layer can detect — a buffer that is not a protocol header, a protocol id this peer does not speak, a version it does not support — is refused with `amqp:connection:framing-error`, and the refusal names the specific cause in its reason class and prose rather than in the condition.",
+  "The reason class carries the distinction the condition cannot: `malformed` for octets that are not a header at all, `unsupported` for a protocol id or version this peer does not speak. A test can therefore assert which failure occurred without inventing a condition the artifact never names.",
+  "The peer closes the connection in all three cases, which is what the section mandates, so the choice of condition does not change the observable lifecycle — only the label attached to it."
+ ],
+ "evidence": "The version-negotiation section states the exchange and requires a peer to close the connection when the header is not one it can accept, and no clause anywhere names the condition to raise: the scout's survey found that the only connection-error value any clause raises is `amqp:connection:framing-error`, and that no clause mentions an error for a header mismatch, an unsupported version, an unparsable header or an unacceptable protocol id. The generated `connection-error` choice offers three values, so a specification that must report *something* has to choose, and the honest thing is to choose the value the artifact does use for wire-level refusals and record the choice rather than leave it to whichever implementation reads the section first.",
+ "id": "version-mismatch-condition",
+ "open": true,
+ "question": "A peer that receives a protocol header it cannot accept must close the connection, and the artifact names no error condition for it. What does the specification report?",
+ "readings": [
+  {
+   "name": "amqp:connection:framing-error for every negotiation failure",
+   "statement": "The condition is the one the artifact uses for wire-level failures; the specific cause is carried in the reason class and the prose. Chosen: it invents nothing, keeps one condition for one class of failure, and lets tests distinguish the causes where the detail already lives."
+  },
+  {
+   "name": "A distinct condition per cause",
+   "statement": "Rejected: the artifact defines three connection-error values and none of them means \"unsupported version\", so inventing `amqp:connection:version-error` or reusing `amqp:connection:forced` would be a specification claim about the protocol that the standard does not make. An implementation that needs to distinguish the causes can do so through the detail."
+  },
+  {
+   "name": "Leave the condition unstated and report only that the connection closes",
+   "statement": "Rejected: the conformance interface reports a condition and a reason for every refusal, and a refusal with no condition would be the one place in the corpus where the peer's observation is untyped."
+  }
+ ],
+ "schema_version": 1
+}

@@ -66,6 +66,10 @@ lean_lib Harness where
 lean_lib Ref where
   globs := #[.submodules `Ref]
 
+@[default_target]
+lean_lib Proofs where
+  globs := #[.submodules `Proofs]
+
 /-- The reference implementation as a native executable: `lake exe amqp-ref
 <vector-file.ndjson>`. -/
 lean_exe «amqp-ref» where
