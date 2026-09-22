@@ -28,3 +28,12 @@ lean_lib Spec
 
 @[default_target]
 lean_lib Contracts
+
+@[default_target]
+lean_lib Ref
+
+/-- The reference implementation as a native executable: `lake exe amqp-ref
+<vector-file.ndjson>`. -/
+lean_exe «amqp-ref» where
+  root := `Ref.Main
+  supportInterpreter := true

@@ -55,9 +55,9 @@
   },
   "amqp-core-types-v1.0-os.xml#picture.19": {
    "clause_text": "[picture] Example Composite Value: constructor list representation of a book | | +-----------------+-------------------+ +-------------+---------------+ | | | | 0x00 0xA3 0x11 \"example:book:li...",
-   "disposition": "superseded:compound-size-field",
+   "disposition": "formalized:Spec.Value.CompositeValue",
    "kind": "picture",
-   "note": "Worked example of a composite value. Its list8 size byte reads 0x40 where the depicted content is 63 octets, so the byte is superseded by the reading recorded in ledger/ambiguities/compound-size-field.json rather than copied.",
+   "note": "Worked example of a composite value, and the reference for the size field's scope: its list8 size 0x40 counts the count octet, the title, the authors array (39 octets on the wire) and the null isbn. Exercised by vectors book-composite-decode, book-composite-encode and book-composite-wrong-size-rejected.",
    "text_sha256": "018b99a7a27a05ca75a066ef7e3fa959c1178dba0d5b56aa0ea0bb91be475648"
   },
   "amqp-core-types-v1.0-os.xml#picture.2": {

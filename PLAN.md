@@ -4,7 +4,9 @@
 
 Produce, in this repository, **a complete, correct, executable formal specification of AMQP 1.0 core** (OASIS Standard, Parts 0–5) in Lean 4, faithful to the OASIS Standard, with a clause-level ledger that makes *completeness* and *fidelity* measured properties rather than claims, and with a defined conformance interface so that downstream work — a Rust implementation, its extraction, and its proofs, which belong to TemperMint, not here — has a definite target.
 
-This repository holds the specification and the evidence that it is correct. It contains **no implementation of the protocol**, in any language, and makes no claim about any implementation.
+This repository holds the specification, the evidence that it is correct, and a **reference implementation written in Lean**. The two are deliberately separate artefacts: the specification is declarative, generated-table-driven and shaped for proof, while the reference implementation is operational, independently written from the same clauses, and compiled to a native executable by Lean itself — so its behaviour rests on no translation step. Differential testing runs the implementation against the specification and against recorded third-party exchanges; the corpus, not either artefact, is what both are measured by.
+
+Nothing here is Rust: extraction through Charon and Aeneas, proofs about a Rust programme, and performance work remain downstream (§22). What this repository now provides to that work is an executable oracle.
 
 ## 1. What "a correct specification" means here
 
@@ -51,10 +53,13 @@ Scan numbers size the work; the ledger is the work.
 | D-h | Specification test vectors: positive, negative, and recorded third-party | `vectors/` |
 | D-i | Executable driver over the vectors (`lake exe amqp-spec`) | `lean/Spec/Exec.lean` |
 | D-j | Handoff notes for downstream implementation work | `HANDOFF.md` |
+| D-l | Reference implementation of the type system in Lean, independent of `Spec.*`, compiled to a native executable | `lean/Ref/`, `lake exe amqp-ref` |
+| D-m | The type-system vector corpus and its schema, authored from the artifacts' worked examples | `vectors/primitives.ndjson`, `tests/contracts/value-vector.schema.json` |
 
 ## 3. Non-goals
 
-- **No implementation, in this repository.** No Rust, no reference implementation, no fast implementation, no extraction, no proofs about code, no performance measurement. Those require TemperMint's toolchain and are scheduled there (§22). The earlier draft of this programme specified them; they are removed, not forgotten.
+- **No Rust, no extraction, no performance work.** The reference implementation is in Lean, and it is the only implementation here. A Rust programme, its extraction through Charon and Aeneas, proofs about it, optimised candidates and measurements belong to TemperMint and are scheduled there (§22).
+- **No claims about the reference implementation's conformance beyond its corpus.** It is an implementation, not a proof: what it satisfies is stated by the vectors it passes, and a clause it does not yet exercise is a clause it does not yet demonstrate. The specification's theorems are about the specification.
 - **No protocol extensions.** AMQP management (`amqp-man`), filter expressions (`filtex`), claims-based security (`amqp-cbs`), addressing, JMS mapping, HTTP-over-AMQP, event streams, and connection-info are out of scope; they exist as working drafts in `oasis-tcs/amqp-specs`, not as part of the OASIS Standard for core AMQP 1.0. Core must nonetheless model how unknown described types and pass-through annotations are handled.
 - **No broker or queue semantics.** AMQP core defines links and termini, not what a destination does with a message. `source`/`target` are formalized as protocol-visible field sets and obligations, not as a routing model.
 - **No TLS, no TCP/IP, no crypto.** Security-layer negotiation is specified; TLS, the byte stream, and mechanism-specific cryptography are environment assumptions, recorded as such in the ledger.
@@ -274,6 +279,16 @@ Two corrections came out of writing the proofs rather than reading them: `decide
 
 Remaining in S1: the value domain (null, booleans, integers, floats, decimals, char, timestamp, uuid, binary, string, symbol, and the compound forms), the reader and writer for all 39 encodings with the decode-error taxonomy, round-trip and canonicality theorems at `Contracts.TypeSystem`'s types, the vector corpus authored from Part 1's examples, and the driver that turns a vector file into per-vector verdicts.
 
+**Progress.** The reference implementation's first slice is landed and passing: `lean/Ref/` reads and writes the type system's primitives, compound lists and arrays with described types, independently of `Spec.*`, with no `partial` (the reader is total, bounded by fuel that decreases at every recursive step), and `lake exe amqp-ref` compiles it to a native binary that consumes the corpus and reports one JSON verdict per vector. `vectors/primitives.ndjson` holds 14 vectors authored from the artifacts' worked examples — the str8 example, the described-URL example, the composite `book` value octet for octet, the narrowest-encoding choices for `uint`, and four rejections (reserved octet, escape octet, truncated string, raised size). `tests/contracts/s1_ref_vectors.sh` passes with a mutation control that corrupts one expected octet and requires the run to fail naming that vector.
+
+The corpus earned its place immediately, finding three things rather than confirming what was written:
+
+* the big-endian writers emitted the least-significant octet first, so `uint 256` encoded to a different number than it decoded from;
+* the size check for compound values and arrays measured from the wrong offset, omitting the count field (and, for arrays, the element constructor) that the size counts;
+* my own reading of the published composite example was wrong — I had claimed its size octet was a documentation defect, having under-counted the authors array by one octet. The encoder agreed with the artifact octet for octet; the vector was corrected, not the artifact, and `ledger/ambiguities/compound-size-field.json` now records the withdrawal with the corrected arithmetic and closes the question.
+
+Remaining in S1: the rest of the primitive surface (floats, decimals, char, timestamp, uuid, maps), the round-trip and canonicality theorems stated in `Contracts/TypeSystem` as propositions about the specification rather than about the implementation, and dispositions for the Part 1 clauses the new vectors cite.
+
 Acceptance: round trips proved on the canonical domain; every encoding row exercised by a vector; the ABNF/table agreement checked; ledger coverage complete for Part 1's normative clauses.
 
 ### S2 — framing and performatives (Part 2 structural)
@@ -431,7 +446,7 @@ git diff --exit-code -- lean/Generated    # regeneration determinism
 
 # S1–S7 — specification claims and corpus, per milestone
 shell bash -c 'cd lean && lake build Contracts.TypeSystem'
-shell bash -c 'cd lean && lake exe amqp-spec vectors/primitives.ndjson'
+shell bash tests/contracts/s1_ref_vectors.sh      # reference implementation over the worked-example corpus
 shell bash scripts/check-proof-assumptions.sh
 
 # V2–V4 — corpus, adequacy, mutations

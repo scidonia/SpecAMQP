@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://specamqp.invalid/contracts/value-vector.schema.json",
+  "title": "AMQP 1.0 type-system vector",
+  "description": "One NDJSON line of a type-system vector, run by `lake exe amqp-ref`. Vectors are authored from OASIS clauses and the artifacts' worked examples, never produced by running the implementation or the specification: a corpus generated from the thing under test proves only that it equals itself. The value vocabulary below is the corpus's own, independent of either implementation's internal types, so agreement is about the wire format rather than about a shared representation.",
+  "type": "object",
+  "required": ["vector", "kind", "clauses", "bytes"],
+  "additionalProperties": false,
+  "properties": {
+    "vector": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]*$",
+      "description": "Stable identifier, unique within the corpus and quoted in verdict reports."
+    },
+    "kind": {
+      "enum": ["decode", "encode", "reject"],
+      "description": "decode: the octets must decode to `value`, consuming all of them. encode: `value` must encode to exactly `bytes`. reject: the octets must fail to decode with the named condition."
+    },
+    "clauses": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string" },
+      "description": "Clause or figure ids this vector tests, as they appear in the ledger (`ledger/clauses.json`) or the picture register (`ledger/pictures.json`). A vector citing nothing cannot be reviewed, and one citing a figure that does not exist cannot be trusted.",
+      "examples": [["amqp-core-types-v1.0-os.xml#picture.1"]]
+    },
+    "bytes": {
+      "type": "string",
+      "pattern": "^([0-9a-f]{2})+$",
+      "description": "Lowercase hex, no separators. For decode and reject this is the input; for encode it is the required output."
+    },
+    "value": {
+      "$ref": "#/$defs/value",
+      "description": "Required for kind=decode and kind=encode."
+    },
+    "canonical": {
+      "type": "boolean",
+      "description": "kind=decode only: when true, the decoded value must re-encode to exactly `bytes`. Used where the encoding is the narrowest form, so the vector checks specificity as well as round-tripping."
+    },
+    "expectError": {
+      "type": "object",
+      "description": "Required for kind=reject.",
+      "required": ["condition", "endpoint"],
+      "additionalProperties": false,
+      "properties": {
+        "condition": {
+          "type": "string",
+          "pattern": "^amqp:",
+          "description": "The mandated error condition. A malformed encoding is amqp:decode-error; a mandated close for protocol reasons names its own condition."
+        },
+        "endpoint": { "enum": ["connection", "session", "link"] }
+      }
+    },
+    "note": {
+      "type": "string",
+      "description": "Why this vector exists, usually the artifact text it was read from, or the decision it tests."
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "kind": { "enum": ["decode", "encode"] } }, "required": ["kind"] },
+      "then": { "required": ["value"] }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "reject" } }, "required": ["kind"] },
+      "then": { "required": ["expectError"] }
+    },
+    {
+      "if": { "properties": { "kind": { "const": "reject" } }, "required": ["kind"] },
+      "then": { "not": { "required": ["canonical"] } }
+    }
+  ],
+  "$defs": {
+    "value": {
+      "type": "object",
+      "required": ["type"],
+      "description": "The corpus's value vocabulary. Integers are given as JSON numbers with their width named by `type`, so a vector cannot be ambiguous about which encoding width it means.",
+      "properties": {
+        "type": {
+          "enum": ["null", "boolean", "ubyte", "ushort", "uint", "ulong", "byte", "short",
+                   "int", "long", "string", "symbol", "binary", "list", "array", "described"]
+        },
+        "value": {
+          "description": "The payload: a boolean or integer for the scalar types, or a nested value for a described value.",
+          "anyOf": [
+            { "type": "boolean" },
+            { "type": "integer" },
+            { "$ref": "#/$defs/value" }
+          ]
+        },
+        "text": { "type": "string", "description": "The payload for string and symbol." },
+        "hex": { "type": "string", "pattern": "^([0-9a-f]{2})*$", "description": "The payload for binary." },
+        "items": { "type": "array", "items": { "$ref": "#/$defs/value" }, "description": "The elements for list and array." },
+        "constructor": { "type": "string", "pattern": "^[0-9a-f]{2}$", "description": "The element constructor octet for array, which the wire format requires and which a reader must honour." },
+        "descriptor": { "$ref": "#/$defs/value" }
+      }
+    }
+  }
+}

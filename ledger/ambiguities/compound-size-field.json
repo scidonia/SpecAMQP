@@ -2,30 +2,31 @@
  "adopted": "Follows the size field",
  "clauses": [
   "amqp-core-types-v1.0-os.xml#picture.8",
+  "amqp-core-types-v1.0-os.xml#picture.9",
   "amqp-core-types-v1.0-os.xml#picture.19"
  ],
  "consequences": [
-  "The specification fixes size = octets following the size field; the published example byte 0x40 is treated as a documentation defect and is not copied into vectors.",
-  "Vector book-composite encodes the size as 0x3F, and vector book-composite-published-size asserts that the published byte 0x40 is rejected as a decode error, so the disagreement is tested in both directions rather than silently smoothed over.",
-  "A recorded third-party capture of an equivalent composite exchange would settle this from practice; until then the reading rests on the array example, which is exact."
+  "Readers and writers both count from the octet after the size field, and a compound value whose declared size disagrees with what was read is rejected.",
+  "Vectors book-composite-decode/encode carry the published octets; book-composite-wrong-size-rejected raises the size octet by one, so the size check is tested rather than assumed."
  ],
  "evidence": [
-  "The array example (picture.9/picture.19) is arithmetically exact under this reading: 0x25 = 37 = count octet (1) + element constructor (1) + elements (15 + 20). Under the other reading it would be 35, and the depicted second element carries no constructor of its own.",
-  "Under the same reading the compound worked example is inconsistent with itself: its list8 size byte reads 0x40 (64) where the depicted content is count (1) + title (23) + authors array (38) + null isbn (1) = 63 = 0x3F. Every other length byte in that example is exact (0x11 = 17 for \"example:book:list\", 0x15 = 21, 0x0E = 14, 0x13 = 19), and 0x40 is a round value, so the size byte is most likely illustrative rather than computed.",
-  "The layout figure (picture.8) labels the region after the count field as \"count items\", which is consistent with the size covering the count field, though its alignment does not settle the question on its own."
+  "The array example is arithmetically exact: array8 size 0x25 = 37 = count (1) + element constructor (1) + elements (15 + 20).",
+  "The composite example is exact too, once the authors array is sized correctly: list8 size 0x40 = 64 = count (1) + title (2 + 21 = 23) + authors array (39 octets on the wire) + null isbn (1).",
+  "The layout figure (picture.8) places the size before the count and labels what follows as the items."
  ],
  "id": "compound-size-field",
- "open": true,
- "question": "For compound encodings (list8/list32, map8/map32), does the size field count the octets that follow it (count field plus items), and does the array size field likewise count its count field?",
+ "open": false,
+ "question": "For compound and array encodings, does the size field count the octets that follow it \u2014 the count field, the array element constructor, then the items?",
  "readings": [
   {
    "name": "Follows the size field",
-   "statement": "size = count field + items (arrays: count + element constructor + elements), excluding the size field itself."
+   "statement": "size = count field (+ element constructor for arrays) + items, excluding the size field itself."
   },
   {
    "name": "Items only",
-   "statement": "size = items only, excluding both the count field and the size field."
+   "statement": "size = items only, excluding the count field and the size field."
   }
  ],
- "schema_version": 1
+ "schema_version": 1,
+ "withdrawn": "An earlier version of this entry claimed the published example was internally inconsistent, reading its size byte 0x40 against a content count of 63. That claim was wrong: it under-counted the authors array by one octet (39 on the wire, not 38, since the element constructor octet is part of the array). The vector corpus caught the error \u2014 the encoder agreed with the published example octet for octet while the vector disagreed, so the vector was corrected rather than the artifact. The clause is now settled by arithmetic rather than by preference."
 }
