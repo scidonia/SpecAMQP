@@ -41,6 +41,12 @@ BLOCK_TAGS = {"p", "li", "dt", "dd", "th", "td", "pre"}
 # Subtrees that carry no normative statements.
 EXCLUDED_TAGS = {"picture", "revhistory", "acknowledgements"}
 
+# Pictures are excluded from clause extraction because most are sequence
+# diagrams, but some carry formal grammar (`Constructor BNF`) or normative
+# keywords. Those are surfaced for disposition rather than dropped: excluding a
+# subtree is not the same as having decided it carries nothing.
+PICTURE_REVIEW_PATTERN = re.compile(r"%x|\bMUST\b|\bSHOULD\b|\bMAY\b|\bREQUIRED\b|\bOPTIONAL\b")
+
 # Sections excluded by name: in the artifacts these are section *names*, not
 # element tags, so matching on the tag alone silently keeps revision history and
 # acknowledgement boilerplate in the ledger.
@@ -390,6 +396,27 @@ def load_artifacts(directory: Path) -> list[Path]:
     return files
 
 
+def collect_pictures(path: Path, artifact: str) -> list[dict]:
+    """Every picture, with the ones that look normative flagged for review."""
+    pictures: list[dict] = []
+    for index, picture in enumerate(ElementTree.parse(path).getroot().iter("picture"), 1):
+        text = " ".join("".join(picture.itertext()).split())
+        matches = sorted(set(PICTURE_REVIEW_PATTERN.findall(text)))
+        pictures.append(
+            {
+                "ref": f"{artifact}#picture.{index}",
+                "artifact": artifact,
+                "index": index,
+                "title": picture.attrib.get("title", ""),
+                "content_sha256": sha256_text(text),
+                "looks_normative": bool(matches),
+                "matches": matches,
+                "excerpt": text if len(text) <= 160 else text[:157] + "...",
+            }
+        )
+    return pictures
+
+
 def collect_constants(files: list[Path]) -> dict[str, str]:
     """Named constants (`<definition name value>`) across all artifacts.
 
@@ -436,7 +463,26 @@ def generate(artifacts_dir: Path, out_dir: Path) -> dict:
     clauses.sort(key=lambda c: c["ref"].split("#", 1)[0])
     clauses.sort(key=lambda c: (c["artifact"], c["anchor"], c["index"]))
 
+    pictures: list[dict] = []
+    for path in files:
+        pictures.extend(collect_pictures(path, path.name))
+
     out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "pictures.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "note": "Pictures are excluded from clause extraction. Those that contain formal "
+                "grammar or normative keywords must carry a disposition: an exclusion is a "
+                "decision, not a default.",
+                "pictures": pictures,
+            },
+            indent=1,
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     (out_dir / "clauses.json").write_text(
         json.dumps({"schema_version": 1, "clauses": clauses}, indent=1, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -454,7 +500,12 @@ def generate(artifacts_dir: Path, out_dir: Path) -> dict:
         + "\n",
         encoding="utf-8",
     )
-    return {"per_artifact": per_artifact, "clauses": clauses, "lowercase_only": lowercase_only}
+    return {
+        "per_artifact": per_artifact,
+        "clauses": clauses,
+        "lowercase_only": lowercase_only,
+        "pictures": pictures,
+    }
 
 
 def disposition_files(directory: Path) -> list[Path]:
@@ -487,6 +538,25 @@ def load_dispositions(directory: Path) -> tuple[dict[str, dict], list[str]]:
     return merged, problems
 
 
+def check_pictures(report: dict, dispositions: dict[str, dict]) -> list[str]:
+    """Normative-looking pictures must carry a disposition, keyed to their content."""
+    problems: list[str] = []
+    for picture in report.get("pictures", []):
+        if not picture["looks_normative"]:
+            continue
+        entry = dispositions.get(picture["ref"])
+        if entry is None:
+            problems.append(
+                f"{picture['ref']}: picture contains {'/'.join(picture['matches'])} but has no "
+                f"disposition — decide what carries its meaning ({picture['title'] or 'untitled'})"
+            )
+        elif entry["text_sha256"] != picture["content_sha256"]:
+            problems.append(
+                f"{picture['ref']}: STALE picture disposition — the picture text changed"
+            )
+    return problems
+
+
 def coverage(report: dict, dispositions: dict[str, dict]) -> dict:
     clauses = report["clauses"]
     by_kind: dict[str, dict[str, int]] = {}
@@ -508,8 +578,18 @@ def coverage(report: dict, dispositions: dict[str, dict]) -> dict:
         key = entry["disposition"].split(":", 1)[0]
         by_disposition[key] = by_disposition.get(key, 0) + 1
 
+    pictures = report.get("pictures", [])
+    reviewable = [p for p in pictures if p["looks_normative"]]
+
     return {
         "schema_version": 1,
+        "pictures": {
+            "total": len(pictures),
+            "reviewable": len(reviewable),
+            "dispositioned": sum(1 for p in reviewable if p["ref"] in dispositions),
+            "note": "Pictures are excluded from clause extraction; those containing formal grammar "
+            "or normative keywords require a disposition, because an exclusion is a decision.",
+        },
         "per_artifact": report["per_artifact"],
         "by_kind": dict(sorted(by_kind.items())),
         "by_disposition": dict(sorted(by_disposition.items())),
@@ -529,21 +609,28 @@ def coverage(report: dict, dispositions: dict[str, dict]) -> dict:
 
 
 def check_dispositions(report: dict, dispositions: dict[str, dict]) -> list[str]:
+    """Validate dispositions against the ledger, for clauses and pictures alike.
+
+    A disposition is keyed to the digest of whatever it decided about: a clause's
+    sentence, or a picture's content. Both live in one identity space, so a
+    decision cannot attach to something that does not exist, and cannot survive a
+    change to the text it was made about.
+    """
     problems: list[str] = []
-    known = {clause["ref"]: clause for clause in report["clauses"]}
+    known = {clause["ref"]: clause["text_sha256"] for clause in report["clauses"]}
+    known.update({picture["ref"]: picture["content_sha256"] for picture in report.get("pictures", [])})
     stale = 0
     for ref, entry in sorted(dispositions.items()):
-        clause = known.get(ref)
-        if clause is None:
-            problems.append(f"{entry['file']}: {ref}: no such clause in the ledger")
+        digest = known.get(ref)
+        if digest is None:
+            problems.append(f"{entry['file']}: {ref}: no such clause or picture in the ledger")
             continue
-        if entry["text_sha256"] != clause["text_sha256"]:
+        if entry["text_sha256"] != digest:
             stale += 1
             problems.append(
-                f"{entry['file']}: {ref}: STALE disposition — the clause text changed\n"
+                f"{entry['file']}: {ref}: STALE disposition — the text it decides about changed\n"
                 f"    disposition recorded for: {entry['text_sha256']}\n"
-                f"    ledger now has:            {clause['text_sha256']}\n"
-                f"    ledger text: {clause['text']}"
+                f"    ledger now has:            {digest}"
             )
     if stale:
         problems.insert(
@@ -628,6 +715,7 @@ def command_check(args: argparse.Namespace) -> int:
         json.dumps(summary, indent=1, sort_keys=True) + "\n", encoding="utf-8"
     )
     problems.extend(check_dispositions(report, dispositions))
+    problems.extend(check_pictures(report, dispositions))
     repository_artifacts = (Path(__file__).resolve().parent.parent / "spec" / "oasis").resolve()
     problems.extend(
         check_reconciliation(

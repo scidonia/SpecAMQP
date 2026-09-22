@@ -21,6 +21,10 @@ NOT exceed <xref name="LIMIT"/> frames in one batch.</p>
      peer A  MUST      MUST
      peer B  MUST      MUST
     </picture>
+    <picture title="Planted BNF">
+      constructor = format-code / %x00 descriptor constructor
+        format-code = fixed / variable / compound / array
+    </picture>
   </section>
 
   <section name="beta" label="lowercase prose is not normative">

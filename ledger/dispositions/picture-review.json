@@ -1,0 +1,45 @@
+{
+ "conventions": {
+  "formalized:": "A Lean declaration path that carries this picture's meaning (the same commitment form as for clauses).",
+  "informative": "The picture illustrates clauses that are formalized elsewhere, and adds no obligation of its own."
+ },
+ "dispositions": {
+  "amqp-core-messaging-v1.0-os.xml#picture.4": {
+   "clause_text": "[picture] untitled: TRANSFER(delivery-id=1, ----------> ** Append message data not ** delivery-tag=2, ** seen previously to delivery ** (1) state=Received(3,0), ** state. ** res...",
+   "disposition": "formalized:Spec.Message.resumedTransfer",
+   "kind": "picture",
+   "note": "Normative: the transfer carries resume=true and the picture defines what the receiver must do for each state value \u2014 null (resume from section 0, ignoring data already received), Received(section, offset) (start at the given point), Received(3,0). Two receiver obligations are stated as MUST.",
+   "text_sha256": "1806720be2de4a8a4c021343cbfb61ffc03669901d9c80a88a1e0ee6a94b91db"
+  },
+  "amqp-core-messaging-v1.0-os.xml#picture.7": {
+   "clause_text": "[picture] untitled: TRANSFER(delivery-id=4, ----------> ** Append message data not ** delivery-tag=6, ** seen previously to delivery ** (1) state=Received(2,0), ** state. ** res...",
+   "disposition": "formalized:Spec.Message.resumedTransfer",
+   "kind": "picture",
+   "note": "Normative: the same resume rule for a payload continuing mid-section (state anywhere between Received(1,150) and Received(2,0) inclusive); the MUST to ignore data up to the first unreceived position is stated here rather than in the surrounding prose.",
+   "text_sha256": "d0bc5a6c9445c4d1968ad8251fa94c5dae1901a2d4f6102426ec492b2a02703b"
+  },
+  "amqp-core-security-v1.0-os.xml#picture.5": {
+   "clause_text": "[picture] SASL Frame: type: 0x01 - SASL frame +0 +1 +2 +3 +-----------------------------------+ -. 0 | SIZE | | +-----------------------------------+ |---> Frame Header 4 | DOFF |...",
+   "disposition": "formalized:Spec.Wire.saslFrame",
+   "kind": "picture",
+   "note": "Normative layout: a SASL frame uses the same 8-byte frame header with type 0x01, and its extended header is ignored exactly as for AMQP frames. The frame-type octet is generated from the artifact table, not transcribed.",
+   "text_sha256": "5b772750d45b0cf6dc787dfd3608cfa24d65adfee0f9b9646cc72451c08ffea1"
+  },
+  "amqp-core-transport-v1.0-os.xml#picture.14": {
+   "clause_text": "[picture] Frame Layout: REQUIRED OPTIONAL OPTIONAL +--------------+-----------------+------------+ | frame header | extended header | frame body | +--------------+-----------------+...",
+   "disposition": "formalized:Spec.Wire.frameLayout",
+   "kind": "picture",
+   "note": "Normative layout: the frame header is fixed width while the extended header and frame body are variable; the REQUIRED/OPTIONAL lanes are the same distinction the framing clauses state in prose.",
+   "text_sha256": "b8112c6e9cd68e24ab3009b284427b0b058f65b1dd2153e4f7be34140e587a44"
+  },
+  "amqp-core-types-v1.0-os.xml#picture.3": {
+   "clause_text": "[picture] Constructor BNF: constructor = format-code / %x00 descriptor constructor format-code = fixed / variable / compound / array fixed = empty / fixed-one / fixed-two / fixed-four ...",
+   "disposition": "formalized:Spec.Value.Constructor",
+   "kind": "picture",
+   "note": "Normative: this is the formal constructor grammar \u2014 the format-code ranges, the %x00 descriptor prefix, and the reserved octets. It is the specification's own normative statement of which octets are format codes, so the codec's accepted set is checked against these ranges as a theorem rather than asserted.",
+   "text_sha256": "428149a68550cdb5125461d030d6cc6513482c4887ceacd016647356b381c332"
+  }
+ },
+ "schema_version": 1,
+ "scope": "Pictures whose content is normative rather than illustrative. Every picture is listed in ledger/pictures.json; those containing formal grammar or normative keywords are flagged reviewable and must carry a decision, so excluding a subtree is an explicit act rather than a default."
+}

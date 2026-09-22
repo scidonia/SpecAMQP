@@ -123,19 +123,51 @@ PY
 note "planted controls classified as claimed"
 
 # 4. Disposition gates --------------------------------------------------------
-python3 - "$tmp/planted/clauses.json" "$tmp/planted-dispositions" <<'PY' || exit 1
+python3 - "$tmp/planted/clauses.json" "$tmp/planted/pictures.json" "$tmp/planted-dispositions" <<'PY' || exit 1
 import json, pathlib, sys
 clauses = json.loads(pathlib.Path(sys.argv[1]).read_text())["clauses"]
-out = pathlib.Path(sys.argv[2]); out.mkdir(parents=True, exist_ok=True)
+pictures = json.loads(pathlib.Path(sys.argv[2]).read_text())["pictures"]
+out = pathlib.Path(sys.argv[3]); out.mkdir(parents=True, exist_ok=True)
 target = next(c for c in clauses if c["kind"] == "MUST")
+reviewable = [p for p in pictures if p["looks_normative"]]
+if not reviewable:
+    print("  planted control: the BNF picture was not flagged for review")
+    raise SystemExit(1)
+picture = reviewable[0]
 
-def write(name, ref, digest):
-    (out / name).write_text(json.dumps({"schema_version": 1, "dispositions": {
-        ref: {"disposition": "formalized:Spec.Planted.thing", "text_sha256": digest}}}) + "\n")
+def clause_disposition(digest):
+    return {target["ref"]: {"disposition": "formalized:Spec.Planted.thing", "text_sha256": digest}}
 
-write("good.json", target["ref"], target["text_sha256"])
-write("stale.json", target["ref"], "0" * 64)
-write("unknown.json", "amqp-core-planted-v1.0-os.xml#amqp:planted/section:nonexistent.1", target["text_sha256"])
+def all_pictures(overrides=None, omit=()):
+    overrides = overrides or {}
+    return {
+        p["ref"]: {
+            "disposition": "formalized:Spec.Planted.picture",
+            "text_sha256": overrides.get(p["ref"], p["content_sha256"]),
+        }
+        for p in reviewable
+        if p["ref"] not in omit
+    }
+
+def write(name, entries):
+    (out / name).write_text(json.dumps({"schema_version": 1, "dispositions": entries}) + "\n")
+
+write("good.json", {**clause_disposition(target["text_sha256"]), **all_pictures()})
+write("stale.json", {**clause_disposition("0" * 64), **all_pictures()})
+write("unknown.json", {
+    **clause_disposition(target["text_sha256"]),
+    **all_pictures(),
+    "amqp-core-planted-v1.0-os.xml#amqp:planted/section:nonexistent.1":
+        {"disposition": "informative", "text_sha256": target["text_sha256"]},
+})
+write("picture-missing.json", {
+    **clause_disposition(target["text_sha256"]),
+    **all_pictures(omit={picture["ref"]}),
+})
+write("picture-stale.json", {
+    **clause_disposition(target["text_sha256"]),
+    **all_pictures(overrides={picture["ref"]: "0" * 64}),
+})
 PY
 run_case() { # name expected-exit grep-pattern
   local name="$1" expected="$2" pattern="$3"
@@ -155,6 +187,8 @@ run_case() { # name expected-exit grep-pattern
 run_case good 0 "check passed"
 run_case stale 1 "STALE disposition"
 run_case unknown 1 "no such clause"
+run_case picture-missing 1 "has no disposition"
+run_case picture-stale 1 "STALE picture disposition"
 
 # 5. The repository's own ledger ---------------------------------------------
 python3 "$ledger" check >"$tmp/repo.log" 2>&1 ||

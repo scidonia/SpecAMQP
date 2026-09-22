@@ -1,17 +1,17 @@
 {
  "by_disposition": {
   "environment": 6,
-  "formalized": 31,
+  "formalized": 37,
   "informative": 1,
   "out-of-scope": 1
  },
  "by_kind": {
   "MAY": {
-   "dispositioned": 10,
+   "dispositioned": 11,
    "total": 88
   },
   "MUST": {
-   "dispositioned": 19,
+   "dispositioned": 23,
    "total": 181
   },
   "MUST NOT": {
@@ -23,7 +23,7 @@
    "total": 7
   },
   "REQUIRED": {
-   "dispositioned": 1,
+   "dispositioned": 2,
    "total": 4
   },
   "SHOULD": {
@@ -36,7 +36,7 @@
   }
  },
  "lowercase_keyword_statements": 0,
- "must_class_undispositioned": 209,
+ "must_class_undispositioned": 205,
  "must_class_undispositioned_by_anchor": {
   "amqp:messaging/section:addressing": [
    "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing.1",
@@ -386,14 +386,6 @@
    "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions/doc:session-flow-control.4",
    "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions/doc:session-flow-control.7",
    "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions/doc:session-flow-control.8"
-  ],
-  "amqp:types/section:composite-type-representation": [
-   "amqp-core-types-v1.0-os.xml#amqp:types/section:composite-type-representation.2",
-   "amqp-core-types-v1.0-os.xml#amqp:types/section:composite-type-representation.3"
-  ],
-  "amqp:types/section:primitive-type-definitions/type:map": [
-   "amqp-core-types-v1.0-os.xml#amqp:types/section:primitive-type-definitions/type:map.1",
-   "amqp-core-types-v1.0-os.xml#amqp:types/section:primitive-type-definitions/type:map.2"
   ]
  },
  "per_artifact": {
@@ -648,6 +640,12 @@
    "sha256": "2ccf30b2c55924aaa5291cc34430a91b75c85d11d34bc008c36fc7ca7574d28c",
    "statements": 6
   }
+ },
+ "pictures": {
+  "dispositioned": 5,
+  "note": "Pictures are excluded from clause extraction; those containing formal grammar or normative keywords require a disposition, because an exclusion is a decision.",
+  "reviewable": 5,
+  "total": 104
  },
  "schema_version": 1,
  "totals": {

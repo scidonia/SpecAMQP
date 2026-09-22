@@ -1,0 +1,25 @@
+{
+ "adopted": "Strict default",
+ "clauses": [
+  "amqp-core-types-v1.0-os.xml#amqp:types/section:primitive-type-definitions/type:map.2"
+ ],
+ "consequences": [
+  "Value equality on maps compares sequences, so two encodings that differ only in pair order are different values.",
+  "A reader that reorders a map it does not interpret (for example the `fields` map) changes the value it forwards, which the specification must state explicitly when the message-sections milestone (S5) reaches annotations."
+ ],
+ "evidence": "Part 1 states the requirement without listing exceptions, and Part 3 gives no exemption for its map-typed sections. The specification therefore models maps as ordered sequences and records the per-section question here rather than inventing an exemption.",
+ "id": "map-ordering",
+ "open": true,
+ "question": "Part 1 requires maps to be treated as ordered unless \"known to be otherwise\". What makes a map-typed field known to be order-insensitive?",
+ "readings": [
+  {
+   "name": "Strict default",
+   "statement": "Every map is a sequence of pairs and order matters, except where another clause or a field definition says otherwise."
+  },
+  {
+   "name": "Annotation fields unordered",
+   "statement": "The Parts that define map-typed fields (delivery-annotations, message-annotations, application-properties, footer, fields) are order-insensitive by construction, since a symbolic key identifies a value."
+  }
+ ],
+ "schema_version": 1
+}

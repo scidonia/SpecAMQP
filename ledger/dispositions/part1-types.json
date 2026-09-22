@@ -1,0 +1,56 @@
+{
+ "conventions": {
+  "formalized:": "A Lean declaration path that carries this clause's meaning. `Spec.Value` holds the grammar; the value domain and codec that the remaining dispositions name land with the rest of S1.",
+  "informative": "The keyword is not a conformance keyword (for example it is used as an adjective)."
+ },
+ "design_consequences": [
+  "Map ordering fixes the value domain: the map case is a sequence of key-value pairs, not a set, so map equality is order-sensitive except where a clause says otherwise.",
+  "Trailing-null omission makes decoding and encoding asymmetric: a reader accepts a shorter composite list than the type declares, while a writer may truncate. Both are latitude, so the conformance relation admits either."
+ ],
+ "dispositions": {
+  "amqp-core-types-v1.0-os.xml#amqp:types/section:composite-type-representation.1": {
+   "clause_text": "When the trailing elements of the list representation are null, they MAY be omitted.",
+   "disposition": "formalized:Spec.Value.CompoundTrailingNulls",
+   "kind": "MAY",
+   "note": "Latitude rather than an obligation: a writer may omit trailing null fields, so a reader must accept a shorter list than the type declares (the missing fields are null) and a writer may or may not truncate. Both readings of the encoding are admitted; the decoding is not.",
+   "text_sha256": "33e5df4fe39a1b552c6bacb4c5dd2572662496e0cdd80a3a1b64b21953788ab7"
+  },
+  "amqp-core-types-v1.0-os.xml#amqp:types/section:composite-type-representation.2": {
+   "clause_text": "Note that a null value and a zero-length array (with a correct type for its elements) both describe an absence of a value and MUST be treated as semantically identical.",
+   "disposition": "formalized:Spec.Value.NullAbsence",
+   "kind": "MUST",
+   "note": "Null and a zero-length array with the element type are the same absence of a value. This fixes the specification's own equality on those two encodings, which is why it is stated as a semantic identity rather than a decode rule.",
+   "text_sha256": "3f852cb7656e61c4f02e9bfa280f4b459e089a7bcf03f8a9017c10525bb31d0c"
+  },
+  "amqp-core-types-v1.0-os.xml#amqp:types/section:composite-type-representation.3": {
+   "clause_text": "A field which is defined as both multiple and mandatory MUST contain at least one value (i.e. for such a field both null and an array with no entries are invalid).",
+   "disposition": "formalized:Spec.Value.MultipleMandatory",
+   "kind": "MUST",
+   "note": "A check on declared types before any encoding is considered: for a field that is both multiple and mandatory, null and the empty array are both invalid. The generated field table carries the multiple and mandatory flags, so the check is stated over that table rather than over hand-written lists.",
+   "text_sha256": "675774f9c45167eea07ac413203e18760cee7f439cf373b3a3f33d66a0dfe34e"
+  },
+  "amqp-core-types-v1.0-os.xml#amqp:types/section:encodings.1": {
+   "clause_text": "All array encodings consist of a size followed by a count followed by an element constructor followed by count elements of encoded data formated as REQUIRED by the element constructor:",
+   "disposition": "formalized:Spec.Value.ArrayEncoding",
+   "kind": "REQUIRED",
+   "note": "The sentence is structural and normative: array encodings are size, count, element constructor, then count elements in the element constructor's form. Its keyword is adjectival (\"formated as REQUIRED by the element constructor\"), so the ledger kind overstates it; the disposition records what carries the meaning, and the note records the misclassification.",
+   "text_sha256": "2a82273b0f1f114f08a97d682fd8729e4518925a9dd3f381345ff4d777003181"
+  },
+  "amqp-core-types-v1.0-os.xml#amqp:types/section:primitive-type-definitions/type:map.1": {
+   "clause_text": "Map encodings MUST contain an even number of items (i.e. an equal number of keys and values).",
+   "disposition": "formalized:Spec.Value.MapEncoding",
+   "kind": "MUST",
+   "note": "An odd number of items is a decode error: the map reader consumes key-value pairs, so a trailing key with no value cannot be represented at all.",
+   "text_sha256": "76ee953c6c5d7366525472d7e6a40a006b69d537b0bcecb07cb2138a649c1bb4"
+  },
+  "amqp-core-types-v1.0-os.xml#amqp:types/section:primitive-type-definitions/type:map.2": {
+   "clause_text": "Unless known to be otherwise, maps MUST be considered to be ordered, that is, the order of the key-value pairs is semantically important and two maps which are different only in the order in which their key-value pairs are encoded are not equal.",
+   "disposition": "formalized:Spec.Value.MapOrdering",
+   "kind": "MUST",
+   "note": "Map equality is order-sensitive by default, which fixes the representation of the map case in the value domain: a map is a sequence of pairs, not a set. The latitude in \"unless known to be otherwise\" is recorded in ledger/ambiguities/map-ordering.json.",
+   "text_sha256": "17ac6fa53d206a7278c7aa2c535b753be0e85f191d082f1dde1b55f45e63a1d9"
+  }
+ },
+ "schema_version": 1,
+ "scope": "Part 1 (Types): the constructor grammar, the primitive type definitions, and the rules that constrain how composite values are encoded."
+}

@@ -1,0 +1,1057 @@
+{
+ "note": "Pictures are excluded from clause extraction. Those that contain formal grammar or normative keywords must carry a disposition: an exclusion is a decision, not a default.",
+ "pictures": [
+  {
+   "artifact": "amqp-core-messaging-v1.0-os.xml",
+   "content_sha256": "10fa3c951226fd0e73fdd5ed515c190c00ae0e402556c94a01b7f033a00ff308",
+   "excerpt": "Bare Message | .---------------------+--------------------. | | +--------+-------------+-------------+------------+--------------+--------------+--------+ | ...",
+   "index": 1,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-messaging-v1.0-os.xml#picture.1",
+   "title": ""
+  },
+  {
+   "artifact": "amqp-core-messaging-v1.0-os.xml",
+   "content_sha256": "dea2e774ef8c1ecae519442e5b5011f0e376dc3e60d04e3eb4e6b9241e71258a",
+   "excerpt": "+------------+ +->| AVAILABLE | | +------------+ | | | | terminal outcome: | | RELEASED/MODIFIED | | TRANSFER (acquiring) | | | | | \\|/ | +------------+ +--|...",
+   "index": 2,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-messaging-v1.0-os.xml#picture.2",
+   "title": "Message State Transitions"
+  },
+  {
+   "artifact": "amqp-core-messaging-v1.0-os.xml",
+   "content_sha256": "f4c083ee1bf981ca433117b6d9a3d9cea49ebf51539b00939c9e36313d043b71",
+   "excerpt": "Peer Partner ======================================================================= ATTACH(name=N, handle=1, --+ +-- ATTACH(name=N, handle=2, role=sender, \\...",
+   "index": 3,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-messaging-v1.0-os.xml#picture.3",
+   "title": ""
+  },
+  {
+   "artifact": "amqp-core-messaging-v1.0-os.xml",
+   "content_sha256": "1806720be2de4a8a4c021343cbfb61ffc03669901d9c80a88a1e0ee6a94b91db",
+   "excerpt": "TRANSFER(delivery-id=1, ----------> ** Append message data not ** delivery-tag=2, ** seen previously to delivery ** (1) state=Received(3,0), ** state. ** res...",
+   "index": 4,
+   "looks_normative": true,
+   "matches": [
+    "MUST"
+   ],
+   "ref": "amqp-core-messaging-v1.0-os.xml#picture.4",
+   "title": ""
+  },
+  {
+   "artifact": "amqp-core-messaging-v1.0-os.xml",
+   "content_sha256": "6a01b5f5bfa8035ffcee6e693f5fdb0367338dd93dc611b5d61e8b55ddc46e69",
+   "excerpt": "TRANSFER(delivery-id=2, ----------> ** Processes confirmation that ** delivery-tag=3, ** was accepted, and settles. ** settled=true, more=false, state=Accept...",
+   "index": 5,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-messaging-v1.0-os.xml#picture.5",
+   "title": ""
+  },
+  {
+   "artifact": "amqp-core-messaging-v1.0-os.xml",
+   "content_sha256": "c9ba260143689be47ba661d616a523409645ec998af400b6524f5865e4ca8c5a",
+   "excerpt": "TRANSFER(delivery-id=3, ----------> ** Processes in the same way ** delivery-tag=4, ** as we be done for a non- ** (1) state=null, ** resumed delivery. ** re...",
+   "index": 6,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-messaging-v1.0-os.xml#picture.6",
+   "title": ""
+  },
+  {
+   "artifact": "amqp-core-messaging-v1.0-os.xml",
+   "content_sha256": "d0bc5a6c9445c4d1968ad8251fa94c5dae1901a2d4f6102426ec492b2a02703b",
+   "excerpt": "TRANSFER(delivery-id=4, ----------> ** Append message data not ** delivery-tag=6, ** seen previously to delivery ** (1) state=Received(2,0), ** state. ** res...",
+   "index": 7,
+   "looks_normative": true,
+   "matches": [
+    "MUST"
+   ],
+   "ref": "amqp-core-messaging-v1.0-os.xml#picture.7",
+   "title": ""
+  },
+  {
+   "artifact": "amqp-core-messaging-v1.0-os.xml",
+   "content_sha256": "f4e047622711024933780b6d328cb04fdee7581f2b4bcf85e8066f781f8ac9c5",
+   "excerpt": "TRANSFER(delivery-id=5, ----------> ** Discard any state relating ** delivery-tag=7, ** to the message delivery. ** resume=true, aborted=true)",
+   "index": 8,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-messaging-v1.0-os.xml#picture.8",
+   "title": ""
+  },
+  {
+   "artifact": "amqp-core-messaging-v1.0-os.xml",
+   "content_sha256": "70f925acb451bb8d9df766c0aff7f2f9efe803d6b8d658df6500d9270048e653",
+   "excerpt": "TRANSFER(delivery-id=6, ----------> ** Processes confirmation that ** delivery-tag=8, ** was accepted, and settles. ** settled=true, more=false, state=Accept...",
+   "index": 9,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-messaging-v1.0-os.xml#picture.9",
+   "title": ""
+  },
+  {
+   "artifact": "amqp-core-messaging-v1.0-os.xml",
+   "content_sha256": "13dd2890bb19467a60e3af44ee3b5885751aae7e8617c26331369fad74dbc65b",
+   "excerpt": "TRANSFER(delivery-id=7, ----------> ** Discard any state relating ** delivery-tag=9, ** to the message delivery. ** resume=true, aborted=true)",
+   "index": 10,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-messaging-v1.0-os.xml#picture.10",
+   "title": ""
+  },
+  {
+   "artifact": "amqp-core-messaging-v1.0-os.xml",
+   "content_sha256": "7ad0107da4f1e93dbe3a57c4f06a5dc2e30701bcb9e85e183884aacf19432b08",
+   "excerpt": "TRANSFER(delivery-id=8, ----------> ** Discard any state relating ** delivery-tag=11, ** to the message delivery. ** resume=true, aborted=true)",
+   "index": 11,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-messaging-v1.0-os.xml#picture.11",
+   "title": ""
+  },
+  {
+   "artifact": "amqp-core-messaging-v1.0-os.xml",
+   "content_sha256": "0e2860431303f0ea0546597baa91937653eab5f17986afc6d93b36e2689837b6",
+   "excerpt": "TRANSFER(delivery-id=9, ----------> ** Locally settle the delivery ** delivery-tag=12, settled=true, resume=true)",
+   "index": 12,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-messaging-v1.0-os.xml#picture.12",
+   "title": ""
+  },
+  {
+   "artifact": "amqp-core-messaging-v1.0-os.xml",
+   "content_sha256": "8758262cf9ff83604687493f0a90e689923f49015e2fd26000852b9d292a13be",
+   "excerpt": "TRANSFER(delivery-id=10 ----------> ** Update any state affected ** delivery-tag=13, ** by the actual outcome, then ** settled=false, ** settle the delivery ...",
+   "index": 13,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-messaging-v1.0-os.xml#picture.13",
+   "title": ""
+  },
+  {
+   "artifact": "amqp-core-messaging-v1.0-os.xml",
+   "content_sha256": "3143a8b0fd545d33681f842477a148d1b264c759a6cdc8016693f3f35d7600f2",
+   "excerpt": "TRANSFER(delivery-id=11, ----------> ** Discard any state relating ** delivery-tag=14, ** to the message delivery. ** resume=true, aborted=true)",
+   "index": 14,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-messaging-v1.0-os.xml#picture.14",
+   "title": ""
+  },
+  {
+   "artifact": "amqp-core-security-v1.0-os.xml",
+   "content_sha256": "e3582fb63f59408d26398f5e7c0810c8fb1e6b09d6a3bc26807bd3ff85ec11c2",
+   "excerpt": "4 OCTETS 1 OCTET 1 OCTET 1 OCTET 1 OCTET +----------+---------+---------+---------+----------+ | \"AMQP\" | %d2 | major | minor | revision | +----------+------...",
+   "index": 1,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-security-v1.0-os.xml#picture.1",
+   "title": "Protocol Header for TLS Security Layer"
+  },
+  {
+   "artifact": "amqp-core-security-v1.0-os.xml",
+   "content_sha256": "9e58b023d5777e9e392f2f1a7b3e7d024568caaebf84f8a05cd9147e741db59c",
+   "excerpt": "TCP Client TCP Server ========================================= AMQP%d2.1.0.0 ---------> <--------- AMQP%d2.1.0.0 : : <TLS negotiation> : : AMQP%d0.1.0.0 ---...",
+   "index": 2,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-security-v1.0-os.xml#picture.2",
+   "title": "Establishing a TLS Security Layer"
+  },
+  {
+   "artifact": "amqp-core-security-v1.0-os.xml",
+   "content_sha256": "32c463b60e0478cc390e52ed52ea7d5b840e8850a563580f167d58c19e92c7f1",
+   "excerpt": "4 OCTETS 1 OCTET 1 OCTET 1 OCTET 1 OCTET +----------+---------+---------+---------+----------+ | \"AMQP\" | %d3 | major | minor | revision | +----------+------...",
+   "index": 3,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-security-v1.0-os.xml#picture.3",
+   "title": "Protocol Header for SASL Security Layer"
+  },
+  {
+   "artifact": "amqp-core-security-v1.0-os.xml",
+   "content_sha256": "41e9f4a28b8dacd93a8cdb54d6d785a9da18a274fc3f664bea138a2853df68ec",
+   "excerpt": "TCP Client TCP Server ========================================= AMQP%d3.1.0.0 ---------> <--------- AMQP%d3.1.0.0 : : <SASL negotiation> : : AMQP%d0.1.0.0 --...",
+   "index": 4,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-security-v1.0-os.xml#picture.4",
+   "title": "Establishing a SASL Security Layer"
+  },
+  {
+   "artifact": "amqp-core-security-v1.0-os.xml",
+   "content_sha256": "5b772750d45b0cf6dc787dfd3608cfa24d65adfee0f9b9646cc72451c08ffea1",
+   "excerpt": "type: 0x01 - SASL frame +0 +1 +2 +3 +-----------------------------------+ -. 0 | SIZE | | +-----------------------------------+ |---> Frame Header 4 | DOFF |...",
+   "index": 5,
+   "looks_normative": true,
+   "matches": [
+    "SHOULD"
+   ],
+   "ref": "amqp-core-security-v1.0-os.xml#picture.5",
+   "title": "SASL Frame"
+  },
+  {
+   "artifact": "amqp-core-security-v1.0-os.xml",
+   "content_sha256": "c81526703ace2f9d1cd7f5c43ddf6b54bb0807a0cdb5e8db6e85a97250002b8b",
+   "excerpt": "SASL Client SASL Server ================================ <-- SASL-MECHANISMS SASL-INIT --> ... <-- SASL-CHALLENGE * SASL-RESPONSE --> ... <-- SASL-OUTCOME --...",
+   "index": 6,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-security-v1.0-os.xml#picture.6",
+   "title": "SASL Exchange"
+  },
+  {
+   "artifact": "amqp-core-transactions-v1.0-os.xml",
+   "content_sha256": "e1138a83b0d619bce5b2e4ca1d37549ce1b6b92f111db4346a9851965a1343a8",
+   "excerpt": "Transaction Controller Transactional Resource =============================================================================== ATTACH(name=txn-ctl, --------->...",
+   "index": 1,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transactions-v1.0-os.xml#picture.1",
+   "title": "Declaring a Transaction"
+  },
+  {
+   "artifact": "amqp-core-transactions-v1.0-os.xml",
+   "content_sha256": "0b7cde616749e3e08ee56a217eb3c951cf9d84d761efa43e4a1606a9c85c868c",
+   "excerpt": "Transaction Controller Transactional Resource =============================================================================== TRANSFER(delivery-id=0, ...) --...",
+   "index": 2,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transactions-v1.0-os.xml#picture.2",
+   "title": "Discharging a Transaction"
+  },
+  {
+   "artifact": "amqp-core-transactions-v1.0-os.xml",
+   "content_sha256": "66b6973f7ceeabd31947ca6686771a0aff49575cb3593e2e5b677b9e1f7b7b22",
+   "excerpt": "Transaction Controller Transactional Resource =============================================================================== TRANSFER(handle=0, ---------> d...",
+   "index": 3,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transactions-v1.0-os.xml#picture.3",
+   "title": "Transactional Publish"
+  },
+  {
+   "artifact": "amqp-core-transactions-v1.0-os.xml",
+   "content_sha256": "a480c86835b57d5da80fbfdd1dba8b14f48168a6c4f71e3d3fcea9737d0a3d13",
+   "excerpt": "Transaction Controller Transactional Resource =============================================================================== TRANSFER(handle=0, ---------> d...",
+   "index": 4,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transactions-v1.0-os.xml#picture.4",
+   "title": "Transactional Receive"
+  },
+  {
+   "artifact": "amqp-core-transactions-v1.0-os.xml",
+   "content_sha256": "977223299457def773871f2f22f55c5c67f0e46adefc1bd8a0e7438bfab025b1",
+   "excerpt": "Transaction Controller Transactional Resource =============================================================================== TRANSFER(handle=0, ---------> d...",
+   "index": 5,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transactions-v1.0-os.xml#picture.5",
+   "title": "Transactional Acquisition"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "6cd59b6553e9fa6f7a6f8137616565a31d684fac88e28dafff23d26520e4e03a",
+   "excerpt": "+------------+ +------------+ / Node A \\ / Node B \\ +----------------+ +--filter +----------------+ | | / | | | MSG_3 <MSG_1> | _/ _ | MSG_1 | | |(_)--------...",
+   "index": 1,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.1",
+   "title": "Message Transfer between Nodes"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "fcc322cf57c676148d9394ff5dd46293d78e043281c73176d479f800ce1b22b4",
+   "excerpt": "+---------------+ +----------+ | <<Container>> | 1..1 0..n | <<Node>> | |---------------|<>-------------------->|----------| | container-id | | name | +-----...",
+   "index": 2,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.2",
+   "title": "Class Diagram of Concrete Containers and Nodes"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "c1d6b02178a06901eb2b2b89b385d694c86cea2ae59605d3906aab8d2c386cde",
+   "excerpt": "Client App Broker +-------------+ +-------------+ | |################################| | | +---+ | | +---+ | | | C | | Connection | | Q | | | +-+-+ | | +-+-+...",
+   "index": 3,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.3",
+   "title": "An AMQP Connection"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "3a7aab1abab393008c86ca1f51d9efc1df397e6a331042d8b5bf64141b7ddb28",
+   "excerpt": "Client App Broker +-------------+ +-------------+ | |################################| | | +---+ |--------------------------------| +---+ | | | C | | Session...",
+   "index": 4,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.4",
+   "title": "An AMQP Session"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "e9f6125d432988d757b0fe958f11945ce6fcad2f62678393edc3d9058abc353f",
+   "excerpt": "Session<------+ +------>Session (ICH=1, OCH=1) | | (ICH=1, OCH=1) \\|/ \\|/ Session<--> Connection <---------> Connection <-->Session (ICH=2, OCH=3) /|\\ /|\\ (I...",
+   "index": 5,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.5",
+   "title": "Session & Connection Endpoints"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "4c54ad471f25ad45dec7aa0d3ec5e0835b8713866ee919b8453bd9f1d813c154",
+   "excerpt": "Client App Broker +-------------+ +-------------+ | |################################| | | +---+ |--------------------------------| +---+ | | | C |O<========...",
+   "index": 6,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.6",
+   "title": "An AMQP Link"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "9638ccc6acfc73b1dfb69ffce947eb8054bfdb4b9bb910887765df63d65332ed",
+   "excerpt": "Client App Broker +-------------+ +-------------+ | | | | | +---+ | | +---+ | | | C |O<=| | | |=O| Q | | | +---+| | | |+---+ | | | | | | | +--------|----+ +-...",
+   "index": 7,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.7",
+   "title": "Connection Loss"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "e5b129012c2689634a9476e05671aae79b0533f3fca695484d0b6fd1b4f78ff1",
+   "excerpt": "Client App Broker +-------------+ +-------------+ | |################################| | | +---+ |--------------------------------| +---+ | | | C |O<========...",
+   "index": 8,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.8",
+   "title": "Link Recovery"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "bf284ffbf90b91d16f64fedcb1fbef878909db67c1ae3b9fdfd5d84b8c37f95a",
+   "excerpt": "+-------------+ | Link | Message Transport +-------------+ (Node to Node) | name | | source | | target | | timeout | +-------------+ /|\\ 0..n | | | \\|/ 0..1 ...",
+   "index": 9,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.9",
+   "title": "Class Diagram of Communication Endpoints"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "da4e1a2660c63ab5d65421f1be7a2c618e0f9a94cabeb09db2ae57d895f2a5db",
+   "excerpt": "Frame Connection Session Link ======================================== open H begin I H attach I H flow I H transfer I H disposition I H detach I H end I H c...",
+   "index": 10,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.10",
+   "title": "Frame Dispatch Table"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "0e1b6a81fb0a2fca0ad3dd8c10a50c1e64c566139c83d7a5b73d0b59e9d12213",
+   "excerpt": "4 OCTETS 1 OCTET 1 OCTET 1 OCTET 1 OCTET +----------+---------+---------+---------+----------+ | \"AMQP\" | %d0 | major | minor | revision | +----------+------...",
+   "index": 11,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.11",
+   "title": "Protocol Header Layout"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "055cb0cc763023083b3e77301a83dcfc6e54dfbbc2acda27fa82d18015cf74eb",
+   "excerpt": "TCP Client TCP Server ====================================================== AMQP%d0.1.0.0 -------------> <------------- AMQP%d0.1.0.0 (1) ... *proceed* AMQP...",
+   "index": 12,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.12",
+   "title": "Version Negotiation Examples"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "31373f0e1bd62e4888486362e087b0bff46d37a334bf11566435eadfa33f184f",
+   "excerpt": "TCP Client TCP Server ====================================================== AMQP%d0.1.0.0 -------------> <------------- AMQP%d3.1.0.0 *TCP CLOSE* ----------...",
+   "index": 13,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.13",
+   "title": "Protocol ID Rejection Example"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "b8112c6e9cd68e24ab3009b284427b0b058f65b1dd2153e4f7be34140e587a44",
+   "excerpt": "REQUIRED OPTIONAL OPTIONAL +--------------+-----------------+------------+ | frame header | extended header | frame body | +--------------+-----------------+...",
+   "index": 14,
+   "looks_normative": true,
+   "matches": [
+    "OPTIONAL",
+    "REQUIRED"
+   ],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.14",
+   "title": "Frame Layout"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "9bc27b3eac96c96fd4b012a45580d49b355b1fbd836d8e76509a2b30bc1ecbb9",
+   "excerpt": "+0 +1 +2 +3 +-----------------------------------+ -. 0 | SIZE | | +-----------------------------------+ |---> Frame Header 4 | DOFF | TYPE | <TYPE-SPECIFIC> ...",
+   "index": 15,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.15",
+   "title": "General Frame Layout"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "481f0791733d5b9613401a5f7bff90e677db855480f36b53f03ea9a23bb80657",
+   "excerpt": "type: 0x00 - AMQP frame +0 +1 +2 +3 +-----------------------------------+ -. 0 | SIZE | | +-----------------------------------+ |---> Frame Header 4 | DOFF |...",
+   "index": 16,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.16",
+   "title": "AMQP Frame Layout"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "1592a7b3c94e2da6dd7563298f5318ce9306d221711c90140f54069ef16ca3b5",
+   "excerpt": "+-------OCHE X: 1 | +-------OCHE Y: 7 | <=== Frame[CH=1], Frame[CH=7] <===+ ===> Frame[CH=0], Frame[CH=1] ===>+ | +------>0: ICHE A | +------>1: ICHE B OCHE:...",
+   "index": 17,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.17",
+   "title": "Unidirectional Channel Multiplexing"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "d95bcc5b229a62393c150bc5591f48770ee4a1327ab0896770c6183fef1864ab",
+   "excerpt": "+-------BIDI/O: 7 | <=== Frame[CH=1], Frame[CH=7] <===+ ===> Frame[CH=0], Frame[CH=1] ===>+ | +------>1: BIDI/I BIDI/I: Incoming half of a single bidirection...",
+   "index": 18,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.18",
+   "title": "Bidirectional Channel Multiplexing"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "c60b767dc28fb010f12a6751b2d560b1b1c2473be9efbb8e32083fa4c747b177",
+   "excerpt": "TCP Client TCP Server ================================== TCP-CONNECT TCP-ACCEPT PROTO-HDR PROTO-HDR OPEN ---+ +--- OPEN \\ / wait x wait / \\ proceed <--+ +-->...",
+   "index": 19,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.19",
+   "title": "Synchronous Connection Open Sequence"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "980eb5ebc7162e898f24f8944891ee2c94bed9da0d16353d617245c8ea65feeb",
+   "excerpt": "TCP Client TCP Server ============================================= TCP-CONNECT TCP-ACCEPT PROTO-HDR PROTO-HDR OPEN ---+ +--- OPEN \\ / pipelined frame x pipe...",
+   "index": 20,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.20",
+   "title": "Pipelined Connection Open Sequence"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "2c4b5cab9ddfc74ce6aef6e9465ed1324872f180e288881de1f53a2afc7fc93b",
+   "excerpt": "TCP Client TCP Server ============================= ... CLOSE -------> +-- CLOSE / TCP-CLOSE TCP-CLOSE <--+",
+   "index": 21,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.21",
+   "title": "Synchronous Connection Close Sequence"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "f179062da17b43803276d2e74d469036dd17f9b21318190bcc63333e843a3ce9",
+   "excerpt": "TCP Client TCP Server ================================ ... CLOSE ---+ +--- CLOSE \\ / x / \\ TCP-CLOSE <--+ +--> TCP-CLOSE",
+   "index": 22,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.22",
+   "title": "Simultaneous Connection Close Sequence"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "714f1c54e6c206b00463bb66299f7d3c7350637c3f12e2b25c4d768281b788ca",
+   "excerpt": "R:HDR @=======@ S:HDR R:HDR[!=S:HDR] +--------| START |-----+ +--------------------------------+ | @=======@ | | | \\|/ \\|/ | | @==========@ @==========@ S:OP...",
+   "index": 23,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.23",
+   "title": "Connection State Diagram"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "89f7ebaafe83027e033673a5ae7982a24e08e69a127608d15f02e60a6d4c5c64",
+   "excerpt": "State Legal Sends Legal Receives Legal Connection Actions ======================================================================= START HDR HDR HDR_RCVD HDR ...",
+   "index": 24,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.24",
+   "title": "Connection State Table"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "f793e84fbe766c42e0d98a863e8329839dd29c02b56e48ae118238801fe955e4",
+   "excerpt": "Link A-------+ +------>Link A | | \\|/ (attached) | Link B<--- Session <--------------> Session <---Link B Link C------>* (detached) *------>Link C",
+   "index": 25,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.25",
+   "title": "Instance Diagram of Session/Link attachment"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "b844132119f498dfa7f44da36776070d290f3a89a717e677f6a47e152d6865f6",
+   "excerpt": "Endpoint Endpoint ===================================================================== [CH3] BEGIN(name=..., ---------> remote-channel=null) +-- [CH7] BEGIN...",
+   "index": 26,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.26",
+   "title": "Session Begin Sequence"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "8d284a5a8afeff3432166595d50abf945c55e0bc5c80fc4450b43b03b5a74907",
+   "excerpt": "Endpoint A Endpoint B ==================================================================== ... [CH3] END(error=...) ---------> (1) +-- [CH7] END(error=...) /...",
+   "index": 27,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.27",
+   "title": "Session End Sequence"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "0882162048fafe30b8e8ff61c0d7d0b05ff28b8c9d37a667617308320e0093a6",
+   "excerpt": "Endpoint A Endpoint B ================================================================= ... [CH3] END(error=...) --+ +-- [CH7] END(error=...) (1) \\ / (2) x /...",
+   "index": 28,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.28",
+   "title": "Simultaneous Session End Sequence"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "7d9ea02e83e1b1e6f08a8c9ad2d5df6f953682d3c11d4a2d6705ee6771154982",
+   "excerpt": "Endpoint Endpoint ================================================ FRAME 1 ----------> FRAME 2 ----------> FRAME 3 ---+ +--- END(error=...) \\ / x / \\ <--+ +-...",
+   "index": 29,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.29",
+   "title": "Session Error Sequence"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "8018713d5c080c919b5ce0c589d9d61e13a9534f31c3d7f808f5e40a1d172cb3",
+   "excerpt": "UNMAPPED<-------------------+ | | +-------+-------+ | S:BEGIN | | R:BEGIN | | | | \\|/ \\|/ | BEGIN_SENT BEGIN_RCVD | | | | | | | R:BEGIN | | S:BEGIN | +------...",
+   "index": 30,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.30",
+   "title": "State Transitions"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "14fba33e8c3550bb4c00b88d5cb16384b2051a326fc8c6e28b8be0562c758393",
+   "excerpt": "+-------------------+ +-------------------+ | name: Link_1 | | name: Link_1 | | handle: i | | handle: j | |-------------------| |-------------------| | role:...",
+   "index": 31,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.31",
+   "title": "Link Handles"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "f63b5183b56ae8ea70a0e8c97d0f6280063652da6ea30b80ec5fdfcec0ac0f13",
+   "excerpt": "Peer Partner ================================================================ *create link endpoint* ATTACH(name=N, handle=1, ----------> *create link endpoi...",
+   "index": 32,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.32",
+   "title": "Establishing a Link"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "145a69181b20f04cbc372cf5cb986e582ea5ecdd61e9df7d3960c3add80e06e8",
+   "excerpt": "Peer Partner ================================================================ *create link endpoint* ATTACH(name=N, handle=1, ----------> *create link endpoi...",
+   "index": 33,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.33",
+   "title": "Refusing a Link"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "caef9d011d3ab34ed01ab20b600960ed02aad7ca0d37b68d0439d3d8c486dd86",
+   "excerpt": "Peer Partner ================================================================ *existing source* ATTACH(name=N, handle=1, ----------> *found existing target* ...",
+   "index": 34,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.34",
+   "title": "Resuming a Link"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "de22f59d0932ddd0ff724378be9b91601a731e17497268c9bca6895fd4ba3d8b",
+   "excerpt": "Peer Partner ================================================================ *existing source* ATTACH(name=N, handle=1, ----------> *found existing target* ...",
+   "index": 35,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.35",
+   "title": "Resuming an altered Link"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "75ca313f50941e73bef2be07307ff5243ff820d9efb2ff8993392c7d6ffb17a7",
+   "excerpt": "Peer Partner ================================================================ *create link endpoint* ATTACH(name=N, handle=1, ----------> *found existing tar...",
+   "index": 36,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.36",
+   "title": "Recovering a Link"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "63109530a23a01b60d4b9587bb9d4e14201c7bacbd72aadb73d16ab0c4f4e571",
+   "excerpt": "Peer Partner ============================================================= *create link endpoint* ATTACH(name=N, handle=1 ----------> *create link endpoint* ...",
+   "index": 37,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.37",
+   "title": "Detaching a Link"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "57459c57e0ce3e0e85f804b4e30d17fb9794732d2741f510aa171e925a6abb87",
+   "excerpt": "Peer Partner ============================================================= ... DETACH(handle=1) ---+ \\ \\ \\ *modify link endpoint* \\ +--> *detach input handle...",
+   "index": 38,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.38",
+   "title": "Updating Link State"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "00c6b80fbbeed1968563dd0c38890f90a11ebb2bc429c09ce224bd9eef5c668c",
+   "excerpt": "Peer Partner ============================================================= *create link endpoint* ATTACH(name=N, handle=1 ----------> *create link endpoint* ...",
+   "index": 39,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.39",
+   "title": "Closing a Link"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "91edebcf306ee447cb06ae0952e6d64dfdbc72a4f054b964a3d1c9093dbe3453",
+   "excerpt": "+----------+ +----------+ | Sender |---------------transfer------------>| Receiver | +----------+ +----------+ \\ / <----------------flow--------------- \\ / +...",
+   "index": 40,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.40",
+   "title": "Flow Control"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "8f5f2cc6c5ba70c7b902f39c4b6e85092c4ef414936e2703e6e8ef4794196743",
+   "excerpt": "flow state | | modifies +------------------+ | +------------------+ | Sender | .----------------------. | Receiver | +------------------+ attach, transfer, f...",
+   "index": 41,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.41",
+   "title": "Flow State & related Frames"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "aebcf7df8ca9aa2b651fd504a177d16791eea6482c3cee17f6f965942ff49906",
+   "excerpt": "+----------+ +----------+ | Receiver |<--------------transfer-------------| Sender | +----------+ +----------+ \\ / -----------------flow--------------> \\ / +...",
+   "index": 42,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.42",
+   "title": "Flow Control Usage Patterns"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "4747b7b3d3bf81ed8339ac7df57f5e1a9d1dd09b9f359f5d5d98dda7de01407f",
+   "excerpt": "Receiver Sender ================================================================= ... flow(link-credit=1) ----------> +---- transfer(...) *block until transf...",
+   "index": 43,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.43",
+   "title": "Synchronous Get"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "7a069b0b73a6b5ac05074a1d1c6e0662c045fd7584b55233aed84c87db1ef5fa",
+   "excerpt": "Receiver Sender ================================================================= ... flow(link-credit=1) ----------> *wait for link-credit <= 0* flow(drain=...",
+   "index": 44,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.44",
+   "title": "Synchronous Get w/ Timeout"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "951c0d39e5718bfaa8632cb87df7a550393b3b6d38a62b4fbee8321e43fb8679",
+   "excerpt": "Receiver Sender ===================================================================== ... <---------- transfer(...) <---------- transfer(...) flow(link-credi...",
+   "index": 45,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.45",
+   "title": "Asynchrnous Notification"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "30ad0631b006d9c1c30bf1039e2eeb35fc27f15dd10cc9ed788c8b6d914f61d6",
+   "excerpt": "Receiver Sender ================================================================ ... <---------- transfer(...) flow(..., ---+ +--- transfer(...) link-credit=...",
+   "index": 46,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.46",
+   "title": "Stopping Incoming Messages"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "039d9dfe278fdbef897c594aaf26e74fb4629bfb5d727c6ea99e670f734d69ef",
+   "excerpt": "+------------------+ / Sender \\ +----------------------+ | unsettled: | transfer(delivery-tag=DT, settled=False, | ... | state=S_0, ...) | DT -> (local: S_0,...",
+   "index": 47,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.47",
+   "title": "Initial Transfer"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "a1df635852896b667ea412e929c66b89e4d44422af12278a5408152abfb420c0",
+   "excerpt": "+------------------+ / Receiver \\ +----------------------+ transfer(delivery-tag=DT, settled=False, | unsettled: | state=S_0, ...) | ... | ------------------...",
+   "index": 48,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.48",
+   "title": "Initial Receipt"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "f59be09f23a74b21f0fb41a709fa58ba796713d42b9468585de4be16ccab0791",
+   "excerpt": "+------------------+ / Receiver \\ +----------------------+ | unsettled: | | ... | <-----------------------------------------------| DT -> (local: S_2, | disp...",
+   "index": 49,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.49",
+   "title": "Indication of Non-Terminal State"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "d5ef6a9a9ef63b9f1ba5408f7867a4314ab04fa6c69496c8fc010a4e3d871dd5",
+   "excerpt": "+------------------+ / Receiver \\ +----------------------+ | unsettled: | | ... | <-----------------------------------------------| DT -> (local: T_0, | disp...",
+   "index": 50,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.50",
+   "title": "Indication of Presumptive Terminal State"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "9114ddec5bb0765711180508adfe9297eff3f8e7376bb9c92af0eb57ffcabea4",
+   "excerpt": "+------------------+ / Sender \\ +----------------------+ | unsettled: | | ... | | DT -> (local: S_0, |<----------------------------------------------- | remo...",
+   "index": 51,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.51",
+   "title": "Receipt of Terminal State"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "020c4c2e40fa1a0e14f17d2d111956bef47cd88e16cb06fa0fe79ef6bee3715c",
+   "excerpt": "+------------------+ / Sender \\ +----------------------+ | unsettled: | disp(role=sender, ..., delivery-tag=DT, | ... | settled=True, state=T_1, ...) | - -> ...",
+   "index": 52,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.52",
+   "title": "Indication of Settlement"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "d3564e2852880ddffd083d0c1140343bf0287ecc51a1f89f883662974e28ffb9",
+   "excerpt": "+------------------+ / Receiver \\ +----------------------+ disp(role=sender, ..., delivery-tag=DT, | unsettled: | settled=True, state=T_1, ...) | ... | -----...",
+   "index": 53,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.53",
+   "title": "Receipt of Settlement"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "8e016318244ba83d158eaa766872366a2f17c2b58a5b74ffc7a96da728b878d3",
+   "excerpt": "+------------------+ / Receiver \\ +----------------------+ | unsettled: | | ... | <-----------------------------------------------| - -> - | | ... | +-------...",
+   "index": 54,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.54",
+   "title": "Final Settlement"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "346bc4febc1ccce685a7293673669047a35f7ccfd249dbc90cd9283863b2386e",
+   "excerpt": "+------------------+ / Sender \\ +----------------------+ | unsettled: | transfer(delivery-tag=DT, settled=True, | ... | state=T_0, ...) | - -> - |-----------...",
+   "index": 55,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.55",
+   "title": "At-Most-Once"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "64b68898258c6ed4eee2ab26077a1bc5c5377cd96cee4ace973137e946c459d6",
+   "excerpt": "+------------------+ / Receiver \\ +----------------------+ | unsettled: | | ... | <-----------------------------------------------| - -> - | disp(role=receiv...",
+   "index": 56,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.56",
+   "title": "At-Least-Once"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "707ce749628334e9b0129181b40eac6fc0f83db51d53468936cc291082dd8133",
+   "excerpt": "+------------+ S:XFR(M=1,A=0) +------| NOT_SENT |------+ | +------------+ | | | | S:XFR(M=0,A=0) | | | S:XFR(M=1,A=0) | | +----------+ | | | | | \\|/ \\|/ | | ...",
+   "index": 57,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.57",
+   "title": "Outgoing Fragmentation State Diagram"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "7b963ba987b41317029fd4015ec4e3f9e3b7ea9acd7f7e1a09e36f0ea028ce53",
+   "excerpt": "+------------+ R:XFR(M=1,A=0) +------| NOT_RCVD |------+ | +------------+ | | | | R:XFR(M=0,A=0) | | | R:XFR(M=1,A=0) | | +----------+ | | | | | \\|/ \\|/ | | ...",
+   "index": 58,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.58",
+   "title": "Incoming Fragmentation State Diagram"
+  },
+  {
+   "artifact": "amqp-core-transport-v1.0-os.xml",
+   "content_sha256": "54b1e31866848d99cf0f1706da5f8e6db9ce081a2b58e3e1176fa84ad3c19214",
+   "excerpt": "3 octets 1 octet +----------------+---------+ | message format | version | +----------------+---------+ | | msb lsb",
+   "index": 59,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-transport-v1.0-os.xml#picture.59",
+   "title": "Layout of Message Format Code"
+  },
+  {
+   "artifact": "amqp-core-types-v1.0-os.xml",
+   "content_sha256": "b4c8b5795fc08f7fcc8c4eed5eb115731393b77d402924190e17e775659f67e0",
+   "excerpt": "constructor untyped bytes | | +--+ +-----------------+-----------------+ | | | | ... 0xA1 0x1E \"Hello Glorious Messaging World\" ... | | | | | | | | utf8 byte...",
+   "index": 1,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-types-v1.0-os.xml#picture.1",
+   "title": "Primitive Format Code (String)"
+  },
+  {
+   "artifact": "amqp-core-types-v1.0-os.xml",
+   "content_sha256": "45d67576a0d879fe73ebf49a8536b010156ed1bb2504746db525acb0d4b19898",
+   "excerpt": "constructor untyped bytes | | +-----------+-----------+ +-----------------+-----------------+ | | | | ... 0x00 0xA1 0x03 \"URL\" 0xA1 0x1E \"http://example.org/...",
+   "index": 2,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-types-v1.0-os.xml#picture.2",
+   "title": "Described Format Code (URL)"
+  },
+  {
+   "artifact": "amqp-core-types-v1.0-os.xml",
+   "content_sha256": "428149a68550cdb5125461d030d6cc6513482c4887ceacd016647356b381c332",
+   "excerpt": "constructor = format-code / %x00 descriptor constructor format-code = fixed / variable / compound / array fixed = empty / fixed-one / fixed-two / fixed-four ...",
+   "index": 3,
+   "looks_normative": true,
+   "matches": [
+    "%x"
+   ],
+   "ref": "amqp-core-types-v1.0-os.xml#picture.3",
+   "title": "Constructor BNF"
+  },
+  {
+   "artifact": "amqp-core-types-v1.0-os.xml",
+   "content_sha256": "64354c6928ec1e9bc6030b304b24ec7a496fa3807c5c6de4b8b6a6132a2fcf7b",
+   "excerpt": "Bit: 7 6 5 4 3 2 1 0 +------------------------------------+ +----------+ | subcategory | subtype | | ext-type | +------------------------------------+ +-----...",
+   "index": 4,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-types-v1.0-os.xml#picture.4",
+   "title": "Format Code Layout"
+  },
+  {
+   "artifact": "amqp-core-types-v1.0-os.xml",
+   "content_sha256": "629884a2db5f66290dc052b11fb083aae2d04c90d315193661029bfd312ab7be",
+   "excerpt": "Subcategory Category Format ============================================================================== 0x4 Fixed Width Zero octets of data. 0x5 Fixed Wid...",
+   "index": 5,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-types-v1.0-os.xml#picture.5",
+   "title": "Subcategory Formats"
+  },
+  {
+   "artifact": "amqp-core-types-v1.0-os.xml",
+   "content_sha256": "ecf99229787968ad229390143915c16447123b0a73d7cf32e887c0c33b3f212a",
+   "excerpt": "n OCTETs +----------+ | data | +----------+ Subcategory n ================= 0x4 0 0x5 1 0x6 2 0x7 4 0x8 8 0x9 16",
+   "index": 6,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-types-v1.0-os.xml#picture.6",
+   "title": "Layout of Fixed Width Data Encodings"
+  },
+  {
+   "artifact": "amqp-core-types-v1.0-os.xml",
+   "content_sha256": "1b805cdc9ebcac1bab881081d5797ecee3618d132ede6638791c35c9c7482be2",
+   "excerpt": "n OCTETs size OCTETs +----------+-------------+ | size | value | +----------+-------------+ Subcategory n ================= 0xA 1 0xB 4",
+   "index": 7,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-types-v1.0-os.xml#picture.7",
+   "title": "Layout of Variable Width Data Encodings"
+  },
+  {
+   "artifact": "amqp-core-types-v1.0-os.xml",
+   "content_sha256": "5268f8d82ade3d7c2b122ee20674a935b6d483e77fb81fd5a762a5425ffe9a86",
+   "excerpt": "+----------= count items =----------+ | | n OCTETs n OCTETs | | +----------+----------+--------------+------------+-------+ | size | count | ... /| item |\\ ....",
+   "index": 8,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-types-v1.0-os.xml#picture.8",
+   "title": "Layout of Compound Data Encodings"
+  },
+  {
+   "artifact": "amqp-core-types-v1.0-os.xml",
+   "content_sha256": "837570b7af3b199888d2c3d4baec9c47cbe79879ad8925c60db4c984d478ab01",
+   "excerpt": "+--= count elements =--+ | | n OCTETs n OCTETs | | +----------+----------+---------------------+-------+------+-------+ | size | count | element-constructor ...",
+   "index": 9,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-types-v1.0-os.xml#picture.9",
+   "title": "Layout of Array Encodings"
+  },
+  {
+   "artifact": "amqp-core-types-v1.0-os.xml",
+   "content_sha256": "04ec5dd26d855d6ea34b7a5e48218fd6055217e95e5eb6afebcb003d71ad5700",
+   "excerpt": "<type class=\"primitive|composite|restricted\" name=\"...\" label=\"...\" provides=\"...\"> ... </type>",
+   "index": 10,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-types-v1.0-os.xml#picture.10",
+   "title": "Type Definitions"
+  },
+  {
+   "artifact": "amqp-core-types-v1.0-os.xml",
+   "content_sha256": "a2eb794457c23f06caf9c1538dc956fcd0d9cc6b8579a9ed4011c43c6451eddb",
+   "excerpt": "<type class=\"primitive\" name=\"...\" label=\"...\" provides=\"...\"> <encoding ... > ... </encoding> ... <encoding ... > ... </encoding> </type>",
+   "index": 11,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-types-v1.0-os.xml#picture.11",
+   "title": "Primitive Type Definitions"
+  },
+  {
+   "artifact": "amqp-core-types-v1.0-os.xml",
+   "content_sha256": "9966a820cc498b7779673abc08fa9972e7c5d952615b6979c55068e0c61c7901",
+   "excerpt": "<type class=\"primitive\" ... > ... <encoding name=\"...\" code=\"0xNN\" category=\"fixed|variable|compound|array\" width=\"N\" label=\"...\"/> ... </type>",
+   "index": 12,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-types-v1.0-os.xml#picture.12",
+   "title": "Encoding Definitions"
+  },
+  {
+   "artifact": "amqp-core-types-v1.0-os.xml",
+   "content_sha256": "8862e27b51d5dc9969a37a24850f8557b8965e7cafa6b5c33476dbf39fca5aa4",
+   "excerpt": "<type class=\"composite\" name=\"...\" label=\"...\" provides=\"...\"> <descriptor name=\"...\" code=\"...\"/> <field name=\"...\" ... > ... </field> ... <field name=\"...\"...",
+   "index": 13,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-types-v1.0-os.xml#picture.13",
+   "title": "Composite Type Definitions"
+  },
+  {
+   "artifact": "amqp-core-types-v1.0-os.xml",
+   "content_sha256": "32e6487740b7079982332cf35e627af7747f3d8d968c6b200f9e7d4de23060be",
+   "excerpt": "<type class=\"composite|restricted\" ...> ... <!-- domain-id:descriptor-id --> <descriptor name=\"domain:name\" code=\"0xNNNNNNNN:0xNNNNNNNN\"/> ... </type>",
+   "index": 14,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-types-v1.0-os.xml#picture.14",
+   "title": "Descriptor Definitions"
+  },
+  {
+   "artifact": "amqp-core-types-v1.0-os.xml",
+   "content_sha256": "6989109fae3ae3c16b51c050c7e62538c6b42aa70b97eb6443c204fe0d0486b1",
+   "excerpt": "<type class=\"composite\" ...> ... <field name=\"...\" type=\"...\" requires=\"...\" default=\"...\" label=\"...\" mandatory=\"true|false\" multiple=\"true|false\" /> ... </...",
+   "index": 15,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-types-v1.0-os.xml#picture.15",
+   "title": "Field Definitions"
+  },
+  {
+   "artifact": "amqp-core-types-v1.0-os.xml",
+   "content_sha256": "7edbacb319f214225c6f711007692bcc7665277b701e705299bddb1bffed155f",
+   "excerpt": "<type class=\"restricted\" name=\"...\" label=\"...\" provides=\"...\"> <descriptor name=\"...\" code=\"...\"/> <choice name=\"...\" value=\"...\"/> ... <choice name=\"...\" v...",
+   "index": 16,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-types-v1.0-os.xml#picture.16",
+   "title": "Restricted Type Definitions"
+  },
+  {
+   "artifact": "amqp-core-types-v1.0-os.xml",
+   "content_sha256": "d221c73c3fa31eb43d9548dba69bcf626440a02452c55173f42fbcefb9716db6",
+   "excerpt": "<type class=\"restricted\" ...> ... <choice name=\"...\" value=\"...\"/> ... </type>",
+   "index": 17,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-types-v1.0-os.xml#picture.17",
+   "title": "Choice Definitions"
+  },
+  {
+   "artifact": "amqp-core-types-v1.0-os.xml",
+   "content_sha256": "6f82b0b098427cccc4b98bb35b8c24145fd2514fb8390685ffa809c4c4abd003",
+   "excerpt": "<type class=\"composite\" name=\"book\" label=\"example composite type\"> <doc> <p>An example composite type.</p> </doc> <descriptor name=\"example:book:list\" code=...",
+   "index": 18,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-types-v1.0-os.xml#picture.18",
+   "title": "Example Composite Type"
+  },
+  {
+   "artifact": "amqp-core-types-v1.0-os.xml",
+   "content_sha256": "018b99a7a27a05ca75a066ef7e3fa959c1178dba0d5b56aa0ea0bb91be475648",
+   "excerpt": "constructor list representation of a book | | +-----------------+-------------------+ +-------------+---------------+ | | | | 0x00 0xA3 0x11 \"example:book:li...",
+   "index": 19,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-types-v1.0-os.xml#picture.19",
+   "title": "Example Composite Value"
+  },
+  {
+   "artifact": "amqp-core-types-v1.0-os.xml",
+   "content_sha256": "8120a9b91726aeb6aab951a82eecbafe3f383f09298cc340796501716dfbe3f4",
+   "excerpt": "item 0 item 1 item n-1 item n +-------+-------+----+---------+---------+ | key 1 | val 1 | .. | key n/2 | val n/2 | +-------+-------+----+---------+---------+",
+   "index": 20,
+   "looks_normative": false,
+   "matches": [],
+   "ref": "amqp-core-types-v1.0-os.xml#picture.20",
+   "title": "Layout of Map Encoding"
+  }
+ ],
+ "schema_version": 1
+}

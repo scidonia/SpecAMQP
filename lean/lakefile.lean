@@ -22,3 +22,9 @@ package specamqp
 
 @[default_target]
 lean_lib Generated
+
+@[default_target]
+lean_lib Spec
+
+@[default_target]
+lean_lib Contracts

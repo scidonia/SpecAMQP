@@ -126,9 +126,14 @@ note "generated counts equal the artifacts' declared surface"
 python3 - "$root" <<'PY' || exit 1
 import pathlib, re, sys
 root = pathlib.Path(sys.argv[1])
-# Hex-looking descriptor literals (`0x10`-style in a codec match) and `amqp:`
-# symbols are the two ways a hand-written file could smuggle in a table value.
-hex_literal = re.compile(r'0x[0-9A-Fa-f]{2}\b')
+# Two ways a handwritten module could smuggle in a table value: writing an
+# `amqp:` symbol itself, or constructing a descriptor from a numeric literal
+# instead of reading the generated table. Bare octet literals are *not* flagged:
+# the encoding grammar's ranges and the frame layout are the specification's own
+# content (`%x40`, `%x00`), and the grammar module is where they belong. The
+# binding that matters is the theorem relating those ranges to the table, which
+# this contract runs below.
+descriptor_literal = re.compile(r'descriptor\s*:=\s*some\s*\{[^}]*code\s*:=\s*0x')
 symbol = re.compile(r'"amqp:')
 scanned = 0
 problems = []
@@ -139,8 +144,10 @@ for directory in ("Spec", "Contracts", "Proofs"):
             stripped = line.split("--", 1)[0]
             if symbol.search(stripped):
                 problems.append(f"{path.relative_to(root)}:{number}: hand-typed amqp: symbol")
-            if hex_literal.search(stripped) and "descriptor" in line.lower():
-                problems.append(f"{path.relative_to(root)}:{number}: literal descriptor code")
+            if descriptor_literal.search(stripped):
+                problems.append(
+                    f"{path.relative_to(root)}:{number}: descriptor constructed from a literal code"
+                )
 for problem in problems:
     print(f"  hand-typed: {problem}")
 if problems:
