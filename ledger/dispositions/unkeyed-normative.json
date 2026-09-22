@@ -1,6 +1,7 @@
 {
  "conventions": {
   "deferred:": "A real obligation the plan places later; the note names where, and no gate claims it today.",
+  "formalized:": "A Lean declaration path that carries this statement's meaning. Some of these are commitments rather than present declarations: the value laws named here do not exist yet and land with the rest of S1, so the value is owed by the plan rather than carried by the tree today.",
   "informative": "Rationale or an address-level fact, with no wire obligation.",
   "underspecified:": "The artifact deliberately leaves behaviour open. Nothing is enforced, and tests must not assert either reading.",
   "unkeyed": "A statement with no RFC 2119 keyword that is still normative, or an explicit silence the specification chooses. The keyword scan cannot see these, so each one is captured and decided explicitly; `check_unkeyed` refuses an omission."
@@ -100,7 +101,7 @@
    "clause_text": "It is invalid for this list to be null or empty.",
    "disposition": "formalized:Spec.Value.MultipleMandatory",
    "kind": "UNKEYED",
-   "note": "Not a specifier: this sentence is an instance of Part 1's multiple-and-mandatory rule, which `Spec.Value.MultipleMandatory` already carries. The field is declared multiple=\"true\" mandatory=\"true\" in the artifact, so the generated field table holds the obligation and this sentence adds no separate check. Verified against the artifact's field element.",
+   "note": "Not a specifier: this sentence is an instance of Part 1's multiple-and-mandatory rule, which `Spec.Value.MultipleMandatory` is owed by the S1 value laws and will carry. The field is declared multiple=\"true\" mandatory=\"true\" in the artifact, so the generated field table holds the obligation and this sentence adds no separate check. Verified against the artifact's field element.",
    "text_sha256": "0f2e0b8b96e5844c0e7edc274e9400230aca239e3a4f00d40e47ad5a28f02e66",
    "unkeyed_phrases": [
     "is invalid"
