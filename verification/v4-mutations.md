@@ -50,13 +50,21 @@ For every bound the specification states, the vector at exactly one step outside
 
 | bound | status |
 |---|---|
-| `channel-max` declared by the open | **MISSING**, vector landed above |
-| `max-frame-size` declared by the open | **MISSING** |
-| MIN-MAX-FRAME-SIZE, an open declaring below 512 | **MISSING** |
-| `handle-max` declared by the begin | MISSING at bound + 1 (the corpus tests further above) |
-| `arrayElementLimit` | unresolved, not missing: my test is crude and 65537 elements are impractical to express |
+| `channel-max` declared by the open | **covered** — `exchange-session-channel-above-the-declared-bound` |
+| `handle-max` declared by the begin, at bound + 1 | **covered** — `exchange-link-handle-at-bound-plus-one`; the corpus's range vector attaches at 5 against a bound of 2, which a runaway bound and a widened one refuse alike |
+| `max-frame-size` declared by the open | **missing and shadowed**: a 4097-octet frame is refused, but by the session's channel rule rather than the size rule, in both layers — the same shape as the channel bound, in the field's other direction. Whether the size check is shadowed or the probe fails to present an oversized frame to it is unresolved |
+| the a priori maximum frame size (512, before the open) | have — my connection sweep's `transfer-600` probes; its model reports the layers' answers among its literal-reading deviations |
 | `channel-max` a priori (before any open) | have — `generated-exchanges.ndjson:9`, a frame on channel 256 with no open |
 | the `256^width` length ceilings | have — `generated.ndjson:125`, a 256-octet payload |
+| `arrayElementLimit` | unresolved, not missing: the test is crude and 65537 elements are impractical to express |
+
+A candidate that the audit raised and the reading then **withdrew**: "MIN-MAX-FRAME-SIZE, an open
+declaring below 512" is not a bound at all. The artifact gives 512 as the maximum frame size
+*before* explicit negotiation — "Prior to any explicit negotiation, the maximum frame size is
+[MIN-MAX-FRAME-SIZE]" — and the field's own text constrains the sender, not the value a peer may
+declare: "A peer MUST NOT send frames larger than its partner can handle. A peer that receives an
+oversized frame MUST close the connection with the framing-error error-code." So both layers
+admitting an open that declares 100 is correct, and the bound worth testing is the a priori one.
 
 ## Discarded runs
 
