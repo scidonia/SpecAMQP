@@ -213,6 +213,65 @@ theorem variable_family_canonical_le (length w : Nat) (hw : w = 1 ∨ w = 4)
   have := lengthWidthOf_le_of_field length w hw hcarries
   omega
 
+/-! ## The compound families and the described case
+
+The same argument as the variable-width family, at their own quantities and constructor
+octets.
+
+A list, map or array declares a *size* — the octets after the size field — and a *count*, so
+the rule's decision for it is `sizeWidthOf size count`, proved in R3 to be `widthChoice` over
+both quantities. `compound_canonical_le` is therefore the variable family's inequality with
+two quantities instead of one, and it covers all three compound forms at once, because all
+three frame their body the same way: a size field, then `size` octets. The element
+constructor an array adds lives *inside* those `size` octets, which is why it does not appear
+in the comparison — a fact worth seeing, since it is the reason one theorem covers arrays and
+lists together.
+
+**The described case takes no instance at all, and that is R4's finding showing up as
+arithmetic.** R4 established that a described value consults no choice rule, because its
+framing carries no quantity. Here that is visible as `described_canonical_le`, which needs
+no `widthChoice` lemma: the framing is one prefix octet, and the descriptor and the value
+each contribute their own canonical size against their own accepted size, so the case is
+purely additive. A family whose consumption lemma is a monotonicity of `+` is the concrete
+form of "adds no new choice". -/
+
+/-- **The rule's width is no wider than the field an accepted compound used.**
+
+`sizeWidthOf` at two quantities — the size and the count the same field must carry — is
+`widthChoice_le_of_fits` at that list. -/
+theorem sizeWidthOf_le_of_field (size count w : Nat) (hw : w = 1 ∨ w = 4)
+    (hcarries : size < 2 ^ (8 * w) ∧ count < 2 ^ (8 * w)) : sizeWidthOf size count ≤ w := by
+  rw [sizeWidthOf_eq_widthChoice]
+  exact widthChoice_le_of_fits [size, count] w hw (by
+    intro q hq
+    simp only [List.mem_cons, List.not_mem_nil, or_false] at hq
+    rcases hq with rfl | rfl
+    · exact hcarries.1
+    · exact hcarries.2)
+
+/-- **An accepted compound encoding is no shorter than the canonical one.**
+
+Both frame the same way — a size field and then `size` octets — so the comparison is the
+widths, and the rule's is no wider. One theorem for lists, maps and arrays alike: an array's
+element constructor is inside the octets its size counts, so it appears on neither side of
+the comparison. -/
+theorem compound_canonical_le (size count w : Nat) (hw : w = 1 ∨ w = 4)
+    (hcarries : size < 2 ^ (8 * w) ∧ count < 2 ^ (8 * w)) :
+    sizeWidthOf size count + size ≤ w + size := by
+  have := sizeWidthOf_le_of_field size count w hw hcarries
+  omega
+
+/-- **The described case needs no width comparison.** A described value's framing is one
+prefix octet and the two encodings; the canonical framing is shorter exactly when the
+descriptor's and the value's own canonical encodings are, which is the case analysis R4
+stated. This is the family whose consumption lemma mentions no field width at all — the
+concrete form of "a described value consults no choice rule". -/
+theorem described_canonical_le (descriptorCanonical valueCanonical descriptorAccepted
+    valueAccepted : Nat) (hd : descriptorCanonical ≤ descriptorAccepted)
+    (hv : valueCanonical ≤ valueAccepted) :
+    1 + descriptorCanonical + valueCanonical ≤ 1 + descriptorAccepted + valueAccepted := by
+  omega
+
 /-! ## The rung's claim -/
 
 /-- **R5: the writer's encoding is no longer than anything the reader accepts.**
