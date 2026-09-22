@@ -433,6 +433,15 @@ Contracts: `lean/Contracts/ConnectionLifecycle.lean`, `vectors/slice.ndjson`, `v
 
 Acceptance: the slice's clauses are dispositioned and formalized; every state in the connection and session machines has a reachable mandated exit; positive vectors admitted and negative vectors rejected with the named error; at least two recorded third-party vectors of the same exchange admitted (V3) with the mutation controls (V4) firing on the slice corpus.
 
+**S3's remaining planner artifact, scoped before it is written: `lean/Contracts/ConnectionLifecycle.lean`.** What it will state, and why each is a statement rather than a restatement of the running code:
+
+* **The state machine's totality.** For every connection state and every frame it permits a send or a receive, the transition the artifact's table names is the one the specification takes; and for every state, the table's action column is what the peer does. This is the claim the state table is the normative source for, and it is the only place in the repository where that picture's content is asserted rather than used.
+* **`ConsumedIsTheDeclaredSize`'s counterpart at the connection layer**: a frame's declared size decides where the next frame begins, so a buffer of frames is walked by their own arithmetic rather than by a search.
+* **The negotiation's outcome is determined by the header**: for the four octets of `AMQP`, the protocol id and the version triple, acceptance and refusal are functions of those octets alone, with the condition and reason class the register's reading pins.
+* **The exchange harness's own law**, which is easy to forget and cheap to state: a step the peer admits leaves the layer in the state the table names, and a step it refuses leaves it where it was — the property every vector's `state` expectation depends on, and the one that would be silently wrong if refusals ever advanced a state.
+
+The harness's *behaviour* is already pinned by 139 step verdicts across two artefacts, so these statements add what vectors cannot: a claim about all states and all frames rather than about the ones somebody thought to generate.
+
 ### S4 — sessions, links, and flow control
 
 Scope: `begin`/`end` with the window rules (`incoming-window`, `outgoing-window`, `next-outgoing-id`, `remote-incoming-window`, `remote-outgoing-window` and their recomputation), session errors and `unmapped` termination, `attach` with both roles and all settle modes, handle allocation, `flow` state (`link-credit`, `delivery-count`, `available`, `drain`, `echo`), transfer fragmentation and `more`, `disposition` and settlement, link resumption, link errors, forced detach.
