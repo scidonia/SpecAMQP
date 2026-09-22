@@ -58,13 +58,24 @@ SECURITY = "amqp-core-security-v1.0-os.xml"
 
 UNATTACHED_HANDLE = "amqp:session:unattached-handle"
 HANDLE_IN_USE = "amqp:session:handle-in-use"
-LINK_HANDLES = f"{TRANSPORT}#amqp:transport/section:link-handles"
-LINK_ERRORS = f"{TRANSPORT}#amqp:transport/section:closing-a-link"
+# The link rules, each cited at the clause that states it rather than at the section it
+# lives in: Part 2 states them under `links/doc:…`, and a vector cites the one its own
+# steps exercise. A section-level citation (`section:link-handles`, `section:flow-control`)
+# named an area rather than a rule, and resolved against no clause at all.
+LINK_HANDLES = f"{TRANSPORT}#amqp:transport/section:links/doc:link-handles.1"
+LINK_ERRORS = f"{TRANSPORT}#amqp:transport/section:links/doc:closing-a-link.1"
 TRANSFER_FIRST_FIELDS = f"{TRANSPORT}#amqp:transport/section:performatives/type:transfer/field:delivery-tag.1"
 TRANSFER_SETTLED = f"{TRANSPORT}#amqp:transport/section:performatives/type:transfer/field:settled.4"
-DETACH_HANDLE = f"{TRANSPORT}#amqp:transport/section:performatives/type:detach/field:handle.1"
+ABORTED_MESSAGES_DISCARDED = f"{TRANSPORT}#amqp:transport/section:performatives/type:transfer/field:aborted.1"
 DISPOSITION_ROLE = f"{TRANSPORT}#amqp:transport/section:performatives/type:disposition.1"
-FLOW_LINK_CREDIT = f"{TRANSPORT}#amqp:transport/section:flow-control"
+# The sender's half of the link credit, in the clause each vector exercises: `.2` is the
+# sender's value matching the delivery-limit the receiver identified, `.3` is the formula
+# it sets `link-credit` by when the receiver sends flow information, `.9` is stopping at
+# zero. (The other half of the aborted-transfer sentence — the payload MUST be ignored —
+# is `DATA_SECTION` below, named there for the session family that cites it.)
+FLOW_SENDER_MATCHES_DELIVERY_LIMIT = f"{TRANSPORT}#amqp:transport/section:links/doc:flow-control.2"
+FLOW_SENDER_SETS_CREDIT = f"{TRANSPORT}#amqp:transport/section:links/doc:flow-control.3"
+FLOW_SENDER_STOPS_AT_ZERO_CREDIT = f"{TRANSPORT}#amqp:transport/section:links/doc:flow-control.9"
 STATE_TABLE = f"{TRANSPORT}#picture.24"
 SESSION_STATES = f"{TRANSPORT}#amqp:transport/section:sessions.7"
 SESSION_TRANSITIONS = f"{TRANSPORT}#picture.30"
@@ -79,6 +90,15 @@ ATTACH_MANDATORY = f"{TRANSPORT}#amqp:transport/section:performatives/type:attac
 ATTACH_DEFAULTS = f"{TRANSPORT}#amqp:transport/section:performatives/type:attach/field:snd-settle-mode.1"
 ATTACH_SETTLE_DEFAULT = f"{TRANSPORT}#amqp:transport/section:performatives/type:attach/field:rcv-settle-mode.1"
 FLOW_NEXT_INCOMING_ID = f"{TRANSPORT}#amqp:transport/section:performatives/type:flow/field:next-incoming-id.1"
+FLOW_HANDLE_MUST_BE_ATTACHED = f"{TRANSPORT}#amqp:transport/section:performatives/type:flow/field:handle.1"
+FLOW_DELIVERY_COUNT_SET_BY_SENDER = f"{TRANSPORT}#amqp:transport/section:performatives/type:flow/field:delivery-count.2"
+# Five of the flow's fields carry one sentence each — "When the handle field is not set,
+# this field MUST NOT be set" — so the vector that exercises the coupling cites all five.
+# One name for the five, because the artifact states one coupling and repeats it per field.
+FLOW_FIELDS_REQUIRE_HANDLE = [
+    f"{TRANSPORT}#amqp:transport/section:performatives/type:flow/field:{field}.1"
+    for field in ("available", "delivery-count", "drain", "link-credit", "properties")
+]
 
 WINDOW_REMOTE_INCOMING = f"{TRANSPORT}#amqp:transport/section:sessions/doc:session-flow-control.3"
 WINDOW_INCOMING = f"{TRANSPORT}#amqp:transport/section:sessions/doc:session-flow-control.5"
@@ -1321,11 +1341,19 @@ def session_corpus(tables: Corpus) -> list[dict]:
     # -- the link machine: handles, credit, deliveries and settlement ------ #
 
     message = b"a message whose split points are the vector's business"
-    link_clauses = [LINK_HANDLES, ATTACH_MANDATORY, TRANSFER_FIRST_FIELDS, TRANSFER_SETTLED,
-                    DETACH_HANDLE, DISPOSITION_ROLE, FLOW_LINK_CREDIT]
+
+    # The four clauses an attach-and-transfer sequence writes: the attach's mandatory
+    # handle, the delivery-tag and settled flag the first transfer carries, and the
+    # disposition that settles it. A vector whose steps exchange such a sequence cites
+    # this list and adds the clauses of its own; one that does not cites its own only.
+    # This is not a blanket for every link vector — the blanket it replaces grew a
+    # citation for the *section* a rule lives in, which is how vectors came to claim
+    # rules their steps never touched.
+    transfer_fields = [ATTACH_MANDATORY, TRANSFER_FIRST_FIELDS, TRANSFER_SETTLED,
+                       DISPOSITION_ROLE]
 
     vectors.append(exchange(
-        "exchange-link-handle-in-use", start=s("MAPPED"), clauses=link_clauses,
+        "exchange-link-handle-in-use", start=s("MAPPED"), clauses=transfer_fields,
         steps=link_up() + [
             t.refused("send", reason="illegalState", condition=HANDLE_IN_USE,
                       state=c("CLOSE_SENT"), body=t.attach_body(role=False), channel=1,
@@ -1361,7 +1389,7 @@ def session_corpus(tables: Corpus) -> list[dict]:
 
     vectors.append(exchange(
         "exchange-link-credit-granted-and-spent", start=s("MAPPED"),
-        clauses=[FLOW_LINK_CREDIT, TRANSFER_ONE_SECTION],
+        clauses=[FLOW_SENDER_STOPS_AT_ZERO_CREDIT, TRANSFER_ONE_SECTION],
         steps=link_up(role_sender=True, credit=1) + [
             t.send_frame(AMQP_FRAME, t.fragment_body(0, 1), state=s("MAPPED"), channel=1,
                          payload=message),
@@ -1376,7 +1404,7 @@ def session_corpus(tables: Corpus) -> list[dict]:
 
     vectors.append(exchange(
         "exchange-link-credit-regranted", start=s("MAPPED"),
-        clauses=[FLOW_LINK_CREDIT, TRANSFER_ONE_SECTION],
+        clauses=[FLOW_SENDER_SETS_CREDIT, TRANSFER_ONE_SECTION],
         steps=link_up(role_sender=True, credit=1) + [
             t.send_frame(AMQP_FRAME, t.fragment_body(0, 1), state=s("MAPPED"), channel=1,
                          payload=message),
@@ -1400,7 +1428,7 @@ def session_corpus(tables: Corpus) -> list[dict]:
                                          state=s("MAPPED"), channel=1, payload=chunks[index]))
         vectors.append(exchange(
             f"exchange-link-fragments-{count}-transfer{'s' if count > 1 else ''}",
-            start=s("MAPPED"), clauses=link_clauses + [TRANSFER_ONE_SECTION],
+            start=s("MAPPED"), clauses=transfer_fields + [TRANSFER_ONE_SECTION],
             steps=steps,
             note=f"one message carried by {count} transfer(s): the transfer clauses make "
                  f"the delivery-id, delivery-tag and message-format first-transfer fields "
@@ -1408,7 +1436,7 @@ def session_corpus(tables: Corpus) -> list[dict]:
                  f"framing is not thereby committed to another"))
 
     vectors.append(exchange(
-        "exchange-link-settled-inherited", start=s("MAPPED"), clauses=link_clauses,
+        "exchange-link-settled-inherited", start=s("MAPPED"), clauses=transfer_fields,
         steps=link_up() + [
             t.receive_frame(AMQP_FRAME, t.fragment_body(0, 2, settled=True),
                             state=s("MAPPED"), channel=1, payload=message[:10]),
@@ -1419,7 +1447,7 @@ def session_corpus(tables: Corpus) -> list[dict]:
              "delivery is settled even though its last frame does not say so"))
 
     vectors.append(exchange(
-        "exchange-link-sender-settle-mode-unmet", start=s("MAPPED"), clauses=link_clauses,
+        "exchange-link-sender-settle-mode-unmet", start=s("MAPPED"), clauses=transfer_fields,
         steps=[t.send_frame(AMQP_FRAME, t.attach_body(role=True), state=s("MAPPED"), channel=1),
                t.receive_frame(AMQP_FRAME, t.attach_body(role=False, sender_settle=0),
                                state=s("MAPPED"), channel=1),
@@ -1440,7 +1468,7 @@ def session_corpus(tables: Corpus) -> list[dict]:
 
     vectors.append(exchange(
         "exchange-link-first-transfer-needs-its-fields", start=s("MAPPED"),
-        clauses=link_clauses,
+        clauses=transfer_fields,
         steps=link_up() + [
             t.receive_frame(AMQP_FRAME, t.fragment_body(0, 1), state=s("MAPPED"), channel=1,
                             payload=message),
@@ -1457,7 +1485,8 @@ def session_corpus(tables: Corpus) -> list[dict]:
              "progress and refused when none is"))
 
     vectors.append(exchange(
-        "exchange-link-detach-releases-handle", start=s("MAPPED"), clauses=link_clauses,
+        "exchange-link-detach-releases-handle", start=s("MAPPED"),
+        clauses=[LINK_HANDLES] + transfer_fields + [FLOW_HANDLE_MUST_BE_ATTACHED],
         steps=link_up() + [
             t.receive_frame(AMQP_FRAME, t.detach_body(), state=s("MAPPED"), channel=1),
             t.refused("receive", reason="illegalState", condition=UNATTACHED_HANDLE,
@@ -1471,7 +1500,8 @@ def session_corpus(tables: Corpus) -> list[dict]:
              "declares for a handle that is not attached"))
 
     vectors.append(exchange(
-        "exchange-link-aborted-discarded", start=s("MAPPED"), clauses=link_clauses,
+        "exchange-link-aborted-discarded", start=s("MAPPED"),
+        clauses=[LINK_HANDLES] + transfer_fields + [ABORTED_MESSAGES_DISCARDED, DATA_SECTION],
         steps=link_up() + [
             t.receive_frame(AMQP_FRAME,
                             t.body("transfer", handle={"type": "uint", "value": 0},
@@ -1486,7 +1516,7 @@ def session_corpus(tables: Corpus) -> list[dict]:
              "next transfer is a first transfer again rather than a continuation of it"))
 
     vectors.append(exchange(
-        "exchange-link-disposition-direction", start=s("MAPPED"), clauses=link_clauses,
+        "exchange-link-disposition-direction", start=s("MAPPED"), clauses=transfer_fields,
         steps=link_up() + [
             t.receive_frame(AMQP_FRAME,
                             t.body("disposition", role={"type": "boolean", "value": True},
@@ -1509,7 +1539,7 @@ def session_corpus(tables: Corpus) -> list[dict]:
 
     vectors.append(exchange(
         "exchange-link-flow-unattached-handle", start=s("MAPPED"),
-        clauses=[FLOW_LINK_CREDIT, LINK_HANDLES],
+        clauses=[LINK_HANDLES, FLOW_HANDLE_MUST_BE_ATTACHED],
         steps=link_up() + [
             t.refused("send", reason="illegalState", condition=UNATTACHED_HANDLE,
                       state=s("MAPPED"),
@@ -1546,7 +1576,7 @@ def session_corpus(tables: Corpus) -> list[dict]:
 
     vectors.append(exchange(
         "exchange-link-flow-field-without-handle", start=s("MAPPED"),
-        clauses=[FLOW_LINK_CREDIT, LINK_HANDLES],
+        clauses=[LINK_HANDLES, *FLOW_FIELDS_REQUIRE_HANDLE],
         steps=link_up() + [
             t.refused("receive", reason="malformed", condition=INVALID_FIELD,
                       state=s("DISCARDING"),
@@ -1572,7 +1602,8 @@ def session_corpus(tables: Corpus) -> list[dict]:
              "are the conforming case"))
 
     vectors.append(exchange(
-        "exchange-link-credit-echoed", start=s("MAPPED"), clauses=[FLOW_LINK_CREDIT],
+        "exchange-link-credit-echoed", start=s("MAPPED"),
+        clauses=[FLOW_SENDER_MATCHES_DELIVERY_LIMIT],
         steps=link_up() + [
             t.receive_frame(AMQP_FRAME,
                             t.flow_body(handle=0, delivery_count=0, link_credit=0),
@@ -1594,7 +1625,7 @@ def session_corpus(tables: Corpus) -> list[dict]:
 
     vectors.append(exchange(
         "exchange-link-credit-counts-messages-not-frames", start=s("MAPPED"),
-        clauses=[FLOW_LINK_CREDIT, TRANSFER_FIRST_FIELDS],
+        clauses=[FLOW_SENDER_STOPS_AT_ZERO_CREDIT, TRANSFER_FIRST_FIELDS],
         steps=link_up(role_sender=True, credit=1) + [
             t.send_frame(AMQP_FRAME, t.fragment_body(index, 3), state=s("MAPPED"),
                          channel=1, payload=message[index::3])
@@ -1614,7 +1645,7 @@ def session_corpus(tables: Corpus) -> list[dict]:
 
     vectors.append(exchange(
         "exchange-link-attach-keeps-the-credit", start=s("MAPPED"),
-        clauses=[FLOW_LINK_CREDIT, LINK_HANDLES],
+        clauses=[FLOW_SENDER_SETS_CREDIT, FLOW_DELIVERY_COUNT_SET_BY_SENDER],
         steps=link_up(role_sender=True, credit=1) + [
             t.receive_frame(AMQP_FRAME, t.attach_body(role=True, handle=1),
                             state=s("MAPPED"), channel=1),
@@ -1659,7 +1690,7 @@ def session_corpus(tables: Corpus) -> list[dict]:
     # is about octets that form no frame header.
     vectors.append(exchange(
         "exchange-link-transfer-direction-received", start=s("MAPPED"),
-        clauses=[SESSION_STATES, LINK_HANDLES],
+        clauses=[SESSION_STATES],
         steps=link_up(role_sender=True) + [
             t.refused("receive", reason="illegalState", condition=ILLEGAL_STATE,
                       state=s("DISCARDING"), body=t.fragment_body(0, 1), channel=1,
@@ -1673,7 +1704,7 @@ def session_corpus(tables: Corpus) -> list[dict]:
 
     vectors.append(exchange(
         "exchange-link-transfer-direction-sent", start=s("MAPPED"),
-        clauses=[SESSION_STATES, LINK_HANDLES],
+        clauses=[SESSION_STATES],
         steps=link_up(role_sender=False) + [
             t.refused("send", reason="illegalState", condition=ILLEGAL_STATE,
                       state=s("MAPPED"), body=t.fragment_body(0, 1), channel=1,
