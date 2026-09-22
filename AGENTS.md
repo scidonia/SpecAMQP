@@ -45,8 +45,15 @@ requires an explicit planner update plus a regenerated SHA-1 manifest:
 
 Coder-owned: `flake.nix`, `flake.lock`, `scripts/**`, `lean/Proofs/**`,
 `lean/Generated/**` (regenerated only), `AGENTS.md` under planner review.
-
 ## Commits
+
+- **Accepting a slice and committing it are one movement.** An accepted slice left
+  uncommitted is indistinguishable, from any other agent's side, from a slice being
+  edited: its files are untracked, and the boundary that says "do not touch another
+  slice's work" tells them to stand down from changes they were ready to make. This
+  happened — a session layer sat uncommitted through a full acceptance, and the cost
+  landed on the agent that respected the boundary rather than on the one that forgot
+  the commit. Accept, verify, commit, in that order and without a pause between.
 
 - **The workspace's git index is shared between agents.** `git add <paths>` does not
   protect a commit from another slice's staged entries: an explicit-paths commit still
