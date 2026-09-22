@@ -52,7 +52,10 @@ run() { # exe corpus outfile
 }
 
 for corpus in "$worked" "$generated"; do
-  name="$(basename "$corpus" .ndjson)"
+  case "$corpus" in
+    "$worked") name=worked ;;
+    *) name=generated ;;
+  esac
   run amqp-ref "$corpus" "$tmp/ref-$name.log"
   run amqp-spec "$corpus" "$tmp/spec-$name.log"
   python3 - "$tmp/ref-$name.log" "$tmp/spec-$name.log" "$name" <<'PYCMP' || exit 1
@@ -103,8 +106,14 @@ for path in sys.argv[1:]:
     kinds = {}
     for v in verdicts:
         kinds[v["kind"]] = kinds.get(v["kind"], 0) + 1
-    if kinds.get("reject", 0) < 8:
-        problems.append(f"{pathlib.Path(path).name}: only {kinds.get('reject', 0)} rejection vectors")
+    # Non-vacuity, scaled to the corpus: a small worked-example corpus needs a couple
+    # of rejections, the generated corpus must carry a substantial negative surface.
+    # A fixed floor is wrong for either end — 8 is unreachable for 14 vectors, and
+    # "any rejection at all" says nothing about a 67,124-vector corpus.
+    floor = 2 if len(verdicts) < 100 else 100
+    if kinds.get("reject", 0) < floor:
+        problems.append(f"{pathlib.Path(path).name}: only {kinds.get('reject', 0)} rejection "
+                        f"vectors, and this corpus must carry at least {floor}")
     if kinds.get("decode", 0) + kinds.get("encode", 0) < 4:
         problems.append(f"{pathlib.Path(path).name}: too few golden vectors to compare")
     if kinds.get("property", 0) + kinds.get("decode", 0) + kinds.get("encode", 0) < 10:

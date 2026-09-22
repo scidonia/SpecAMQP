@@ -58,7 +58,8 @@ import json, pathlib, re, sys
 schema = json.loads(pathlib.Path(sys.argv[3]).read_text())
 id_pattern = re.compile(schema["properties"]["vector"]["pattern"])
 problems = []
-for corpus in sys.argv[1:]:
+for corpus in sys.argv[1:3]:   # argv[1:3] are the corpora; argv[3] is the schema, whose
+                               # lines are not JSON lines and must not be walked as a corpus
     seen = set()
     lines = [l for l in pathlib.Path(corpus).read_text().splitlines() if l.strip()]
     for number, line in enumerate(lines, 1):
