@@ -728,6 +728,49 @@ def check_dispositions(report: dict, dispositions: dict[str, dict]) -> list[str]
     return problems
 
 
+def check_ambiguities(report: dict, dispositions: dict[str, dict], path: Path) -> list[str]:
+    """Validate the ambiguity register against the ledger it cites.
+
+    The register is where a clause whose reading is genuinely open gets decided, and
+    a disposition may cite a decision by id (`superseded:<id>`). Unvalidated, it is
+    documentation that drifts: a decision id nobody can find, a clause that was
+    reworded, a reading list with one entry. These are cheap invariants and they are
+    the difference between a register and a folder.
+    """
+    problems: list[str] = []
+    if not path.exists():
+        return problems
+    known = {clause["ref"] for clause in report["clauses"]}
+    known.update({picture["ref"] for picture in report.get("pictures", [])})
+    seen: dict[str, str] = {}
+    for file in sorted(path.glob("*.json")):
+        document = json.loads(file.read_text(encoding="utf-8"))
+        identifier = document.get("id")
+        if identifier != file.stem:
+            problems.append(f"{file.name}: id {identifier!r} does not match the file name")
+        if identifier in seen:
+            problems.append(f"{file.name}: duplicate ambiguity id {identifier!r}, also in {seen[identifier]}")
+        seen[identifier] = file.name
+        readings = document.get("readings") or []
+        names = [reading.get("name") for reading in readings]
+        if len(readings) < 2:
+            problems.append(f"{file.name}: an ambiguity needs at least two readings to be one")
+        for reading in readings:
+            if not reading.get("statement"):
+                problems.append(f"{file.name}: reading {reading.get('name')!r} states nothing")
+        if document.get("adopted") not in names:
+            problems.append(
+                f"{file.name}: adopted {document.get('adopted')!r} is not one of the readings "
+                f"{names}"
+            )
+        if not isinstance(document.get("open"), bool):
+            problems.append(f"{file.name}: `open` must be a boolean")
+        for ref in document.get("clauses", []):
+            if ref not in known:
+                problems.append(f"{file.name}: cites {ref}, which is not a clause or picture in the ledger")
+    return problems
+
+
 def check_reconciliation(report: dict, path: Path, required: bool) -> list[str]:
     """Verify the recorded baseline reconciliation still matches the ledger.
 
@@ -806,6 +849,7 @@ def command_check(args: argparse.Namespace) -> int:
     problems.extend(check_dispositions(report, dispositions))
     problems.extend(check_pictures(report, dispositions))
     problems.extend(check_unkeyed(report, dispositions))
+    problems.extend(check_ambiguities(report, dispositions, Path(Path(args.out) / "ambiguities")))
     repository_artifacts = (Path(__file__).resolve().parent.parent / "spec" / "oasis").resolve()
     problems.extend(
         check_reconciliation(
