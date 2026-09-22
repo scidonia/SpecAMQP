@@ -222,7 +222,7 @@
   },
   "expectError": {
    "additionalProperties": false,
-   "description": "Required for kind=reject. `condition` is the protocol-level consequence; `reason` optionally pins the implementation's named reason class.",
+   "description": "Required for kind=reject, and allowed on kind=encode. On a reject vector it names the protocol-level condition the peer sees plus, optionally, the implementation reason class the artefact must report. On an encode vector it means the encoder must refuse this value, which is how an encode-direction refusal is expressed \u2014 the corpus cannot say it with bytes, and a writer whose domain exceeds what the reader accepts would emit octets it then refuses to read.",
    "properties": {
     "condition": {
      "description": "The mandated error condition. A malformed encoding is amqp:decode-error; a mandated close for protocol reasons names its own condition.",
