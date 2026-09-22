@@ -3,10 +3,25 @@
   "deferred:": "A real obligation the plan places later; the note names where, and no gate claims it today.",
   "formalized:": "A Lean declaration path that carries this statement's meaning. Some of these are commitments rather than present declarations: the value laws named here do not exist yet and land with the rest of S1, so the value is owed by the plan rather than carried by the tree today.",
   "informative": "Rationale or an address-level fact, with no wire obligation.",
+  "invariant:": "A Lean declaration path naming the law that carries this clause: an invariant or preservation theorem about state, where nothing observable can pin it.",
   "underspecified:": "The artifact deliberately leaves behaviour open. Nothing is enforced, and tests must not assert either reading.",
   "unkeyed": "A statement with no RFC 2119 keyword that is still normative, or an explicit silence the specification chooses. The keyword scan cannot see these, so each one is captured and decided explicitly; `check_unkeyed` refuses an omission."
  },
  "dispositions": {
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing.u1": {
+   "clause_text": "For a move link with a default configuration this is trivially achieved as such an end result will lead to the message in the ARCHIVED state on the node, and thus ineligible for transfer.",
+   "disposition": "deferred:S5",
+   "kind": "UNKEYED",
+   "note": "A move link's archived-state result: the addressing layer's behaviour, which no slice has yet written.",
+   "text_sha256": "aed598102e20f8f4653a15ffd5e8402b13ff2a713b34f15ae868566c5ed805c0"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:terminus-expiry-policy.u1": {
+   "clause_text": "If the link is subsequently re-attached before the terminus is expired, then the count down is aborted.",
+   "disposition": "deferred:S5",
+   "kind": "UNKEYED",
+   "note": "A re-attach aborting the expiry countdown: a node's policy, unwritten.",
+   "text_sha256": "230a3a0d23c714afe90f1b04578ee77bf92566e9cff23eea18be2833749aa840"
+  },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.u1": {
    "clause_text": "In this case the sender will either apply that outcome at the source, or in the rare case that it cannot apply that outcome, indicate the terminal outcome that has been applied.",
    "disposition": "deferred:S5",
@@ -87,6 +102,27 @@
     "is reserved"
    ]
   },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:first-acquirer.u1": {
+   "clause_text": "If this value is true, then this message has not been acquired by any other link (see \u00abdistribution-nodes\u00bb).",
+   "disposition": "deferred:S5",
+   "kind": "UNKEYED",
+   "note": "The header's acquisition flag, which the message layer will read when it decodes a message's delivery history.",
+   "text_sha256": "11e2adddc584c8fb6eae045cf5c02177e0506c96e6fb0e8ff07ca5320e739462"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:priority.u1": {
+   "clause_text": "Thus, for example, if 2 distinct priorities are implemented, then levels 0 to 4 are equivalent, and levels 5 to 9 are equivalent and levels 4 and 5 are distinct.",
+   "disposition": "informative",
+   "kind": "UNKEYED",
+   "note": "Opening with `Thus, for example` \u2014 an illustration of how priority levels map, not a requirement on an endpoint.",
+   "text_sha256": "1d882499623943b20a4a659690d0f97be531b6289efe315064ed3cb9a6682524"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:ttl.u1": {
+   "clause_text": "If this is set then a message expiration time will be computed based on the time of arrival at an intermediary.",
+   "disposition": "deferred:S5",
+   "kind": "UNKEYED",
+   "note": "Expiry computed on arrival at an intermediary: node behaviour, not a peer-observable rule.",
+   "text_sha256": "5ae376c0304337ed3c6bf9a8ca5b91c96402f41aa2c2c1b07e509e272314c3c0"
+  },
   "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl/type:sasl-init/field:hostname.u1": {
    "clause_text": "It is undefined what a different value to those already specified means.",
    "disposition": "underspecified:hostname-meanings",
@@ -117,6 +153,20 @@
     "is undefined"
    ]
   },
+  "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:coordination/type:discharge/field:fail.u1": {
+   "clause_text": "If the transaction is a local transaction, then this flag controls whether the transaction is committed or aborted when it is discharged.",
+   "disposition": "formalized:SpecAMQP.Spec.Transactions",
+   "kind": "UNKEYED",
+   "note": "The discharge machine reads this flag and decides committed against aborted; the module is the carrier and a symbol will name it when the machine is next touched.",
+   "text_sha256": "9738e9dfd0270813f81f0a062e8b2c1794c0a5a0a4290384788b762a22cfb5a2"
+  },
+  "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:transactions.u1": {
+   "clause_text": "If the control link is closed while there exist non-discharged transactions it created, then all such transactions are immediately rolled back, and attempts to perform further transactional work on them will lead to failure.",
+   "disposition": "formalized:SpecAMQP.Spec.Transactions.Layer.retireAll; test:txn-declared-then-detached-id-is-gone; test:txn-discharge-after-detach-refused",
+   "kind": "UNKEYED",
+   "note": "The clause this slice found: retiring every transaction a control link created when the link is released, and refusing further work on the retired ids.",
+   "text_sha256": "f8e1e93508b9505a1f3886c0ebd87d8d78bdf9adc79caf96e4fc111d3eefcd5e"
+  },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-declare.u1": {
    "clause_text": "Note that links to the \u00abcoordinator\u00bb cannot be resumed.",
    "disposition": "deferred:S6",
@@ -126,6 +176,34 @@
    "unkeyed_phrases": [
     "cannot"
    ]
+  },
+  "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.u1": {
+   "clause_text": "If the transaction is rolled back then the delivery is not made available.",
+   "disposition": "deferred:S5",
+   "kind": "UNKEYED",
+   "note": "A rolled-back transaction's delivery is not made available: a delivery-state outcome, which the messaging layer carries.",
+   "text_sha256": "41ddc44e4a8211c726932196d441336b8eb75c3eacb19a74284c3fd17b00bcb9"
+  },
+  "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.u2": {
+   "clause_text": "If the transaction is rolled back then the delivery is not made available at the target.",
+   "disposition": "deferred:S5",
+   "kind": "UNKEYED",
+   "note": "The same at the target.",
+   "text_sha256": "dca753f335a9a865a90828bf0c925b2099f2de8ac25906dd721edc83172f0d7a"
+  },
+  "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.u3": {
+   "clause_text": "If the controller requests a rollback or the discharge attempt be unsuccessful, then the outcome is not applied.",
+   "disposition": "deferred:S5",
+   "kind": "UNKEYED",
+   "note": "A rollback or an unsuccessful discharge applies no outcome: delivery-state again.",
+   "text_sha256": "cd0211c931554cc9764bc1cb853f0631adb708e2824e600ff7a580d0351b08db"
+  },
+  "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.u4": {
+   "clause_text": "If the resource settles the delivery before the discharge then the behavior after discharge is the same as the case above.",
+   "disposition": "deferred:S5",
+   "kind": "UNKEYED",
+   "note": "Settling before the discharge leaves the after-discharge behaviour as in the case above: delivery-state.",
+   "text_sha256": "fd479618b3fc7bf2e0d5f83e681a6ed905e42804e2b8dd412390f0c1f2c14369"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections.u1": {
    "clause_text": "The use of pipelined frames by a peer cannot be distinguished by the peer's partner from non-pipelined use so long as the pipelined frames conform to the partner's capabilities and limitations.",
@@ -187,6 +265,48 @@
     "cannot"
    ]
   },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.u1": {
+   "clause_text": "The link endpoint is then mapped to an unused handle, and an \u00abattach\u00bb frame is issued carrying the state of the newly created endpoint.",
+   "disposition": "deferred:S3-session",
+   "kind": "UNKEYED",
+   "note": "Link creation mapping an endpoint to an unused handle and issuing the attach: the link machine's prose. The handle registry exists; whether it carries this sentence is that slice's disposition to make.",
+   "text_sha256": "ef5b4a02c2c16c2836275d59351e0e5d2f8588095e758f4d7052f05d5c61fce3"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.u2": {
+   "clause_text": "The full link state is then constructed from the authoritative source or target supplied by the other endpoint once the link is established.",
+   "disposition": "deferred:S3-session",
+   "kind": "UNKEYED",
+   "note": "The full link state constructed from the peer's authoritative source or target once the link is established.",
+   "text_sha256": "c1d2cb488b4e77aa496e2893e7b38790b198260c2c96213d1ff8ecaf6f945a1d"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.u3": {
+   "clause_text": "If the remote peer has no record of the link, then no terminus will be located, and local terminus (source or target as appropriate) field in the \u00abattach\u00bb frame will be null.",
+   "disposition": "deferred:S3-session",
+   "kind": "UNKEYED",
+   "note": "No peer record of the link means no terminus is located: the attach's outcome for an unknown link.",
+   "text_sha256": "40fc5be6df42797cb822dab460e8c3ec17221689fc75afd54dcf35da71ed9fc7"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.u4": {
+   "clause_text": "The sender will then send its final delivery state along with an indication that the delivery is settled at the sender.",
+   "disposition": "deferred:S3-session",
+   "kind": "UNKEYED",
+   "note": "The sender sending its final delivery state with the settled indication.",
+   "text_sha256": "7774caf6ed9a158f0aa74bc9d70644119959d418ceb9d6784290457f427b7b53"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.u5": {
+   "clause_text": "The application can then perform some final action, e.g., remove the delivery-tag from a set kept for de-duplication, and then notify the receiver that the delivery is settled.",
+   "disposition": "deferred:S3-session",
+   "kind": "UNKEYED",
+   "note": "The application's final action and the notification to the receiver.",
+   "text_sha256": "9da2420a24e8fbaacd809278e7ba274545a215f68a81d5bef4ee1c715f64d770"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.u6": {
+   "clause_text": "If the disposition frame indicated below is lost, then upon link recovery the sender will not see the delivery-tag in the receiver's unsettled map and will therefore assume the delivery was lost and resend it, resulting in duplicate processing of the message at the receiver.",
+   "disposition": "deferred:S3-session",
+   "kind": "UNKEYED",
+   "note": "A lost disposition and what the sender sees on link recovery: the unsettled-map rule from the sender's side.",
+   "text_sha256": "7eb245561a76d02bef2cd65faa69d3713aac2f4f43fd56f303ca7c4c201f0c2f"
+  },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:flow-control.u1": {
    "clause_text": "Only the receiver can independently choose a value for this field.",
    "disposition": "deferred:S4",
@@ -227,6 +347,27 @@
     "cannot"
    ]
   },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:attach/field:source.u1": {
+   "clause_text": "If no source is specified on an outgoing link, then there is no source currently attached to the link.",
+   "disposition": "deferred:S3-session",
+   "kind": "UNKEYED",
+   "note": "No source on an outgoing link means no source currently attached: an attach-field rule the link machine states today as a default rather than as this sentence.",
+   "text_sha256": "94c8c07fdf38f2ba0081fd22f3fb8f6fef1025105451493127fa4139deb62d7d"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:attach/field:target.u1": {
+   "clause_text": "If no target is specified on an incoming link, then there is no target currently attached to the link.",
+   "disposition": "deferred:S3-session",
+   "kind": "UNKEYED",
+   "note": "The mirror rule for an incoming link's target.",
+   "text_sha256": "4b709bc83b85e76fd65e70f36defe98fb6371865d00cdae722155304dcd3a13c"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:disposition/field:batchable.u1": {
+   "clause_text": "If true, then the issuer is hinting that there is no need for the peer to urgently communicate the impact of the updated delivery states.",
+   "disposition": "informative",
+   "kind": "UNKEYED",
+   "note": "The issuer `is hinting`: advisory, and the artifact says so in the sentence.",
+   "text_sha256": "428aa2f78fe563d4e8b71c8d490061c7740490fc8dad6aef851ee61ae01d8c33"
+  },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:available.u1": {
    "clause_text": "Only the sender can independently set this value.",
    "disposition": "deferred:S4",
@@ -247,6 +388,13 @@
     "only the receiver endpoint can"
    ]
   },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:desired-capabilities.u1": {
+   "clause_text": "If the receiver of the desired-capabilities offers extension capabilities which are not present in the desired-capabilities list it received, then it can be sure those (undesired) capabilities will not be used on the connection.",
+   "disposition": "deferred:S3-connection",
+   "kind": "UNKEYED",
+   "note": "What a peer may conclude from the capabilities list it receives: the connection layer's negotiation.",
+   "text_sha256": "b8e64314b90c87ddc8a3e943d29111cd6c4988f5d4e8f5aaf51df359063b03cf"
+  },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:hostname.u1": {
    "clause_text": "It is undefined what a different value to that already specified means.",
    "disposition": "underspecified:hostname-meanings",
@@ -257,6 +405,34 @@
     "is undefined"
    ]
   },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:idle-time-out.u1": {
+   "clause_text": "If the value is not set, then the sender does not have an idle time-out.",
+   "disposition": "deferred:S3-connection",
+   "kind": "UNKEYED",
+   "note": "An unset idle-time-out means the sender has none: the timeout work already treats the unset value, and this names the declaration to cite when that slice is next dispositioned.",
+   "text_sha256": "41026e18bfc29fb56c9f8ac59cc7458ee248ed733bae93001209f2c7d3067d46"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:batchable.u1": {
+   "clause_text": "If true, then the issuer is hinting that there is no need for the peer to urgently communicate updated delivery state.",
+   "disposition": "informative",
+   "kind": "UNKEYED",
+   "note": "`hinting that there is no need` \u2014 advisory, not a requirement on the peer.",
+   "text_sha256": "42a21902693b6af0c9e63ad6b9dbc490bbdc0a4a6de63bd6c6236941678b7e0f"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:batchable.u2": {
+   "clause_text": "If the message being delivered is too large to fit within a single frame, then the setting of batchable to true on any of the \u00abtransfer\u00bb performatives for the delivery is equivalent to setting batchable to true for all the \u00abtransfer\u00bb performatives for the delivery.",
+   "disposition": "deferred:S3-session",
+   "kind": "UNKEYED",
+   "note": "Setting batchable on any transfer of a multi-frame delivery is equivalent to setting it on all: a rule about the transfer family's fields.",
+   "text_sha256": "2885e0c192e2a13267edad24d06b27174f2cfd411866298725f4e57457528fe7"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:rcv-settle-mode.u1": {
+   "clause_text": "If the negotiated link value is \u00abreceiver-settle-mode\u00bb, then it is illegal to set this field to \u00abreceiver-settle-mode\u00bb.",
+   "disposition": "deferred:S3-session",
+   "kind": "UNKEYED",
+   "note": "Setting the field to the negotiated link value is illegal: a transfer validation rule the link machine will state.",
+   "text_sha256": "3c3963c72790e68e044e90698a8af94075b745447ee6d39d60fec1aa4adb8ef3"
+  },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions.u1": {
    "clause_text": "In this state an endpoint cannot send or receive frames.",
    "disposition": "deferred:S4",
@@ -266,6 +442,13 @@
    "unkeyed_phrases": [
     "cannot"
    ]
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions/doc:session-flow-control.u1": {
+   "clause_text": "If the next-incoming-id field of the \u00abflow\u00bb frame is not set, then remote-incoming-window is computed as follows:",
+   "disposition": "formalized:SpecAMQP.Contracts.SessionWindows.receiving_flow_computes_remote_incoming_window",
+   "kind": "UNKEYED",
+   "note": "The unset branch of the remote-incoming-window formula, which the window contract states as a law over the constructor that computes it. Carried as a law rather than as a rule: the declaration is a theorem over the constructor that computes the window, because nothing in the arithmetic can be witnessed by a vector.",
+   "text_sha256": "faf73e651b78f5e317dad39d734d89330569575da0b8539d15e3cf053a24bb68"
   },
   "amqp-core-types-v1.0-os.xml#amqp:types/section:primitive-type-definitions/type:map.u1": {
    "clause_text": "A map in which there exist two identical key values is invalid.",

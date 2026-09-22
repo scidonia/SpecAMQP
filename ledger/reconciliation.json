@@ -37,7 +37,7 @@
     "required": 0,
     "should": 13,
     "should_not": 7,
-    "statements": 98
+    "statements": 103
    }
   },
   "amqp-core-overview-v1.0-os.xml": {
@@ -142,7 +142,7 @@
     "required": 1,
     "should": 5,
     "should_not": 1,
-    "statements": 37
+    "statements": 43
    }
   },
   "amqp-core-transport-v1.0-os.xml": {
@@ -174,7 +174,7 @@
     "required": 2,
     "should": 32,
     "should_not": 4,
-    "statements": 240
+    "statements": 255
    }
   },
   "amqp-core-types-v1.0-os.xml": {
@@ -213,6 +213,7 @@
   "excluded-subtrees": "The baseline matched raw file text, including <picture> diagrams and the revhistory/acknowledgements sections. Those carry no normative statements, so the ledger excludes them; the per-artifact audit records the excluded keyword census so the exclusion is visible rather than silent.",
   "overview-not-scanned": "Part 1-5 only were scanned for the baseline. Part 0 (Overview) carries normative statements about containers, nodes, negotiated frame size and connection concurrency; those clauses appear here for the first time.",
   "unkeyed-phrase-extension": "The phrase list that captures keyword-free statements was extended after S4's flow-control work read the flow fields literally: `link-credit` says `Only the receiver endpoint can independently set this value`, `available` its mirror, and Part 2's other sections bound retransmission and name error conditions with `cannot` \u2014 rules that carry neither a conformance keyword nor any phrasing the earlier list knew. Eighteen further statements entered the ledger: eleven in Part 2 (flow-field ownership, the session state's frame bar, the `framing-error`, `redirect` and `frame-size-too-small` conditions), six in Part 3 (resumption options and the section-number / section-offset bounds) and one in Part 4 (links to the \u00abcoordinator\u00bb cannot be resumed). Each carries a `deferred:` disposition naming the milestone that owns it.",
+  "unkeyed-shape-extension": "A second extension to the keyword-free capture, after a slice found an obligation in the transactions section that neither a conformance keyword nor any phrase the list knew: `If the control link is closed while there exist non-discharged transactions it created, then all such transactions are immediately rolled back, and attempts to perform further transactional work on them will lead to failure.` The shape was measured before it was adopted \u2014 a rule keyed on `will lead to` alone captures two statements, the shape captures twenty-five, and both capture twenty-six \u2014 so the capture is a conditional whose consequent is asserted in the indicative (`then \u2026 is/are/will/has/have/does/remains/can no longer`). Twenty-six statements entered the ledger: five in Part 3, six in Part 4 and fifteen in Part 2. Some are plainly normative and were invisible before \u2014 `attach`'s source and target defaults, the transactional-work consequences, `transfer`'s receive-settle-mode restriction. The ones that are informative are captured and dispositioned as such, which is the census doing its job rather than the pattern being blunt.",
   "unkeyed-statements": "Normative sentences that carry no conformance keyword are now ledger statements of their own. The baseline and the first ledger both counted only keyword tokens, so a paragraph such as Part 1's map type lost its duplicate-key sentence entirely while the counts agreed. Twenty-seven such statements exist across the five parts; each carries a disposition and `check_unkeyed` refuses an omission. Eighteen of them entered the ledger only once the phrase list was extended (`cannot`, `Only the \u2026 can \u2026`), which is the mechanism recorded under `unkeyed-phrase-extension`.",
   "wrapped-keyword": "A `MUST NOT` (or `SHOULD NOT`) broken across source lines is one clause. The baseline's raw-text pattern missed the wrap and counted the leading MUST as a plain MUST, so the MUST/MUST NOT split differs while the total is unchanged."
  },
