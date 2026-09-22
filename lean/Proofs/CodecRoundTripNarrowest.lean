@@ -1,4 +1,5 @@
 import Proofs.CodecRoundTripDescribed
+import Proofs.ExceptMap
 
 /-!
 # The value codec's round trip: R5, the narrowest form
@@ -153,22 +154,31 @@ theorem foldl_be_bound (bytes : List UInt8) (init : Nat) :
 four-octet field is below `2 ^ 32`. This is the reader's counterpart of the writer's
 `filled` check, and it is the fact a narrowest-form argument about an *accepted* encoding
 needs — the quantity it compares is one the reader read from a field of some width, and
-this is what bounds it by that width. -/
-theorem takeBe_lt (width : Nat) (c : Cursor) (h : c.pos + width ≤ c.data.size)
+this is what bounds it by that width.
+
+The offset's check is not a hypothesis: `takeBe` is a `do`-block over `takeBytes`, so the
+field's absence is a refusal of that block, and a refusal contradicts the success this
+statement is handed. `Proofs/ExceptMap.lean`'s `except_bind_error` is what reduces that
+`do`-block at the refusal and lets the contradiction be seen. -/
+theorem takeBe_lt (width : Nat) (c : Cursor)
     (v : Nat) (c' : Cursor) (hv : takeBe width c = .ok (v, c')) : v < 256 ^ width := by
-  rw [takeBe_eq_fold width c h] at hv
-  have hval : beValue ((c.data.toList.drop c.pos).take width) = v :=
-    congrArg Prod.fst (Except.ok.inj hv)
-  have hlen : ((c.data.toList.drop c.pos).take width).length ≤ width := by
-    rw [List.length_take]
-    exact Nat.min_le_left _ _
-  rw [← hval, beValue]
-  have hbound : ((c.data.toList.drop c.pos).take width).foldl
-      (fun acc byte => acc * 256 + byte.toNat) 0 <
-        256 ^ ((c.data.toList.drop c.pos).take width).length := by
-    simpa using foldl_be_bound ((c.data.toList.drop c.pos).take width) 0
-  exact Nat.lt_of_lt_of_le hbound
-    (Nat.pow_le_pow_right (by decide : (0 : Nat) < 256) hlen)
+  by_cases h : c.pos + width ≤ c.data.size
+  · rw [takeBe_eq_fold width c h] at hv
+    have hval : beValue ((c.data.toList.drop c.pos).take width) = v :=
+      congrArg Prod.fst (Except.ok.inj hv)
+    have hlen : ((c.data.toList.drop c.pos).take width).length ≤ width := by
+      rw [List.length_take]
+      exact Nat.min_le_left _ _
+    rw [← hval, beValue]
+    have hbound : ((c.data.toList.drop c.pos).take width).foldl
+        (fun acc byte => acc * 256 + byte.toNat) 0 <
+          256 ^ ((c.data.toList.drop c.pos).take width).length := by
+      simpa using foldl_be_bound ((c.data.toList.drop c.pos).take width) 0
+    exact Nat.lt_of_lt_of_le hbound
+      (Nat.pow_le_pow_right (by decide : (0 : Nat) < 256) hlen)
+  · -- the field is not there, so the reader refuses and nothing was accepted
+    simp only [takeBe, takeBytes, if_neg h, except_bind_error] at hv
+    exact absurd hv (by simp)
 
 /-! ## The first family's consumption lemma
 
@@ -281,25 +291,34 @@ length and no more. `takeBytes_advances` is the second of those — the reader's
 how far it moved, which is what lets an accepted encoding's size be written as the field plus
 the quantity the family inequalities compare.
 
-It carries the cursor's check as a hypothesis for the same reason `takeBe_lt` does: its
-success implies the check, but extracting that means inverting `takeBytes`' refusal branch,
-and that is the `Functor.map` on `Except` obstruction this ladder has met three times. The
-check is what every consumption site already has. -/
+Neither carries a precondition: a refusal is what the reader's success rules out, and the case
+split that reads that off is now available, because `Proofs/ExceptMap.lean` hands `simp` the
+`Except` reduction that was missing — the `>>=` a `do`-block desugars to. Before that lemma a
+successful read's own refusal branch could not be discharged, so both statements carried the
+cursor's check as a hypothesis rather than deriving it; the check is no longer needed, and no
+consumption site has to supply it. -/
 
 /-- **Reading `n` octets advances the cursor by `n` and yields `n` of them.**
 
-The reader's own account of its movement: `takeBytes n` at a checked offset returns a cursor
-at `pos + n` and a buffer of exactly `n` octets. This is what an accepted encoding's size is
-made of — a field, then a payload of the payload's own length. -/
-theorem takeBytes_advances (n : Nat) (c : Cursor) (h : c.pos + n ≤ c.data.size)
+The reader's own account of its movement: `takeBytes n` at an offset that holds `n` octets
+returns a cursor at `pos + n` and a buffer of exactly `n` octets. This is what an accepted
+encoding's size is made of — a field, then a payload of the payload's own length.
+
+The offset's check is not a hypothesis: if the octets were not there, `takeBytes` would refuse,
+and its refusal contradicts the hypothesis that it succeeded. -/
+theorem takeBytes_advances (n : Nat) (c : Cursor)
     (bytes : Octets) (c' : Cursor) (hb : takeBytes n c = .ok (bytes, c')) :
     c'.pos = c.pos + n ∧ bytes.size = n := by
-  simp only [takeBytes, h, ↓reduceIte, Except.ok.injEq, Prod.mk.injEq] at hb
-  obtain ⟨hbytes, hcursor⟩ := hb
-  refine ⟨?_, ?_⟩
-  · rw [← hcursor]
-  · rw [← hbytes, Array.size_extract]
-    omega
+  by_cases h : c.pos + n ≤ c.data.size
+  · simp only [takeBytes, h, ↓reduceIte, Except.ok.injEq, Prod.mk.injEq] at hb
+    obtain ⟨hbytes, hcursor⟩ := hb
+    refine ⟨?_, ?_⟩
+    · rw [← hcursor]
+    · rw [← hbytes, Array.size_extract]
+      omega
+  · -- the reader refuses, so nothing was accepted
+    simp only [takeBytes, if_neg h] at hb
+    exact absurd hb (by simp)
 
 /-! ## The rung's claim -/
 

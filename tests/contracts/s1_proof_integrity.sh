@@ -198,6 +198,7 @@ import Contracts.TypeSystem
 import Proofs.CodecRoundTrip
 import Proofs.CodecRoundTripCompound
 import Proofs.CodecRoundTripDescribed
+import Proofs.ExceptMap
 import Proofs.CodecRoundTripNarrowest
 import Proofs.CodecRoundTripVariable
 import Spec.ReadLaws
