@@ -4,7 +4,7 @@ cd53ded13c0c31f2d6bacd3d04e3195f5c091b76  lean/Spec/Codec.lean
 fdb7124d119e3a66f6ab521d7c0dc22d34ed6fd4  lean/Spec/Frame.lean
 31e43aed7900e071a7a1615d739be50f716b5b74  lean/Spec/FrameCodec.lean
 7c2fc8950376880dfbba4beb86a052316ea8b589  lean/Spec/Main.lean
-d217340efec24e26245f21f2cfb4d04e9b140242  lean/Spec/Message.lean
+27c028422bb26779d7f587c8ca54a428035551c6  lean/Spec/Message.lean
 9fa46bb63a4e3b09f04c9d89689b74a676356783  lean/Spec/ReadLaws.lean
 8a0037265d01ea579ba2f8b6965513a45799b86d  lean/Spec/Session.lean
 0d21912c7627dddca29799f8b7a224fe91907b05  lean/Spec/SessionCodec.lean
@@ -47,6 +47,7 @@ d7cf7735d5765392d594e61138d761c141ef77a2  ledger/ambiguities/rejected-discharge-
 a78b2bcfe68699fc78794f1bc156a90b6214fdbe  ledger/ambiguities/second-open-refusal.json
 f1df18bddd8ad6dfa626560dfcf70419598c73dd  ledger/ambiguities/session-state-description-route.json
 0a438b210a37b4ed9558191f9987761a3de518b6  ledger/ambiguities/session-window-violation.json
+154ebe37627ea34810d738a423ca17e9244b83d6  ledger/ambiguities/settlement-is-absorbing.json
 c661a0341ee5572bd716861459bcfbedbae36a7f  ledger/ambiguities/unmapped-begin.json
 59045518f02b945530ce6c86810ea0d79bcf1cae  ledger/ambiguities/unmapped-channel-refusal.json
 2dd54d7eeae541a3df93bd52a17aae4d8cff5a6e  ledger/ambiguities/version-mismatch-condition.json

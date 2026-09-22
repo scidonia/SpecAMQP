@@ -1,0 +1,21 @@
+{
+ "adopted": "Settlement is absorbing: a later step cannot unsettle a delivery",
+ "consequences": [
+  "The two artefacts diverged here and the differential could not see it, because no vector carried a settled-then-unsettled step; gen-delivery-settled-not-unsettled was added as the isolating vector, so the divergence is a verdict rather than a note.",
+  "Registered after review rather than at the time: it was ruled 'decided, not silent' and left out of the register on that reasoning. The correct distinction is narrower \u2014 a question that is *silent* and a question that is *read* both need a durable record, and only a question whose answer is a citation belongs in neither. A generated vector's prose note is coder-owned and regenerates; this entry is the record."
+ ],
+ "evidence": "The artifact names no condition for this. The transport's own account of settlement grounds the reading: settling a delivery causes the sender to remove the delivery-tag from its unsettled map, and the unsettled map is the record of *unsettled* deliveries \u2014 nothing in that account puts an entry back.",
+ "id": "settlement-is-absorbing",
+ "open": true,
+ "question": "Is settlement absorbing \u2014 once a step settles a delivery, can a later step for the same delivery report it unsettled?",
+ "readings": [
+  {
+   "name": "Settlement is absorbing: a later step cannot unsettle a delivery",
+   "statement": "Adopted. A settled delivery stays settled however a later step reports it, because the artifact's account of the unsettled map is an account of removal and not of re-insertion. The delivery machine records `carried || step` and `settled_monotone` states the property over it, so the reading has a theorem carrying it rather than only a branch."
+  },
+  {
+   "name": "A step's own settled flag is authoritative, so a later step may unsettle",
+   "statement": "Rejected. It reads each frame in isolation, which would let a peer empty and refill the unsettled map it is defined by, and it leaves the absorbing property without a carrier."
+  }
+ ]
+}

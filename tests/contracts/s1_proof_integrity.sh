@@ -205,6 +205,7 @@ import Spec.ReadLaws
 
 import Proofs.ReadProgress
 import Proofs.CodecNarrowestAssembly
+import Spec.Message   # S5: the message layer's theorems, so their axiom inventories are disclosed per theorem
 #print axioms SpecAMQP.Contracts.constructor_grammar_public
 #print axioms SpecAMQP.Contracts.extended_header_width
 #print axioms SpecAMQP.Contracts.body_starts_after_the_header
@@ -220,6 +221,14 @@ import Proofs.CodecNarrowestAssembly
 #print axioms SpecAMQP.Proofs.lengthWidthOf_le_of_field
 #print axioms SpecAMQP.Proofs.variable_family_canonical_le
 #print axioms SpecAMQP.Proofs.foldl_be_bound
+#print axioms SpecAMQP.Spec.Message.sectionKinds_match_table
+#print axioms SpecAMQP.Spec.Message.sectionKinds_have_descriptors
+#print axioms SpecAMQP.Spec.Message.sectionKinds_have_shapes
+#print axioms SpecAMQP.Spec.Message.sectionKinds_distinct
+#print axioms SpecAMQP.Spec.Message.sectionKinds_distinct_descriptors
+#print axioms SpecAMQP.Spec.Message.recordState_settled
+#print axioms SpecAMQP.Spec.Message.settled_monotone
+#print axioms SpecAMQP.Spec.Message.terminal_absorbing
 #print axioms SpecAMQP.Proofs.takeBe_lt
 #print axioms SpecAMQP.Proofs.widthChoice_le_of_fits
 #print axioms SpecAMQP.Proofs.widthChoice_narrow_iff
@@ -260,6 +269,11 @@ import Proofs.CodecNarrowestAssembly
 #print axioms SpecAMQP.Proofs.readScalarData_progress
 #print axioms SpecAMQP.Proofs.exists_of_bind_ok
 AXIOMS
+# The inventories are printed from the modules' own oleans, so they must be built first: an
+# olean can be absent from a clean tree or removed by a sibling slice's failed build, and a
+# proof-integrity gate that reports "does not exist" has told the reader nothing about proofs.
+( cd "$root/lean" && LAKE_NO_CACHE=1 lake build ) >"$tmp/build.log" 2>&1 ||
+  { printf 's1_proof_integrity: FAIL: could not build the modules the inventories are printed from: %s\n' "$(tail -3 "$tmp/build.log")" >&2; exit 1; }
 ( cd "$root/lean" && LAKE_NO_CACHE=1 lake env lean "$tmp/Axioms.lean" ) >"$tmp/axioms.log" 2>&1 ||
   die "could not print the accepted theorem's axioms: $(tail -3 "$tmp/axioms.log")"
 grep -q "sorryAx" "$tmp/axioms.log" &&
