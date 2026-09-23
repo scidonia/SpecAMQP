@@ -559,6 +559,12 @@ def valueNat : Value → Option Nat
   | .ulong n => some n
   | _ => none
 
+/-- A `binary` value's payload: the one form whose payload is a byte string, and the form
+a field declared `binary` (or a restriction of it, like `delivery-tag`) carries. -/
+def valueOctets : Value → Option Octets
+  | .binary payload => some payload
+  | _ => none
+
 /-- A `multiple` field's symbols as the strings they are: a single symbol is the wire
 form of a one-element list, and the corpus's own frames are written that way. -/
 def symbolsOf : Value → List String

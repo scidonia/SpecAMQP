@@ -74,9 +74,26 @@ ABORTED_DISCARDS = (
     f"{TRANSPORT}#amqp:transport/section:performatives/type:transfer/field:aborted.2")
 # The three fields a first transfer must carry, which is what makes the end of a delivery
 # observable: a transfer offered after the message ended has none of them to carry.
+TRANSFER_FIELD_ANCHOR = f"{TRANSPORT}#amqp:transport/section:performatives/type:transfer/field:"
 FIRST_TRANSFER_FIELDS = [
-    f"{TRANSPORT}#amqp:transport/section:performatives/type:transfer/field:{field}.1"
+    f"{TRANSFER_FIELD_ANCHOR}{field}.1"
     for field in ("delivery-id", "delivery-tag", "message-format")]
+# The unkeyed sentence each of those three fields states its *continuation* rule with — "It is
+# an error if the delivery-tag on a continuation transfer differs from the delivery-tag on the
+# first transfer of a delivery" — which is the rule the family's three difference negatives
+# carry, and which neither artefact enforced before them. The `.u1` index is the ledger's: the
+# sentence carries no RFC 2119 keyword, so its disposition keys on the unkeyed form.
+CONTINUATION_IDENTITY = {
+    field: f"{TRANSFER_FIELD_ANCHOR}{field}.u1"
+    for field in ("delivery-id", "delivery-tag", "message-format")}
+# The value each difference negative gives the field it contradicts. The values the first
+# transfer carries are `fragment_body`'s — delivery-id 0, delivery-tag `b"tag"`, message-format
+# 0 — so each of these differs from the value it is compared against, and `self_check` says so
+# rather than this comment.
+DIFFERING_CONTINUATIONS = (
+    ("delivery-id", {"type": "uint", "value": 1}),
+    ("delivery-tag", {"type": "binary", "hex": b"elsewhere".hex()}),
+    ("message-format", {"type": "uint", "value": 1}))
 TRANSFER_CARRIES_A_MESSAGE = (
     f"{TRANSPORT}#amqp:transport/section:performatives/type:transfer.1")
 # The size the split rule defers to, in both halves: the field that declares it and the
@@ -226,8 +243,9 @@ def flow_corpus(tables: slices.Corpus) -> list[dict]:
     # A continuation that repeats the first transfer's fields. `delivery-tag.1` and its two
     # siblings make those fields required on the first transfer and *omissible* on a
     # continuation; the error the artifact names is a continuation that *differs*. So this
-    # framing is admitted, and carrying the vector is what keeps the negative corpus's two
-    # refusals from reading as a rule that a continuation must not repeat them.
+    # framing is admitted, and carrying the vector is what keeps the negative corpus's five
+    # refusals from reading as a rule that a continuation must not repeat the fields: the
+    # difference negatives refuse a *different* value, and this one is the same values again.
     cut = count // 2
     repeated = tables.body("transfer", handle={"type": "uint", "value": 0},
                            **{"delivery-id": {"type": "uint", "value": 0},
@@ -246,15 +264,98 @@ def flow_corpus(tables: slices.Corpus) -> list[dict]:
              "again: the three clauses make those fields required on the first transfer and "
              "omissible on a continuation, and the error they name is a continuation whose "
              "value *differs* from the first transfer's — so a sender that repeats them is "
-             "admitted. The negative corpus's refusals are then about the split points, not "
-             "about the fields a continuation repeats"))
+             "admitted. The negative corpus's two split-point refusals are then about the "
+             "split points, and its three difference refusals are about a *different* value, "
+             "not about the fields a continuation repeats"))
 
     return vectors
 
 
+def continuation_difference(tables: slices.Corpus) -> list[dict]:
+    """The three difference negatives' pieces, one entry per field: the legitimate framing's two
+    bodies and steps, and the body of the continuation that contradicts the first of them.
+
+    One function for the family and for `self_check`, so the control reads the bodies the vectors
+    are made of rather than a second copy of them: `first` and `middle` are what the two framing
+    steps carry, and `body` is what the refusing step carries.
+    """
+    octets = declared_message(SWEPT_TEXT)
+    count = len(octets)
+    first_cut, second_cut = count // 3, (2 * count) // 3
+    # Two transfers of a three-transfer framing, `more` set on both so the delivery is still in
+    # progress when the third arrives. The second is a continuation, and `fragment_body` writes a
+    # continuation carrying none of the three fields, which is what one is allowed to do.
+    first, middle = tables.fragment_body(0, 3), tables.fragment_body(1, 3)
+    framing = [tables.receive_frame(slices.AMQP_FRAME, body, state=slices.s("MAPPED"), channel=1,
+                                    payload=octets[start:end])
+               for body, start, end in ((first, 0, first_cut), (middle, first_cut, second_cut))]
+    return [{"field": field, "first": first, "middle": middle, "framing": framing,
+             "payload": octets[second_cut:],
+             "body": tables.body("transfer", handle={"type": "uint", "value": 0},
+                                 **{"more": {"type": "boolean", "value": True},
+                                    field: differing})}
+            for field, differing in DIFFERING_CONTINUATIONS]
+
+
+def declared_item(tables: slices.Corpus, body: dict, type_name: str, field: str) -> dict:
+    """One field's value in a described field list, positioned by the declared order.
+
+    `Corpus.body` writes the fields in that order and `described` drops the trailing nulls, so
+    an index past the list is the null the shorter list means.
+    """
+    index = tables.fields[type_name].index(field)
+    items = body["value"]["items"]
+    return items[index] if index < len(items) else {"type": "null"}
+
+
+def differing_continuation_negatives(tables: slices.Corpus) -> list[dict]:
+    """The three fields `delivery-id.u1`, `delivery-tag.u1` and `message-format.u1` make an
+    error to *contradict* on a continuation transfer, one vector each.
+
+    Each vector is a three-transfer framing of the swept message. The first transfer carries the
+    three fields, as the first transfer of a delivery must; the second *omits* all three, which
+    the same field's first sentence permits on a continuation; and the third carries one field
+    again with a different value from the first transfer's. So the omission is observed admitted
+    in the same run as the contradiction is refused, and the refusal can only be about the
+    difference — a rule that refused a continuation for omitting the fields, or for carrying
+    them at all, would fail this vector at the step above rather than at the one that refuses.
+    `flow-fragment-continuation-repeats-the-first-fields` is the other side of that contrast: a
+    continuation carrying all three fields *unchanged* stays admitted.
+
+    Three vectors rather than one because a refusal leaves the session in `DISCARDING` and one
+    framing cannot observe three refusals; a family that tested only the tag would leave
+    `delivery-id.u1` and `message-format.u1` with no carrier in either artefact.
+    """
+    vectors: list[dict] = []
+    for entry in continuation_difference(tables):
+        field = entry["field"]
+        vectors.append(exchange(
+            f"flow-negative-continuation-{field}-differs", start=slices.s("MAPPED"),
+            clauses=[SPLIT_POINTS, TRANSFER_CARRIES_A_MESSAGE,
+                     f"{TRANSFER_FIELD_ANCHOR}{field}.1", CONTINUATION_IDENTITY[field]],
+            steps=link_up(tables) + entry["framing"] + [
+                tables.refused(
+                    "receive", reason="malformed", condition=slices.INVALID_FIELD,
+                    state=slices.s("DISCARDING"), body=entry["body"], channel=1,
+                    payload=entry["payload"],
+                    note=f"the third transfer of this delivery carries {field} again, with a "
+                         f"value the first transfer's does not have: `{field}.u1` says \"It is "
+                         f"an error if the {field} on a continuation transfer differs from the "
+                         f"{field} on the first transfer of a delivery\"")],
+            note=f"a legitimate two-transfer framing of the message, followed by a continuation "
+                 f"whose {field} contradicts the first transfer's. The step above shows the same "
+                 f"framing admitted with the field omitted (`{field}.1` lets a continuation omit "
+                 f"it); carrying a *different* value is the error, and both artefacts must refuse "
+                 f"it with {slices.INVALID_FIELD} and the malformed class"))
+    return vectors
+
+
 def flow_negative_corpus(tables: slices.Corpus) -> list[dict]:
-    """The split points the artifact does not permit, in the two directions `links.29`
-    names: a delivery that does not end, and a frame over the size the clause defers to."""
+    """The framings the artifact does not permit: the two directions `links.29` names — a
+    delivery that does not end, and a frame over the size the clause defers to — and the
+    continuation whose `delivery-id`, `delivery-tag` or `message-format` contradicts the first
+    transfer's, which `.u1` makes an error and no artefact enforced before this family."""
+
     octets = declared_message(SWEPT_TEXT)
     count = len(octets)
     vectors: list[dict] = []
@@ -335,6 +436,15 @@ def flow_negative_corpus(tables: slices.Corpus) -> list[dict]:
              "maximum — so a split point that fits is admitted and one that does not is "
              "refused, in one vector, from one sender, on one link"))
 
+    # -- a continuation that contradicts the first transfer ------------- #
+    #
+    # The third rule the family carries, and the only one that is about the *continuation*
+    # transfer a split produces rather than about where the split falls: `delivery-id.u1`,
+    # `delivery-tag.u1` and `message-format.u1` each make it an error for a continuation to
+    # differ from the first transfer of its delivery. `differing_continuation_negatives` builds
+    # one vector per field, each with the omission admitted before the contradiction refused.
+    vectors.extend(differing_continuation_negatives(tables))
+
     return vectors
 
 
@@ -387,6 +497,9 @@ def self_check() -> None:
       admitted.
     * The frame-size negative's two split points are on opposite sides of the limit it
       names, so the vector cannot decay into one that is refused for another reason.
+    * Each difference negative's middle transfer omits all three continuation fields and its
+      last carries exactly one, with a value the first transfer's is not: the omission is what
+      the vector observes admitted, and a single field is what makes the refusal attributable.
     """
     first, second = section_named("data"), section_named("amqp-value")
     if first.code == second.code:
@@ -415,3 +528,23 @@ def self_check() -> None:
         raise SystemExit("the refused split is not over the limit")
     if len(long_message) <= limit - fixed + 1:
         raise SystemExit("the long message has no split point that leaves the limit")
+    # The three difference negatives are only *about* the difference if the difference is all
+    # that changed: the middle transfer must carry none of the three fields — which is the
+    # omission the vector observes admitted before it refuses — and the last must carry one whose
+    # value is not the first transfer's. A copy-paste that left the first transfer's value in the
+    # last step would produce a vector that refuses nothing, and one that filled the middle step
+    # in would produce a vector whose admitted step is not the omission it claims.
+    for entry in continuation_difference(tables):
+        field = entry["field"]
+        if declared_item(tables, entry["middle"], "transfer", field) != {"type": "null"}:
+            raise SystemExit(f"the difference negative's middle transfer carries {field}, so the "
+                             f"omission it must observe admitted is not in it")
+        if declared_item(tables, entry["body"], "transfer", field) == \
+                declared_item(tables, entry["first"], "transfer", field):
+            raise SystemExit(f"the difference negative's last transfer repeats the first "
+                             f"transfer's {field}, so it contradicts nothing")
+        for other in CONTINUATION_IDENTITY:
+            if other != field and \
+                    declared_item(tables, entry["body"], "transfer", other) != {"type": "null"}:
+                raise SystemExit(f"the difference negative for {field} also carries {other}, so "
+                                 f"its refusal would not be attributable to one field")

@@ -1233,23 +1233,23 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:delivery-id.u1": {
    "clause_text": "It is an error if the delivery-id on a continuation transfer differs from the delivery-id on the first transfer of a delivery.",
-   "disposition": "deferred:S3-session",
+   "disposition": "test:flow-negative-continuation-delivery-id-differs",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Enforced in both artefacts by `transferLink`'s continued branch and pinned by `flow-negative-continuation-delivery-id-differs` at its step 6, where both refuse with `amqp:invalid-field` and class `malformed`. The disposition was `deferred:S3-session` while the layer was unwritten; the layer is written and the vector is the evidence.",
    "text_sha256": "e5feb45a1bbb06d53f7fa5cc003e5610cebcd92e4815e0ccf3bcc6acc391aed4"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:delivery-tag.u1": {
    "clause_text": "It is an error if the delivery-tag on a continuation transfer differs from the delivery-tag on the first transfer of a delivery.",
-   "disposition": "deferred:S3-session",
+   "disposition": "test:flow-negative-continuation-delivery-tag-differs",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Enforced in both artefacts by `transferLink`'s continued branch and pinned by `flow-negative-continuation-delivery-tag-differs` at its step 6, where both refuse with `amqp:invalid-field` and class `malformed`. The disposition was `deferred:S3-session` while the layer was unwritten; the layer is written and the vector is the evidence.",
    "text_sha256": "d5bcde8be5cee5d38660e9da3caf33a716bea0b7b099122b6c74286165ab6418"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:message-format.u1": {
    "clause_text": "It is an error if the message-format on a continuation transfer differs from the message-format on the first transfer of a delivery.",
-   "disposition": "deferred:S3-session",
+   "disposition": "test:flow-negative-continuation-message-format-differs",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Enforced in both artefacts by `transferLink`'s continued branch and pinned by `flow-negative-continuation-message-format-differs` at its step 6, where both refuse with `amqp:invalid-field` and class `malformed`. The disposition was `deferred:S3-session` while the layer was unwritten; the layer is written and the vector is the evidence.",
    "text_sha256": "487e690adf70aff28d47b98c4ad951780e8232bf3a7fd9898074fc051c01d379"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:more.u1": {

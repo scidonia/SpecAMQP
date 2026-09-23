@@ -478,6 +478,12 @@ def numberOf : Value → Option Nat
   | .ulong n => some n.toNat
   | _ => none
 
+/-- A `binary` value's payload: the one form whose payload is a byte string, and the form a
+field declared `binary` — like `delivery-tag` — carries. -/
+def octetsOf : Value → Option (List UInt8)
+  | .binary b => some b
+  | _ => none
+
 /-- The symbols a `multiple` field carries: one symbol is the one-element wire form. -/
 def symbolList : Value → List String
   | .symbol s => [s]

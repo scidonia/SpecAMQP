@@ -57,7 +57,7 @@ open SpecAMQP.Harness (Octets)
 open SpecAMQP.Spec.Codec (Value)
 open SpecAMQP.Spec.Connection
   (choiceValue? fieldDefault fieldValue fieldSet framingError invalidField missingMandatory
-   valueNat)
+   valueNat valueOctets)
 
 /-! ## The session state machine (picture 30, "State Transitions") -/
 
@@ -462,6 +462,24 @@ structure Session where
   senderSettleMode : Bool
   /-- The delivery a transfer is carrying, while one is in progress. -/
   delivery : Option Delivery
+  /-- The `delivery-tag` the transfer that *began* the delivery in progress carried, and the
+  `message-format` it carried with it. `delivery-tag.u1` and `message-format.u1` compare those
+  fields on a continuation transfer against the first transfer's — "It is an error if the
+  delivery-tag on a continuation transfer differs from the delivery-tag on the first transfer of
+  a delivery" — and `delivery-id.u1` does the same for a field the delivery already holds.
+
+  Both live exactly as long as the delivery they are about: the transfer that begins one records
+  what it carried, a continuation leaves the recording alone, and a delivery that completes,
+  aborts or is released takes it with it. A recorded value that outlived its delivery would be
+  compared against the wrong one, which is worse than not comparing at all.
+
+  A value this endpoint has no reading of — a first transfer whose `delivery-tag` was not a
+  `binary` field — records `none`, and a continuation is then unconstrained rather than refused:
+  the rule is about a *differing* value, and absence is not a difference. -/
+  deliveryTag : Option Octets
+  /-- The `message-format` the transfer that began the delivery in progress carried. Cleared
+  with `deliveryTag`, for the same reason. -/
+  deliveryFormat : Option Nat
   /-- The transaction layer, where this session's link is a **control link**: `some` once
   either end's `attach` names a `coordinator` target, and `none` — which is the behaviour
   every session has always had — where it does not.
@@ -512,6 +530,8 @@ def Session.initial : Session where
   peerCredit := 0
   senderSettleMode := false
   delivery := none
+  deliveryTag := none
+  deliveryFormat := none
 
 /-- The session a state name starts at, with the channels its own description says it
 has: "UNMAPPED ... is not mapped to any incoming or outgoing channels", `BEGIN_SENT` "is
@@ -695,6 +715,7 @@ def attachLink (session : Session) (outbound : Bool) (body : Value) :
     return { session with
                handle := some handle, handles := handle :: session.handles,
                role := some role, position, peerCount := 0, peerCredit := 0, delivery := none,
+               deliveryTag := none, deliveryFormat := none,
                senderSettleMode := if role == LinkRole.sender then senderSettle else session.senderSettleMode }
   else
     return { session with
@@ -711,6 +732,7 @@ def attachLink (session : Session) (outbound : Bool) (body : Value) :
                               session.position
                             else position),
                delivery := none,
+               deliveryTag := none, deliveryFormat := none,
                senderSettleMode := if role == LinkRole.sender then senderSettle else session.senderSettleMode }
 
 /-- The flow exchange: the flow's own fields against the link's state. The windows'
@@ -800,8 +822,14 @@ def transferLink (session : Session) (outbound : Bool) (body : Value) :
       s!"a transfer is the sender's frame, and this endpoint attached as \
         {(session.role.getD LinkRole.receiver).name}")
   let continued := session.delivery.isSome
+  -- the three fields a continuation may repeat, omit or *contradict*, read once here: the two
+  -- the held delivery does not carry are recorded by the transfer that begins a delivery, and
+  -- `delivery-id` is compared against the id the delivery already holds
+  let carriedId := (fieldValue "transfer" "delivery-id" body).bind valueNat
+  let carriedTag := (fieldValue "transfer" "delivery-tag" body).bind valueOctets
+  let carriedFormat := (fieldValue "transfer" "message-format" body).bind valueNat
   let id ←
-    match (fieldValue "transfer" "delivery-id" body).bind valueNat with
+    match carriedId with
     | some id => pure id
     | none =>
       match session.delivery with
@@ -816,6 +844,26 @@ def transferLink (session : Session) (outbound : Bool) (body : Value) :
     (refusal invalidField "malformed"
       "a first transfer MUST carry its delivery-tag and message-format, which only a \
         continuation transfer may omit")
+  -- `delivery-id.u1`, `delivery-tag.u1` and `message-format.u1`: each says "It is an error if
+  -- [the field] on a continuation transfer differs from [the field] on the first transfer of a
+  -- delivery". Only a continuation can contradict anything — a first transfer's values are what
+  -- a later transfer is compared against, so they cannot differ from themselves — and omission is
+  -- not a difference: `delivery-id.2` makes it a MAY and the other two's first sentence lets a
+  -- continuation omit them. So each rule is checked against a value the frame *carries*, and one
+  -- this endpoint has no reading of leaves the continuation unconstrained rather than refused.
+  if continued then do
+    refuseUnless (carriedId.isNone || session.delivery.map (fun held => held.id) == carriedId)
+      (refusal invalidField "malformed"
+        "the delivery-id of a continuation transfer differs from the delivery-id of the \
+          delivery it continues, which `transfer/field:delivery-id.u1` makes an error")
+    refuseUnless (carriedTag.isNone || carriedTag == session.deliveryTag)
+      (refusal invalidField "malformed"
+        "the delivery-tag of a continuation transfer differs from the delivery-tag of the \
+          delivery it continues, which `transfer/field:delivery-tag.u1` makes an error")
+    refuseUnless (carriedFormat.isNone || carriedFormat == session.deliveryFormat)
+      (refusal invalidField "malformed"
+        "the message-format of a continuation transfer differs from the message-format of \
+          the delivery it continues, which `transfer/field:message-format.u1` makes an error")
   let settled := fieldSet "transfer" "settled" body
   let aborted := fieldSet "transfer" "aborted" body
   -- `more` decides whether this transfer completes the delivery; `aborted` discards it
@@ -834,8 +882,17 @@ def transferLink (session : Session) (outbound : Bool) (body : Value) :
             settled in at least one of its transfers, and delivery {id} is not")
       else pure none
   let delivery ← delivery
+  -- The recorded identity lives exactly as long as the delivery it is about: the transfer that
+  -- *begins* a delivery records what it carried, a continuation leaves the recording alone, and a
+  -- delivery that completes or is discarded takes the recording with it — `delivery-id.u1` says
+  -- "differs from the delivery-id on the first transfer of *a* delivery", so a value that outlived
+  -- its delivery could be compared against the wrong one.
+  let deliveryTag := if delivery.isSome then (if continued then session.deliveryTag else carriedTag)
+                     else none
+  let deliveryFormat :=
+    if delivery.isSome then (if continued then session.deliveryFormat else carriedFormat) else none
   match session.position with
-  | none => return { session with delivery }
+  | none => return { session with delivery, deliveryTag, deliveryFormat }
   | some current =>
       -- what the credit bounds is *messages*, not frames: `link-credit` is "the current
       -- maximum number of messages that can be handled at the receiver endpoint" and "the
@@ -854,14 +911,14 @@ def transferLink (session : Session) (outbound : Bool) (body : Value) :
               credit := if starting then current.credit - 1 else current.credit,
               deliveryCount :=
                 if starting then current.deliveryCount + 1 else current.deliveryCount }
-        return { session with position := some position, delivery }
+        return { session with position := some position, delivery, deliveryTag, deliveryFormat }
       else
         -- the receiver's count follows the sender's: "any subsequent messages received"
         let position : Position :=
           { current with
               deliveryCount :=
                 if starting then current.deliveryCount + 1 else current.deliveryCount }
-        return { session with position := some position, delivery }
+        return { session with position := some position, delivery, deliveryTag, deliveryFormat }
 
 /-- Whether a body is a disposition performative. The dispatch table gives it to the
 session endpoint; this module's `Performative` names only the frames the session state
@@ -896,11 +953,13 @@ def detachLink (session : Session) (outbound : Bool) (body : Value) :
     -- the transactions it created, "all such transactions are immediately rolled back"
     return Session.afterLinkRelease
       { session with handle := none, role := none, position := none,
-                     peerCount := 0, peerCredit := 0, delivery := none }
+                     peerCount := 0, peerCredit := 0, delivery := none,
+                     deliveryTag := none, deliveryFormat := none }
   else
     return Session.afterLinkRelease
       { session with peerHandle := none, peerRole := none,
-                     peerCount := 0, peerCredit := 0, delivery := none }
+                     peerCount := 0, peerCredit := 0, delivery := none,
+                     deliveryTag := none, deliveryFormat := none }
 
 /-- The disposition exchange: `disposition.1/.2`'s directionality ("all links MUST have
 the directionality indicated by the specified role"), the range `first`/`last` name, and
@@ -936,7 +995,7 @@ def dispositionLink (session : Session) (outbound : Bool) (body : Value) :
   match session.delivery with
   | some delivery =>
     if fieldSet "disposition" "settled" body && first ≤ delivery.id && delivery.id ≤ last then
-      return { session with delivery := none }
+      return { session with delivery := none, deliveryTag := none, deliveryFormat := none }
     else return session
   | none => return session
 

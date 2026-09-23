@@ -25,7 +25,7 @@ namespace SpecAMQP.Ref.Session
 
 open SpecAMQP.Generated.Oasis
   (ChoiceDecl TypeDecl choices errorConditionsOf types)
-open SpecAMQP.Ref.Connection (missingMandatory numberOf valueOfField)
+open SpecAMQP.Ref.Connection (missingMandatory numberOf octetsOf valueOfField)
 -- The transaction layer's state and the two names this module reads from it. Opened
 -- selectively: `Ref.Transactions` also defines a `Refusal`, and this module has its own.
 open SpecAMQP.Ref.Transactions (Layer coordinatorCapabilities)
@@ -342,6 +342,17 @@ structure Endpoint where
   senderSettleMode : Bool
   /-- The delivery in progress, while one is. -/
   delivery : Option Delivery
+  /-- The `delivery-tag` the transfer that *began* the delivery in progress carried, and the
+  `message-format` it carried with it: `delivery-tag.u1` and `message-format.u1` compare those
+  fields on a continuation transfer against the first transfer's, and `delivery-id.u1` does the
+  same for the id the held delivery already carries.
+
+  Both are cleared wherever the delivery is, so a recording cannot outlive the delivery it is
+  about. A field this endpoint could not read records nothing, and a continuation is then
+  unconstrained rather than refused: the rule is about a *differing* value, and absence is not a
+  difference. -/
+  deliveryTag : Option (List UInt8)
+  deliveryFormat : Option Nat
   /-- The transaction layer, where this session's link is a control link: `some` once
   either end's attach names a coordinator target, and `none` where it does not, which is
   every session that is not doing transactional work. Part 4 sends the declare and
@@ -375,6 +386,8 @@ def Endpoint.fresh (state : State) : Endpoint where
   peerCredit := 0
   senderSettleMode := false
   delivery := none
+  deliveryTag := none
+  deliveryFormat := none
 
 /-- The endpoint a state name starts at, with the channels and the begin's arrival taken
 from the state's own description. -/
@@ -539,7 +552,7 @@ def attachLink (endpoint : Endpoint) (outbound : Bool) (body : Value) :
     -- reading, taken from the credit's ownership sentence
     return { endpoint with handle := some handle, handles := handle :: endpoint.handles,
                             role := some role, peerCount := 0, peerCredit := 0,
-                            delivery := none,
+                            delivery := none, deliveryTag := none, deliveryFormat := none,
                             position := some ⟨(if role == Role.sender then initialCount else 0), 0⟩,
                             senderSettleMode :=
                               if role == Role.sender then settle else endpoint.senderSettleMode }
@@ -547,6 +560,7 @@ def attachLink (endpoint : Endpoint) (outbound : Bool) (body : Value) :
     return { endpoint with peerHandle := some handle,
                             peerHandles := handle :: endpoint.peerHandles,
                             peerRole := some role, delivery := none,
+                            deliveryTag := none, deliveryFormat := none,
                             position := if role == Role.sender || endpoint.position.isSome
                                         then endpoint.position else some ⟨0, 0⟩,
                             peerCount := (if role == Role.sender
@@ -630,8 +644,14 @@ def transferLink (endpoint : Endpoint) (outbound : Bool) (body : Value) :
     | some .null | none => false
     | some _ => true
   let continued := endpoint.delivery.isSome
+  -- the three fields a continuation may repeat, omit or *contradict*, read once here: the two the
+  -- held delivery does not carry are recorded by the transfer that begins a delivery, and
+  -- `delivery-id` is compared against the id the delivery already holds
+  let carriedId := (valueOfField "transfer" "delivery-id" body).bind numberOf
+  let carriedTag := (valueOfField "transfer" "delivery-tag" body).bind octetsOf
+  let carriedFormat := (valueOfField "transfer" "message-format" body).bind numberOf
   let id ←
-    match (valueOfField "transfer" "delivery-id" body).bind numberOf with
+    match carriedId with
     | some id => pure id
     | none =>
       match endpoint.delivery with
@@ -641,18 +661,49 @@ def transferLink (endpoint : Endpoint) (outbound : Bool) (body : Value) :
   if !continued && !(present "delivery-tag" && present "message-format") then
     .error (refuse invalidFieldCondition "malformed"
       "a first transfer MUST carry its delivery-tag and message-format")
+  -- `delivery-id.u1`, `delivery-tag.u1` and `message-format.u1`: each says "It is an error if
+  -- [the field] on a continuation transfer differs from [the field] on the first transfer of a
+  -- delivery". Only a continuation can contradict anything — a first transfer's values are what a
+  -- later transfer is compared against — and omission is not a difference: the fields' own first
+  -- sentence and `delivery-id.2` let a continuation omit them. So each rule is checked against a
+  -- value the frame *carries*, and one this endpoint has no reading of leaves the continuation
+  -- unconstrained rather than refused.
+  if continued then
+    if carriedId.isSome && (endpoint.delivery.map (fun held => held.id)) != carriedId then
+      .error (refuse invalidFieldCondition "malformed"
+        "the delivery-id of a continuation transfer differs from the delivery-id of the \
+          delivery it continues, which `transfer/field:delivery-id.u1` makes an error")
+    if carriedTag.isSome && carriedTag != endpoint.deliveryTag then
+      .error (refuse invalidFieldCondition "malformed"
+        "the delivery-tag of a continuation transfer differs from the delivery-tag of the \
+          delivery it continues, which `transfer/field:delivery-tag.u1` makes an error")
+    if carriedFormat.isSome && carriedFormat != endpoint.deliveryFormat then
+      .error (refuse invalidFieldCondition "malformed"
+        "the message-format of a continuation transfer differs from the message-format of \
+          the delivery it continues, which `transfer/field:message-format.u1` makes an error")
   let settled := present "settled"
   let aborted := present "aborted"
   let more := !aborted && present "more"
   let completed := Delivery.advance endpoint.delivery id settled
-  if aborted then return { endpoint with delivery := none }
+  if aborted then return { endpoint with delivery := none, deliveryTag := none,
+                                          deliveryFormat := none }
   if !more && endpoint.senderSettleMode && !completed.settled then
     .error (refuse invalidFieldCondition "malformed"
       s!"with sender-settle-mode negotiated, a delivery MUST be settled in at least one of \
         its transfers, and delivery {id} is not")
+  -- The recording lives exactly as long as the delivery it is about: the transfer that *begins* a
+  -- delivery records what it carried, a continuation leaves the recording alone, and the transfer
+  -- that ends the delivery takes the recording with it — `delivery-id.u1` says "differs from the
+  -- delivery-id on the first transfer of *a* delivery", so a value that outlived its delivery
+  -- could be compared against the wrong one.
+  let recorded :=
+    if continued then (endpoint.deliveryTag, endpoint.deliveryFormat)
+    else (carriedTag, carriedFormat)
+  let deliveryTag := if more then recorded.1 else none
+  let deliveryFormat := if more then recorded.2 else none
   let progress := if more then some completed else none
   match endpoint.position with
-  | none => return { endpoint with delivery := progress }
+  | none => return { endpoint with delivery := progress, deliveryTag, deliveryFormat }
   | some position =>
     -- the credit bounds messages rather than frames, and the delivery-count "is
     -- incremented whenever a message is sent": both move on the transfer that begins a
@@ -664,11 +715,15 @@ def transferLink (endpoint : Endpoint) (outbound : Bool) (body : Value) :
       if starting && position.credit == 0 then
         .error (refuse wireCondition "limit"
           "the link has no credit left: the sender has reached the receiver's delivery-limit")
-      if !starting then return { endpoint with position := some counted, delivery := progress }
+      if !starting then
+        return { endpoint with position := some counted, delivery := progress,
+                               deliveryTag, deliveryFormat }
       let spent := { counted with credit := position.credit - 1 }
-      return { endpoint with position := some spent, delivery := progress }
+      return { endpoint with position := some spent, delivery := progress,
+                             deliveryTag, deliveryFormat }
     else
-      return { endpoint with position := some counted, delivery := progress }
+      return { endpoint with position := some counted, delivery := progress,
+                             deliveryTag, deliveryFormat }
 
 /-- The detach exchange: the handle rules, the release `link-handles` gives a detach — "this
 handle ... remains in use until the link is detached" — and `links.15`'s exception, since
@@ -685,11 +740,13 @@ def detachLink (endpoint : Endpoint) (outbound : Bool) (body : Value) :
     -- control link's release rolls back the transactions it created
     return Endpoint.afterLinkRelease
       { endpoint with handle := none, role := none, position := none,
-                      peerCount := 0, peerCredit := 0, delivery := none }
+                      peerCount := 0, peerCredit := 0, delivery := none,
+                      deliveryTag := none, deliveryFormat := none }
   else
     return Endpoint.afterLinkRelease
       { endpoint with peerHandle := none, peerRole := none,
-                      peerCount := 0, peerCredit := 0, delivery := none }
+                      peerCount := 0, peerCredit := 0, delivery := none,
+                      deliveryTag := none, deliveryFormat := none }
 
 /-- Whether a body is a disposition: the dispatch table gives it to the session, and this
 module's `Frame` names only the frames the state machine itself turns on. -/
@@ -730,7 +787,7 @@ def dispositionLink (endpoint : Endpoint) (outbound : Bool) (body : Value) :
       | some .null | none => false
       | some _ => true
     if settled && first ≤ delivery.id && delivery.id ≤ last then
-      return { endpoint with delivery := none }
+      return { endpoint with delivery := none, deliveryTag := none, deliveryFormat := none }
     else return endpoint
 
 
