@@ -69,7 +69,10 @@ where the operator asks for them rather than into the passing corpus.
 `--staged` writes the third family to a path of the caller's choosing: vectors authored
 from the artifact that at least one artefact does not meet. Each is a *divergence* (the
 two artefacts answer the same step differently, and neither side is chosen) or a *shared
-gap* (both admit what a clause forbids, so no differential can see it); `staged_corpus`
+gap* (both admit what a clause forbids, so no differential can see it); the divergence
+kind is empty as the file stands — its last two members were aligned by `d50abc1` and
+`1540777` and promoted — so the family is shared gaps only, which is what the file is for:
+holding the obligations a gate cannot yet require rather than being emptied. `staged_corpus`
 names which, with the clause and both observed answers, because the file is a fix
 slice's opening evidence rather than a corpus a gate runs.
 
@@ -2128,6 +2131,19 @@ def session_corpus(tables: Corpus) -> list[dict]:
              "and the next delivery — which settles nowhere — is the violation"))
 
     vectors.append(exchange(
+        "exchange-link-settled-false-under-settled-negotiation", start=s("MAPPED"),
+        clauses=[TRANSFER_SETTLED, SESSION_END_ON_ERROR, SESSION_ERRORS],
+        steps=link_up(role_sender=False, peer_settle=settle_choices["settled"]) + [
+            t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                      state=s("DISCARDING"), body=t.transfer_body(settled=False),
+                      channel=1, payload=message)],
+        note="the `settled` choice is met by the flag's content rather than by the field's "
+             "presence: a transfer that sets `settled` to *false* settles no transfer of "
+             "its delivery, so the delivery breaks the negotiation and is refused with "
+             "`amqp:invalid-field`, leaving the peer in `session:DISCARDING`. Both "
+             "artefacts admitted it until `d50abc1` and `1540777`; both refuse it since"))
+
+    vectors.append(exchange(
         "exchange-link-mixed-negotiation-neither-obligation", start=s("MAPPED"),
         clauses=[TRANSFER_SETTLED, TRANSFER_SETTLED_NEVER, TRANSFER_ONE_SECTION],
         steps=link_up(role_sender=False, peer_settle=settle_choices["mixed"]) + [
@@ -2254,6 +2270,55 @@ def session_corpus(tables: Corpus) -> list[dict]:
         note="the complement of the abort vector: an aborted delivery leaves the link "
              "usable, so the next transfer is a first transfer of a new delivery and is "
              "admitted. `aborted.2` discards the delivery and its payload, not the link"))
+
+    vectors.append(exchange(
+        "exchange-link-aborted-false-spends-no-credit", start=s("MAPPED"),
+        clauses=[ABORTED_MESSAGES_DISCARDED, FLOW_SENDER_STOPS_AT_ZERO_CREDIT,
+                 TRANSFER_MORE_ABORTED_PRECEDENCE],
+        steps=link_up(role_sender=True, credit=1) + [
+            t.send_frame(AMQP_FRAME, t.transfer_body(aborted=False),
+                         state=s("MAPPED"), channel=1, payload=message),
+            t.refused("send", reason="limit", condition=FRAMING_ERROR,
+                      state=s("MAPPED"), body=t.transfer_body(delivery_id=1),
+                      channel=1, payload=message)],
+        note="the credit an aborted delivery spends turns on what `aborted` carries: a "
+             "transfer whose flag is *false* is not an aborted delivery, so it consumes the "
+             "one delivery the receiver granted and the delivery after it is refused with "
+             "`amqp:connection:framing-error` and class `limit`, the peer staying in "
+             "`session:MAPPED`. The reference admitted that delivery until `1540777`; both "
+             "artefacts have refused it since"))
+
+    vectors.append(exchange(
+        "exchange-link-aborted-spends-the-credit", start=s("MAPPED"),
+        clauses=[ABORTED_MESSAGES_DISCARDED, FLOW_SENDER_STOPS_AT_ZERO_CREDIT,
+                 TRANSFER_ABORT_PRIOR_DATA],
+        steps=link_up(role_sender=True, credit=1) + [
+            t.send_frame(AMQP_FRAME, t.transfer_body(aborted=True),
+                         state=s("MAPPED"), channel=1, payload=message),
+            t.refused("send", reason="limit", condition=FRAMING_ERROR,
+                      state=s("MAPPED"), body=t.transfer_body(delivery_id=1),
+                      channel=1, payload=message)],
+        note="an aborted delivery spends the credit it was sent under, so the delivery the "
+             "receiver's grant does not cover is refused with "
+             "`amqp:connection:framing-error` and class `limit`, the peer staying in "
+             "`session:MAPPED`. The reference admitted it until `1540777`; both artefacts "
+             "have refused it since"))
+
+    vectors.append(exchange(
+        "exchange-link-more-false-completes-the-delivery", start=s("MAPPED"),
+        clauses=[TRANSFER_MORE_LAST_FRAME, TRANSFER_FIRST_FIELDS],
+        steps=link_up() + [
+            t.receive_frame(AMQP_FRAME, t.transfer_body(more=False),
+                            state=s("MAPPED"), channel=1, payload=message),
+            t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                      state=s("DISCARDING"), body=t.transfer_body(identity=False),
+                      channel=1, payload=message)],
+        note="`more` carries a value rather than a presence: a transfer whose flag is "
+             "*false* is the last of its delivery, so the delivery is complete and the "
+             "continuation that follows it — a transfer with nothing to continue — is "
+             "refused with `amqp:invalid-field`, leaving the peer in `session:DISCARDING`. "
+             "Both artefacts admitted both steps until `d50abc1` and `1540777`; both refuse "
+             "the continuation since"))
 
     # -- resumption: the flag a resumed delivery is named by ------------------------- #
 
@@ -2411,14 +2476,17 @@ def staged_corpus(tables: Corpus) -> list[dict]:
     named. They are written to a path the caller names, outside `vectors/`, so the corpus
     a gate reads stays green while the finding stays in a file a fix slice can lift.
 
-    The two classes are worth distinguishing, because they need different work:
+    Every vector here is now a **shared gap**: a frame both artefacts admit (or refuse)
+    against the clause, so no differential can see it. The class it is not — a
+    **divergence**, a frame the two artefacts answer differently, with neither side chosen
+    here — held the aborted-credit pair and is empty since `d50abc1` and `1540777` aligned
+    them; both are in `vectors/`, with the two flag readings the same commits settled.
 
-    * a **divergence** is a frame the two artefacts answer differently. Neither side is
-      chosen here: the vector states what the clause requires and records both answers,
-      and the reading that decides between them belongs to the register.
-    * a **shared gap** is a frame both artefacts admit (or refuse) against the clause, so
-      no differential can see it. These are the shapes the corpus has never reached, and
-      each one is a rule with no carrier in either layer.
+    Shared gaps only is the stronger statement, and the one worth carrying: every vector
+    staged here is a rule neither artefact enforces, so no comparison between the two can
+    see any of them, and this corpus is the only instrument that can. What is staged is the
+    ledger's deferred obligations made visible rather than a backlog of defects for one side
+    to fix.
 
     Three of them are settled-mode or delivery-count readings the register is silent on
     (`Transfer/field:settled.6`, `transfer/field:rcv-settle-mode.u1`,
@@ -2451,56 +2519,9 @@ def staged_corpus(tables: Corpus) -> list[dict]:
                 state=s("MAPPED"), channel=1)]
 
     unsettled = t.settle_mode("sender-settle-mode", "unsettled")
-    settled = t.settle_mode("sender-settle-mode", "settled")
     second = t.settle_mode("receiver-settle-mode", "second")
 
     return [
-        # -- a frame the two artefacts answer differently ---------------------- #
-
-        exchange(
-            "staged-link-aborted-false-spends-no-credit", start=s("MAPPED"),
-            clauses=[ABORTED_MESSAGES_DISCARDED, FLOW_SENDER_STOPS_AT_ZERO_CREDIT,
-                     TRANSFER_MORE_ABORTED_PRECEDENCE],
-            steps=link_up(role_sender=True, credit=1) + [
-                t.send_frame(AMQP_FRAME, t.transfer_body(aborted=False),
-                             state=s("MAPPED"), channel=1, payload=message),
-                t.refused("send", reason="limit", condition=FRAMING_ERROR,
-                          state=s("MAPPED"), body=t.transfer_body(delivery_id=1),
-                          channel=1, payload=message)],
-            note="**Divergence, on the credit an aborted delivery spends.** The receiver "
-                 "granted one delivery of credit. `aborted` is a boolean whose value here "
-                 "is *false*, so the delivery is not an aborted one and it consumes the "
-                 "credit the receiver granted — which makes the second delivery exceed "
-                 "the delivery-limit and be refused. The specification refuses it with "
-                 "`amqp:connection:framing-error` and class `limit`, leaving the peer in "
-                 "`session:MAPPED`; the reference **admits** it, because its `aborted` "
-                 "check is a presence test that reads an explicit false as an abort and "
-                 "returns before the credit block. So the divergence has two causes at "
-                 "once — the flag's value read as its presence, and the credit an aborted "
-                 "delivery does or does not spend — and the vector's second step is what "
-                 "separates them from the outside"),
-
-        exchange(
-            "staged-link-aborted-spends-the-credit", start=s("MAPPED"),
-            clauses=[ABORTED_MESSAGES_DISCARDED, FLOW_SENDER_STOPS_AT_ZERO_CREDIT,
-                     TRANSFER_ABORT_PRIOR_DATA],
-            steps=link_up(role_sender=True, credit=1) + [
-                t.send_frame(AMQP_FRAME, t.transfer_body(aborted=True),
-                             state=s("MAPPED"), channel=1, payload=message),
-                t.refused("send", reason="limit", condition=FRAMING_ERROR,
-                          state=s("MAPPED"), body=t.transfer_body(delivery_id=1),
-                          channel=1, payload=message)],
-            note="**Divergence, with the flag the clauses do agree about.** Here the "
-                 "delivery really is aborted, so both artefacts discard it — and they "
-                 "still disagree about the credit it spent. The specification refuses the "
-                 "next delivery with `amqp:connection:framing-error` and class `limit`; "
-                 "the reference **admits** it. Which reading the artifact gives is not "
-                 "stated: `flow-control.5` ties `link-credit` to `delivery-count`, an "
-                 "aborted delivery advances the sender's sequence number, and "
-                 "`aborted.1` requires the *recipient* to discard the message rather than "
-                 "the sender to un-send it. The register is silent, which is why this is "
-                 "staged rather than decided"),
-
         # -- frames both artefacts admit against the clause --------------------- #
 
         exchange(
@@ -2536,43 +2557,6 @@ def staged_corpus(tables: Corpus) -> list[dict]:
                  "peer in `session:MAPPED`. The receive-direction vector above says the "
                  "same about the peer's frames; this one says it about ours, which is "
                  "where an enforcement would have to live to stop the frame"),
-
-        exchange(
-            "staged-link-settled-false-under-settled-negotiation", start=s("MAPPED"),
-            clauses=[TRANSFER_SETTLED, SESSION_END_ON_ERROR, SESSION_ERRORS],
-            steps=link_up(role_sender=False, peer_settle=settled) + [
-                t.refused("receive", reason="malformed", condition=INVALID_FIELD,
-                          state=s("DISCARDING"), body=t.transfer_body(settled=False),
-                          channel=1, payload=message)],
-            note="**Shared gap: the flag's content against its presence.** `settled.4` "
-                 "requires the field to be **true** on at least one transfer of a "
-                 "delivery when the negotiated mode is the `settled` choice. This "
-                 "transfer carries the field with the value *false*, so no transfer of "
-                 "the delivery is settled and the delivery breaks the negotiation — while "
-                 "both artefacts **admit** it, because both read the flag by presence "
-                 "(`fieldSet`/`present` are true for any non-null value). The corpus "
-                 "already carries the vector where the flag is absent, which both refuse "
-                 "correctly; this is the neighbouring input that shows the check is on "
-                 "the field's shape rather than on its content"),
-
-        exchange(
-            "staged-link-more-false-completes-the-delivery", start=s("MAPPED"),
-            clauses=[TRANSFER_MORE_LAST_FRAME, TRANSFER_FIRST_FIELDS],
-            steps=link_up() + [
-                t.receive_frame(AMQP_FRAME, t.transfer_body(more=False),
-                                state=s("MAPPED"), channel=1, payload=message),
-                t.refused("receive", reason="malformed", condition=INVALID_FIELD,
-                          state=s("DISCARDING"), body=t.transfer_body(identity=False),
-                          channel=1, payload=message)],
-            note="**Shared gap, the same shape as the settled flag.** `links.29` says how "
-                 "a split message is carried — \"by setting the more flag on all but the "
-                 "last «transfer» frame\" — so a transfer whose `more` is *false* is the "
-                 "last one and the delivery it carries is complete. Both artefacts "
-                 "**admit** both steps here: they read `more` by presence, so an explicit "
-                 "false continues the delivery and the following continuation, which has "
-                 "nothing to continue, is admitted too. The second step is what makes the "
-                 "reading observable rather than a matter of taste: whichever way the "
-                 "flag is read, the two steps cannot both be right"),
 
         exchange(
             "staged-link-rcv-settle-second-over-first", start=s("MAPPED"),
