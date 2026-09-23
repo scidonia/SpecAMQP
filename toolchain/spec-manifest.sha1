@@ -33,6 +33,7 @@ b5f824512d926a5475306134bb61ee8c215ae2d2  ledger/ambiguities/check-precedence-un
 20131c9f40d375af402d2dea11e7fa6efac6acbf  ledger/ambiguities/fail-true-against-an-unknown-id.json
 9cb58a5caf168e43340942811352ca89b5c978cd  ledger/ambiguities/flow-link-field-without-handle.json
 1e4244761b674c05d55c077b5eb729c296911b75  ledger/ambiguities/head-only-payload-admitted.json
+63c608c8e8e369bf42623a85cf8b294bd52b9cb2  ledger/ambiguities/hostname-meanings.json
 0a4f2402a909204beb513fd9ec654a6cc3858776  ledger/ambiguities/interleaved-deliveries-absorbed.json
 1092310820915987af91379bc39de52d14bd5549  ledger/ambiguities/link-uniqueness-vacuous.json
 49aa74044fcaedbbd43858b42022b11e8860ccde  ledger/ambiguities/map-ordering.json
@@ -44,6 +45,7 @@ a78b2bcfe68699fc78794f1bc156a90b6214fdbe  ledger/ambiguities/second-open-refusal
 f1df18bddd8ad6dfa626560dfcf70419598c73dd  ledger/ambiguities/session-state-description-route.json
 0a438b210a37b4ed9558191f9987761a3de518b6  ledger/ambiguities/session-window-violation.json
 154ebe37627ea34810d738a423ca17e9244b83d6  ledger/ambiguities/settlement-is-absorbing.json
+8e2950040761de47adf4d1fdda0099f827eeaaa3  ledger/ambiguities/tls-hostname-mismatch.json
 6565db734b7b3fe11c1e75c0175fd1a97295984f  ledger/ambiguities/transport-close-not-an-input.json
 c661a0341ee5572bd716861459bcfbedbae36a7f  ledger/ambiguities/unmapped-begin.json
 59045518f02b945530ce6c86810ea0d79bcf1cae  ledger/ambiguities/unmapped-channel-refusal.json
