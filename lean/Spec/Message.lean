@@ -239,9 +239,20 @@ theorem sectionKinds_have_shapes :
     SectionKind.all.all (fun kind => kind.shape.isOk) = true := by
   decide
 
-/-- The kinds' names are distinct: a descriptor names at most one section type. -/
+/-- The kinds' names are pairwise distinct, which is a claim about the names and not about
+list lengths: `List.map` preserves a list's length for *any* function, so a length equation
+would hold whatever names the kinds carried, and it would say nothing about the descriptor
+lookup being a function. This is the proposition that does: two kinds sharing a type name
+would make `kindOfTypeName?` and `kindOfDescriptorCode?` order-dependent, and a descriptor
+would name more than one section type. -/
 theorem sectionKinds_distinct :
-    (SectionKind.all.map SectionKind.typeName).length = SectionKind.all.length := by
+    (SectionKind.all.map SectionKind.typeName).Nodup = true := by
+  decide
+
+/-- The descriptors the kinds are looked up by are distinct too, so `kindOfDescriptorCode?`
+answers with one kind rather than the first of several. -/
+theorem sectionKinds_distinct_descriptors :
+    (SectionKind.all.map (fun kind => kind.descriptorCode.toOption)).Nodup = true := by
   decide
 
 /-! ## Fields, and the type rules the declared surface states
