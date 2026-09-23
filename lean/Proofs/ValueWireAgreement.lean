@@ -22,6 +22,58 @@ and the fuel induction itself, whose entry point is free. What each owes and how
 proved is stated where it belongs rather than in a list here: see the octet step's arithmetic, and
 `arm_0x00`'s docstring for the pattern the branches follow.
 
+## What the compound and array rows owe, and the fuel asymmetry that shapes them
+
+The tools the loop relations need are landed — `pairUp_agrees` (the two artefacts' map pairings),
+`specElementData` with `specElementData_loop` and `specElementData_progress` (the specification's
+element read, named as a reader so the element count can be inducted on), the reference's own cursor
+advances, the element-constructor bridge (`elementDecl?_isSome`, `elementDecl?_of_assigned`,
+`elementDecl?_refusal`), and the refusal families for an octet the declared surface does not assign
+(`encodingOf_none_of_not_assigned`, `ref_readValue_unassigned`, `spec_readValue_unassigned`,
+`dataDecl_of_unassigned`). The loop relations themselves are **not** landed, and the reason is a
+finding that a later sitting has to design around rather than a missing lemma:
+
+**The two artefacts spend fuel differently on a compound's header.** The reference's `readCompound`
+matches on `fuel + 1`, so it spends one unit on its own header and reads its items at `readItems
+(F - 1)`; the specification's `readValue` is where that unit was spent, and its `readCompound` passes
+its own fuel through, reading its items at `readItems F`. At one value-level fuel the two item loops
+therefore sit **one apart**, and the offset *compounds*: an item that is itself a compound puts its
+own items one further apart again, so the difference is `1` per nesting level and grows without bound
+as the input nests. `split`-free measurement of the two: `readItems 3 1` and `readItems 2 1` are the
+item loops of the two artefacts on the same value-level fuel, and at fuel zero they are not even the
+same function — `Ref.readItems 0 0 c` refuses where `Spec.readItems 1 0 c` accepts — so no statement
+of the form "ref `readItems j` ↔ spec `readItems j`" can be proved from the readers as they are.
+
+Two designs close the gap, and a successor should pick one deliberately:
+
+* **The specification's fuel is irrelevant above the bound.** A fuel unit is spent only where a reader
+  *descends*, and a descent consumes octets (a described value behind one constructor octet, a
+  compound's items behind two size fields, an array's elements behind a size field, a count field and
+  a constructor). So at a cursor whose remaining octets the fuel covers, one unit more of fuel changes
+  no answer — and the item loops can then be put on one footing by converting the specification's fuel
+  down. This is the cheaper design and it needs *no* per-octet work: the specification's dispatch is
+  on `classify code.toNat` and on the generated table, so its cases are six, and the four width cases
+  are uniform in the row (`specElementData` is exactly the reader's own decision, so a whole width
+  case is one application of the element clause). It must be stated as an *agreement* and not an
+  equality (a refusal's prose names the cursor it was refused at), as a joint induction over the six
+  readers (the value reader descends into the compound, the array and the element decision at one fuel
+  less; the compound's items and the element decision read at the *same* fuel, so the level's clauses
+  must be proved in dependency order), and each clause has to carry the *buffer invariance* of a read
+  as well as its answer — `c₂.data = c.data`, which the arms supply per row from the primitive lemmas
+  but which the loops need for the bound arithmetic.
+* **The value relation is stated at a fuel pair.** State the middle layer with the reference's fuel
+  and the specification's as parameters and carry the offset symbolically. This needs no new fact, but
+  it needs the *scalar* rows re-proved at shifted fuel pairs, since the landed arms relate the two
+  readers at one fuel: forty branches of the same size as the arms, or the arms restated with a second
+  fuel parameter.
+
+The item loop's own statement is worth one more note, whichever design is chosen: it is false at fuel
+zero-to-one with a zero count (see the measurement above), so a clause for it has to be stated from
+fuel one, and the middle layer never needs it lower — a compound's items are only reached behind a
+header the bound has already made readable, which is also what makes the zero-fuel cases of the
+compound and array clauses close (they are `spec_readCompound_header` and the array's own fuel match).
+
+
 ## Why a fuel-indexed formulation, and what it carries
 
 The two readers are the same shape: each is `readValue fuel cursor`, the entry points feed it the
@@ -2493,5 +2545,464 @@ theorem arm_0x83 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Re
       rw [hrel]
       exact signedOfOctets_64 b hlt)
     hS hR (spec_takeU8_data hs)
+
+/-! ## What the induction carries, and why it is not the law itself
+
+The compound and array rows read *below* the fuel their own value was read at: a `list8` opened by
+`readValue (fuel + 1)` reads its items at `readValue (fuel - 1)`, two levels down, while a described
+value reads its descriptor and its value at `readValue fuel`, one level down. So a step lemma cannot
+rest on `WireAgrees fuel` alone — it needs the agreement at every fuel beneath it — and this is that
+obligation, named once rather than spelled out at every branch:
+
+`WireAgreesUpTo n` is `WireAgrees` at every fuel up to `n`. It is *not* a strengthening of the law a
+contract needs; it is the induction's own invariant, and `wireLayer_all` below ends by reading the
+top of it off at `n = n`. -/
+def WireAgreesUpTo (n : Nat) : Prop := ∀ k, k ≤ n → WireAgrees k
+
+/-- The invariant at a lower fuel, which is what every descent inside a branch needs. -/
+theorem wireAgreesUpTo_mono {m n : Nat} (h : WireAgreesUpTo n) (hmn : m ≤ n) : WireAgreesUpTo m :=
+  fun k hk => h k (by omega)
+
+/-- The invariant at its own fuel. -/
+theorem wireAgreesUpTo_self {n : Nat} (h : WireAgreesUpTo n) : WireAgrees n := h n (le_refl n)
+
+/-! ## An octet the declared surface does not assign
+
+The reference dispatches on the constructor octet as a literal, so its own arms cover forty of the
+256 and its catch-all covers the rest; the specification dispatches on `classify` and the generated
+table, so an octet outside those forty reaches `declInRange`, which refuses it by name. What the
+catch-all needs is that "outside the reference's forty" and "the declared surface assigns no row" are
+the same set, and the two artefacts' own tests are the cheapest way to say so: `assignedConstructor`
+is the reference's own forty-literal test, and the sweep below checks the generated table against it
+for every octet there is, by ordinary evaluation over the 256 of them. -/
+
+set_option maxRecDepth 10000 in
+/-- **The declared surface and the reference's constructor test assign the same octets.** One finite
+evaluation over all 256 octets, with the table's own `find?` asked about each; the reference's test is
+asked of `UInt8.ofNat n`, which *is* `n` as an octet for every `n < 256`, so the sweep covers every
+octet there is. -/
+theorem no_encoding_of_unassigned_constructor :
+    (List.range 256).all (fun n =>
+      (SpecAMQP.Generated.Oasis.encodingOf n).isNone
+        || SpecAMQP.Ref.assignedConstructor (UInt8.ofNat n)) = true := by
+  decide
+
+/-- The sweep, read off at one octet: an octet the reference does not accept has no row in the
+declared surface. -/
+theorem encodingOf_none_of_not_assigned {code : UInt8}
+    (h : SpecAMQP.Ref.assignedConstructor code = false) :
+    SpecAMQP.Generated.Oasis.encodingOf code.toNat = none := by
+  have hmem := List.all_eq_true.mp no_encoding_of_unassigned_constructor code.toNat
+    (List.mem_range.mpr code.toNat_lt)
+  rw [Bool.or_eq_true] at hmem
+  rcases hmem with hnone | hassigned
+  · exact Option.isNone_iff_eq_none.mp hnone
+  · rw [show UInt8.ofNat code.toNat = code from by simp [UInt8.ofNat_toNat]] at hassigned
+    rw [h] at hassigned
+    exact absurd hassigned (by simp)
+
+/-- **The reference refuses an octet it does not accept, naming it `unassigned`.** The reference's own
+dispatch has one arm per assigned octet and one catch-all, so the catch-all is exactly the
+`assignedConstructor` test failing — which is what makes this provable from the test alone. -/
+theorem ref_readValue_unassigned (fuel : Nat) (c' : SpecAMQP.Ref.Cursor) (code : UInt8)
+    (d' : SpecAMQP.Ref.Cursor) (hr : SpecAMQP.Ref.takeU8 c' = .ok (code, d'))
+    (hass : SpecAMQP.Ref.assignedConstructor code = false) :
+    SpecAMQP.Ref.readValue (fuel + 1) c' = .error (.unassigned code) := by
+  simp only [SpecAMQP.Ref.readValue]
+  rw [hr, except_bind_ok]
+  dsimp only
+  split
+  all_goals first
+    | rfl
+    | (simp only [SpecAMQP.Ref.assignedConstructor] at hass; exact absurd hass (by simp))
+
+set_option maxRecDepth 10000 in
+/-- The grammar's classification, checked against the octet it classifies: `%x00` is the only
+descriptor prefix, so every *other* octet is refused by the specification's own dispatch rather than
+read as one. -/
+theorem classify_sweep :
+    (List.range 255).all (fun k =>
+      decide (SpecAMQP.Spec.Value.classify (k + 1) ≠ .descriptor)) = true := by
+  decide
+
+/-- A non-zero octet is never the descriptor prefix. -/
+theorem classify_ne_descriptor_of_ne_zero (n : Nat) (hn : n < 256) (h : n ≠ 0) :
+    SpecAMQP.Spec.Value.classify n ≠ SpecAMQP.Spec.Value.Constructor.descriptor := by
+  obtain ⟨k, rfl⟩ : ∃ k, n = k + 1 := ⟨n - 1, by omega⟩
+  exact of_decide_eq_true
+    (List.all_eq_true.mp classify_sweep k (List.mem_range.mpr (by omega)))
+
+/-- **The declared surface's range check, in the shape a refusal needs.** A row the table does not
+hold is refused with the class `unassigned`, whatever the range the octet's classification gave it. -/
+theorem declInRange_of_none {code : UInt8} {cat : SpecAMQP.Generated.Oasis.Category} {w : Nat}
+    (h : SpecAMQP.Generated.Oasis.encodingOf code.toNat = none) :
+    ∃ r : SpecAMQP.Spec.Codec.Refusal,
+      SpecAMQP.Spec.Codec.declInRange code cat w = .error r ∧ r.reasonClass = "unassigned" := by
+  unfold SpecAMQP.Spec.Codec.declInRange
+  rw [h]
+  exact ⟨_, rfl, rfl⟩
+
+/-- The declared surface's lookup refuses an octet it has no row for, in the same words. The
+descriptor prefix and the reserved octets are refusals here too, so this needs no hypothesis beyond
+the missing row. -/
+theorem dataDecl_of_unassigned (code : UInt8)
+    (hnone : SpecAMQP.Generated.Oasis.encodingOf code.toNat = none) :
+    ∃ r : SpecAMQP.Spec.Codec.Refusal,
+      SpecAMQP.Spec.Codec.dataDecl code = .error r ∧ r.reasonClass = "unassigned" := by
+  unfold SpecAMQP.Spec.Codec.dataDecl
+  split
+  all_goals first
+    | exact ⟨_, rfl, rfl⟩
+    | exact declInRange_of_none hnone
+
+/-- **The specification refuses an octet the declared surface does not assign, naming it
+`unassigned`.** The one place this needs more than the missing row is the descriptor prefix: `%x00`
+is unassigned in the table and would send the reader down the described-value arm, so the octet has to
+be excluded by name — which is what the reference's own test already does, since it counts `%x00`
+among the constructors it accepts. -/
+theorem spec_readValue_unassigned (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (code : UInt8)
+    (d : SpecAMQP.Spec.Codec.Cursor)
+    (hu : SpecAMQP.Spec.Codec.takeU8 c = .ok (code, d))
+    (hnone : SpecAMQP.Generated.Oasis.encodingOf code.toNat = none)
+    (hne : code ≠ 0x00) :
+    ∃ refusal : SpecAMQP.Spec.Codec.Refusal,
+      SpecAMQP.Spec.Codec.readValue (fuel + 1) c = .error refusal ∧
+      refusal.reasonClass = "unassigned" := by
+  obtain ⟨r, hd, hc⟩ := dataDecl_of_unassigned code hnone
+  have hne0 : code.toNat ≠ 0 := fun h => hne (UInt8.toNat_inj.mp (by simpa using h))
+  have hcl : SpecAMQP.Spec.Value.classify code.toNat ≠ .descriptor :=
+    classify_ne_descriptor_of_ne_zero code.toNat code.toNat_lt hne0
+  simp only [SpecAMQP.Spec.Codec.readValue]
+  rw [hu, except_bind_ok]
+  split
+  all_goals first
+    | exact absurd ‹SpecAMQP.Spec.Value.classify code.toNat = .descriptor› hcl
+    | exact ⟨_, rfl, rfl⟩
+    | exact ⟨r, by dsimp only; rw [hd]; simp only [except_bind_error], hc⟩
+
+/-! ## The element constructor: two tests, one set of octets
+
+An array's element constructor is checked by both readers *after* the count and the limit and *before*
+any element is read: the reference asks its own `assignedConstructor`, and the specification asks
+`elementDecl?`, whose answer is the declaration the element's data is read under (or `none` for the
+descriptor prefix). The two tests accept the same octets, which is one finite evaluation over the 256
+of them — `elementDecl?` is asked of `UInt8.ofNat n`, which is `n` as an octet for every `n < 256`. -/
+
+set_option maxRecDepth 10000 in
+/-- **The two element-constructor tests accept the same octets.** -/
+theorem elementDecl?_sweep :
+    (List.range 256).all (fun n =>
+      (SpecAMQP.Spec.Codec.elementDecl? (UInt8.ofNat n)).toOption.isSome
+        == SpecAMQP.Ref.assignedConstructor (UInt8.ofNat n)) = true := by
+  decide
+
+/-- The sweep as an equation at one octet. -/
+theorem elementDecl?_isSome (ctor : UInt8) :
+    (SpecAMQP.Spec.Codec.elementDecl? ctor).toOption.isSome =
+      SpecAMQP.Ref.assignedConstructor ctor := by
+  have hall := List.all_eq_true.mp elementDecl?_sweep ctor.toNat
+    (List.mem_range.mpr ctor.toNat_lt)
+  rwa [show UInt8.ofNat ctor.toNat = ctor from by simp [UInt8.ofNat_toNat], beq_iff_eq] at hall
+
+/-- An octet the reference accepts as an element constructor is one the specification looks up
+successfully. -/
+theorem elementDecl?_of_assigned {ctor : UInt8}
+    (h : SpecAMQP.Ref.assignedConstructor ctor = true) :
+    ∃ ed : Option SpecAMQP.Generated.Oasis.EncodingDecl,
+      SpecAMQP.Spec.Codec.elementDecl? ctor = .ok ed := by
+  cases hed : SpecAMQP.Spec.Codec.elementDecl? ctor with
+  | ok ed => exact ⟨ed, rfl⟩
+  | error e =>
+    have his := elementDecl?_isSome ctor
+    rw [hed] at his
+    simp only [Except.toOption, Option.isSome] at his
+    rw [h] at his
+    exact absurd his (by simp)
+
+/-- **An octet the reference refuses as an element constructor is refused by name.** The specification
+has two more refusal sites than the reference here — the reserved range and the range check — but both
+name `unassigned`, and the octet below `%x40` that the reference's test also rejects cannot reach the
+descriptor-prefix arm, since `elementDecl?` handles `%x00` before it classifies anything. -/
+theorem elementDecl?_refusal {ctor : UInt8}
+    (h : SpecAMQP.Ref.assignedConstructor ctor = false) :
+    ∃ r : SpecAMQP.Spec.Codec.Refusal,
+      SpecAMQP.Spec.Codec.elementDecl? ctor = .error r ∧ r.reasonClass = "unassigned" := by
+  have hnone := encodingOf_none_of_not_assigned h
+  have hne : ctor.toNat ≠ 0 := by
+    intro hz
+    have hz' : ctor = 0x00 := by
+      have : ctor.toNat = (0x00 : UInt8).toNat := by simpa using hz
+      exact UInt8.toNat_inj.mp this
+    rw [hz'] at h
+    exact absurd h (by decide)
+  have hcl : SpecAMQP.Spec.Value.classify ctor.toNat ≠ .descriptor :=
+    classify_ne_descriptor_of_ne_zero ctor.toNat ctor.toNat_lt hne
+  unfold SpecAMQP.Spec.Codec.elementDecl?
+  rw [if_neg hne]
+  split
+  all_goals first
+    | exact absurd ‹SpecAMQP.Spec.Value.classify ctor.toNat = .descriptor› hcl
+    | exact ⟨_, rfl, rfl⟩
+    | (obtain ⟨r, hr, hc⟩ := declInRange_of_none (cat := .fixed) hnone
+       exact ⟨r, by rw [hr]; simp only [except_map_error], hc⟩)
+    | (obtain ⟨r, hr, hc⟩ := declInRange_of_none (cat := .variable) hnone
+       exact ⟨r, by rw [hr]; simp only [except_map_error], hc⟩)
+    | (obtain ⟨r, hr, hc⟩ := declInRange_of_none (cat := .compound) hnone
+       exact ⟨r, by rw [hr]; simp only [except_map_error], hc⟩)
+    | (obtain ⟨r, hr, hc⟩ := declInRange_of_none (cat := .array) hnone
+       exact ⟨r, by rw [hr]; simp only [except_map_error], hc⟩)
+
+/-! ## The reference's own reads, as the arithmetic a loop's bound needs
+
+Every bound in this development is a statement about the octets left at a cursor, and the cursor
+arithmetic that carries one bound to the next read is the readers' own advances. The specification's
+are in `Proofs.ReadProgress`; these are the reference's, stated the same way — where the read left the
+cursor, on which buffer, and what the read therefore required of the buffer. The requirement is what a
+*small* fuel is excluded by: a header that was read says the buffer held its octets. -/
+
+/-- **The reference's payload read.** -/
+theorem ref_takeBytes_of_ok {n : Nat} {c c' : SpecAMQP.Ref.Cursor}
+    {bytes : SpecAMQP.Harness.Octets} (h : SpecAMQP.Ref.takeBytes n c = .ok (bytes, c')) :
+    c'.data = c.data ∧ c'.pos = c.pos + n ∧ c.pos + n ≤ c.data.size := by
+  by_cases hn : c.pos + n ≤ c.data.size
+  · simp only [SpecAMQP.Ref.takeBytes, if_pos hn, Except.ok.injEq, Prod.mk.injEq] at h
+    obtain ⟨-, hcur⟩ := h
+    subst hcur
+    exact ⟨rfl, rfl, hn⟩
+  · simp only [SpecAMQP.Ref.takeBytes, if_neg hn] at h
+    exact absurd h (by simp)
+
+/-- **The reference's octet read.** -/
+theorem ref_takeU8_of_ok {c c' : SpecAMQP.Ref.Cursor} {b : UInt8}
+    (h : SpecAMQP.Ref.takeU8 c = .ok (b, c')) :
+    c'.data = c.data ∧ c'.pos = c.pos + 1 ∧ c.pos + 1 ≤ c.data.size := by
+  by_cases hn : c.pos < c.data.size
+  · simp only [SpecAMQP.Ref.takeU8, dif_pos hn, Except.ok.injEq, Prod.mk.injEq] at h
+    obtain ⟨-, hcur⟩ := h
+    subst hcur
+    exact ⟨rfl, rfl, hn⟩
+  · simp only [SpecAMQP.Ref.takeU8, dif_neg hn] at h
+    exact absurd h (by simp)
+
+/-- **The reference's big-endian field read.** -/
+theorem ref_takeBeU_of_ok {w : Nat} {c c' : SpecAMQP.Ref.Cursor} {m : Nat}
+    (h : SpecAMQP.Ref.takeBeU w c = .ok (m, c')) :
+    c'.data = c.data ∧ c'.pos = c.pos + w ∧ c.pos + w ≤ c.data.size := by
+  unfold SpecAMQP.Ref.takeBeU at h
+  obtain ⟨⟨bytes, d⟩, hb, h⟩ := exists_of_bind_ok h
+  dsimp only at h
+  rw [except_pure_ok, Except.ok.injEq, Prod.mk.injEq] at h
+  obtain ⟨-, hcur⟩ := h
+  subst hcur
+  exact ref_takeBytes_of_ok hb
+
+/-- The specification's octet read leaves its cursor one further on, which is the arithmetic its own
+branches need. Stated here because `Proofs.ReadProgress` gives the *inequality* the fuel law needs and
+the loops need the advance itself. -/
+theorem spec_takeU8_pos {c d : SpecAMQP.Spec.Codec.Cursor} {b : UInt8}
+    (h : SpecAMQP.Spec.Codec.takeU8 c = .ok (b, d)) : d.pos = c.pos + 1 := by
+  by_cases hn : c.pos < c.data.size
+  · simp only [SpecAMQP.Spec.Codec.takeU8, dif_pos hn, Except.ok.injEq, Prod.mk.injEq] at h
+    rw [← h.2]
+  · simp only [SpecAMQP.Spec.Codec.takeU8, dif_neg hn] at h
+    exact absurd h (by simp)
+
+/-! ## A map's pairs, from the items it read
+
+The two artefacts pair a map's items the same way — consecutive items, key then value, in wire order —
+but they say it differently: the reference's `pairUp` is the partial function that *refuses* an odd
+tail (`none`), the specification's drops a dangling item rather than refusing it. The parity check
+ahead of the items read is what makes the two agree, so the bridge below is stated with the reference's
+`pairUp` succeeding as a hypothesis; the specification's list is then the same pairing, and the
+hypothesis is exactly what the reference's own reader had established. -/
+
+/-- Two lists that agree are both empty or both consed; the mismatched shapes are the relation's own
+`False`, so they are the two sides of the induction's base. -/
+theorem bodiesAgreeList_cons {x : SpecAMQP.Spec.Codec.Value}
+    {xs : List SpecAMQP.Spec.Codec.Value} {y : SpecAMQP.Ref.Value} {ys : List SpecAMQP.Ref.Value}
+    (h : BodiesAgreeList (x :: xs) (y :: ys)) : BodiesAgree x y ∧ BodiesAgreeList xs ys := by
+  simpa only [BodiesAgreeList] using h
+
+/-- An agreeing list is empty on the right when it is empty on the left. -/
+theorem bodiesAgreeList_nil_left {ys : List SpecAMQP.Ref.Value}
+    (h : BodiesAgreeList [] ys) : ys = [] := by
+  cases ys with
+  | nil => rfl
+  | cons y ys => simp only [BodiesAgreeList] at h
+
+/-- ... and empty on the left when it is empty on the right. -/
+theorem bodiesAgreeList_nil_right {xs : List SpecAMQP.Spec.Codec.Value}
+    (h : BodiesAgreeList xs []) : xs = [] := by
+  cases xs with
+  | nil => rfl
+  | cons x xs => simp only [BodiesAgreeList] at h
+
+/-- **The two artefacts' pairings agree.** Inducting on the *pairing* rather than on the items: the
+reference's `pairUp` is the partial function, so its success is what says how many items there were
+and how they were grouped, and each pair of the reference's is a pair of the specification's, key
+against key and value against value. Inducting on the grouping rather than on the items is what keeps
+the induction hypothesis available at the list the recursion actually reaches — the items come two at
+a time, so the tail the recursion reaches is two shorter than the tail the item induction would
+reach. The shapes where the two disagree about a dangling item are the ones the reference's success
+excludes, and each is closed as the contradiction it is. -/
+theorem pairUp_agrees (zs : List (SpecAMQP.Ref.Value × SpecAMQP.Ref.Value)) :
+    ∀ (xs : List SpecAMQP.Spec.Codec.Value) (ys : List SpecAMQP.Ref.Value),
+      BodiesAgreeList xs ys → SpecAMQP.Ref.pairUp ys = some zs →
+      BodiesAgreePairs (SpecAMQP.Spec.Codec.pairUp xs) zs := by
+  induction zs with
+  | nil =>
+    intro xs ys h hz
+    cases ys with
+    | nil =>
+      rw [bodiesAgreeList_nil_right h]
+      simp only [SpecAMQP.Spec.Codec.pairUp, BodiesAgreePairs]
+    | cons y ys =>
+      cases ys with
+      | nil =>
+        simp only [SpecAMQP.Ref.pairUp] at hz
+        exact absurd hz (by intro hh; cases hh)
+      | cons y' ys' =>
+        cases hp : SpecAMQP.Ref.pairUp ys' with
+        | none =>
+          simp only [SpecAMQP.Ref.pairUp, hp, Option.map_none] at hz
+          exact absurd hz (by intro hh; cases hh)
+        | some zs'' =>
+          simp only [SpecAMQP.Ref.pairUp, hp, Option.map_some] at hz
+          exact absurd hz (by intro hh; cases hh)
+  | cons z zs' ih =>
+    cases z with
+    | mk z₁ z₂ =>
+      intro xs ys h hz
+      cases ys with
+      | nil =>
+        simp only [SpecAMQP.Ref.pairUp, Option.some.injEq] at hz
+        exact absurd hz (by intro hh; cases hh)
+      | cons y ys =>
+        cases ys with
+        | nil =>
+          simp only [SpecAMQP.Ref.pairUp] at hz
+          exact absurd hz (by intro hh; cases hh)
+        | cons y' ys' =>
+          cases hp : SpecAMQP.Ref.pairUp ys' with
+          | none =>
+            simp only [SpecAMQP.Ref.pairUp, hp, Option.map_none] at hz
+            exact absurd hz (by intro hh; cases hh)
+          | some zs'' =>
+            simp only [SpecAMQP.Ref.pairUp, hp, Option.map_some, Option.some.injEq] at hz
+            injection hz with hhead htailz
+            injection hhead with h1 h2
+            subst h1
+            subst h2
+            subst htailz
+            cases xs with
+            | nil => simp only [BodiesAgreeList] at h
+            | cons x xs₁ =>
+              obtain ⟨hxy, htail⟩ := bodiesAgreeList_cons h
+              cases xs₁ with
+              | nil => simp only [BodiesAgreeList] at htail
+              | cons x' xs' =>
+                obtain ⟨hx', hrest⟩ := bodiesAgreeList_cons htail
+                simp only [SpecAMQP.Spec.Codec.pairUp]
+                unfold BodiesAgreePairs
+                exact ⟨hxy, hx', ih xs' ys' hrest hp⟩
+
+/-! ## The specification's array element, as a reader of its own
+
+An array's elements are read by `readElementsLoop`, whose one element is a *decision* on the element
+constructor's declaration rather than a reader: the descriptor prefix reads the element's own
+descriptor and value, and an assigned row reads the data its category names. The loop's agreement has
+to be an induction on the element count, and an induction on a count needs its step to be a *step* —
+so the decision is named here as a reader, and `specElementData_loop` below is the equation that says
+this is the reader's own read rather than a second reading of the same octets. -/
+def specElementData (fuel : Nat) (elementDecl : Option SpecAMQP.Generated.Oasis.EncodingDecl)
+    (c : SpecAMQP.Spec.Codec.Cursor) :
+    Except SpecAMQP.Spec.Codec.Refusal
+      (SpecAMQP.Spec.Codec.Value × SpecAMQP.Spec.Codec.Cursor) :=
+  match elementDecl with
+  | none => (do
+      let (descriptor, c) ← SpecAMQP.Spec.Codec.readValue fuel c
+      let (value, c) ← SpecAMQP.Spec.Codec.readValue fuel c
+      return (.described descriptor value, c))
+  | some decl =>
+    match decl.category with
+    | .fixed | .variable => SpecAMQP.Spec.Codec.readScalarData decl c
+    | .compound => SpecAMQP.Spec.Codec.readCompound fuel decl c
+    | .array => SpecAMQP.Spec.Codec.readArrayData fuel decl c
+
+/-- **The element loop is its element read and then the loop.** An identity of the reader's own
+definition, so a step of the count induction is the element read and the induction hypothesis. Proved
+through the equation lemmas rather than by `rfl`: the specification's readers are one `mutual` block,
+so their unfoldings are the compiler's equations and not `iota`. -/
+theorem specElementData_loop (fuel : Nat) (elementDecl : Option SpecAMQP.Generated.Oasis.EncodingDecl)
+    (count : Nat) (c : SpecAMQP.Spec.Codec.Cursor) :
+    SpecAMQP.Spec.Codec.readElementsLoop fuel elementDecl (count + 1) c =
+      specElementData fuel elementDecl c >>= fun p =>
+        SpecAMQP.Spec.Codec.readElementsLoop fuel elementDecl count p.2 >>= fun q =>
+          .ok (p.1 :: q.1, q.2) := by
+  cases elementDecl <;> cases count <;>
+    (unfold SpecAMQP.Spec.Codec.readElementsLoop specElementData
+     dsimp only
+     first
+       | rfl
+       | ((simp only [SpecAMQP.Spec.Codec.readElementsLoop, except_bind_ok, except_pure_ok]) <;> rfl))
+
+/-- **An element read does not move its cursor backwards.** The loop's bound is a statement about the
+octets left at the loop's *entry* cursor, and the induction hands it to the read of the next element:
+what makes it still hold there is that the cursor only moves forward. The four readers the element
+decision selects are the ones `Proofs.ReadProgress` already states this for, at the fuels this
+decision uses them at. -/
+theorem specElementData_progress (fuel : Nat)
+    (elementDecl : Option SpecAMQP.Generated.Oasis.EncodingDecl) :
+    ∀ (c : SpecAMQP.Spec.Codec.Cursor) (v : SpecAMQP.Spec.Codec.Value)
+      (c₂ : SpecAMQP.Spec.Codec.Cursor),
+      specElementData fuel elementDecl c = .ok (v, c₂) → c.pos ≤ c₂.pos := by
+  intro c v c₂ h
+  cases elementDecl with
+  | none =>
+    unfold specElementData at h
+    obtain ⟨⟨d, c₁⟩, h1, h⟩ := exists_of_bind_ok h
+    dsimp only at h
+    obtain ⟨⟨val, c₃⟩, h2, h⟩ := exists_of_bind_ok h
+    dsimp only at h
+    rw [except_pure_ok, Except.ok.injEq, Prod.mk.injEq] at h
+    have p1 := (readValue_progress fuel).1 c d c₁ h1
+    have p2 := (readValue_progress fuel).1 c₁ val c₃ h2
+    rw [← h.2]
+    omega
+  | some decl =>
+    simp only [specElementData] at h
+    split at h
+    all_goals first
+      | exact readScalarData_progress decl c v c₂ h
+      | exact (readValue_progress fuel).2.2.1 decl c v c₂ h
+      | exact (readValue_progress fuel).2.2.2.1 decl c v c₂ h
+
+/-! ## An exhausted cursor, and what the container readers answer there
+
+A compound's zero-fuel case is the one place the two readers' *shape* differs rather than their fuel:
+the reference's `readCompound` matches on `fuel + 1` and refuses at zero, while the specification's has
+no match of its own and refuses at zero by failing to read its first size field. The two refusals are
+the same class, and these are the facts that say so without either reader having to name the prose it
+refused with. -/
+
+/-- **An exhausted cursor makes the specification's big-endian field read refuse as `truncated`.** The
+refusal is the one a compound's or an array's header meets first, and its *class* is what the fuel
+comparison reads. -/
+theorem spec_takeBe_exhausted {w : Nat} (hw : 1 ≤ w) {c : SpecAMQP.Spec.Codec.Cursor}
+    (h : c.data.size ≤ c.pos) :
+    SpecAMQP.Spec.Codec.takeBe w c = .error (SpecAMQP.Spec.Codec.refusal "truncated"
+      s!"{w} octet(s) needed at offset {c.pos} of {c.data.size}") := by
+  unfold SpecAMQP.Spec.Codec.takeBe SpecAMQP.Spec.Codec.takeBytes
+  rw [if_neg (by omega), except_bind_error]
+
+/-- The same for a compound's own header. The fuel does not appear: a compound's items are only
+reached behind two size fields, so a cursor with nothing left refuses before any of the reader's own
+decisions. -/
+theorem spec_readCompound_header {fuel : Nat} {decl : SpecAMQP.Generated.Oasis.EncodingDecl}
+    (hwidth : 1 ≤ decl.width) (c : SpecAMQP.Spec.Codec.Cursor) (h : c.data.size ≤ c.pos) :
+    SpecAMQP.Spec.Codec.readCompound fuel decl c = .error (SpecAMQP.Spec.Codec.refusal "truncated"
+      s!"{decl.width} octet(s) needed at offset {c.pos} of {c.data.size}") := by
+  unfold SpecAMQP.Spec.Codec.readCompound
+  rw [spec_takeBe_exhausted hwidth h, except_bind_error]
 
 end SpecAMQP.Proofs
