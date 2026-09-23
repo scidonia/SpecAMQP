@@ -23,10 +23,27 @@ elsewhere; what this repository produces is the contract they are measured again
 | `tests/contracts/` | the gates: what makes the claims above checkable |
 | `PLAN.md` | the programme of record, including its own rules of evidence |
 
-The two artefacts are the point. `lean/Spec/` and `lean/Ref/` are separate implementations of the same
-semantics, written independently — the reference side deliberately without reading the specification side —
-so that when they agree on a corpus, that agreement is evidence about the standard rather than two
-programs sharing an author.
+## Where an implementation fits
+
+**The specification's purpose is to be a target.** `PLAN.md` defines what it means for an endpoint to
+conform — a state machine over a frozen interface alphabet — and that interface was frozen *before any
+implementation existed* for exactly this reason: proving an instance of it for a concrete programme is
+downstream work, and it needs the extraction toolchain. A Rust programme, its extraction through Charon and
+Aeneas, and the proofs about it are TemperMint's, not this repository's. What this repository provides to
+that work is an **executable oracle and a definite contract to prove against**.
+
+**`lean/Ref/` is not that proof, and it is not an implementation-acceptance mechanism.** It is a second
+*independent reading* of the same standard, because the dominant residual risk here is prose ambiguity: two
+readings by the same reader share their errors, so the way to test a reading is to build a second one from
+the artifacts without looking at the first and see whether the two agree on the wire. Where they disagree,
+one of them has misread the standard, and the disagreement is the evidence. That is a check on **the
+specification**, not on an implementation.
+
+And because the vectors, the verdict schema and the comparison are deliberately implementation-agnostic — a
+Rust binary, a Gallina development through extraction, or a third party's stack can be added as a runner
+rather than requiring a rewrite — the same corpus that tests the two readings also becomes the first
+acceptance test any implementation runs. A second formalisation in a second prover was considered and not
+adopted; `PLAN.md` records the reasons rather than the conclusion alone.
 
 ## How it is checked
 
