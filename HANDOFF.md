@@ -568,9 +568,15 @@ instance, the `ValuePrefixDetermined` residual in `Proofs/CoreLaws.lean`. Its co
 it is the plumbing — and its prerequisites are the value layer's hypotheses (§2) and the layer proofs it
 reuses, which is why the value layer's agreement is the rung everything above it waits on.
 
-**R4 — the wire differential: not started.** The corpus replayed against the endpoint over a
-socket, compared per vector against `amqp-spec` with the same verdict-and-reason comparison
-`s1_differential.sh` uses in process.
+**R4 — the wire differential: implemented and discriminating; the corpus-driven application is not built.**
+`scripts/run-endpoint-wire-differential.sh` plus `scripts/endpoint/wire_peer.py` replay a corpus over a socket
+against the *shipped* endpoint and compare each step with `amqp-spec`'s in-process verdict and class. Its first
+run measured **one** fact rather than six: 6 of 6 vectors of `vectors/slice.ndjson` diverge because the endpoint
+reaches `HDR_EXCH` and sits there — it has *no application*, so it never attempts the sends a vector's `send` step
+describes, while in process the harness attempts them and the core refuses. Closing that is the app-seam half: an
+endpoint-side counterpart of the peer, beside the probe under `scripts/endpoint/`. It has also found a candidate
+defect — two SASL vectors expect `414d515000010000` and the endpoint writes something else, so either the shell's
+SASL header choice or the vector is wrong.
 
 **Outstanding, and in flight elsewhere in the tree** (`git status --porcelain`):
 
