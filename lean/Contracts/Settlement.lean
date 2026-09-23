@@ -86,7 +86,7 @@ theorem unsettled_first_transfer_stays_unsettled (id : Nat) :
 
 Each proposition below is over the specification's own `dispositionLink` (or the session's
 `transferLink` for the settlement mode), so a reader can tell exactly what is claimed and a proof
-module has something precise to discharge. None is proved today, and none is a paraphrase of the
+module has something precise to discharge. **One of them is proved today** — `SenderSettleModeIsTheChoiceTheClauseSelects`, by `Proofs.Settlement.senderSettleModeIsTheChoiceTheClauseSelects` — and the rest are stated without proof, so the distinction is named here rather than left to be inferred from a module's existence. None is a paraphrase of the code, and none is a paraphrase of the
 code: each is the clause's requirement, with the hypotheses the clause needs. -/
 
 /-- **A disposition whose role is the other end's is refused.** The role field "identifies whether
@@ -171,6 +171,8 @@ def SenderSettleModeDeliveriesAreSettledOnATransfer : Prop :=
     ∃ reason : Refusal,
       transferLink session true body = .error reason ∧
         reason.condition = invalidField
+
+**Proved by** `Proofs.Settlement.senderSettleModeIsTheChoiceTheClauseSelects`.
 
 /-- **The negotiated settle mode is the *choice* the artifact selects, not the *element's* name.**
 `attach`'s `snd-settle-mode` field has the declared type `sender-settle-mode`
