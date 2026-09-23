@@ -798,7 +798,7 @@ flake.nix  flake.lock
 toolchain/{sources.toml,downstream-pins.toml}
 spec/oasis/{amqp-core-*-v1.0-os.xml,NOTICE}
 ledger/{clauses.json,coverage.json,dispositions/,ambiguities/}
-lean/{Spec/,Generated/Oasis/,Contracts/,Proofs/,lakefile.lean,lean-toolchain,lake-manifest.json}
+lean/{Spec/,Ref/,Harness/,Impl/,Shell/,Generated/Oasis/,Contracts/,Proofs/,lakefile.lean,lean-toolchain,lake-manifest.json}
 vectors/{*,recorded/}
 tests/contracts/
 scripts/
