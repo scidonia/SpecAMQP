@@ -239,7 +239,7 @@ Totals as of the tree at the time of writing:
 | clauses | 579 |
 | anchor paths | 234 |
 | MUST-class statements (`MUST` + `MUST NOT`) | 230 |
-| undispositioned MUST-class | 170 |
+| undispositioned MUST-class | see the check — `python3 scripts/clause-ledger.py check` (145 at the time of writing, and every batch of 25 moves it by that much) |
 | dispositions recorded | 282 in 5 files |
 | by disposition | deferred 129, formalized 64, informative 54, environment 6, underspecified 3, out-of-scope 1, superseded 1, plus 24 picture-review entries |
 | keyword-free but normative (`UNKEYED`) | 178 |

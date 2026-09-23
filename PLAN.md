@@ -1244,6 +1244,16 @@ after the work.
 named**. Both are this repository's recurring defect — a rule that passes while doing less than it says — arriving in an instruction rather
 than in a check, which is where a dispatch is easiest to get wrong and hardest to notice.
 
+**A moving number is never quoted bare in a document.** The ledger's undispositioned count has moved 170 → 145 today and moves by twenty-five
+with every batch, and a hand-off table cell carrying it went stale the moment the first batch landed. The remedy is not a schedule of updates:
+it is to quote **the command that reports it**, with the number dated if a number is wanted at all — `python3 scripts/clause-ledger.py check`
+is the value, and any copy of its output is a claim about a moment.
+
+This is the same defect as the rest of §16 in its purest form — a claim that was true when written and is read as present tense — with the
+aggravating factor that its author knows it will move. Counts of completed work, coverage percentages and gate totals all behave this way, so
+the rule is about the *kind* of claim rather than about the ledger: **if the number can change without anyone editing the sentence, the
+sentence should carry the command rather than the number.**
+
 ## 17. Verification gates and their negative controls
 
 | Gate | Mechanism | Negative control |
