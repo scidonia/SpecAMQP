@@ -16,7 +16,10 @@ is that claim's development, and it is **in progress**. Landed: the formulation 
 its truth needs), the base case, the octet step and its payload bridges, the branch *pattern*, and
 **34 of the 40 arms** — the described branch and every row that reads no recursive value: the five
 other zero-width rows, the one-octet payloads, the wide unsigned and `char` widths, the seven *signed*
-widths, the six opaque widths, and the six variable rows. Still owed: the six compound and array rows,
+widths, the six opaque widths, and the six variable rows. Also landed: the fuel-irrelevance family
+(`fuelIrrelevant_all`, with its six reader clauses), which is the fact the loop relations need — the
+specification's reader answers the same at every fuel above the octet bound, so its item loop can be
+put on the reference's footing one fuel lower. Still owed: the six compound and array rows,
 with the three loop relations they share; the dispatch that turns the arms into the induction step;
 and the fuel induction itself, whose entry point is free. What each owes and how it is
 proved is stated where it belongs rather than in a list here: see the octet step's arithmetic, and
@@ -31,7 +34,8 @@ advances, the element-constructor bridge (`elementDecl?_isSome`, `elementDecl?_o
 `elementDecl?_refusal`), and the refusal families for an octet the declared surface does not assign
 (`encodingOf_none_of_not_assigned`, `ref_readValue_unassigned`, `spec_readValue_unassigned`,
 `dataDecl_of_unassigned`). The loop relations themselves are **not** landed, and the reason is a
-finding that a later sitting has to design around rather than a missing lemma:
+finding that shapes them rather than a missing lemma — the plan owner's response to it is the
+irrelevance family now landed at the end of this module:
 
 **The two artefacts spend fuel differently on a compound's header.** The reference's `readCompound`
 matches on `fuel + 1`, so it spends one unit on its own header and reads its items at `readItems
@@ -55,8 +59,9 @@ first** (`4c3c4a0`), and the account below is what designing it showed:
   down. This is the cheaper design and it needs *no* per-octet work: the specification's dispatch is
   on `classify code.toNat` and on the generated table, so its cases are six, and the four width cases
   are uniform in the row (`specElementData` is exactly the reader's own decision, so a whole width
-  case is one application of the element clause). What designing it established, and what a successor
-  should not have to rediscover:
+  case is one application of the element clause). **Implemented** at the end of this module
+  (`fuelIrrelevant_all` and its six corollaries), with the guards that designing it established. What
+  designing it established, and what a successor should not have to rediscover:
   - It must be stated as an *agreement* and not an equality (a refusal's prose names the cursor it was
     refused at), and each clause must carry the *buffer invariance* of its read as well as its answer
     — `c₂.data = c.data`. The arms supply that per row from the primitive lemmas; the loops need it for
@@ -3044,5 +3049,916 @@ theorem spec_readCompound_header {fuel : Nat} {decl : SpecAMQP.Generated.Oasis.E
       s!"{decl.width} octet(s) needed at offset {c.pos} of {c.data.size}") := by
   unfold SpecAMQP.Spec.Codec.readCompound
   rw [spec_takeBe_exhausted hwidth h, except_bind_error]
+
+
+/-! ## The specification's fuel is irrelevant above the octet bound
+
+The tooling above is what the middle layer's compound and array rows need; this is the fact that lets
+them be stated. The two artefacts spend fuel differently on a compound's header — the reference's
+`readCompound` matches on `fuel + 1` and so spends a unit on its own header, while the specification's
+`readValue` is where that unit was spent and its `readCompound` passes its own fuel through — so the
+item loops sit one apart at one value-level fuel. What closes the gap is that a fuel unit is spent
+only where a reader *descends*, and a descent consumes octets: at a cursor the fuel covers, one unit
+more of fuel changes no answer. That is the family below, and it is what the loops are then put on one
+footing with.
+
+The statements carry three things beyond the answer. The agreement is an *agreement* and not an
+equality, because a refusal's prose names the cursor it was refused at. Each reader's read is shown to
+hand back the buffer it was given (`readRows_data`), because a loop's tail is read at a cursor the item
+read advanced and the octet bound at the tail is expressible only through that buffer. And two clauses
+carry guards that are conditions on the *statement*: the item loop refuses at fuel zero and accepts at
+fuel one with a zero count, so its clause is stated from fuel one, and the compound and array readers
+need a header wide enough to spend the octet that puts their item loops a level down, which is
+`WideOption` and the two table sweeps. -/
+
+open SpecAMQP.Spec.Codec
+open SpecAMQP.Generated.Oasis (EncodingDecl)
+
+
+/-- **A fixed-width row's read hands back its own buffer.** The value the row answers is built from
+the payload, but the cursor it answers with is the one the payload read left, and that read took an
+`extract` of the buffer rather than a copy of it. -/
+theorem readFixed_data (decl : EncodingDecl) (c : Cursor) (v : Value) (c' : Cursor)
+    (h : readFixed decl c = .ok (v, c')) : c'.data = c.data := by
+  obtain ⟨payload, c₁, hb, hc⟩ := readFixed_ok decl c v c' h
+  rw [← hc]
+  exact spec_takeBytes_data hb
+
+/-- **A variable-width row's read hands back its own buffer.** -/
+theorem readVariable_data (decl : EncodingDecl) (c : Cursor) (v : Value) (c' : Cursor)
+    (h : readVariable decl c = .ok (v, c')) : c'.data = c.data := by
+  obtain ⟨length, c₁, payload, c₂, hbe, hbp, hc, -⟩ := readVariable_ok decl c v c' h
+  rw [← hc, spec_takeBytes_data hbp, spec_takeBe_data hbe]
+
+/-- **A scalar row's read hands back its own buffer**, whichever of the two categories it declares. -/
+theorem readScalarData_data (decl : EncodingDecl) (c : Cursor) (v : Value) (c' : Cursor)
+    (h : readScalarData decl c = .ok (v, c')) : c'.data = c.data := by
+  unfold readScalarData at h
+  split at h
+  all_goals first
+    | exact readFixed_data decl c v c' h
+    | exact readVariable_data decl c v c' h
+    | exact absurd h (by simp)
+
+/-- **Every reader in the value cluster hands back the buffer it was given.**
+
+The companion of `readValue_progress`, and the fact the fuel-irrelevance clauses need: a loop's tail
+is read at the cursor the item or element read handed back, so the octet bound at the tail is
+expressible only through the buffer the read left. The six clauses are one induction on the fuel, in
+dependency order, because the `mutual` block cannot be separated: the compound reader reads its items
+at its *own* fuel, and the element loop's element decision reads the value reader at its own fuel
+too, so those two clauses are reached at the same level they are proved at. -/
+theorem readRows_data : ∀ (fuel : Nat),
+    (∀ (c : Cursor) (v : Value) (c' : Cursor), readValue fuel c = .ok (v, c') → c'.data = c.data) ∧
+    (∀ (count : Nat) (c : Cursor) (items : List Value) (c' : Cursor),
+      readItems fuel count c = .ok (items, c') → c'.data = c.data) ∧
+    (∀ (decl : EncodingDecl) (c : Cursor) (v : Value) (c' : Cursor),
+      readCompound fuel decl c = .ok (v, c') → c'.data = c.data) ∧
+    (∀ (decl : EncodingDecl) (c : Cursor) (v : Value) (c' : Cursor),
+      readArrayData fuel decl c = .ok (v, c') → c'.data = c.data) ∧
+    (∀ (elementDecl : Option EncodingDecl) (count : Nat) (c : Cursor) (items : List Value)
+      (c' : Cursor), readElements fuel elementDecl count c = .ok (items, c') → c'.data = c.data) ∧
+    (∀ (elementDecl : Option EncodingDecl) (count : Nat) (c : Cursor) (items : List Value)
+      (c' : Cursor), readElementsLoop fuel elementDecl count c = .ok (items, c') →
+        c'.data = c.data) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+    have hValue : ∀ (c : Cursor) (v : Value) (c' : Cursor),
+        readValue 0 c = .ok (v, c') → c'.data = c.data := by
+      intro c v c' h
+      simp only [readValue] at h
+      exact absurd h (by simp)
+    have hItems : ∀ (count : Nat) (c : Cursor) (items : List Value) (c' : Cursor),
+        readItems 0 count c = .ok (items, c') → c'.data = c.data := by
+      intro count c items c' h
+      simp only [readItems] at h
+      exact absurd h (by simp)
+    have hCompound : ∀ (decl : EncodingDecl) (c : Cursor) (v : Value) (c' : Cursor),
+        readCompound 0 decl c = .ok (v, c') → c'.data = c.data := by
+      intro decl c v c' h
+      unfold readCompound at h
+      obtain ⟨⟨size, c₁⟩, h1, h⟩ := exists_of_bind_ok h
+      try dsimp only at h
+      obtain ⟨⟨count, c₂⟩, h2, h⟩ := exists_of_bind_ok h
+      try dsimp only at h
+      have d1 := spec_takeBe_data h1
+      have d2 := spec_takeBe_data h2
+      split at h
+      · obtain ⟨⟨items, c₃⟩, h3, h⟩ := exists_of_bind_ok h
+        try dsimp only at h
+        have d3 := hItems count c₂ items c₃ h3
+        split at h
+        · simp only [Except.ok.injEq, Prod.mk.injEq] at h
+          rw [← h.2, d3, d2, d1]
+        · exact absurd h (by simp)
+      · split at h
+        · exact absurd h (by simp)
+        · obtain ⟨⟨items, c₃⟩, h3, h⟩ := exists_of_bind_ok h
+          try dsimp only at h
+          have d3 := hItems count c₂ items c₃ h3
+          split at h
+          · simp only [Except.ok.injEq, Prod.mk.injEq] at h
+            rw [← h.2, d3, d2, d1]
+          · exact absurd h (by simp)
+      · exact absurd h (by simp)
+    have hArrayData : ∀ (decl : EncodingDecl) (c : Cursor) (v : Value) (c' : Cursor),
+        readArrayData 0 decl c = .ok (v, c') → c'.data = c.data := by
+      intro decl c v c' h
+      simp only [readArrayData] at h
+      exact absurd h (by simp)
+    have hElements : ∀ (elementDecl : Option EncodingDecl) (count : Nat) (c : Cursor)
+        (items : List Value) (c' : Cursor),
+        readElements 0 elementDecl count c = .ok (items, c') → c'.data = c.data := by
+      intro elementDecl count c items c' h
+      simp only [readElements] at h
+      exact absurd h (by simp)
+    have hElementData : ∀ (elementDecl : Option EncodingDecl) (c : Cursor) (v : Value)
+        (c' : Cursor), specElementData 0 elementDecl c = .ok (v, c') → c'.data = c.data := by
+      intro elementDecl c v c' h
+      unfold specElementData at h
+      split at h <;> try (split at h)
+      all_goals first
+        | (obtain ⟨⟨dsc, c₁⟩, h1, h⟩ := exists_of_bind_ok h
+           try dsimp only at h
+           simp only [readValue] at h1
+           exact absurd h1 (by simp))
+        | exact readScalarData_data _ c v c' h
+        | exact hCompound _ c v c' h
+        | exact hArrayData _ c v c' h
+    have hElementsLoop : ∀ (elementDecl : Option EncodingDecl) (count : Nat) (c : Cursor)
+        (items : List Value) (c' : Cursor),
+        readElementsLoop 0 elementDecl count c = .ok (items, c') → c'.data = c.data := by
+      intro elementDecl count
+      induction count with
+      | zero =>
+        intro c items c' h
+        simp only [readElementsLoop] at h
+        simp only [Except.ok.injEq, Prod.mk.injEq] at h
+        rw [← h.2]
+      | succ k ihk =>
+        intro c items c' h
+        rw [specElementData_loop] at h
+        obtain ⟨⟨item, c₁⟩, h1, h⟩ := exists_of_bind_ok h
+        try dsimp only at h
+        obtain ⟨⟨rest, c₂⟩, h2, h⟩ := exists_of_bind_ok h
+        try dsimp only at h
+        have d1 := hElementData elementDecl c item c₁ h1
+        have d2 := ihk c₁ rest c₂ h2
+        simp only [Except.ok.injEq, Prod.mk.injEq] at h
+        rw [← h.2, d2, d1]
+    exact ⟨hValue, hItems, hCompound, hArrayData, hElements, hElementsLoop⟩
+  | succ n ih =>
+    obtain ⟨ihValue, ihItems, ihCompound, ihArrayData, ihElements, ihElementsLoop⟩ := ih
+    have hValue : ∀ (c : Cursor) (v : Value) (c' : Cursor),
+        readValue (n + 1) c = .ok (v, c') → c'.data = c.data := by
+      intro c v c' h
+      unfold readValue at h
+      obtain ⟨⟨code, c₁⟩, hu, h⟩ := exists_of_bind_ok h
+      try dsimp only at h
+      have d0 := spec_takeU8_data hu
+      split at h
+      all_goals first
+        | (obtain ⟨⟨descriptor, c₂⟩, h1, h⟩ := exists_of_bind_ok h
+           try dsimp only at h
+           obtain ⟨⟨inner, c₃⟩, h2, h⟩ := exists_of_bind_ok h
+           try dsimp only at h
+           have d1 := ihValue c₁ descriptor c₂ h1
+           have d2 := ihValue c₂ inner c₃ h2
+           simp only [except_pure_ok, Except.ok.injEq, Prod.mk.injEq] at h
+           rw [← h.2, d2, d1, d0])
+        | (obtain ⟨decl, hd, h⟩ := exists_of_bind_ok h
+           try dsimp only at h
+           split at h <;> try (split at h)
+           all_goals first
+             | (have hh := readScalarData_data decl c₁ v c' h; rw [hh, d0])
+             | (have hh := ihCompound decl c₁ v c' h; rw [hh, d0])
+             | (have hh := ihArrayData decl c₁ v c' h; rw [hh, d0]))
+        | exact absurd h (by simp)
+    have hItems : ∀ (count : Nat) (c : Cursor) (items : List Value) (c' : Cursor),
+        readItems (n + 1) count c = .ok (items, c') → c'.data = c.data := by
+      intro count
+      cases count with
+      | zero =>
+        intro c items c' h
+        simp only [readItems] at h
+        simp only [Except.ok.injEq, Prod.mk.injEq] at h
+        rw [← h.2]
+      | succ k =>
+        intro c items c' h
+        unfold readItems at h
+        obtain ⟨⟨item, c₁⟩, h1, h⟩ := exists_of_bind_ok h
+        try dsimp only at h
+        obtain ⟨⟨rest, c₂⟩, h2, h⟩ := exists_of_bind_ok h
+        try dsimp only at h
+        have d1 := ihValue c item c₁ h1
+        have d2 := ihItems k c₁ rest c₂ h2
+        simp only [except_pure_ok, Except.ok.injEq, Prod.mk.injEq] at h
+        rw [← h.2, d2, d1]
+    have hCompound : ∀ (decl : EncodingDecl) (c : Cursor) (v : Value) (c' : Cursor),
+        readCompound (n + 1) decl c = .ok (v, c') → c'.data = c.data := by
+      intro decl c v c' h
+      unfold readCompound at h
+      obtain ⟨⟨size, c₁⟩, h1, h⟩ := exists_of_bind_ok h
+      try dsimp only at h
+      obtain ⟨⟨count, c₂⟩, h2, h⟩ := exists_of_bind_ok h
+      try dsimp only at h
+      have d1 := spec_takeBe_data h1
+      have d2 := spec_takeBe_data h2
+      split at h
+      · obtain ⟨⟨items, c₃⟩, h3, h⟩ := exists_of_bind_ok h
+        try dsimp only at h
+        have d3 := hItems count c₂ items c₃ h3
+        split at h
+        · simp only [Except.ok.injEq, Prod.mk.injEq] at h
+          rw [← h.2, d3, d2, d1]
+        · exact absurd h (by simp)
+      · split at h
+        · exact absurd h (by simp)
+        · obtain ⟨⟨items, c₃⟩, h3, h⟩ := exists_of_bind_ok h
+          try dsimp only at h
+          have d3 := hItems count c₂ items c₃ h3
+          split at h
+          · simp only [Except.ok.injEq, Prod.mk.injEq] at h
+            rw [← h.2, d3, d2, d1]
+          · exact absurd h (by simp)
+      · exact absurd h (by simp)
+    have hArrayData : ∀ (decl : EncodingDecl) (c : Cursor) (v : Value) (c' : Cursor),
+        readArrayData (n + 1) decl c = .ok (v, c') → c'.data = c.data := by
+      intro decl c v c' h
+      unfold readArrayData at h
+      obtain ⟨⟨size, c₁⟩, h1, h⟩ := exists_of_bind_ok h
+      try dsimp only at h
+      obtain ⟨⟨count, c₂⟩, h2, h⟩ := exists_of_bind_ok h
+      try dsimp only at h
+      have d1 := spec_takeBe_data h1
+      have d2 := spec_takeBe_data h2
+      split at h
+      · exact absurd h (by simp)
+      · obtain ⟨⟨constructor, c₃⟩, h3, h⟩ := exists_of_bind_ok h
+        try dsimp only at h
+        have d3 := spec_takeU8_data h3
+        obtain ⟨elementDecl, h4, h⟩ := exists_of_bind_ok h
+        try dsimp only at h
+        obtain ⟨⟨items, c₄⟩, h5, h⟩ := exists_of_bind_ok h
+        try dsimp only at h
+        have d4 := ihElements elementDecl count c₃ items c₄ h5
+        split at h
+        · simp only [Except.ok.injEq, Prod.mk.injEq] at h
+          rw [← h.2, d4, d3, d2, d1]
+        · exact absurd h (by simp)
+    have hElements : ∀ (elementDecl : Option EncodingDecl) (count : Nat) (c : Cursor)
+        (items : List Value) (c' : Cursor),
+        readElements (n + 1) elementDecl count c = .ok (items, c') → c'.data = c.data := by
+      intro elementDecl count c items c' h
+      simp only [readElements] at h
+      exact ihElementsLoop elementDecl count c items c' h
+    have hElementData : ∀ (elementDecl : Option EncodingDecl) (c : Cursor) (v : Value)
+        (c' : Cursor), specElementData (n + 1) elementDecl c = .ok (v, c') → c'.data = c.data := by
+      intro elementDecl c v c' h
+      unfold specElementData at h
+      split at h <;> try (split at h)
+      all_goals first
+        | (obtain ⟨⟨dsc, c₁⟩, h1, h⟩ := exists_of_bind_ok h
+           try dsimp only at h
+           obtain ⟨⟨val, c₂⟩, h2, h⟩ := exists_of_bind_ok h
+           try dsimp only at h
+           have d1 := hValue c dsc c₁ h1
+           have d2 := hValue c₁ val c₂ h2
+           simp only [except_pure_ok, Except.ok.injEq, Prod.mk.injEq] at h
+           rw [← h.2, d2, d1])
+        | exact readScalarData_data _ c v c' h
+        | exact hCompound _ c v c' h
+        | exact hArrayData _ c v c' h
+    have hElementsLoop : ∀ (elementDecl : Option EncodingDecl) (count : Nat) (c : Cursor)
+        (items : List Value) (c' : Cursor),
+        readElementsLoop (n + 1) elementDecl count c = .ok (items, c') → c'.data = c.data := by
+      intro elementDecl count
+      induction count with
+      | zero =>
+        intro c items c' h
+        simp only [readElementsLoop] at h
+        simp only [Except.ok.injEq, Prod.mk.injEq] at h
+        rw [← h.2]
+      | succ k ihk =>
+        intro c items c' h
+        rw [specElementData_loop] at h
+        obtain ⟨⟨item, c₁⟩, h1, h⟩ := exists_of_bind_ok h
+        try dsimp only at h
+        obtain ⟨⟨rest, c₂⟩, h2, h⟩ := exists_of_bind_ok h
+        try dsimp only at h
+        have d1 := hElementData elementDecl c item c₁ h1
+        have d2 := ihk c₁ rest c₂ h2
+        simp only [Except.ok.injEq, Prod.mk.injEq] at h
+        rw [← h.2, d2, d1]
+    exact ⟨hValue, hItems, hCompound, hArrayData, hElements, hElementsLoop⟩
+
+/-- **A value read spends its constructor octet before anything else**, so at a fuel at least one it
+leaves the cursor strictly further on. The weak progress `readValue_progress` gives is not enough for
+the item loop's tail: its bound is one octet tighter than the loop's, and only the octet the value
+reader took makes up the difference. -/
+theorem readValue_lt {f : Nat} {c : Cursor} {v : Value} {d : Cursor}
+    (hf : 1 ≤ f) (h : readValue f c = .ok (v, d)) : c.pos < d.pos := by
+  obtain ⟨k, rfl⟩ : ∃ k, f = k + 1 := ⟨f - 1, by omega⟩
+  unfold readValue at h
+  obtain ⟨⟨code, c₁⟩, hu, h⟩ := exists_of_bind_ok h
+  try dsimp only at h
+  have h1 : c₁.pos = c.pos + 1 := spec_takeU8_pos hu
+  split at h
+  all_goals first
+    | (obtain ⟨⟨descriptor, c₂⟩, h2, h⟩ := exists_of_bind_ok h
+       try dsimp only at h
+       obtain ⟨⟨inner, c₃⟩, h3, h⟩ := exists_of_bind_ok h
+       try dsimp only at h
+       have p1 := (readValue_progress k).1 c₁ descriptor c₂ h2
+       have p2 := (readValue_progress k).1 c₂ inner c₃ h3
+       simp only [except_pure_ok, Except.ok.injEq, Prod.mk.injEq] at h
+       rw [← h.2]
+       omega)
+    | (obtain ⟨decl, hd, h⟩ := exists_of_bind_ok h
+       try dsimp only at h
+       split at h <;> try (split at h)
+       all_goals first
+         | (have p := readScalarData_progress decl c₁ v d h; omega)
+         | (have p := (readValue_progress k).2.2.1 decl c₁ v d h; omega)
+         | (have p := (readValue_progress k).2.2.2.1 decl c₁ v d h; omega))
+    | exact absurd h (by simp)
+
+/-- **The element decision hands back its own buffer.** Read off the cluster: the descriptor prefix's
+two value reads and the compound and array rows are all cases of it, and the scalar rows are the
+payload-free ones. -/
+theorem specElementData_data (fuel : Nat) (ed : Option EncodingDecl) (c : Cursor) (v : Value)
+    (c' : Cursor) (h : specElementData fuel ed c = .ok (v, c')) : c'.data = c.data := by
+  unfold specElementData at h
+  split at h <;> try (split at h)
+  all_goals first
+    | (obtain ⟨⟨dsc, c₁⟩, h1, h⟩ := exists_of_bind_ok h
+       try dsimp only at h
+       obtain ⟨⟨val, c₂⟩, h2, h⟩ := exists_of_bind_ok h
+       try dsimp only at h
+       have d1 := (readRows_data fuel).1 c dsc c₁ h1
+       have d2 := (readRows_data fuel).1 c₁ val c₂ h2
+       simp only [except_pure_ok, Except.ok.injEq, Prod.mk.injEq] at h
+       rw [← h.2, d2, d1])
+    | exact readScalarData_data _ c v c' h
+    | exact (readRows_data fuel).2.2.1 _ c v c' h
+    | exact (readRows_data fuel).2.2.2.1 _ c v c' h
+
+
+/-! ## The specification's fuel is irrelevant above the octet bound -/
+
+/-- **The specification's two answers agree**: the same value and cursor, or refusals of the same
+class. An *agreement* rather than an equality, because a refusal's prose names the cursor it was
+refused at: `readValue 0 c` says the input ends before the value does, while the same read at a
+larger fuel fails to take its constructor octet and says so. -/
+def AnswerAgrees {α : Type} (x y : Except SpecAMQP.Spec.Codec.Refusal α) : Prop :=
+  (∀ a, x = .ok a → y = .ok a) ∧
+  (∀ r : SpecAMQP.Spec.Codec.Refusal, x = .error r →
+    ∃ r' : SpecAMQP.Spec.Codec.Refusal, y = .error r' ∧ r.reasonClass = r'.reasonClass)
+
+theorem answerAgrees_refl {α : Type} (x : Except SpecAMQP.Spec.Codec.Refusal α) :
+    AnswerAgrees x x :=
+  ⟨fun _ h => h, fun r h => ⟨r, h, rfl⟩⟩
+
+/-- A shared continuation preserves the relation: everything a reader's caller does with the answer —
+a size comparison, a pairing, a value constructor — is fuel-free. -/
+theorem answerAgrees_bind {α β : Type} {x y : Except SpecAMQP.Spec.Codec.Refusal α}
+    (h : AnswerAgrees x y) (k : α → Except SpecAMQP.Spec.Codec.Refusal β) :
+    AnswerAgrees (x >>= k) (y >>= k) := by
+  constructor
+  · intro b hb
+    obtain ⟨a, hx, hk⟩ := exists_of_bind_ok hb
+    rw [h.1 a hx, except_bind_ok, hk]
+  · intro r hr
+    cases hx : x with
+    | error e =>
+      rw [hx, except_bind_error] at hr
+      obtain ⟨r', hr', hcl⟩ := h.2 e hx
+      exact ⟨r', by rw [hr', except_bind_error], by rw [← Except.error.inj hr]; exact hcl⟩
+    | ok a =>
+      rw [hx, except_bind_ok] at hr
+      exact ⟨r, by rw [h.1 a hx, except_bind_ok, hr], rfl⟩
+
+/-- The same, for a continuation that consumes the *cursor* as well as the value — which every
+reader below a read does, since the read beneath starts where the read above left off. The
+continuation's agreement is asked only of the pair the left read actually answers, because that is
+the cursor the second read's octet bound has to be about. -/
+theorem answerAgrees_bind₂ {α β : Type} {x y : Except SpecAMQP.Spec.Codec.Refusal (α × Cursor)}
+    {F G : α × Cursor → Except SpecAMQP.Spec.Codec.Refusal (β × Cursor)}
+    (h : AnswerAgrees x y)
+    (hk : ∀ (p : α × Cursor), x = .ok p → AnswerAgrees (F p) (G p)) :
+    AnswerAgrees (x >>= F) (y >>= G) := by
+  constructor
+  · intro b hb
+    obtain ⟨p, hx, hk'⟩ := exists_of_bind_ok hb
+    have hy := h.1 p hx
+    rw [hy, except_bind_ok, (hk p hx).1 b hk']
+  · intro r hr
+    cases hx : x with
+    | error e =>
+      rw [hx, except_bind_error] at hr
+      obtain ⟨r', hr', hcl⟩ := h.2 e hx
+      exact ⟨r', by rw [hr', except_bind_error], by rw [← Except.error.inj hr]; exact hcl⟩
+    | ok p =>
+      rw [hx, except_bind_ok] at hr
+      obtain ⟨r', hr', hcl⟩ := (hk p hx).2 r hr
+      exact ⟨r', by rw [h.1 p hx, except_bind_ok, hr'], hcl⟩
+
+/-- **A continuation under a read that refuses.** When the left read never accepts, the two
+continuations are never reached and nothing about them matters — which is how the item loop's
+zero-fuel tail is closed. -/
+theorem answerAgrees_bind_error {α β : Type} {x y : Except SpecAMQP.Spec.Codec.Refusal α}
+    (h : AnswerAgrees x y) (hx : ∀ a, x ≠ .ok a)
+    (K : α → Except SpecAMQP.Spec.Codec.Refusal β) (K' : α → Except SpecAMQP.Spec.Codec.Refusal β) :
+    AnswerAgrees (x >>= K) (y >>= K') := by
+  constructor
+  · intro b hb
+    obtain ⟨a, ha, -⟩ := exists_of_bind_ok hb
+    exact absurd ha (hx a)
+  · intro r hr
+    cases hxe : x with
+    | error e =>
+      rw [hxe, except_bind_error] at hr
+      obtain ⟨r', hr', hcl⟩ := h.2 e hxe
+      exact ⟨r', by rw [hr', except_bind_error], by rw [← Except.error.inj hr]; exact hcl⟩
+    | ok a => exact absurd hxe (hx a)
+
+/-- The class a failed octet step names: `truncated`, whatever the prose. -/
+theorem spec_takeU8_error_class {c : Cursor} {r : SpecAMQP.Spec.Codec.Refusal}
+    (h : takeU8 c = .error r) : r.reasonClass = "truncated" := by
+  unfold takeU8 at h
+  split at h
+  · exact absurd h (by simp)
+  · simp only [Except.error.injEq] at h
+    rw [← h]
+    rfl
+
+/-- The same for a failed payload read. -/
+theorem spec_takeBytes_error_class {n : Nat} {c : Cursor} {r : SpecAMQP.Spec.Codec.Refusal}
+    (h : takeBytes n c = .error r) : r.reasonClass = "truncated" := by
+  unfold takeBytes at h
+  split at h
+  · exact absurd h (by simp)
+  · simp only [Except.error.injEq] at h
+    rw [← h]
+    rfl
+
+/-- ... and for a failed big-endian field, which refuses through the payload read. -/
+theorem spec_takeBe_error_class {w : Nat} {c : Cursor} {r : SpecAMQP.Spec.Codec.Refusal}
+    (h : takeBe w c = .error r) : r.reasonClass = "truncated" := by
+  unfold takeBe at h
+  cases hb : takeBytes w c with
+  | error e =>
+    rw [hb, except_bind_error] at h
+    rw [← Except.error.inj h]
+    exact spec_takeBytes_error_class hb
+  | ok p => rw [hb, except_bind_ok] at h; exact absurd h (by simp)
+
+/-- **The budget a read hands to the read beneath it**: the same buffer, a cursor no further back. -/
+theorem bound_tail_value {f : Nat} {c d : Cursor} {v : Value}
+    (h : readValue f c = .ok (v, d)) (hb : c.data.size - c.pos ≤ f) :
+    d.data.size - d.pos ≤ f := by
+  have hd := (readRows_data f).1 c v d h
+  have hp := (readValue_progress f).1 c v d h
+  rw [hd]; omega
+
+/-- **One octet of the budget is spent by the value reader's own constructor**, which is what makes the
+item loop's tail bound one tighter than the loop's. -/
+theorem bound_tail_lt {f : Nat} {c d : Cursor} {v : Value}
+    (h : readValue f c = .ok (v, d)) (hb : c.data.size - c.pos ≤ f) :
+    d.data.size - d.pos ≤ f - 1 := by
+  have hf : 1 ≤ f := by
+    cases f with
+    | zero => simp only [readValue] at h; exact absurd h (by simp)
+    | succ k => omega
+  have hd := (readRows_data f).1 c v d h
+  have hp := readValue_lt hf h
+  rw [hd]; omega
+
+/-- The element read's budget, which the element loop's count induction passes on. -/
+theorem bound_tail_element {f : Nat} {ed : Option EncodingDecl} {c d : Cursor} {v : Value}
+    (h : specElementData f ed c = .ok (v, d)) (hb : c.data.size - c.pos ≤ f) :
+    d.data.size - d.pos ≤ f := by
+  have hd := specElementData_data f ed c v d h
+  have hp := specElementData_progress f ed c v d h
+  rw [hd]; omega
+
+/-- **An element declaration set whose rows carry a width.** The declared surface's rows below the
+fixed category are one and four octets wide, and a zero-width header would leave the two fuels' item
+loops reached with nothing spent — which is why the element clauses carry this rather than a bare
+`Option EncodingDecl`. -/
+def WideOption (ed : Option EncodingDecl) : Prop :=
+  ∀ decl : EncodingDecl, ed = some decl → decl.category ≠ Generated.Oasis.Category.fixed →
+    1 ≤ decl.width
+
+/-- **Every reader in the value cluster agrees with itself across fuels above the octet bound**, at
+one fuel. Six clauses rather than one, because the readers are mutually recursive and their
+guard-free forms are false at the boundary: the item loop refuses at fuel zero and accepts at fuel one
+with a zero count, so its clause is stated from fuel one, and the compound and array readers need a
+header wide enough to spend the octet that puts their item loops a level down. -/
+structure FuelIrrelevant (f : Nat) : Prop where
+  value : ∀ (f' : Nat), f ≤ f' → ∀ (c : Cursor), c.data.size - c.pos ≤ f →
+    AnswerAgrees (readValue f c) (readValue f' c)
+  items : ∀ (f' : Nat), f ≤ f' → 1 ≤ f → ∀ (count : Nat) (c : Cursor),
+    c.data.size - c.pos ≤ f - 1 → AnswerAgrees (readItems f count c) (readItems f' count c)
+  compound : ∀ (f' : Nat), f ≤ f' → ∀ (decl : EncodingDecl) (c : Cursor), 1 ≤ decl.width →
+    c.data.size - c.pos ≤ f → AnswerAgrees (readCompound f decl c) (readCompound f' decl c)
+  array : ∀ (f' : Nat), f ≤ f' → ∀ (decl : EncodingDecl) (c : Cursor), 1 ≤ decl.width →
+    c.data.size - c.pos ≤ f → AnswerAgrees (readArrayData f decl c) (readArrayData f' decl c)
+  element : ∀ (f' : Nat), f ≤ f' → ∀ (ed : Option EncodingDecl) (c : Cursor), WideOption ed →
+    c.data.size - c.pos ≤ f → AnswerAgrees (specElementData f ed c) (specElementData f' ed c)
+  elementLoop : ∀ (f' : Nat), f ≤ f' → ∀ (ed : Option EncodingDecl) (count : Nat) (c : Cursor),
+    WideOption ed → c.data.size - c.pos ≤ f →
+    AnswerAgrees (readElementsLoop f ed count c) (readElementsLoop f' ed count c)
+
+
+/-- The invariant at every fuel up to `n`. A clause is read at the fuel below when a reader descends
+into a container two levels down, so the step has to reach every lower level, not only its own. -/
+def FuelIrrelevantUpTo (n : Nat) : Prop := ∀ k, k ≤ n → FuelIrrelevant k
+
+set_option maxRecDepth 10000 in
+/-- **The declared surface's rows below the fixed category carry a width.** One finite evaluation of
+the table itself, asked of every octet there is. -/
+theorem dataDecl_rows_wide :
+    (List.range 256).all (fun n =>
+      match (SpecAMQP.Spec.Codec.dataDecl (UInt8.ofNat n)).toOption with
+      | some d => (match d.category with
+        | Generated.Oasis.Category.fixed => true
+        | _ => decide (1 ≤ d.width))
+      | none => true) = true := by
+  decide
+
+set_option maxRecDepth 10000 in
+/-- The same for the element-constructor lookup, which reads the same table. -/
+theorem elementDecl_rows_wide :
+    (List.range 256).all (fun n =>
+      match (SpecAMQP.Spec.Codec.elementDecl? (UInt8.ofNat n)).toOption with
+      | some (some d) => (match d.category with
+        | Generated.Oasis.Category.fixed => true
+        | _ => decide (1 ≤ d.width))
+      | _ => true) = true := by
+  decide
+
+/-- **The declared surface's rows below the fixed category carry a width**, read off the sweep at one
+octet: the compound, array and variable rows are one and four octets wide, and a zero-width header
+would leave the item loop reached with nothing spent. -/
+theorem width_of_dataDecl {code : UInt8} {decl : EncodingDecl}
+    (hd : SpecAMQP.Spec.Codec.dataDecl code = .ok decl)
+    (hc : decl.category ≠ Generated.Oasis.Category.fixed) : 1 ≤ decl.width := by
+  have hmem := List.all_eq_true.mp dataDecl_rows_wide code.toNat
+    (List.mem_range.mpr code.toNat_lt)
+  rw [show UInt8.ofNat code.toNat = code from by simp [UInt8.ofNat_toNat]] at hmem
+  rw [hd] at hmem
+  simp only [Except.toOption] at hmem
+  cases hcat : decl.category with
+  | fixed => exact absurd hcat hc
+  | «variable» => exact of_decide_eq_true hmem
+  | compound => exact of_decide_eq_true hmem
+  | array => exact of_decide_eq_true hmem
+
+/-- The same read off `elementDecl?`: an array's element constructor names a row of the same table. -/
+theorem wideOption_of_elementDecl {ctor : UInt8} {ed : Option EncodingDecl}
+    (h : SpecAMQP.Spec.Codec.elementDecl? ctor = .ok ed) : WideOption ed := by
+  intro decl heq hc
+  have hmem := List.all_eq_true.mp elementDecl_rows_wide ctor.toNat
+    (List.mem_range.mpr ctor.toNat_lt)
+  rw [show UInt8.ofNat ctor.toNat = ctor from by simp [UInt8.ofNat_toNat]] at hmem
+  rw [h] at hmem
+  simp only [Except.toOption, heq] at hmem
+  cases hcat : decl.category with
+  | fixed => exact absurd hcat hc
+  | «variable» => exact of_decide_eq_true hmem
+  | compound => exact of_decide_eq_true hmem
+  | array => exact of_decide_eq_true hmem
+
+/-- **Every reader in the value cluster answers the same way at every fuel above the octet bound.**
+
+The proof is one induction over the fuel, and each level's six clauses are proved in dependency order,
+because the readers are one `mutual` block and two of the dependences stay *inside* a level: the
+compound reader reads its items at its own fuel, and the element loop reads the element decision at
+its own fuel too. Everything else descends a level, which is why the induction hypothesis has to be
+the family at every fuel below rather than the last one. -/
+theorem fuelIrrelevantUpTo_all : ∀ n : Nat, FuelIrrelevantUpTo n := by
+  intro n
+  induction n with
+  | zero =>
+    have hVal0 : ∀ (f' : Nat), 0 ≤ f' → ∀ (c : Cursor), c.data.size - c.pos ≤ 0 →
+        AnswerAgrees (readValue 0 c) (readValue f' c) := by
+      intro f' _ c hb
+      have hle : c.data.size ≤ c.pos := by omega
+      cases f' with
+      | zero => exact answerAgrees_refl _
+      | succ m =>
+        have h0 : readValue 0 c = .error (SpecAMQP.Spec.Codec.refusal "truncated"
+            "the input ends before the value does") := by simp only [readValue]
+        cases hu : takeU8 c with
+        | error r =>
+          have h1 : readValue (m + 1) c = .error r := by
+            simp only [readValue, hu, except_bind_error]
+          have hcl := spec_takeU8_error_class hu
+          rw [h0, h1]
+          exact ⟨fun a ha => absurd ha (by simp),
+            fun r₀ hr₀ => ⟨r, rfl, by rw [← Except.error.inj hr₀]; exact hcl.symm⟩⟩
+        | ok p => obtain ⟨b, d⟩ := p; exact absurd (spec_takeU8_lt hu) (by omega)
+    have hIt0 : ∀ (f' : Nat), 0 ≤ f' → 1 ≤ 0 → ∀ (count : Nat) (c : Cursor),
+        c.data.size - c.pos ≤ 0 - 1 →
+        AnswerAgrees (readItems 0 count c) (readItems f' count c) := by
+      intro f' _ h1
+      exact absurd h1 (by omega)
+    have hComp0 : ∀ (f' : Nat), 0 ≤ f' → ∀ (decl : EncodingDecl) (c : Cursor), 1 ≤ decl.width →
+        c.data.size - c.pos ≤ 0 →
+        AnswerAgrees (readCompound 0 decl c) (readCompound f' decl c) := by
+      intro f' _ decl c hw hb
+      have hle : c.data.size ≤ c.pos := by omega
+      have h0 := spec_readCompound_header (fuel := 0) hw c hle
+      cases f' with
+      | zero => exact answerAgrees_refl _
+      | succ m =>
+        rw [h0, spec_readCompound_header (fuel := m + 1) hw c hle]
+        exact answerAgrees_refl _
+    have hArr0 : ∀ (f' : Nat), 0 ≤ f' → ∀ (decl : EncodingDecl) (c : Cursor), 1 ≤ decl.width →
+        c.data.size - c.pos ≤ 0 →
+        AnswerAgrees (readArrayData 0 decl c) (readArrayData f' decl c) := by
+      intro f' _ decl c hw hb
+      have hle : c.data.size ≤ c.pos := by omega
+      cases f' with
+      | zero => exact answerAgrees_refl _
+      | succ m =>
+        have h0 : readArrayData 0 decl c = .error (SpecAMQP.Spec.Codec.refusal "truncated"
+            "the input ends before the array does") := by simp only [readArrayData]
+        cases h1 : takeBe decl.width c with
+        | error r =>
+          have h1' : readArrayData (m + 1) decl c = .error r := by
+            simp only [readArrayData, h1, except_bind_error]
+          have hcl := spec_takeBe_error_class h1
+          rw [h0, h1']
+          exact ⟨fun a ha => absurd ha (by simp),
+            fun r₀ hr₀ => ⟨r, rfl, by rw [← Except.error.inj hr₀]; exact hcl.symm⟩⟩
+        | ok p => obtain ⟨size, c₁⟩ := p; rw [spec_takeBe_exhausted hw hle] at h1; exact absurd h1 (by simp)
+    have hEl0 : ∀ (f' : Nat), 0 ≤ f' → ∀ (ed : Option EncodingDecl) (c : Cursor), WideOption ed →
+        c.data.size - c.pos ≤ 0 →
+        AnswerAgrees (specElementData 0 ed c) (specElementData f' ed c) := by
+      intro f' _ ed c hw hb
+      have hle : c.data.size ≤ c.pos := by omega
+      cases f' with
+      | zero => exact answerAgrees_refl _
+      | succ m =>
+        cases hed : ed with
+        | none =>
+          simp only [specElementData]
+          exact answerAgrees_bind_error (hVal0 (m + 1) (Nat.zero_le (m + 1)) c (by omega))
+            (fun a ha => by simp only [readValue] at ha; exact absurd ha (by simp)) _ _
+        | some decl =>
+          simp only [specElementData]
+          cases hcat : decl.category with
+          | fixed => exact answerAgrees_refl _
+          | «variable» => exact answerAgrees_refl _
+          | compound =>
+            exact hComp0 (m + 1) (Nat.zero_le (m + 1)) decl c
+              (hw decl hed (by rw [hcat]; simp)) (by omega)
+          | array =>
+            exact hArr0 (m + 1) (Nat.zero_le (m + 1)) decl c
+              (hw decl hed (by rw [hcat]; simp)) (by omega)
+    have hElLoop0 : ∀ (f' : Nat), 0 ≤ f' → ∀ (ed : Option EncodingDecl) (count : Nat) (c : Cursor),
+        WideOption ed → c.data.size - c.pos ≤ 0 →
+        AnswerAgrees (readElementsLoop 0 ed count c) (readElementsLoop f' ed count c) := by
+      intro f' _ ed count
+      cases f' with
+      | zero => intro c hw hb; exact answerAgrees_refl _
+      | succ m =>
+       induction count with
+       | zero => intro c hw hb; simp only [readElementsLoop]; exact answerAgrees_refl _
+       | succ k ihk =>
+        intro c hw hb
+        rw [specElementData_loop, specElementData_loop]
+        refine answerAgrees_bind₂ (hEl0 (m + 1) (Nat.zero_le (m + 1)) ed c hw hb) ?_
+        intro p hrd
+        obtain ⟨a, d⟩ := p
+        dsimp only at hrd ⊢
+        exact answerAgrees_bind (ihk d hw (bound_tail_element hrd (by omega))) _
+    have hLvl : FuelIrrelevant 0 := ⟨hVal0, hIt0, hComp0, hArr0, hEl0, hElLoop0⟩
+    intro k hk
+    have hk0 : k = 0 := by omega
+    subst hk0
+    exact hLvl
+  | succ n ih =>
+    have hVal : ∀ (f' : Nat), n + 1 ≤ f' → ∀ (c : Cursor), c.data.size - c.pos ≤ n + 1 →
+        AnswerAgrees (readValue (n + 1) c) (readValue f' c) := by
+      intro f' hf' c hb
+      obtain ⟨m, rfl⟩ : ∃ m, f' = m + 1 := ⟨f' - 1, by omega⟩
+      have hm : n ≤ m := by omega
+      cases hu : takeU8 c with
+      | error r => simp only [readValue, hu, except_bind_error]; exact answerAgrees_refl _
+      | ok p =>
+        obtain ⟨code, c₁⟩ := p
+        have hc1d : c₁.data = c.data := spec_takeU8_data hu
+        have hc1p : c₁.pos = c.pos + 1 := spec_takeU8_pos hu
+        have hb1 : c₁.data.size - c₁.pos ≤ n := by rw [hc1d, hc1p]; omega
+        simp only [readValue, hu, except_bind_ok]
+        split
+        all_goals first
+          | (refine answerAgrees_bind₂ ((ih n le_rfl).value m hm c₁ hb1) ?_
+             intro p hrd
+             obtain ⟨a, d⟩ := p
+             dsimp only at hrd ⊢
+             exact answerAgrees_bind ((ih n le_rfl).value m hm d (bound_tail_value hrd hb1)) _)
+          | exact answerAgrees_refl _
+          | (cases hd : SpecAMQP.Spec.Codec.dataDecl code with
+             | error r => exact answerAgrees_refl _
+             | ok decl =>
+               cases hcat : decl.category with
+               | fixed => simp only [except_bind_ok, hcat]; exact answerAgrees_refl _
+               | «variable» =>
+                 simp only [except_bind_ok, hcat]; exact answerAgrees_refl _
+               | compound =>
+                 simp only [except_bind_ok, hcat]
+                 exact (ih n le_rfl).compound m hm decl c₁
+                   (width_of_dataDecl hd (by rw [hcat]; simp)) hb1
+               | array =>
+                 simp only [except_bind_ok, hcat]
+                 exact (ih n le_rfl).array m hm decl c₁
+                   (width_of_dataDecl hd (by rw [hcat]; simp)) hb1)
+    have hIt : ∀ (f' : Nat), n + 1 ≤ f' → 1 ≤ n + 1 → ∀ (count : Nat) (c : Cursor),
+        c.data.size - c.pos ≤ (n + 1) - 1 →
+        AnswerAgrees (readItems (n + 1) count c) (readItems f' count c) := by
+      intro f' hf' _ count c hb
+      obtain ⟨m, rfl⟩ : ∃ m, f' = m + 1 := ⟨f' - 1, by omega⟩
+      have hm : n ≤ m := by omega
+      cases count with
+      | zero => simp only [readItems]; exact answerAgrees_refl _
+      | succ k =>
+        cases n with
+        | zero =>
+          -- the item read at this level is the value reader at fuel zero, which refuses outright
+          simp only [readItems]
+          have hb0 : c.data.size - c.pos ≤ 0 := by simpa using hb
+          refine answerAgrees_bind_error ((ih 0 (Nat.zero_le 0)).value m (Nat.zero_le m) c hb0) ?_ _ _
+          intro a ha
+          simp only [readValue] at ha
+          exact absurd ha (by simp)
+        | succ n' =>
+          simp only [readItems]
+          refine answerAgrees_bind₂ ((ih (n' + 1) (by omega)).value m (by omega) c (by omega)) ?_
+          intro p hrd
+          obtain ⟨a, d⟩ := p
+          dsimp only at hrd ⊢
+          exact answerAgrees_bind ((ih (n' + 1) (by omega)).items m (by omega) (by omega) k d
+            (bound_tail_lt hrd (by omega))) _
+    have hComp : ∀ (f' : Nat), n + 1 ≤ f' → ∀ (decl : EncodingDecl) (c : Cursor), 1 ≤ decl.width →
+        c.data.size - c.pos ≤ n + 1 →
+        AnswerAgrees (readCompound (n + 1) decl c) (readCompound f' decl c) := by
+      intro f' hf' decl c hw hb
+      obtain ⟨m, rfl⟩ : ∃ m, f' = m + 1 := ⟨f' - 1, by omega⟩
+      have hm : n ≤ m := by omega
+      cases h1 : takeBe decl.width c with
+      | error r => simp only [readCompound, h1, except_bind_error]; exact answerAgrees_refl _
+      | ok p =>
+        obtain ⟨size, c₁⟩ := p
+        cases h2 : takeBe decl.width c₁ with
+        | error r =>
+          simp only [readCompound, h1, h2, except_bind_ok, except_bind_error]
+          exact answerAgrees_refl _
+        | ok q =>
+          obtain ⟨count, c₂⟩ := q
+          have hb2 : c₂.data.size - c₂.pos ≤ (n + 1) - 1 := by
+            rw [spec_takeBe_data h2, spec_takeBe_data h1]
+            have p1 := takeBe_advances decl.width c size c₁ h1
+            have p2 := takeBe_advances decl.width c₁ count c₂ h2
+            omega
+          simp only [readCompound, h1, h2, except_bind_ok]
+          split
+          all_goals first
+            | (refine answerAgrees_bind (hIt (m + 1) (by omega) (by omega) count c₂ hb2) _)
+            | (split
+               all_goals first
+                 | (refine answerAgrees_bind (hIt (m + 1) (by omega) (by omega) count c₂ hb2) _)
+                 | exact answerAgrees_refl _)
+            | exact answerAgrees_refl _
+    have hArr : ∀ (f' : Nat), n + 1 ≤ f' → ∀ (decl : EncodingDecl) (c : Cursor), 1 ≤ decl.width →
+        c.data.size - c.pos ≤ n + 1 →
+        AnswerAgrees (readArrayData (n + 1) decl c) (readArrayData f' decl c) := by
+      intro f' hf' decl c hw hb
+      obtain ⟨m, rfl⟩ : ∃ m, f' = m + 1 := ⟨f' - 1, by omega⟩
+      have hm : n ≤ m := by omega
+      cases h1 : takeBe decl.width c with
+      | error r => simp only [readArrayData, h1, except_bind_error]; exact answerAgrees_refl _
+      | ok p =>
+        obtain ⟨size, c₁⟩ := p
+        cases h2 : takeBe decl.width c₁ with
+        | error r =>
+          simp only [readArrayData, h1, h2, except_bind_ok, except_bind_error]
+          exact answerAgrees_refl _
+        | ok q =>
+          obtain ⟨count, c₂⟩ := q
+          simp only [readArrayData, h1, h2, except_bind_ok]
+          split
+          · all_goals exact answerAgrees_refl _
+          · cases h3 : takeU8 c₂ with
+            | error r =>
+              simp only [except_bind_error]
+              exact answerAgrees_refl _
+            | ok p3 =>
+              obtain ⟨ctor, c₃⟩ := p3
+              cases h4 : elementDecl? ctor with
+              | error r =>
+                simp only [h4, except_bind_ok, except_bind_error]
+                exact answerAgrees_refl _
+              | ok ed =>
+                simp only [h4, except_bind_ok]
+                have hp3 := spec_takeU8_pos h3
+                have hle3 := spec_takeU8_next_le h3
+                have hp1 := takeBe_advances decl.width c size c₁ h1
+                have hp2 := takeBe_advances decl.width c₁ count c₂ h2
+                have hdd : c₃.data.size = c.data.size := by
+                  rw [spec_takeU8_data h3, spec_takeBe_data h2, spec_takeBe_data h1]
+                have hge : 2 ≤ n := by omega
+                obtain ⟨n', rfl⟩ : ∃ n', n = n' + 1 := ⟨n - 1, by omega⟩
+                obtain ⟨m', rfl⟩ : ∃ m', m = m' + 1 := ⟨m - 1, by omega⟩
+                simp only [readElements]
+                refine answerAgrees_bind ((ih n' (by omega)).elementLoop m' (by omega) ed count c₃
+                  (wideOption_of_elementDecl h4) (by omega)) _
+    have hEl : ∀ (f' : Nat), n + 1 ≤ f' → ∀ (ed : Option EncodingDecl) (c : Cursor), WideOption ed →
+        c.data.size - c.pos ≤ n + 1 →
+        AnswerAgrees (specElementData (n + 1) ed c) (specElementData f' ed c) := by
+      intro f' hf' ed c hw hb
+      obtain ⟨m, rfl⟩ : ∃ m, f' = m + 1 := ⟨f' - 1, by omega⟩
+      have hm : n ≤ m := by omega
+      cases hed : ed with
+      | none =>
+        simp only [specElementData]
+        refine answerAgrees_bind₂ (hVal (m + 1) (by omega) c hb) ?_
+        intro p hrd
+        obtain ⟨a, d⟩ := p
+        dsimp only at hrd ⊢
+        exact answerAgrees_bind (hVal (m + 1) (by omega) d (bound_tail_value hrd hb)) _
+      | some decl =>
+        simp only [specElementData]
+        cases hcat : decl.category with
+        | fixed => exact answerAgrees_refl _
+        | «variable» => exact answerAgrees_refl _
+        | compound =>
+          exact hComp (m + 1) (by omega) decl c (hw decl hed (by rw [hcat]; simp)) hb
+        | array =>
+          exact hArr (m + 1) (by omega) decl c (hw decl hed (by rw [hcat]; simp)) hb
+    have hElLoop : ∀ (f' : Nat), n + 1 ≤ f' → ∀ (ed : Option EncodingDecl) (count : Nat) (c : Cursor),
+        WideOption ed → c.data.size - c.pos ≤ n + 1 →
+        AnswerAgrees (readElementsLoop (n + 1) ed count c) (readElementsLoop f' ed count c) := by
+      intro f' hf' ed count
+      obtain ⟨m, rfl⟩ : ∃ m, f' = m + 1 := ⟨f' - 1, by omega⟩
+      induction count with
+      | zero => intro c hw hb; simp only [readElementsLoop]; exact answerAgrees_refl _
+      | succ k ihk =>
+        intro c hw hb
+        rw [specElementData_loop, specElementData_loop]
+        refine answerAgrees_bind₂ (hEl (m + 1) (by omega) ed c hw hb) ?_
+        intro p hrd
+        obtain ⟨a, d⟩ := p
+        dsimp only at hrd ⊢
+        exact answerAgrees_bind (ihk d hw (bound_tail_element hrd hb)) _
+    have hLvl : FuelIrrelevant (n + 1) := ⟨hVal, hIt, hComp, hArr, hEl, hElLoop⟩
+    intro k hk
+    by_cases hkn : k ≤ n
+    · exact ih k hkn
+    · have hk1 : k = n + 1 := by omega
+      subst hk1
+      exact hLvl
+
+/-- The level family holds at every fuel. -/
+theorem fuelIrrelevant_all (f : Nat) : FuelIrrelevant f := fuelIrrelevantUpTo_all f f le_rfl
+
+/-- **The specification's value reader answers the same at every fuel above the octet bound.** -/
+theorem readValue_irrel {f f' : Nat} (hle : f ≤ f') {c : Cursor} (hb : c.data.size - c.pos ≤ f) :
+    AnswerAgrees (readValue f c) (readValue f' c) :=
+  (fuelIrrelevant_all f).value f' hle c hb
+
+/-- **The item loop, from fuel one** at a cursor whose octets the fuel covers one below itself. -/
+theorem readItems_irrel {f f' : Nat} (hle : f ≤ f') (hf : 1 ≤ f) {count : Nat} {c : Cursor}
+    (hb : c.data.size - c.pos ≤ f - 1) :
+    AnswerAgrees (readItems f count c) (readItems f' count c) :=
+  (fuelIrrelevant_all f).items f' hle hf count c hb
+
+/-- **The compound reader**, whose header the width guard makes spend octets. -/
+theorem readCompound_irrel {f f' : Nat} (hle : f ≤ f') {decl : EncodingDecl} {c : Cursor}
+    (hw : 1 ≤ decl.width) (hb : c.data.size - c.pos ≤ f) :
+    AnswerAgrees (readCompound f decl c) (readCompound f' decl c) :=
+  (fuelIrrelevant_all f).compound f' hle decl c hw hb
+
+/-- The array reader, the same clause. -/
+theorem readArrayData_irrel {f f' : Nat} (hle : f ≤ f') {decl : EncodingDecl} {c : Cursor}
+    (hw : 1 ≤ decl.width) (hb : c.data.size - c.pos ≤ f) :
+    AnswerAgrees (readArrayData f decl c) (readArrayData f' decl c) :=
+  (fuelIrrelevant_all f).array f' hle decl c hw hb
+
+/-- The element decision. -/
+theorem specElementData_irrel {f f' : Nat} (hle : f ≤ f') {ed : Option EncodingDecl} {c : Cursor}
+    (hw : WideOption ed) (hb : c.data.size - c.pos ≤ f) :
+    AnswerAgrees (specElementData f ed c) (specElementData f' ed c) :=
+  (fuelIrrelevant_all f).element f' hle ed c hw hb
+
+/-- The element loop. -/
+theorem readElementsLoop_irrel {f f' : Nat} (hle : f ≤ f') {ed : Option EncodingDecl}
+    {count : Nat} {c : Cursor} (hw : WideOption ed) (hb : c.data.size - c.pos ≤ f) :
+    AnswerAgrees (readElementsLoop f ed count c) (readElementsLoop f' ed count c) :=
+  (fuelIrrelevant_all f).elementLoop f' hle ed count c hw hb
 
 end SpecAMQP.Proofs
