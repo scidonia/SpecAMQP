@@ -905,6 +905,20 @@ three**: the reference's `disposition`'s `settled` and the `settled` the transac
 rather than a deferral, and the field's *declaration* (`type="boolean" default="false"`, "If true, indicates that the referenced deliveries are considered settled") is the authority the clause list does not carry. **Five sites, one reading, and
 no committed verdict moved** (`d50abc1`, `1540777`).
 
+**And what remains staged is not a backlog of defects — it is the deferred obligations made visible, which is worth stating because the two look identical from the corpus's side.** After the four are promoted, the nine that remain are
+dispositioned `deferred:S4` (`flow/field:delivery-count.3`'s receiver echo, `field:delivery-count.2`'s presence half, `transfer/field:settled.6` in both directions, `resume.2`, `resume.3`, `attach/field:unsettled.5`) or `deferred:S3-session`
+(`transfer/field:rcv-settle-mode.u1`) or `deferred:S3` (`picture.24`'s `-` column). **Every one of the nine is a clause the plan already carries later**, which is why they fail in *both* artefacts and why the differential cannot see any of them: the
+staged set is now **shared-gaps-only**, and the corpus is the only instrument that can. So the staged file's job is not to be emptied; it is to hold, per milestone, the obligations a gate cannot yet require.
+
+**Three of them are additionally blocked by a decision rather than a milestone**, and the distinction matters to anyone picking this up: `resume.2`, `resume.3` and `attach/field:unsettled.5` each name the local unsettled map or a resumed
+delivery, and `MODEL RESTRICTION: the S4 slice contains at most one link per session` (§13's D4 record) means the model has no link identity to resume and no map to consult. They are the server-side obligations §23.3 lists — resumption is what a
+broker needs most — and they move only when D4's named triggers fire, not when a milestone arrives.
+
+**One disposition was asserting more than a declaration carries, and the staged corpus is what showed it.** `flow/field:delivery-count.2` read `formalized:Spec.Session.flowCountRefusal` while its staged vector failed in both artefacts: the sentence
+carries two obligations — the value ("to the current delivery-count") and its being set at all — and `flowCountRefusal?` refuses a present-but-wrong count, returning `none` when the field is absent. The note had disclosed the presence half
+precisely, with the line numbers; what the *value* could not say is that half the clause is pending, so it now carries `deferred:S4` as well. **A `formalized:` that covers half a sentence conflates completed work with pending work**, and the
+vocabulary had no form for it until this clause needed one.
+
 **The priority family produced sixteen of the thirty-six, and it is the session layer's form of the shape the value sweep found three of** — a declared or negotiated value against what the frame carries. Where the
 value layer's version was a *constructor* against its *contents*, the session layer's is a *negotiated mode* against a *field* (a settlement flag under the choice that forbids it, a receiver's mode under a
 `first` negotiation, a count against the credit actually held), and the same three-reading split appears: what the flag says, what its presence implies, and what the negotiated state permits.
