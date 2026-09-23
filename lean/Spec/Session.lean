@@ -56,8 +56,8 @@ open SpecAMQP.Generated.Oasis (TypeDecl)
 open SpecAMQP.Harness (Octets)
 open SpecAMQP.Spec.Codec (Value)
 open SpecAMQP.Spec.Connection
-  (choiceValue? fieldDefault fieldValue fieldSet framingError invalidField missingMandatory
-   valueNat valueOctets)
+  (choiceValue? fieldBool fieldDefault fieldValue fieldSet framingError invalidField
+   missingMandatory valueBool valueNat valueOctets)
 
 /-! ## The session state machine (picture 30, "State Transitions") -/
 
@@ -878,11 +878,15 @@ def transferLink (session : Session) (outbound : Bool) (body : Value) :
       (refusal invalidField "malformed"
         "the message-format of a continuation transfer differs from the message-format of \
           the delivery it continues, which `transfer/field:message-format.u1` makes an error")
-  let settled := fieldSet "transfer" "settled" body
-  let aborted := fieldSet "transfer" "aborted" body
+  -- a boolean means its value: `settled`, `aborted` and `more` set to false are not the
+  -- same as unset, which `settled.6`'s "false (or unset)" and the artifact's `settled=False`
+  -- diagrams both turn on
+  let settled := fieldBool "transfer" "settled" body
+  let aborted := fieldBool "transfer" "aborted" body
   -- `more` decides whether this transfer completes the delivery; `aborted` discards it
-  -- ("Aborted messages SHOULD be discarded by the recipient")
-  let more := !aborted && fieldSet "transfer" "more" body
+  -- ("Aborted messages SHOULD be discarded by the recipient"), and `more.u1` gives
+  -- `aborted` precedence when both are set to true
+  let more := !aborted && fieldBool "transfer" "more" body
   let delivery : Except Refusal (Option Delivery) :=
     if aborted then pure none
     else if more then pure (some (Delivery.step session.delivery id settled))
@@ -1012,7 +1016,7 @@ def dispositionLink (session : Session) (outbound : Bool) (body : Value) :
         range")
   match session.delivery with
   | some delivery =>
-    if fieldSet "disposition" "settled" body && first ≤ delivery.id && delivery.id ≤ last then
+    if fieldBool "disposition" "settled" body && first ≤ delivery.id && delivery.id ≤ last then
       return { session with delivery := none, deliveryTag := none, deliveryFormat := none }
     else return session
   | none => return session
@@ -1295,8 +1299,9 @@ def step (session : Session) (outbound : Bool) (channel : Nat) (body : Value)
     -- unset means false, and a continuation carries what the delivery's earlier transfers
     -- set. Read here rather than after `transferLink`, which releases the delivery when
     -- the transfer completes it and would take the flag with it.
-    let settled := fieldSet "transfer" "settled" body ||
-      (session.delivery.map (fun delivery => delivery.settled)).getD false
+    let settled :=
+      ((fieldValue "transfer" "settled" body).bind valueBool).getD
+        ((session.delivery.map (fun delivery => delivery.settled)).getD false)
     if outbound then do
       -- the two windows a sent transfer is charged against: ours, which "defines the
       -- maximum number of outgoing «transfer» frames that the endpoint can currently

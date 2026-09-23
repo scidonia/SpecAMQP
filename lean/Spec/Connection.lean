@@ -565,6 +565,12 @@ def valueOctets : Value → Option Octets
   | .binary payload => some payload
   | _ => none
 
+/-- A `boolean` value's truth: the type's encoding is a single octet, false for the octet
+zero and true for any other, which the layer's codec already reads that way. -/
+def valueBool : Value → Option Bool
+  | .boolean b => some b
+  | _ => none
+
 /-- A `multiple` field's symbols as the strings they are: a single symbol is the wire
 form of a one-element list, and the corpus's own frames are written that way. -/
 def symbolsOf : Value → List String
@@ -584,6 +590,19 @@ def fieldSet (typeName fieldName : String) (body : Value) : Bool :=
   match fieldValue typeName fieldName body with
   | some .null | none => false
   | some _ => true
+
+/-- A boolean field's value, false when the field is absent.
+
+A boolean field means *what it carries*: a field that is present and false is not the same
+as a field that is not there, and the artifact names both states in one sentence —
+`transfer/field:settled.6` requires the field to be "false (or unset)" — while its own
+worked diagrams write `settled=False` on transfers and on dispositions rather than leaving
+the field out. Reading presence where a clause reads a value collapses the two encodings
+into one, and a rule that names both states becomes unenforceable: `settled.4` obliges a
+sender under the «settled» negotiation to set the field true, which a presence reader
+accepts a frame setting it false as satisfying. -/
+def fieldBool (typeName fieldName : String) (body : Value) : Bool :=
+  ((fieldValue typeName fieldName body).bind valueBool).getD false
 
 /-- The mandatory fields of a performative that it does not carry.
 
