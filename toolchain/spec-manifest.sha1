@@ -25,6 +25,8 @@ f1b824c9c4aeae571c20a0acb2e7ff06d1b50741  lean/Contracts/Sasl.lean
 cd0b5ac08a97c9ff4c4074a2cade872b32c78da4  lean/Contracts/Settlement.lean
 7a52a63a35cda512b63a483e43af4799ae81beea  lean/Contracts/Transaction.lean
 c5ee92929caed5a244bae9a85cea9d0af5e7749a  lean/Contracts/TypeSystem.lean
+e3d4841bca4da7b7d2125eeee81b85b6dbe83cd8  vectors/flow-negative.ndjson
+baa885742e1030d84ad2cb946eaba54d4228a94e  vectors/flow.ndjson
 0f123312d720c0282d52ceb90467270f289dc6ed  vectors/frames-negative.ndjson
 860b8160aeeff3a1c8033f86292924a99e797a9c  vectors/frames.ndjson
 ccc84acbd80928c1ee75368b208ccd018d50cfc4  vectors/generated-exchanges.ndjson
