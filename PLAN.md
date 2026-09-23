@@ -239,6 +239,23 @@ and the module is what a proof is checked against.
 * `ValueCarrierAgree`, the corpus vocabulary: a JSON value the reference's carrier accepts is one the specification's accepts,
   with the layer's relation between the bodies. No classes, no wire, one claim, and it is the one hypothesis in the layer with
   no evidence against it. It is also the most tractable, so it is first.
+* `ValueCarrierAgree`, calibrated against a scratch development that must not land: **the two carriers dispatch in different clause orders**, so
+  the lockstep cannot be one `split`. The clause sets are identical and the orders are not — one lists `float, double, decimal32, decimal64,
+  decimal128, char, timestamp, uuid` where the other lists `char, timestamp, float, double, decimal32, decimal64, decimal128, uuid` — so a single
+  `split` pairs `float` with `char` and every later branch is matched against the wrong clause. The proof cases the *reference's* dispatch, whose
+  `split at h` carries each branch's discriminant equality, and rewrites that discriminant into the specification's match: mechanical, one per
+  branch, and twenty-five branches of plumbing before any clause is proved. The compound clauses differ in the *order of reading* as well — the
+  specification reads `items` before `constructor`, the reference the reverse — so they need the reads re-ordered around a shared `Json` rather
+  than matched step for step. That two independently authored carriers agree on the clause set and disagree on its order is a fact about the
+  artefacts rather than a defect, and it is **invisible to the differential by construction**, since the same clauses in another order give the
+  same answers; a proof obstacle no test here could surface is what this paragraph is for. What is calibrated and working: the fuel induction,
+  with the item-loop lemma proved inside the `succ` step against the induction hypothesis over `List.mapM` of the corpus vocabulary (using
+  `exists_of_bind_ok` from `ReadProgress`, and a `dsimp` after each extraction because `mapM_cons` leaves the continuation as an unreduced match
+  on the pair), and the trivial clauses — null, boolean, string, symbol, binary — which close in two or three lines each once their discriminants
+  are rewritten. What remains is the bulk: twenty integer branches needing the round-trip lemmas at the bounds `unsignedOf`, `signedOf` and
+  `boundedField` establish, the compound clauses needing list and pair versions of the item lemma, and the four locksteps whose reads are
+  ordered differently. Several hours of branch-by-branch proof, not a finishing pass.
+
 * `ValueWriterAgree`, the send direction: **restated over the reader-reachable domain.** The body of an endpoint can only come
   from a reader — the wire is the only source of values — so a body no reader can produce cannot be sent by a conforming peer
   nor arise in the implementation answering one, and the ill-width family that refuted the unrestricted statement is a
