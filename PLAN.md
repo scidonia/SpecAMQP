@@ -295,7 +295,10 @@ would surface only in a proof that stated the two as equal functions, and it wou
 independently authored implementations are *allowed* to differ in wording is the point of having two. And the bridge must enter as a
 *local hypothesis*: `simp only` takes identifiers rather than applied terms, so an applied lemma silently does not fire.
 
-**The statement is at fuel 64, not quantifier-general**, and the clause lemmas are proved at `valueOfJson (fuel + 1)` with the
+**The statement is at fuel 64, not quantifier-general** — and that is the carrier's own bound rather than an accident, so it should
+stay: the claim is an implication *from the reference's success at that fuel*, which means a value deeper than the bound is rejected by
+the carrier and falls outside the domain rather than counting against the statement. Generalising the quantifier would state something
+no test here asks for and no proof here needs. and the clause lemmas are proved at `valueOfJson (fuel + 1)` with the
 discriminant as a hypothesis — so discharging it needs a join that is plumbing rather than mathematics: the twenty-five-way dispatch on
 the kind, the extraction of the discriminant equality from the reference's own success, and the fuel instantiation at 63. Worth knowing
 at the start of the remaining clauses rather than at the end of the last one, which is why it is recorded here at fifteen of twenty-five.
