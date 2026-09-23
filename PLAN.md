@@ -763,6 +763,14 @@ lemmas. The item loop then landed at one fuel on both sides (`ItemsAgree`, `read
 reduced to their octet step, their classify/table resolution and a call to that body. **The entry point is still not reached**, and the sitting recorded the two relations still outstanding — the map rows
 and the array element loop's one-fuel offset — rather than reporting progress as proximity.
 
+**And a fourth constraint the plan did not anticipate, found by a statement that was false rather than unproved.** An element whose declared row is width zero reads nothing through
+`takeBytes 0`, which succeeds exactly when the cursor is inside the buffer, and an array of zero-width values is read at exactly that cursor (`pos = size`) — so the element decision's statement is
+**false** without `c.pos ≤ c.data.size`, and the loop has to carry the condition on. It is landed as the readers' position invariance (`readRows_le_size`, `specElementData_le`), and it is the fourth
+instance of the shape this section now records three times: a law quantified over positions a reader cannot occupy is a different law and a false one, and the repair is a restriction to what the readers
+actually reach, stated as a clause on the statement rather than as an assumption. **What remains is one hypothesis away from the contract**: the element decision's forty constructor rows are named
+(`ElementsDecideAt`/`ElementsDecideBelow`) and taken as hypotheses by the loop and the array body, so the entry point must not be reached with them standing in for the rows — a version of
+`ValueLayersAgree` conditional on them is a proof about a different proposition.
+
 **And it declined to inherit a claim it could not check**: the previous sitting described the entry point as free once the loops compose, and this one says plainly that it did not verify that. **A handover
 that carries an unverified claim forward is how a plan acquires facts nobody measured** — the same rule as the docstring that said the two readers spend the same fuel, one sitting later.
 
