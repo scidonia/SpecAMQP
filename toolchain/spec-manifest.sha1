@@ -13,7 +13,7 @@ f1b824c9c4aeae571c20a0acb2e7ff06d1b50741  lean/Contracts/Sasl.lean
 cd0b5ac08a97c9ff4c4074a2cade872b32c78da4  lean/Contracts/Settlement.lean
 7a52a63a35cda512b63a483e43af4799ae81beea  lean/Contracts/Transaction.lean
 c5ee92929caed5a244bae9a85cea9d0af5e7749a  lean/Contracts/TypeSystem.lean
-e4fd18dbb21535504cc782d8fb6d360e2c89c2b8  lean/Spec/Codec.lean
+f8940df7bf0bffcaf8b2f68d914de108b92f1659  lean/Spec/Codec.lean
 e53591db4b916e797445d227165fb7fd42b98af6  lean/Spec/Connection.lean
 2a205f752ad6833b88e2064a498eba8b86193fba  lean/Spec/ConnectionCodec.lean
 c92c679a91d5a504610bbd47f27ffe33f7776971  lean/Spec/Frame.lean
@@ -89,7 +89,7 @@ db82368890d436450b3c199292a6c76d7c1ede34  tests/contracts/value_boundaries.sh
 860b8160aeeff3a1c8033f86292924a99e797a9c  vectors/frames.ndjson
 ccc84acbd80928c1ee75368b208ccd018d50cfc4  vectors/generated-exchanges.ndjson
 d6ce3953f0a2ffecd4c947bd66c7d4799b3b5339  vectors/generated-frames.ndjson
-b22dd480096d2126ee8d6b764e03fc0540521cdb  vectors/generated.ndjson
+a8ce18e74801ab8c0f20db6d21ac2ab66b3cab97  vectors/generated.ndjson
 e5f033faca866b81c8d3f614761858dc591ec2c0  vectors/isolation.md
 2c6eb7f4cfd6e68184c967a121928251f346e669  vectors/message/deliveries.ndjson
 56025501f1567db480e31b5d76f8b00761951b75  vectors/message/generated.ndjson
