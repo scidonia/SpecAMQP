@@ -540,7 +540,12 @@ ls lean/Impl
 
 **R3 — the conformance theorem: not started, and its declaration is not written either.** That is the
 planner's next pen: the repository's order is statement, then proof, then acceptance, and R3 has no
-`Contracts/` module and no relation stated beyond §1's plumbing. Its content is narrower than its name —
+`Contracts/` module and no relation stated beyond §1's plumbing. What exists: `lean/Impl/Core.lean:311`
+already defines `specCore : Endpoint State`, so the specification's side of the interface is wrapped by the
+implementation's own module; `Contracts/Conformance.lean` supplies `ConformsVia` and the `Endpoint`
+structure every other instance uses. What is missing: the implementation's `Endpoint` (the module exports
+its step; nothing wraps it as an `Endpoint` yet) and the relation, which §1's plumbing describes as
+`i.conn = s`. Naming those two is the declaration; the proof is R3. Its content is narrower than its name —
 it is the plumbing — and its prerequisites are the value layer's hypotheses (§2) and the layer proofs it
 reuses, which is why the value layer's agreement is the rung everything above it waits on.
 
