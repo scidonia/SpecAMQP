@@ -24,6 +24,27 @@ structures are separate declarations with the same fields, so the relation is `C
 buffer, same position) and the induction hypothesis must preserve it through the descent, not merely
 carry the value. That is where "the same octets consumed" comes from.
 
+## The described branch, and the statement it needs first
+
+`wireDescribed` (`0x00`) is the first branch that consumes the induction hypothesis, and reading it
+shows the statement must be *strengthened* before it can be proved: a `.described` body's view is
+`some (typeOfDescriptor descriptor)`, so agreeing on views is not enough — the two *descriptors* must
+correspond, which is exactly `BodiesAgree` (`FrameSendConformance.lean`), the relation the corpus
+side already uses between the two value types. The success conjunct should therefore carry
+`BodiesAgree body other`, and the contract's view equality is then *derived* from it:
+
+* `typeOfDescriptor` inspects only `.ulong` and `.symbol` descriptors, and both readers run `find?`
+  over the **same generated table** — `Spec/Frame.lean:76` and `Ref/Frame.lean:39` both
+  `open SpecAMQP.Generated.Oasis (TypeDecl types)`. There is no second table to compare, only the
+  representation difference inside the predicate (`code` against `code.toNat`), which is the same
+  `BodiesAgree` obligation at the descriptor.
+* So `BodiesAgree body other → specBodyView body = refBodyView other` is a case analysis on the
+  body, with the `.described` case asking the descriptor lemma above.
+
+A later reader may wonder why the statement below says the view rather than `BodiesAgree`: it is the
+contract's spelling, kept so the claim is the contract's own, and the strengthening is the route to
+proving it.
+
 ## What the view weakens to
 
 `specBodyView`/`refBodyView` look at a body only to ask *which described type it announces*
