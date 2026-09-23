@@ -187,8 +187,10 @@ def pump (conn : Conn) (core : State) (app : App)
   return core
 
 /-- **The layer a protocol header names.** The header *is* the decision: `announcedHeader` builds it from
-the layer this peer offers, and the connection starts in the layer that same header names, so announcing
-one layer and speaking the other is not a state this shell can reach. The protocol id is the field the
+the layer this peer offers, and the connection starts in `Spec.Connection.Endpoint.initialFor` at the
+layer that same header names, so announcing one layer and speaking the other is not a state this shell can
+reach — and the starting state is the specification's own, so an implementation's `init` is proved against
+a specification state rather than assumed equal to one. The protocol id is the field the
 layout draws at index 4 — `magic` is four octets — and anything that is not SASL's is read as AMQP, which
 is the conservative default rather than a third layer this peer does not speak. -/
 def layerOfHeader (header : Octets) : SpecAMQP.Spec.Connection.Layer :=
@@ -202,8 +204,7 @@ the socket's close. -/
 def runConnection (conn : Conn) (header : Octets) (app : App)
     (readOctets : USize := defaultReadOctets) : IO State := do
   let core : State :=
-    { conn := { SpecAMQP.Spec.Connection.Endpoint.initial with layer := layerOfHeader header },
-      inbox := #[] }
+    { conn := SpecAMQP.Spec.Connection.Endpoint.initialFor (layerOfHeader header), inbox := #[] }
   match SpecAMQP.Impl.Core.submit core header with
   | .error message =>
     throw (IO.userError s!"this peer cannot announce its own header: {message}")
