@@ -287,6 +287,23 @@ its obligations need `simp only [BodiesAgree]` and `trivial` does not typecheck 
 needing round-trip lemmas at the bounds `unsignedOf`, `signedOf` and `boundedField` establish, and four compound clauses needing
 recursion at the fuel the reader hands down — `List.mapM` for items and a pair-level analogue for a map.
 
+**Two shapes the carrier's middle taught, both worth the next run's first minute.** The six octet payloads are **not equal functions**
+on the two sides: the specification's `hexPayloadOf` and the reference's `fixedHex` perform the same reads and the same width check and
+differ in their failure *text*, so they relate one-directionally on the success path (`fixedHex_ok_hexPayloadOf`) rather than by equality
+as the unsigned pair does. That difference is invisible to every test here — the corpus compares classes and the classes agree — so it
+would surface only in a proof that stated the two as equal functions, and it would surface looking like an arithmetic error. That two
+independently authored implementations are *allowed* to differ in wording is the point of having two. And the bridge must enter as a
+*local hypothesis*: `simp only` takes identifiers rather than applied terms, so an applied lemma silently does not fire.
+
+**The statement is at fuel 64, not quantifier-general**, and the clause lemmas are proved at `valueOfJson (fuel + 1)` with the
+discriminant as a hypothesis — so discharging it needs a join that is plumbing rather than mathematics: the twenty-five-way dispatch on
+the kind, the extraction of the discriminant equality from the reference's own success, and the fuel instantiation at 63. Worth knowing
+at the start of the remaining clauses rather than at the end of the last one, which is why it is recorded here at fifteen of twenty-five.
+
+Remaining and routed in the module's header: the signed widths (`BitVec.toInt_ofNat'` then `Int.bmod_eq_iff` against the range
+`signedOf` carries), `char`, whose disagreement with the reference is in the *accessor* rather than the arithmetic — `Nat` against `Int`,
+a bridge before any proof — and the four compounds.
+
 **What discharging the hypotheses would take, in order, so the next sitting does not rediscover the shape.** The refutations stand as theorems either way — a refuted hypothesis is a theorem or it is a rumour. Then: **(i)** decide the reading for each divergence, which needs the artifact's own text — for the odd-counted map, whether the count names items or entries and whether the *form* of the count is checked before or after its consistency with the octets. Where the artifact is silent, a register entry decides it, which is what the register is for. **(ii)** Align the two artefacts to that reading, one commit per divergence, since each is symmetric in a different place. **(iii)** Add a vector per divergence, because *reachability* is what decides whether the corpus could ever have seen it: the array-element family is reachable through the corpus vocabulary and the odd-count map is not, and that difference is a fact about the corpus rather than about the defect. **(iv)** Only then are the hypotheses provable and the two conditional instances unconditional. **The order is the point**: a vector written last would be a vector written from the fix rather than from the artifact, which is the rule this repository keeps and exactly why the differential cannot be the thing that finds this class of defect.
 
 **And a second divergence sits underneath the first, found by a sharper witness.** The reported buffer violated two rules at once — an odd count *and* a declared size inconsistent with its items — so it could not say which rule either artefact was answering. A buffer violating only parity, `#[0xC1, 0x03, 0x03, 0x40, 0x40, 0x40]` where the items measure exactly the declared three octets, gives `malformed` from the specification and `sizeMismatch "map" 3 4` from the reference: declared 3, **measured 4**. Four is what a map's content measures if the *count field is inside the size*, three if it is not — so the two artefact seem to differ about what a compound value's size field covers, which would change the class for every map and list rather than only the odd ones. The ledger's index yields the parity clause (`amqp:types/section:primitive-type-definitions/type:map.1`) and nothing on the size field's extent, so that question is open and is being settled from the artifact's prose. **It is the more important of the two**: a parity rule affects one malformed encoding, a size-accounting difference affects the whole corpus.
