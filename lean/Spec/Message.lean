@@ -60,7 +60,10 @@ namespace SpecAMQP.Spec.Message
 
 open Lean
 open SpecAMQP.Harness (Octets Refusal ofHex toHex)
-open SpecAMQP.Spec.Codec
+-- The codec's names are opened selectively, because this module spells `Refusal` with
+-- the harness's shape (a condition and a class-led detail) while `Spec.Codec` now spells
+-- it with the class as a field: an unrestricted open would make the bare name ambiguous.
+open SpecAMQP.Spec.Codec (Value typeName toJson toJsonPairs decodeValue encodeValue valueOfJson)
 open SpecAMQP.Generated.Oasis
 
 /-! ## Conditions, read from the declared choice table
@@ -723,7 +726,7 @@ decoding is the type system's reader plus the checks above: nothing here re-read
 the value codec has read. -/
 def decodeSection (policy : Policy) (bytes : Octets) : Except Refusal (Section × Nat) :=
   match decodeValue bytes with
-  | .error detail => .error ⟨decodeError, detail⟩
+  | .error refusal => .error ⟨decodeError, refusal.message⟩
   | .ok (value, consumed) =>
     match sectionOfValue policy value with
     | .error reason => .error reason
@@ -828,7 +831,9 @@ the table, then the body. The type system's writer chooses the narrowest form of
 encoding, so two implementations that both write a section this way write the same octets
 and the corpus can compare them. -/
 
-/-- A section's octets: its declared descriptor, then its body. -/
+/-- A section's octets: its declared descriptor, then its body. The value layer's writer
+answers with a classed refusal, and this layer's own refusal carries a condition and a
+class-led detail, so the class travels in the detail exactly as it always has. -/
 def encodeSection (sec : Section) : Except String Octets := do
   let kind := Section.kind sec
   let code ← kind.descriptorCode
@@ -840,7 +845,7 @@ def encodeSection (sec : Section) : Except String Octets := do
     | .octets _ payload => Value.binary payload
     | .elements _ items => Value.list items
     | .single _ value => value
-  encodeValue (.described (.ulong code) body)
+  (encodeValue (.described (.ulong code) body)).mapError (fun refusal => refusal.message)
 
 /-- A message's octets: its sections in the order given. The order is not recomputed from
 the structure list, because a caller that hands over an illegal order is refused by

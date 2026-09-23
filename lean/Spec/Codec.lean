@@ -69,11 +69,6 @@ structure Cursor where
   pos : Nat
 deriving Repr
 
-/-- Reading either yields a value and the rest of the input, or says why it failed.
-A notation rather than a parameterised `abbrev`, deliberately: instance search does
-not unfold an abbreviation, so `do` blocks over one cannot find `Bind`. -/
-notation "Result" α:max => Except String (α × Cursor)
-
 /-! ## Refusals and the declared limit
 
 A decode refusal's detail leads with its reason class: `truncated`, `unassigned`,
@@ -85,10 +80,40 @@ quietly acquire a class nobody else uses.
 `unsupported` is not a claim about the grammar: it is a legal constructor whose form
 this reader does not handle. `unassigned` is the grammar's answer — the octet is below
 every format-code range, one of the escapes held for future formats, or a format code
-the declared surface leaves unassigned. -/
+the declared surface leaves unassigned.
 
-/-- A refusal's detail: the reason class, then the prose. -/
-def refusal (reasonClass prose : String) : String := s!"{reasonClass}: {prose}"
+The class is a **field** of a refusal, not a token a reader recovers from the message:
+the class is the part of a refusal that is interface — the corpus compares classes
+between the artefacts, and a proof can quantify only over a class that is a term — and a
+class read back out of prose by `String.splitOn` is one the kernel cannot reason about,
+because `splitOn` is a well-founded scan over `String.Pos.Raw` that no kernel tactic
+reduces. So every reader and writer here answers with a `Refusal`, whose `reasonClass` is
+the class and whose `message` is the class, a colon, and the prose; and the corpus-facing
+entry points render that message, byte for byte what this module has always reported to a
+caller. The frame layer's refusals carry the same two fields for the same reason, and
+render their messages through the rule below, so that no two layers can spell a refusal
+differently. -/
+
+/-- A refusal: the reason class this layer names, and the message a caller sees. -/
+structure Refusal where
+  /-- The reason class this refusal names. -/
+  reasonClass : String
+  /-- The message a caller sees: the class, a colon, and the prose. -/
+  message : String
+deriving Repr, DecidableEq
+
+/-- A refusal's message: the reason class, a colon, and the prose. This is the one place
+the spelling is fixed. -/
+def refusalMessage (reasonClass prose : String) : String := s!"{reasonClass}: {prose}"
+
+/-- A refusal whose class this layer named itself. -/
+def refusal (reasonClass prose : String) : Refusal :=
+  ⟨reasonClass, refusalMessage reasonClass prose⟩
+
+/-- Reading either yields a value and the rest of the input, or says why it failed.
+A notation rather than a parameterised `abbrev`, deliberately: instance search does
+not unfold an abbreviation, so `do` blocks over one cannot find `Bind`. -/
+notation "Result" α:max => Except Refusal (α × Cursor)
 
 /-- The most array elements this reader materialises.
 
@@ -190,12 +215,12 @@ def beOctets (width : Nat) (n : Nat) : List UInt8 :=
 /-- `n` in `width` big-endian octets, refusing a value that does not fit rather
 than truncating it: a payload that silently lost its high octets would encode a
 different value than the one asked for. -/
-def filled (width : Nat) (n : Nat) : Except String (List UInt8) :=
+def filled (width : Nat) (n : Nat) : Except Refusal (List UInt8) :=
   if n < 2 ^ (8 * width) then .ok (beOctets width n)
   else .error (refusal "limit" s!"{n} does not fit in {width} big-endian octet(s)")
 
 /-- `i` in `width` two's-complement octets, refusing a value outside the range. -/
-def twosComplement (width : Nat) (i : Int) : Except String (List UInt8) :=
+def twosComplement (width : Nat) (i : Int) : Except Refusal (List UInt8) :=
   let modulus : Int := (2 : Int) ^ (8 * width)
   if -(modulus / 2) ≤ i ∧ i < modulus / 2 then .ok (beOctets width (i % modulus).toNat)
   else .error (refusal "limit" s!"{i} does not fit in {width} octet(s) of two's complement")
@@ -205,7 +230,7 @@ def signedOfOctets (width : Nat) (n : Nat) : Int :=
   if n < 2 ^ (8 * width - 1) then (n : Int) else (n : Int) - (2 : Int) ^ (8 * width)
 
 /-- A payload as a Unicode string, or why it is not one. -/
-def utf8Of (bytes : Octets) (kind : String) : Except String String :=
+def utf8Of (bytes : Octets) (kind : String) : Except Refusal String :=
   match String.fromUTF8? (ByteArray.mk bytes) with
   | some text => .ok text
   | none => .error (refusal "malformed" s!"a {kind} payload of {bytes.size} octet(s) is not valid UTF-8")
@@ -224,7 +249,7 @@ number of octets, so it is refused here; `Spec.Value.encodings_follow_range` is 
 theorem that no committed row can do this, and this is the reader's own guard for
 tables that change. -/
 def declInRange (code : UInt8) (category : Category) (width : Nat) :
-    Except String EncodingDecl :=
+    Except Refusal EncodingDecl :=
   match encodingOf code.toNat with
   | none =>
     .error (refusal "unassigned" s!"octet 0x{toHex #[code]} lies in the \
@@ -239,7 +264,7 @@ def declInRange (code : UInt8) (category : Category) (width : Nat) :
         grammar disagree")
 
 /-- The declaration a leading octet selects, by the grammar's classification of it. -/
-def dataDecl (code : UInt8) : Except String EncodingDecl :=
+def dataDecl (code : UInt8) : Except Refusal EncodingDecl :=
   match classify code.toNat with
   | .descriptor =>
     .error (refusal "unassigned" s!"octet 0x{toHex #[code]} is the descriptor prefix, not an encoding")
@@ -254,7 +279,7 @@ def dataDecl (code : UInt8) : Except String EncodingDecl :=
 prefix `%x00`: an array of described values states that prefix once and each
 element's own descriptor and value after it, so there is no one row under which
 their data could be written. -/
-def elementDecl? (constructor : UInt8) : Except String (Option EncodingDecl) :=
+def elementDecl? (constructor : UInt8) : Except Refusal (Option EncodingDecl) :=
   if constructor.toNat = 0 then .ok none
   else
     match classify constructor.toNat with
@@ -270,7 +295,7 @@ def elementDecl? (constructor : UInt8) : Except String (Option EncodingDecl) :=
 
 /-- The declared surface's row of a type at a size width. The writer selects octets
 this way rather than naming them, so a wrong encoding here has to be a wrong table. -/
-def rowOf (owner : String) (width : Nat) : Except String EncodingDecl :=
+def rowOf (owner : String) (width : Nat) : Except Refusal EncodingDecl :=
   match encodings.find? (fun decl => decl.owner == owner && decl.width == width) with
   | some decl => .ok decl
   | none =>
@@ -278,12 +303,15 @@ def rowOf (owner : String) (width : Nat) : Except String EncodingDecl :=
       {width}")
 
 /-- The `boolean` row that names `true` or `false`, which is how the table
-distinguishes the two fixed-width zero-octet boolean encodings. -/
-def booleanRow (b : Bool) : Except String EncodingDecl :=
+distinguishes the two fixed-width zero-octet boolean encodings. A table that declared
+neither is a declared surface with no form for the value asked of it, which is the
+capacity family `rowOf` names: `limit`. -/
+def booleanRow (b : Bool) : Except Refusal EncodingDecl :=
   let wanted := if b then "true" else "false"
   match encodings.find? (fun decl => decl.owner == "boolean" && decl.name == some wanted) with
   | some decl => .ok decl
-  | none => .error s!"the declared surface has no boolean encoding named {wanted}"
+  | none =>
+    .error (refusal "limit" s!"the declared surface has no boolean encoding named {wanted}")
 
 /-- A declaration's constructor octet, read from the table. -/
 def tagOf (decl : EncodingDecl) : List UInt8 := [UInt8.ofNat decl.code]
@@ -519,7 +547,7 @@ end
 
 /-- Decode a buffer: the value, and how many octets it consumed. The depth budget is
 the number of octets, which every descent spends at least one of. -/
-def decodeValue (bytes : Octets) : Except String (Value × Nat) :=
+def decodeValue (bytes : Octets) : Except Refusal (Value × Nat) :=
   match readValue bytes.size ⟨bytes, 0⟩ with
   | .ok (value, c) => .ok (value, c.pos)
   | .error e => .error e
@@ -660,14 +688,14 @@ which is what the reader measures. -/
 /-- A variable-width payload: its length in the declaration's own width, then the
 payload. The length's width is the array constructor's where this writes element
 data, not the element's own preference. -/
-def lengthPrefixed (decl : EncodingDecl) (payload : List UInt8) : Except String (List UInt8) := do
+def lengthPrefixed (decl : EncodingDecl) (payload : List UInt8) : Except Refusal (List UInt8) := do
   let length ← filled decl.width payload.length
   return length ++ payload
 
 /-- A raw payload written unchanged, provided it is as wide as the declaration says:
 an array whose constructor is `float` carries four-octet elements, not whatever
 width an element would choose alone. -/
-def rawPayload (decl : EncodingDecl) (bits : Octets) : Except String (List UInt8) :=
+def rawPayload (decl : EncodingDecl) (bits : Octets) : Except Refusal (List UInt8) :=
   if bits.size = decl.width then .ok bits.toList
   else
     .error (refusal "limit" s!"a {decl.owner} payload is {decl.width} octet(s) and \
@@ -677,7 +705,7 @@ def rawPayload (decl : EncodingDecl) (bits : Octets) : Except String (List UInt8
 the body. The size counts the octets after it, so it is the count field's width plus
 the body's length. -/
 def compoundOctets (decl : EncodingDecl) (count : Nat) (body : List UInt8) :
-    Except String (List UInt8) := do
+    Except Refusal (List UInt8) := do
   let size := decl.width + body.length
   if size < 2 ^ (8 * decl.width) ∧ count < 2 ^ (8 * decl.width) then
     return beOctets decl.width size ++ beOctets decl.width count ++ body
@@ -689,7 +717,7 @@ def compoundOctets (decl : EncodingDecl) (count : Nat) (body : List UInt8) :
 element constructor, then the elements' data. The size counts the count field, the
 constructor and the elements. -/
 def arrayOctets (decl : EncodingDecl) (constructor : UInt8) (count : Nat)
-    (elements : List UInt8) : Except String (List UInt8) := do
+    (elements : List UInt8) : Except Refusal (List UInt8) := do
   let size := decl.width + 1 + elements.length
   if size < 2 ^ (8 * decl.width) ∧ count < 2 ^ (8 * decl.width) then
     return beOctets decl.width size ++ beOctets decl.width count ++
@@ -700,7 +728,7 @@ def arrayOctets (decl : EncodingDecl) (constructor : UInt8) (count : Nat)
 
 /-- A fixed-width declaration's data: as many octets as the row declares, in the
 type's own form. A value of another type is refused rather than written short. -/
-def writeFixedData (decl : EncodingDecl) (value : Value) : Except String (List UInt8) :=
+def writeFixedData (decl : EncodingDecl) (value : Value) : Except Refusal (List UInt8) :=
   match decl.owner, value with
   | "null", .null => .ok []
   | "boolean", .boolean b => if decl.width = 0 then .ok [] else .ok [if b then 1 else 0]
@@ -728,7 +756,7 @@ def writeFixedData (decl : EncodingDecl) (value : Value) : Except String (List U
 
 /-- A variable-width declaration's data: the length in the row's width, then the
 payload. -/
-def writeVariableData (decl : EncodingDecl) (value : Value) : Except String (List UInt8) :=
+def writeVariableData (decl : EncodingDecl) (value : Value) : Except Refusal (List UInt8) :=
   match decl.owner, value with
   | "binary", .binary payload => lengthPrefixed decl payload.toList
   | "string", .string text => lengthPrefixed decl text.toUTF8.toList
@@ -739,15 +767,19 @@ def writeVariableData (decl : EncodingDecl) (value : Value) : Except String (Lis
       {typeName other}")
 
 /-- A scalar value's octets under the declaration the table gives it: the constructor
-octet, then the row's data form. -/
-def emitScalar (value : Value) (decl : EncodingDecl) : Except String (List UInt8) := do
+octet, then the row's data form. A row whose category is not a scalar one is a row the
+scalar path was not asked about, and the value it would have to carry is not the shape
+the row's encoding takes: the shape family's `malformed`, the same class
+`writeDeclared` and `writeArrayData` name. -/
+def emitScalar (value : Value) (decl : EncodingDecl) : Except Refusal (List UInt8) := do
   let data ←
     match decl.category with
     | .fixed => writeFixedData decl value
     | .variable => writeVariableData decl value
     | _ =>
-      .error s!"the declared surface calls octet 0x{toHex #[UInt8.ofNat decl.code]} a \
-        {categoryName decl.category} encoding, whose data is not written as a scalar"
+      .error (refusal "malformed" s!"the declared surface calls octet \
+        0x{toHex #[UInt8.ofNat decl.code]} a {categoryName decl.category} encoding, whose \
+        data is not written as a scalar")
   return tagOf decl ++ data
 
 mutual
@@ -755,7 +787,7 @@ mutual
 /-- A value's octets, constructor octet first, in the narrowest form the declared
 surface offers it. Each recursive call is on a strictly smaller subterm of the value
 being written, which is the measure `termination_by` names. -/
-def writeValue : Value → Except String (List UInt8)
+def writeValue : Value → Except Refusal (List UInt8)
   | .described descriptor inner => do
     let head ← writeValue descriptor
     let tail ← writeValue inner
@@ -830,7 +862,7 @@ def writeValue : Value → Except String (List UInt8)
 termination_by value => sizeOf value
 
 /-- Items in order, each carrying its own constructor. -/
-def writeItems : List Value → Except String (List UInt8)
+def writeItems : List Value → Except Refusal (List UInt8)
   | [] => .ok []
   | item :: rest => do
     let head ← writeValue item
@@ -839,7 +871,7 @@ def writeItems : List Value → Except String (List UInt8)
 termination_by items => sizeOf items
 
 /-- A map's pairs in wire order. -/
-def writePairs : List (Value × Value) → Except String (List UInt8)
+def writePairs : List (Value × Value) → Except Refusal (List UInt8)
   | [] => .ok []
   | (key, value) :: rest => do
     let head ← writeValue key
@@ -849,7 +881,7 @@ def writePairs : List (Value × Value) → Except String (List UInt8)
 termination_by pairs => sizeOf pairs
 
 /-- Array elements' data, each in the array's declared constructor form. -/
-def writeElements : List Value → Option EncodingDecl → UInt8 → Except String (List UInt8)
+def writeElements : List Value → Option EncodingDecl → UInt8 → Except Refusal (List UInt8)
   | [], _, _ => .ok []
   | item :: rest, elementDecl, constructor => do
     let head ← writeDeclared item elementDecl constructor
@@ -860,7 +892,7 @@ termination_by items _ _ => sizeOf items + 1
 /-- One element's data: the array's constructor is already written, so what follows is
 either the row that constructor names or, under the descriptor prefix, the element's
 own descriptor and value. -/
-def writeDeclared : Value → Option EncodingDecl → UInt8 → Except String (List UInt8)
+def writeDeclared : Value → Option EncodingDecl → UInt8 → Except Refusal (List UInt8)
   | .described descriptor inner, none, _ => do
     let head ← writeValue descriptor
     let tail ← writeValue inner
@@ -877,7 +909,7 @@ def writeDeclared : Value → Option EncodingDecl → UInt8 → Except String (L
 termination_by item _ _ => sizeOf item + 1
 
 /-- A compound's data: its items, then the size and count fields that announce them. -/
-def writeCompoundData : Value → EncodingDecl → Except String (List UInt8)
+def writeCompoundData : Value → EncodingDecl → Except Refusal (List UInt8)
   | .list items, decl => do
     let body ← writeItems items
     compoundOctets decl items.length body
@@ -892,7 +924,7 @@ termination_by item _ => sizeOf item
 
 /-- An array's data: its elements' data, then the size and count fields that
 announce them. -/
-def writeArrayData : Value → EncodingDecl → Except String (List UInt8)
+def writeArrayData : Value → EncodingDecl → Except Refusal (List UInt8)
   | .array constructor items, decl => do
     if items.length > arrayElementLimit then
       .error (refusal "limit" s!"an array of {items.length} element(s): this writer \
@@ -908,19 +940,30 @@ termination_by item _ => sizeOf item
 end
 
 /-- Encode a value in the narrowest form the declared surface offers for it. -/
-def encodeValue (value : Value) : Except String Octets := do
+def encodeValue (value : Value) : Except Refusal Octets := do
   return (← writeValue value).toArray
 
 /-- The specification behind the corpus interface: `Spec.Value`'s classification and
-`Generated.Oasis.Encodings`' declared surface, read and written. -/
+`Generated.Oasis.Encodings`' declared surface, read and written.
+
+The corpus interface is a refusal's *message* rather than the refusal: the harness reads
+the class off the rendered detail for whichever artefact it is driving, so the class
+travels in the message it has always led, byte for byte. A caller that wants the class as
+a term — a proof, or the frame layer — reads it off `decodeValue`/`encodeValue`'s
+`Refusal` instead. The corpus vocabulary's own reader (`valueOfJson` and the two payload
+readers under it) keeps a plain `String` error: a corpus that spells no value type has no
+wire refusal to class, and rendering one would invent a class for a defect of the corpus
+rather than of the octets. -/
 def specCodec : Codec where
   name := "specification"
   decode := fun bytes =>
     match decodeValue bytes with
     | .ok (value, consumed) => .ok (toJson value, consumed)
-    | .error e => .error e
+    | .error refusal => .error refusal.message
   encode := fun json => do
     let value ← valueOfJson 64 json
-    encodeValue value
+    match encodeValue value with
+    | .ok octets => .ok octets
+    | .error refusal => .error refusal.message
 
 end SpecAMQP.Spec.Codec
