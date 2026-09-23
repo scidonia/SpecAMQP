@@ -71,38 +71,24 @@ therefore:
   replacement. What the discharge rests on is the wire-agreement module's forty arms, the fuel
   irrelevance that aligns its loops, and the readers' position invariance — each of which had to be
   *found* rather than assumed.
-* **The send direction is a different shape, and worse — `Conforms specFrameSend refFrameSend` is
-  false.** Not its hypothesis: its consequent. `.array 0x00 [null]` and `.array 0xE0 [null]` are
-  accepted by `frameOfJson`, the specification names the refusal `malformed:` because the element is
-  not the scalar that encoding requires, and the reference's `arrayElement` catch-all still names it
-  `limit:`. A reachable input, two classes, one observable. `Proofs/FrameSendConformance.lean` carries
-  that refutation as a theorem, so the day someone weakens the reference rather than fixing it, the
-  theorem goes red — which is what a refutation is for.
-* **And the connection instance's own hypothesis is a frame-layer claim that nothing in the tree
-  produces.** `SpecAMQP.Proofs.ReadersAgree` is `∀ bytes`, the two *frame* readers agree — the
-  reference's answer matched by the specification's, with `FramesAgree` relating the frames, or the same
-  class on refusal — and it is consumed as an argument by `readersAgree_answer_matched` and by
-  `ref_connection_conforms`. **No theorem concludes it**, and the value layer's discharge does not supply
-  it: `ValueLayersAgree` is about the *value* readers, while this demands the stronger `FramesAgree`
-  relation at the frame layer. So the connection instance stays conditional, and **whether it follows from
-  the frame layer's discharge is an open question recorded here rather than assumed** — answered either by
-  deriving it or by a buffer where the stronger relation fails while `ValueLayersAgree` holds.
+**The statuses are deliberately not restated here, and that is a decision with evidence behind it.** This
+block has been rewritten three times in one day because it asserted the *state* of four instances whose
+states moved under it — a hypothesis refuted and then withdrawn, a `String` removed from a writer's error
+type, a relation proved between two passes over the same paragraph, and a sentence claiming a theorem that
+had never been in the tree at all. **Every rewrite left the parts it was not looking at**, which makes this
+the most-edited prose in the repository and the only block whose claims track facts that change by the hour.
+So the statuses live where the slices that change them can keep them:
 
-**What follows was a fix in one of the two readings, and the receive half is done.** Both artefacts
-refused those buffers and differed only about the class, so either one misread the artifact or the
-artifact was silent and the register decided; the reading was decided, both artefacts were aligned to
-it (`fd9bdc5`), and the witness above now draws the same class from both. The **send** half
-is closed as far as alignment goes and *not* closed as a theorem: patch 3 split the reference's
-`arrayElement` catch-all, and three shape refusals on the specification's side were reclassified with it
-(`writeFixedData`, `writeVariableData`, `writeCompoundData`), so the two writers now name the same class
-for every array body either can reach. **No refutation is provable**, and the reason is a type rather than
-a missing witness: the reference's writer returns `Except String Octets`, so its class can only be
-recovered by splitting a sentence — the same unreducible step that blocked the value-layer refutations
-before the specification's class became a field. `Conforms specFrameSend refFrameSend` is therefore
-*believed false before patch 3 and undecided after it, and unprovable in both cases* until the reference's
-writer carries a class. `PLAN.md` §10 records the order of discharge — decide the reading, align the
-artefacts, then add a vector, because a vector written before the fix is authored from the artifact and one
-written after it is authored from the fix.
+* **the frame send direction** — conditional on `ValueWriterAgree`, and what is known about its consequent
+  is stated in `Proofs/FrameSendConformance.lean`'s closing section, together with the search that
+  established it and what a witness would have to be;
+* **the connection layer** — unconditional, by `connection_conformance` below;
+* **the frame receive half** — unconditional, by `frame_receive_conformance` below;
+* **the value layer's agreement** — proved, `Proofs.valueLayersAgree`.
+
+**And the one thing this section keeps, because it does not move**: the order of discharge is to decide the
+reading, align the artefacts, then add a vector — a vector written before the fix is authored from the
+artifact, and one written after it is authored from the fix.
 -/
 
 namespace SpecAMQP.Contracts
