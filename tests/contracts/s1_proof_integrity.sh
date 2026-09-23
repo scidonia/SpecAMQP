@@ -333,6 +333,12 @@ import Spec.Message
 #print axioms SpecAMQP.Proofs.ref_connection_conforms_existential
 #print axioms SpecAMQP.Proofs.stepAgrees
 #print axioms SpecAMQP.Proofs.arriving_matched
+-- The two lemmas that make the vacuity's direction a fact rather than a sentence: one proves the
+-- escape exists (a reference more permissive than the specification satisfies `AnswersMatch`), the
+-- other refutes the reverse mismatch. They are what a later edit to the vocabulary would have to
+-- keep true, so their inventories are asked alongside the composition they explain.
+#print axioms SpecAMQP.Proofs.answersMatch_of_spec_refuses
+#print axioms SpecAMQP.Proofs.not_answersMatch_of_ref_refuses
 #print axioms SpecAMQP.Proofs.lengthPrefixed_ok
 #print axioms SpecAMQP.Proofs.takeBe_beOctets
 #print axioms SpecAMQP.Spec.ReadLaws.extract_toList_eq_drop_take

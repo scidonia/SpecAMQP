@@ -1602,6 +1602,26 @@ def AnswersMatch (so : Except Spec.Connection.Refusal Spec.Connection.Outcome)
       ∃ r, so = .error r ∧ r.condition = r'.condition ∧ r.reasonClass = r'.reasonClass ∧
         r.state.map refState = r'.place ∧ r.wrote = r'.reply)
 
+/-- **The vacuity is asymmetric, in the direction that matters.** The two conjuncts are keyed in
+opposite directions — the first on the specification accepting, the second on the reference refusing —
+so an answer the specification refuses and the reference accepts satisfies the relation however the
+two answers differ: both antecedents are false. This is that fact, and it is the reason a step slice's
+`isOk` agreement is part of the composition's vocabulary rather than a convenience. -/
+
+theorem answersMatch_of_spec_refuses (r : Spec.Connection.Refusal) (i' : Ref.Connection.Peer)
+    (wrote : List Octets) : AnswersMatch (.error r) (.ok i') wrote :=
+  ⟨fun out hout => absurd hout (by simp), fun r' hr' => absurd hr' (by simp)⟩
+
+/-- And the other mismatch is not vacuous: a specification that accepts demands that the reference
+accept, so a reference that refuses while the specification accepts fails the relation outright. -/
+
+theorem not_answersMatch_of_ref_refuses (out : Spec.Connection.Outcome)
+    (r' : Ref.Connection.Refusal) (wrote : List Octets) :
+    ¬ AnswersMatch (.ok out) (.error r') wrote := by
+  intro h
+  obtain ⟨i', hro, _⟩ := h.1 out rfl
+  exact absurd hro (by simp)
+
 /-- What the AMQP-layer frame step needs of the two bodies and the two endpoints: every question its
 guards ask, answered the same way on both sides. The two column fields carry the hypothesis the two
 guards supply — the AMQP step refuses a SASL role before the column is consulted, on both sides — which
@@ -4992,9 +5012,17 @@ theorem placedRef_isOk (i : Ref.Connection.Peer) (outbound : Bool)
 
 /-! ## The composition's own rules -/
 
-/-- **A step slice's answer, with the shape it agrees on.** `AnswersMatch`'s two conjuncts are
-implications, so they hold vacuously when the two sides answer with different shapes; the shape
-equality is what makes the answer the *same answer*, which is what the composition compares. -/
+/-- **A step slice's answer, with the shape it agrees on.**
+
+`AnswersMatch`'s two conjuncts are implications keyed in opposite directions — the first on the
+*specification* accepting, the second on the *reference* refusing — so they are vacuous
+*asymmetrically*, and the direction that is vacuous is the dangerous one. Where the specification
+refuses and the reference accepts, both antecedents are false and the relation holds however the two
+answers differ, so a reference strictly more permissive than the specification would escape it. The
+other mismatch is already caught: where the specification accepts, the first conjunct demands that the
+reference accept too. The shape equality closes the escape, and it is what makes the answer the *same
+answer* — which is what `PairMatches` compares. Both halves of that sentence are theorems in the
+vocabulary section above: `answersMatch_of_spec_refuses` and `not_answersMatch_of_ref_refuses`. -/
 
 def AnswersAgree (so : Except Spec.Connection.Refusal Spec.Connection.Outcome)
     (ro : Except Ref.Connection.Refusal Ref.Connection.Peer) (wrote : List Octets) : Prop :=
