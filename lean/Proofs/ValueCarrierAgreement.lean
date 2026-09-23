@@ -9,16 +9,18 @@ open Lean (Json)
 `FrameSendConformance.ValueCarrierAgree` is the value layer's claim in the corpus vocabulary: a
 value the reference's carrier reads is one the specification's also reads, and the two readings
 agree as values. This module is its proof, one clause at a time, and it is **in progress**: twenty-
-three of the twenty-five clauses are proved, in six families —
+four of the twenty-five clauses are proved, in six families —
 
 * the structured scalars `null`, `boolean`, `string`, `symbol`;
 * the octet payloads `binary`, `float`, `double`, `decimal32`, `decimal64`, `decimal128`, `uuid`;
 * the unsigned widths `ubyte`, `ushort`, `uint`, `ulong`;
 * the signed widths `byte`, `short`, `int`, `long`, and `timestamp`;
 * the compounds `list`, `array` and `described`, which take the claim one fuel down as a parameter;
+* `char`, whose two readers do not share an accessor, and which is put back on one value by the JSON
+  bridge below;
 
-and the remaining two are `map` and `char`, each blocked on a JSON-layer bridge named at the end of
-this header rather than on any AMQP content.
+and the remaining one is `map`, blocked on a JSON-layer bridge of its own named at the end of this
+header rather than on any AMQP content.
 The route to each is named at the end of this header. What is *not* yet done is the join: the
 statement is at fuel 64 (`Ref.Vectors.valueOfJson 64 json = .ok other → ∃ body, …`), while every
 clause here is at `valueOfJson (fuel + 1)` with the discriminant as a hypothesis, so discharging it
@@ -636,7 +638,7 @@ theorem boundedField_ok_getObjValAs (json : Json) (key : String) (lo hi n : Int)
     · rename_i hcond
       injection h with hb
       subst hb
-      first | rfl | exact hv
+      rfl
     · simp at h
 
 /-- The bounds a successful bounded read enforces. -/
@@ -959,6 +961,89 @@ theorem carrier_clause_array (fuel : Nat) (json : Json)
                 rfl, by
                 simp only [BodiesAgree]
                 exact ⟨trivial, hlist⟩⟩
-            | cons c2 rest2 => simp only [hcl] at h ⊢; simp at h
+            | cons c2 rest2 => simp [hcl] at h
+
+/-! ### The JSON layer under the corpus vocabulary
+
+Two clauses reached past the AMQP content to the layer beneath it. `char` is the first: the
+specification reads a code point as a JSON *natural*, the reference as a JSON *integer*, so the
+clause needs the two accessors related. Both readers' instances match the structural form
+`{mantissa := ·, exponent := 0}`, and the natural one requires a non-negative mantissa - which is
+exactly the range the reference's own check carries. -/
+
+/-- The number layer: a JSON number that reads as an integer `i ≥ 0` reads as the natural `i.toNat`. -/
+theorem getNat?_of_getInt? (v : Json) (i : Int) (h0 : 0 ≤ i) (h : Json.getInt? v = .ok i) :
+    Json.getNat? v = .ok i.toNat := by
+  cases v with
+  | num n =>
+    cases n with
+    | mk m e =>
+      cases e with
+      | zero =>
+        cases m with
+        | ofNat p =>
+          simp only [Json.getInt?, Json.getNat?] at h ⊢
+          injection h with hi
+          subst hi
+          rfl
+        | negSucc p =>
+          simp only [Json.getInt?] at h
+          injection h with hi
+          subst hi
+          simp only [Int.negSucc_eq] at h0
+          omega
+      | succ e => simp [Json.getInt?] at h
+  | null => simp_all [Json.getInt?]
+  | bool b => simp_all [Json.getInt?]
+  | str s => simp_all [Json.getInt?]
+  | arr a => simp_all [Json.getInt?]
+  | obj o => simp_all [Json.getInt?]
+
+/-- **The accessor bridge the `char` clause needs**: the same key, read as a natural and as an
+integer. -/
+theorem getObjValAs_nat_of_int (json : Json) (key : String) (i : Int) (h0 : 0 ≤ i)
+    (h : json.getObjValAs? Int key = .ok i) :
+    json.getObjValAs? Nat key = .ok i.toNat := by
+  unfold Json.getObjValAs? at h ⊢
+  exact getNat?_of_getInt? (json.getObjValD key) i h0 h
+
+/-- **The `"char"` clause.** The one clause whose two readers do not share an accessor: the
+specification reads the code point as a JSON natural, the reference as a JSON integer. The bridge
+`getObjValAs_nat_of_int` puts them back on the same value, the reference's own range supplies both
+the non-negativity the bridge needs and the code-point bound, and the rest is the unsigned round
+trip at 1114111. -/
+theorem carrier_clause_char (fuel : Nat) (json : Json)
+    (hk : json.getObjValAs? String "type" = .ok "char") (other : SpecAMQP.Ref.Value)
+    (h : SpecAMQP.Ref.Vectors.valueOfJson (fuel + 1) json = .ok other)
+    (_ih : ValueCarrierAgrees fuel) :
+    ∃ body : SpecAMQP.Spec.Codec.Value,
+      SpecAMQP.Spec.Codec.valueOfJson (fuel + 1) json = .ok body ∧ BodiesAgree body other := by
+  unfold SpecAMQP.Ref.Vectors.valueOfJson at h
+  unfold SpecAMQP.Spec.Codec.valueOfJson
+  simp only [Bind.bind, Except.bind] at h ⊢
+  simp only [hk] at h ⊢
+  cases hb : SpecAMQP.Ref.Vectors.boundedField json "codepoint" 0 1114111 with
+  | error err => simp [hb] at h
+  | ok n =>
+    have hrange := boundedField_range json "codepoint" 0 1114111 n hb
+    have hread : json.getObjValAs? Int "codepoint" = .ok n :=
+      boundedField_ok_getObjValAs json "codepoint" 0 1114111 n hb
+    have hnat : json.getObjValAs? Nat "codepoint" = .ok n.toNat :=
+      getObjValAs_nat_of_int json "codepoint" n (by omega) hread
+    have hcp : SpecAMQP.Spec.Codec.codePointOf json = .ok n.toNat := by
+      unfold SpecAMQP.Spec.Codec.codePointOf
+      cases hv : json.getObjValAs? Nat "codepoint" with
+      | error err => simp [hv] at hnat
+      | ok v =>
+        simp only [hv] at hnat ⊢
+        injection hnat with hnv
+        subst hnv
+        simp only [Bind.bind, Except.bind, if_pos (by omega : n.toNat ≤ 1114111)]
+    simp only [hb, hcp] at h ⊢
+    injection h with hb'
+    subst hb'
+    exact ⟨.char n.toNat, rfl, by
+      simp only [BodiesAgree]
+      exact (u32_toNat n.toNat (by omega)).symm⟩
 
 end SpecAMQP.Proofs
