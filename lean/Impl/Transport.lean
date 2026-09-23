@@ -12,10 +12,35 @@ are those four, unchanged. The two extra declarations are not speculative additi
 but the shortest path to `accept` and to the client side: `accept` needs a socket
 that is bound and listening, and a client needs to dial before it can `send`. They
 operate on sockets, not on protocol state, and an operation that does not appear
-here (no `shutdown`, no `poll`/`select`, no `setsockopt`, no name resolution, no
-non-blocking mode, no address type) is absent because the synchronous endpoint does
-not need it. The count is now in a gate's output, so growing it is a deliberate act
+here (no `shutdown`, no `poll`/`select`, no name resolution, no non-blocking mode,
+no address type, no timeout) is absent because the synchronous endpoint does not
+need it. The count is now in a gate's output, so growing it is a deliberate act
 rather than a convenience.
+
+## Every place the shim has a policy, since it has more than two
+
+A disclosure that lists an operation as absent while the code calls it is worse than
+no list, so this one is exhaustive rather than illustrative. The shim is bare
+syscalls except at these points, each of which is a decision with a reason:
+
+- **`SO_REUSEADDR` is set on `listen`.** Not a hidden convenience: a loopback harness
+  that re-runs has to rebind a port the previous run left in `TIME_WAIT`, and without
+  it the second run fails on an address the first one legitimately released. It is set
+  on the listening socket only, and a failure to set it is reported rather than
+  ignored. `setsockopt` therefore appears in this module after all — for this one
+  option, on this one call.
+- **`SOCK_CLOEXEC` is set on every socket**, accepted or connected, so a descriptor
+  cannot leak into a child process.
+- **`recv` refuses a zero-length request** (`EINVAL`). A zero-length read returns zero
+  octets exactly as an orderly close does, so allowing it would make `none` mean two
+  different things.
+- **`send` uses `MSG_NOSIGNAL`**, so a peer that has gone away fails the write instead
+  of killing the process between a test's assertions.
+- **`close` is called once and not retried on `EINTR`**; on Linux the descriptor is
+  released either way, so a retry could close an unrelated descriptor that had since
+  taken the same number. A failure is reported, not swallowed.
+- **An orderly close is `none`, not an error**, and **`send` performs one syscall and
+  reports what the kernel accepted** — both argued in their own sections below.
 
 ## The trust, stated rather than implied
 
@@ -35,9 +60,9 @@ outside the source has to be believed for it to be a claim about a running proce
    declarations below. It performs the syscalls, it is written by hand in C, and no
    proof here concerns it. What this module does about that is make the shim small,
    keep its contract narrow enough to check by reading, and prove by two-process
-   loopback (`lean/Loopback/`, `scripts/run-transport-loopback.sh`) that it delivers
-   the octets it is given, in order, without truncation — which is a measurement of
-   behaviour, not a proof, and is reported as one.
+   loopback — `scripts/loopback/` and `scripts/run-transport-loopback.sh` — that it
+   delivers the octets it is given, in order, without truncation, which is a
+   measurement of behaviour, not a proof, and is reported as one.
 
 Nothing else in the implementation is unproved. In particular the six operations
 below are the only `@[extern]` declarations in the tree, they are `private` to this

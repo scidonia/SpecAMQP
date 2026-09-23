@@ -60,20 +60,20 @@ def run (port : UInt16) (count chunk : Nat) : IO Bool := do
   IO.println "client: closed"
   return matched
 
-end Loopback.Client
-
 /--
-The entry point, outside the namespace for the same reason the server's is: a
-namespaced `main` gets no C wrapper. See `Loopback/Server.lean`.
+The client's command line: parse, run one dialogue, and carry the verdict in the exit
+status. Namespaced for the same reason the server's is — see `Loopback/Server.lean`.
 -/
-def main (args : List String) : IO UInt32 := do
-  match Loopback.Client.parse args with
+def runMain (args : List String) : IO UInt32 := do
+  match parse args with
   | .error message =>
     IO.eprintln s!"client: {message}"
     return 2
   | .ok (port, count, chunk) =>
     try
-      if ← Loopback.Client.run port count chunk then return 0 else return 1
+      if ← run port count chunk then return 0 else return 1
     catch error =>
       IO.eprintln s!"client: {error}"
       return 1
+
+end Loopback.Client

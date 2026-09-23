@@ -60,33 +60,33 @@ def serve (port : UInt16) (chunk : Nat) : IO Unit := do
   listener.close
   IO.println "server: closed"
 
-end Loopback.Server
-
 /--
-The entry point, declared *outside* the namespace on purpose: Lean emits the C `main`
-wrapper only for a module that declares a local `main`, so a namespaced
-`Loopback.Server.main` links as an executable with no entry point — which is how
-this was found, as `ld.lld: undefined symbol: main`. `UInt32` is the exit status,
-by the same convention as `Ref.Main`: zero for a dialogue that happened, non-zero
-for one that did not.
+The server's command line: parse, serve, and turn the outcome into an exit status.
+Namespaced rather than a bare `main`, because Lean emits the C `main` wrapper only for
+a module that declares a *local* `main`, and Lake allows one executable per root
+module — so each executable gets its own four-line root module (`ServerMain.lean` for
+the real one, `ControlServerMain.lean` for the control) and they share this function
+instead of a copy of it.
 -/
-def main (args : List String) : IO UInt32 := do
+def runMain (args : List String) : IO UInt32 := do
   match args with
   | [portText, chunkText] =>
-    match Loopback.Wire.portArg portText, Loopback.Wire.chunkArg chunkText with
+    match Wire.portArg portText, Wire.chunkArg chunkText with
     | .ok port, .ok chunk =>
       try
-        Loopback.Server.serve port chunk
+        serve port chunk
         return 0
       catch error =>
         IO.eprintln s!"server: {error}"
         return 1
     | .error message, _ =>
-      IO.eprintln s!"server: {message}\n{Loopback.Server.usage}"
+      IO.eprintln s!"server: {message}\n{usage}"
       return 2
     | _, .error message =>
-      IO.eprintln s!"server: {message}\n{Loopback.Server.usage}"
+      IO.eprintln s!"server: {message}\n{usage}"
       return 2
   | _ =>
-    IO.eprintln Loopback.Server.usage
+    IO.eprintln usage
     return 2
+
+end Loopback.Server

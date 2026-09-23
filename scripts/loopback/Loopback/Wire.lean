@@ -23,12 +23,20 @@ way in and the client swapped them again on the way out, in the same places, so 
 comparison saw the original payload and reported a match. It was caught only by the
 multi-buffer case, where the two directions' read boundaries fall differently.
 
-The repair is in `scripts/run-transport-loopback.sh`, which now gives the server and
-the client different read sizes so the windows cannot coincide, and the control was
-re-run to confirm that every non-empty case catches it with a named offset. The
-lesson generalises past this harness: a mutant whose failure depends on symmetry
-between two processes is a mutant whose failure cannot be attributed, and the
-symmetric case has to be broken deliberately rather than left to chance.
+The repair is in two places rather than one sentence. `scripts/run-transport-loopback.sh`
+gives the server and the client different read sizes, so the two directions' windows cannot
+coincide; and the controls are *committed* rather than described, so a reader can re-run
+them instead of believing this paragraph. `scripts/loopback/mutants/shim_controls.c`
+compiles this same shim file with wrappers that plant one fault on demand, `lake build`
+produces the control binaries, and `scripts/run-transport-loopback.sh --mutant <name>`
+runs the four cases against them and requires the documented outcome — detection for the
+two `recv` controls, and success with hundreds of send calls for `short-send`, which is
+the only way to exercise the loop below. A harness that has never been made to fail proves
+nothing; a control that lives only in prose cannot be re-run.
+
+The lesson generalises past this harness: a mutant whose failure depends on symmetry
+between two processes is a mutant whose failure cannot be attributed, and the symmetric
+case has to be broken deliberately rather than left to chance.
 
 (The other measurement a reader needs is in `Server.lean`: Lean's stdout is
 block-buffered, so the readiness line must be flushed or a waiting runner waits

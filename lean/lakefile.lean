@@ -126,7 +126,7 @@ lean_lib Loopback where
 connection, echoes the announced payload, reports its call counts, exits. -/
 lean_exe «amqp-loopback-server» where
   srcDir := "../scripts/loopback"
-  root := `Loopback.Server
+  root := `Loopback.ServerMain
   moreLinkObjs := #[«transport-shim»]
 
 /-- `lake exe amqp-loopback-client <port> <octets> <chunk-octets>` — R1's client:
@@ -134,8 +134,37 @@ sends a known byte string, compares what comes back octet for octet, exits non-z
 on a mismatch. -/
 lean_exe «amqp-loopback-client» where
   srcDir := "../scripts/loopback"
-  root := `Loopback.Client
+  root := `Loopback.ClientMain
   moreLinkObjs := #[«transport-shim»]
+
+/--
+R1's shim controls: the same shim file, compiled with wrappers that plant a fault on
+demand (`scripts/loopback/mutants/shim_controls.c`, selected by `SPECAMQP_SHIM_CONTROL`).
+
+Separate object file and separate executables, so neither binary under test contains a
+line of control code and no control can be switched on in a run that means to be clean.
+A harness that has never been made to fail proves nothing; this is what makes it fail
+on request, reproducibly, for anyone reviewing the evidence.
+-/
+target «transport-shim-controls» pkg : System.FilePath := do
+  let scriptDir := pkg.dir.parent.getD pkg.dir / "scripts"
+  let srcJob ← inputTextFile <| scriptDir / "loopback" / "mutants" / "shim_controls.c"
+  buildO (pkg.buildDir / "c" / "transport_shim_controls.o") srcJob
+    #["-I", (← getLeanIncludeDir).toString]
+    #["-O2", "-fPIC", "-std=c11", "-Wall", "-Wextra"]
+
+/-- `lake exe amqp-loopback-control-server …` — the server linked against the controls
+instead of the shim. -/
+lean_exe «amqp-loopback-control-server» where
+  srcDir := "../scripts/loopback"
+  root := `Loopback.ControlServerMain
+  moreLinkObjs := #[«transport-shim-controls»]
+
+/-- `lake exe amqp-loopback-control-client …` — the client linked against the controls. -/
+lean_exe «amqp-loopback-control-client» where
+  srcDir := "../scripts/loopback"
+  root := `Loopback.ControlClientMain
+  moreLinkObjs := #[«transport-shim-controls»]
 
 /-- The reference implementation as a native executable: `lake exe amqp-ref
 <vector-file.ndjson>`. -/

@@ -21,12 +21,14 @@
  * ## Allocation and length discipline
  *
  * The shim allocates nothing it does not hand to Lean's garbage collector, and
- * frees nothing Lean owns. `recv` allocates exactly one scalar array, sized
- * `maxOctets`, receives into its own storage bounded by that size, and then sets
- * its length to what arrived — so the returned buffer is never longer than either
- * the request or the data, and there is no separate buffer to leak. Nothing is
- * copied twice and no `malloc` appears: an out-of-memory condition is
- * `lean_alloc_object`'s, which aborts loudly rather than returning a short read.
+ * frees nothing Lean owns. `recv` allocates exactly one *buffer* — one scalar array,
+ * sized `maxOctets` — receives into its own storage bounded by that size, and then
+ * sets its length to what arrived, so the returned buffer is never longer than either
+ * the request or the data. The success path also allocates the `Option.some`
+ * constructor that carries that buffer, and the error and end-of-stream paths free the
+ * buffer before returning it, so every path releases what it took. Nothing is copied
+ * twice and no `malloc` appears: an out-of-memory condition is `lean_alloc_object`'s,
+ * which aborts loudly rather than returning a short read.
  *
  * ## The calling convention, as measured rather than assumed
  *
