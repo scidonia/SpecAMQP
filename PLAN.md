@@ -960,6 +960,17 @@ at one copy — it is the copy someone happened to read — and the words are al
 are "refuted", "vacuous", "as a theorem", "not started", and "vacuous" again; each of them was true somewhere and false in a
 second place, and only the grep found the second place.
 
+**A check must assert what it means, not that something arrived.** The shell driver's readiness check read *any* first line from
+the server as its readiness line, so a server that failed to bind printed `bind: address already in use`, that line was taken as
+readiness, and a **dead server was carried into the case**. One port collision therefore arrived as ten unrelated assertion
+failures, and the first attempt at diagnosing the collision could not see the collision for them. Readiness is the server's own
+announcement now, and an attempt that does not produce it reports the line it got instead.
+
+The general form is what earns this a place beside the other rules here: **a check that accepts *something* where it means *this
+thing* converts one real failure into several misleading ones.** That is worse than accepting nothing, because the failure is still
+there and the report now points at a dozen places it is not — and it is the same family as the gates whose scope was a list rather
+than a walk, and the floors that were reported rather than asserted. Every one of them passed while checking less than it claimed.
+
 ## 17. Verification gates and their negative controls
 
 | Gate | Mechanism | Negative control |
