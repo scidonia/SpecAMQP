@@ -21,6 +21,15 @@ endpoint's own narration, which is the corpus's vocabulary (`took <state>` / `re
 
 Nothing here decides whether the endpoint was right: this script reports what happened,
 and the driver compares that with the vector and with `amqp-spec`'s in-process answer.
+
+`--coalesce` writes each maximal run of consecutive `receive` steps in **one** `sendall`, so
+that two frames the vector puts on the wire back to back arrive in the endpoint as one read.
+It exists because whether they do is otherwise a race the driver cannot vary: back-to-back
+loopback writes issued by one process reach a reader that is already blocked in `recv` as
+separate segments run after run, which is exactly why a verdict that turns on the difference
+went unnoticed for as long as it did. Writing them as one segment is a peer the vector does
+not forbid — the steps are semantic, not a segmentation — and it is what makes the difference
+observable on demand rather than by chance.
 """
 
 from __future__ import annotations
@@ -78,6 +87,8 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--corpus", required=True, help="the vector file")
     parser.add_argument("--vector", required=True, help="the vector id to play")
     parser.add_argument("--report", required=True, help="where to write the per-step JSON lines")
+    parser.add_argument("--coalesce", action="store_true",
+                        help="write each run of consecutive `receive` steps in one sendall")
     args = parser.parse_args(argv)
 
     vectors = {}
@@ -91,6 +102,30 @@ def main(argv: list[str]) -> int:
 
     report = pathlib.Path(args.report)
     lines: list[str] = []
+    # Which `receive` steps are written together. `group` maps the step that carries a run's write (1-based,
+    # as the report numbers steps) to the octets of the whole run, and `joined` names, for every later step
+    # of that run, the step whose write it went out in — so each step still reports itself, and one of them
+    # reports the write.
+    group: dict[int, bytes] = {}
+    joined: dict[int, int] = {}
+    alongside: dict[int, list[int]] = {}
+    if args.coalesce:
+        own = vector.get("steps", [])
+        index = 0
+        while index < len(own):
+            if own[index].get("direction") == "receive":
+                end = index
+                while end + 1 < len(own) and own[end + 1].get("direction") == "receive":
+                    end += 1
+                if end > index:
+                    group[index + 1] = b"".join(
+                        bytes.fromhex(own[k]["bytes"]) for k in range(index, end + 1))
+                    alongside[index + 1] = [k + 1 for k in range(index, end + 1)]
+                    for k in range(index + 1, end + 1):
+                        joined[k + 1] = index + 1
+                index = end + 1
+            else:
+                index += 1
     sock = connect(args.port)
     try:
         # The shell announces the protocol header on **every** connection, so it is on the wire
@@ -127,12 +162,21 @@ def main(argv: list[str]) -> int:
             expect = step.get("expect") or {}
             direction = step["direction"]
             if direction == "receive":
-                sock.sendall(wire)
+                if number in group:
+                    sock.sendall(group[number])
+                elif number in joined:
+                    pass  # this step's octets went out in the same write as `joined[number]`'s
+                else:
+                    sock.sendall(wire)
                 record = {
                     "step": number, "direction": direction, "status": expect.get("status", "admitted"),
                     "state": expect.get("state"), "bytes": step["bytes"],
                     "written": len(wire), "observed": "written",
                 }
+                if number in joined:
+                    record["one_write_with_step"] = joined[number]
+                elif number in group:
+                    record["one_write_for_steps"] = alongside[number]
             elif direction == "send":
                 if number == 1 and len(wire) == 8 and preamble:
                     # the vector's first step is the header, which was just read as the preamble

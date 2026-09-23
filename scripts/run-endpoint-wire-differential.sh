@@ -24,12 +24,23 @@
 #
 # ## What this tier cannot yet reach, stated rather than hidden
 #
-# The endpoint's *application* is fixed in `Shell.Main`: it announces the protocol header (the shell does,
-# on every connection) and then sends nothing, ending the client side once both headers are exchanged.
-# `Shell.Driver.App` is the seam a corpus-driven application goes through, and until one exists the send
-# steps beyond the header cannot be taken by the shipped process. Those steps are therefore expected to
-# diverge here, and each one is reported as the application's absence rather than as a protocol defect —
-# the distinction matters, because the first is a missing programme and the second would be a bug.
+# The application the differential runs is `scripts/endpoint/WireApp`: a corpus-driven application at the
+# `Shell.Driver.App` seam, beside its peer `wire_peer.py` and shipped by neither. Two properties of *that
+# seam* keep some `send` steps out of the application's reach, and both are the seam's rather than either
+# artefact's:
+#
+#   * a vector asking for two `send` steps in a row, with nothing arriving between them, has its second
+#     send never prompted: the shell asks the application after each **unit** of the peer's octets, and
+#     there is no unit to ask it after (measured at step 2 of `slice-open-missing-container-id` and
+#     `slice-open-channel-max-wrong-type`);
+#   * a step whose pre-state is `START` is not the application's to play at all, because the shell
+#     announces the protocol header itself before the core's first read (`Shell.Driver.runConnection`).
+#
+# Those steps are expected to diverge here, and each divergence says which case it is **in its own line**:
+# the control's problem text names the seam property where the step's pre-state shows which one it is, and
+# stays silent where the cause is unknown. A limitation named in the run's output is one a reader of the
+# run can weigh; the same words kept in a commit message are archaeology, and the reviewer of this tier
+# found exactly that — three findings attributed where nobody running the script would look.
 #
 # ## The two lessons this driver is built on
 #
@@ -70,6 +81,18 @@ cd "$root/lean"
 port_base="${SPECAMQP_WIRE_PORT_BASE:-$((49100 + ($$ % 300)))}"
 port_attempts="${SPECAMQP_WIRE_PORT_ATTEMPTS:-40}"
 read_octets="${SPECAMQP_WIRE_READ_OCTETS:-64}"
+
+# The peer's write grouping is this driver's **control** over the one condition the endpoint's reads cannot
+# be trusted to vary: `SPECAMQP_WIRE_COALESCE=1` writes each run of consecutive `receive` steps in one
+# `sendall`, so both frames arrive in the endpoint as a single read and are consumed by a single `feed`.
+# Without it, whether they do is a race nothing here samples differently — a reader already blocked in
+# `recv` takes back-to-back loopback writes as separate arrivals, run after run — which is precisely how a
+# verdict that turns on the difference went unnoticed. Two runs of one condition are a sample; this is the
+# other condition.
+coalesce_flag=""
+if [ -n "${SPECAMQP_WIRE_COALESCE:-}" ]; then
+  coalesce_flag="--coalesce"
+fi
 
 # ---------------------------------------------------------------- in-process: the specification's answer
 
@@ -134,10 +157,19 @@ port=""
 # driver (`SPECAMQP_WIRE_*` here, `SPECAMQP_ENDPOINT_*` in the shell's driver) for the same reason — a
 # shared base would make two suites race for one window instead of settling it by bind.
 #
-# Returns 0 when the endpoint announced the port it took, 1 when the range is exhausted — a **named
-# invalid**: this run tested nothing — and 2 when the endpoint started and refused the vector, since a
-# vector the application cannot play is a loud failure of its own and retrying it on forty ports would
-# report a bind collision that never happened.
+# Returns 0 when the endpoint announced the port it took — and it is **printed**, in the shape and for
+# the reason the shell's driver prints it, because a run that leaves no visible record of the port it
+# took cannot be reproduced from its own output; 1 when the range is exhausted, a **named invalid**: this
+# run tested nothing; 2 when the endpoint started and refused the vector; and 3 when it failed to start
+# for a reason this driver does not recognise.
+#
+# Classes 2 and 3 are **not** retried: a vector the application cannot play, and a start-up failure that
+# is not a bind collision, are each a loud failure of their own, and retrying either across forty ports
+# would report a collision that never happened — which is the whole reason the two are named rather than
+# left to fall through. **Only a failed bind is retried**, and that is decided by the transport's own
+# words (`transport shim: bind failed: …`) rather than by "the server did not announce": the derived port
+# may be held by the gate that ran before this one, and the *next* port is the answer to that, but
+# nothing else about a failure to start is a fact about the port.
 start_endpoint() {
   label=$1
   first=$2
@@ -150,10 +182,13 @@ start_endpoint() {
       >"$srv_fifo" 2>&1 &
     srv_pid=$!
     exec 3<"$srv_fifo"
+    # The endpoint's own output up to (and including) its readiness line, one whole line at a time: the
+    # separator goes *after* each line rather than before it, so a failure's first line is not preceded by
+    # a blank one in the message this driver prints.
     readiness=""
     announced=0
     while IFS= read -r line <&3; do
-      readiness=$(printf '%s\n%s' "$readiness" "$line")
+      readiness="${readiness}${line}"$'\n'
       if printf '%s' "$line" | grep -q 'listening port='; then
         announced=1
         break
@@ -161,17 +196,31 @@ start_endpoint() {
     done
     if [ "$announced" = 1 ]; then
       ready="$readiness"
+      printf '     (took port %s for %s)\n' "$port" "$label"
       return 0
-    fi
-    if printf '%s' "$readiness" | grep -qE 'carries no vector|no start state|send a .value|asked to send'; then
-      printf '%s\n' "$readiness" >"$work/$label.startup.log"
-      exec 3<&-
-      wait "$srv_pid" 2>/dev/null
-      return 2
     fi
     exec 3<&-
     wait "$srv_pid" 2>/dev/null
-    attempt=$((attempt + 1))
+    printf '%s' "$readiness" >"$work/$label.startup.log"
+    # The endpoint's own words, as one message: no trailing blank line, and a stand-in when it said nothing
+    # at all — a server the `timeout` killed before it printed still fails loudly rather than silently.
+    startup_words="${readiness%$'\n'}"
+    startup_words="${startup_words:-the endpoint exited without saying anything}"
+    if printf '%s' "$readiness" | grep -qE 'transport shim: bind failed'; then
+      printf '     port %s did not bind: %s\n' "$port" "$startup_words"
+      attempt=$((attempt + 1))
+      continue
+    fi
+    if printf '%s' "$readiness" | grep -qE 'carries no vector|names no start state|send a .value'; then
+      # The three messages the endpoint can print **before** its readiness line, and the only three:
+      # `asked to send` is deliberately not among them, because it is raised inside `serveApp`, which
+      # runs strictly after the announcement has been printed and read — a branch that cannot fire here
+      # is a branch that would make the class look wider than it is.
+      printf '     the endpoint refused %s: %s\n' "$label" "$startup_words"
+      return 2
+    fi
+    printf '     %s: the endpoint did not start: %s\n' "$label" "$startup_words"
+    return 3
   done
   return 1
 }
@@ -186,8 +235,13 @@ for id in $vectors; do
   start_endpoint "$id" "$port_base"
   start_status=$?
   if [ "$start_status" != 0 ]; then
+    # Three named classes, and each one says which it is: the range was exhausted, the endpoint refused
+    # the vector, or the endpoint failed to start for a reason that is not a bind collision. Only the
+    # first is about the port; the comparator quotes the endpoint's own words for the other two.
     if [ "$start_status" = 2 ]; then
       printf '%s\n' "$id INVALID endpoint-refused-the-vector" >>"$work/socket.log"
+    elif [ "$start_status" = 3 ]; then
+      printf '%s\n' "$id INVALID endpoint-failed-to-start" >>"$work/socket.log"
     else
       printf '%s\n' "$id INVALID no-port-in-the-scan-range" >>"$work/socket.log"
     fi
@@ -197,10 +251,12 @@ for id in $vectors; do
 
   timeout 120 python3 "$root/scripts/endpoint/wire_peer.py" \
     --port "$port" --corpus "$root/$corpus" --vector "$id" --report "$peer_report" \
-    >"$work/$id.peer.stdout" 2>&1
+    $coalesce_flag >"$work/$id.peer.stdout" 2>&1
   peer_status=$?
 
-  { printf '%s\n' "$ready"; cat <&3; } >"$endpoint_log"
+  # the readiness the server announced, then the rest of its own output: `ready` already ends in its
+  # newline, so the two halves join without a blank line between them
+  { printf '%s' "$ready"; cat <&3; } >"$endpoint_log"
   exec 3<&-
   wait "$srv_pid"
   endpoint_status=$?
@@ -250,6 +306,37 @@ def narration(lines):
             out.append((m.group(1), m.group(2)))
     return out
 
+def ended_state(lines):
+    """The state the endpoint's own application reported the connection ended in.
+
+    `WireApp.main` prints it as its last word — `endpoint: the connection ended in {state}` — and it is
+    the only statement anywhere of where a refusal that **ended** the connection left the peer: the
+    narration vocabulary carries no state on a refusal, by design. Reading it here is what lets a vector
+    whose refused step names a state be compared at all, rather than diverge by construction.
+    """
+    for line in reversed(lines):
+        m = re.match(r"^endpoint: the connection ended in (\S+)$", line.strip())
+        if m:
+            return m.group(1)
+    return None
+
+def bare_state(name):
+    """A corpus state name without its layer prefix: `connection:HDR_EXCH` is `HDR_EXCH`."""
+    return name.split(":")[-1] if name else ""
+
+# The two reasons a `send` step can reach the application and still never be played. Both are properties
+# of the seam between the shell and the application, measured and written next to that seam
+# (`WireApp/Main.lean`'s header, `Shell.Driver`'s); naming them in the run's own output is what keeps a
+# known limitation distinguishable from a regression by somebody reading only the table.
+SEAM_HEADER_BEFORE_START = (
+    "the shell announces the protocol header itself, before the core's first read "
+    "(Shell.Driver.runConnection), so a step whose pre-state is START is not the application's to play — "
+    "a known seam limitation, not the endpoint's answer")
+SEAM_NO_UNIT_TO_PROMPT = (
+    "the shell asks the application after each unit the peer's octets complete (Shell.Driver.serveUnits), "
+    "so the second of two sends played from one state, with no octets arriving between them, has nothing "
+    "to prompt it — a known seam limitation, not the endpoint's answer")
+
 rows = []
 for record in pathlib.Path(socket_log).read_text().splitlines():
     parts = record.split()
@@ -274,11 +361,42 @@ for record in pathlib.Path(socket_log).read_text().splitlines():
                 peer[entry["step"]] = entry
     endpoint_lines = pathlib.Path(work / f"{vector_id}.endpoint.log").read_text().splitlines()
     answers = narration(endpoint_lines)
+    ended = ended_state(endpoint_lines)
+
+    # Every step plays from a state, and this is the application's own accounting (`WireApp.sendsOf`): the
+    # vector's `start`, then the state each step's expectation names — or the state the step before left,
+    # when it names none. The differential needs it to say *why* a `send` step was never attempted, which
+    # the endpoint's narration alone cannot say.
+    played_from = []
+    cursor = bare_state(vector.get("start") or "")
+    for step in steps:
+        played_from.append(cursor)
+        named = (step.get("expect") or {}).get("state")
+        cursor = bare_state(named) if named else cursor
+
+    def seam_cause(number):
+        """The known reason this `send` step was never the application's to play, quoted, or nothing.
+
+        A cause is named only where the step's own pre-state shows it: silence where the reason is
+        unknown is the honest output, and a plausible-sounding cause nothing supports would be worse than
+        none. The two are measured ones (`WireApp/Main.lean`'s header carries the reproduction), and both
+        are properties of the shell/application seam rather than of the endpoint's protocol core.
+        """
+        index = number - 1
+        if index >= len(steps) or steps[index].get("direction") != "send":
+            return ""
+        if played_from[index] == "START":
+            return f" [{SEAM_HEADER_BEFORE_START}]"
+        if index > 0 and steps[index - 1].get("direction") == "send" \
+                and played_from[index - 1] == played_from[index]:
+            return f" [{SEAM_NO_UNIT_TO_PROMPT}]"
+        return ""
 
     # What the endpoint narrated, and how it lines up with the vector's steps. A `took <state>` is one
     # answer to one step and names the state the peer is in after it. A **refusal is two answers** — the
     # protocol condition, then the reason class — because that is the vocabulary the corpus compares on,
-    # and neither names a state: a refused step leaves the peer where the last `took` already said it was.
+    # and neither names a state: where a refusal leaves the peer is read from the endpoint's own narration
+    # (the `ended` line above) rather than assumed.
     # So a step consumes every consecutive refusal it produced, and otherwise exactly one answer. This is
     # why a positional one-answer-per-step reading was wrong, and why it is replaced rather than widened.
     problems = []
@@ -288,7 +406,7 @@ for record in pathlib.Path(socket_log).read_text().splitlines():
     # before the vector's first step, exactly as it puts those octets on the wire. A vector that begins
     # after the exchange says so in `start`, so the answers up to and including the one naming that state
     # belong to the preamble and not to any step of the vector.
-    start_state = (vector.get("start") or "").split(":")[-1]
+    start_state = bare_state(vector.get("start") or "")
     if start_state:
         for index, (verb, word) in enumerate(answers):
             if verb == "took" and word == start_state:
@@ -316,6 +434,7 @@ for record in pathlib.Path(socket_log).read_text().splitlines():
                 else:
                     detail += (f"; {observed.get('observed', 'no observation')} — the endpoint was in "
                                f"{in_state or 'no state it narrated'}, where the vector asks for no send")
+                    detail += seam_cause(number)
                 step_problems.append(detail)
         # the endpoint's own answer to this step
         if status == "refused":
@@ -326,7 +445,7 @@ for record in pathlib.Path(socket_log).read_text().splitlines():
             if not consumed:
                 step_problems.append(
                     "the endpoint narrated no refusal: the vector expects it to offer these octets and be "
-                    "refused, and no refusal reached the wire")
+                    "refused, and no refusal reached the wire" + seam_cause(number))
             else:
                 said = " ".join(consumed)
                 if (expect.get("condition") or "") not in said:
@@ -335,9 +454,22 @@ for record in pathlib.Path(socket_log).read_text().splitlines():
                 if (expect.get("reason") or "") not in said:
                     step_problems.append(
                         f"the endpoint refused as `{said}`; the vector names {expect.get('reason')}")
-            if state and in_state and in_state != state.split(":")[-1]:
-                step_problems.append(
-                    f"the vector expects the peer in {state}; the endpoint is in {in_state}")
+            if state:
+                # **Where a refusal leaves the peer is stated by the endpoint, not assumed here.** The
+                # narration vocabulary carries no state on a refusal, so this comparison used to read the
+                # state the *last* `took` named — which is right only while the refusal changed nothing,
+                # and made every vector whose refused step names a state diverge by construction. The
+                # endpoint's own words decide it: the state it narrated last stands (`in_state`), unless
+                # the refusal is the last thing it narrated, in which case the state its **application**
+                # reported the connection ended in is the only statement of where it went.
+                if answer_index >= len(answers) and ended:
+                    after, told_by = ended, "the state its application reported the connection ended in"
+                else:
+                    after, told_by = in_state, f"what the endpoint narrated last, `took {in_state}`"
+                if after and after != bare_state(state):
+                    step_problems.append(
+                        f"the vector expects the peer in {state}; the endpoint's own last word was {after} "
+                        f"({told_by})")
         elif state and answer_index < len(answers) and answers[answer_index][0] == "took":
             in_state = answers[answer_index][1]
             answer_index += 1
@@ -386,10 +518,14 @@ print()
 print(f"{'vector':<46} {'socket':<7} {'in process':<22} divergence")
 agree = 0
 for vector_id, verdict, spec_text, problems in rows:
+    # Every problem is printed **in full**, one per line, where it used to be cut at seventy columns and
+    # capped at two: the part that says *which* it is — a seam limitation named with its cause, or the
+    # endpoint's own last word quoted — lands at the end of the line, and a fixed-width cut hides exactly
+    # that. Whoever reads this table and nothing else is the reader the attribution is for.
     first = problems[0] if problems else ""
-    print(f"{vector_id:<46} {verdict:<7} {spec_text:<22} {first[:70]}")
-    for extra in problems[1:3]:
-        print(f"{'':<46} {'':<7} {'':<22} {extra[:70]}")
+    print(f"{vector_id:<46} {verdict:<7} {spec_text:<22} {first}")
+    for extra in problems[1:]:
+        print(f"{'':<46} {'':<7} {'':<22} {extra}")
     if verdict == "pass" and spec_text.startswith("amqp-spec pass"):
         agree += 1
 print()
