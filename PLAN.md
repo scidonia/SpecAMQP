@@ -140,6 +140,16 @@ corrected, and it is worth the paragraph because the ledger's citations are the 
 line still points at *something*, and nothing checks whether it still points at the thing the note describes. It is the stale-claim family in its most mechanical
 form — a claim about a *location* — and the audit that found it was a reading rather than a gate, which is the honest statement of where that check sits today.
 
+**And the two grades composed, which is a sharper finding than either grade alone.** A clause can be *implemented* while being *unstatable in the specification*:
+`version-negotiation.5`, the transport-role obligation, is carried by `Shell/Driver.runConnection` submitting the announced header before the read loop and
+`Shell/Main` deciding the role from the command line — while `Endpoint` has no transport-role field for the specification to state it with. Both halves belong
+in one note: a reader who saw only "nothing carries this" would go looking for an implementation, and a reader who saw only "the shell does it" would take the
+clause as discharged. The disposition stays `deferred:` on the *specification's* side and the note names the shell, which is a composition rather than a gap.
+
+**And a record-shape decision worth keeping**: no disposition had named an `Impl`/`Shell`/`Harness` declaration before, so the value stayed in the specification's
+vocabulary with the shell named only in the note. If implementation-side carriers become a *class* rather than an instance, that is a conventions change to make
+deliberately and with a second example in hand, rather than on the strength of the first.
+
 ## 7. Generated definition tables
 
 `scripts/gen-oasis-lean.py` reads the pinned bytes and emits `lean/Generated/Oasis/`, one module per declaration kind:
