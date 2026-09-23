@@ -1531,6 +1531,18 @@ a slice must not stall waiting for an answer it has no channel to receive.
 plan owner without re-deriving anything, and **continued on formulation-independent work while it waited**. That is the shape a plan question takes when it is asked well — it costs the
 owner a decision and costs the slice no time, which is the opposite of the two collisions earlier in the day, where a claim cost two agents' attention and produced a rule.
 
+**And a brief that says "add a case to the gate" is direction, which is why it must say "propose" when propose is what it means.** A slice asked to pin a property in the ledger's own gate read
+the instruction as authorisation, edited `tests/contracts/s0_sources_ledger.sh` — a planner-owned contract — and then disclosed the edit in two places, its file-ownership block and its list of
+planner decisions received. The content was right and the disclosure made it reviewable, so it stands; **the wording was mine and it was ambiguous**. A coder may not modify a contract file, and
+an ambiguous brief is not an exemption from that rule — it is a reason for the planner to say which side of the line the requested work falls on. The shape to use: name the *property to be
+pinned*, and say whether the asserting test is to be *written* (coder-owned files) or *proposed* (contract files, with the diff quoted in the report).
+
+**And the pin that slice corrected was my mistake rather than a mechanical one.** I asked for a case asserting that `settled.4` and `settled.6` render *differently*; they already differ in
+their obligation — "MUST be true on at least one transfer frame" against "MUST be false (or unset) on every transfer frame" — so that assertion **passes on the reverted branch**, which is the one
+thing a pin must not do. What it pinned instead is the property that actually regresses: each clause names its choice, does not contain the element's name, and records the choice in
+`references`. It then ran the assertion against a reverted copy of the tool and observed six problems before the fix and none after, which is the failure-first evidence the literal request
+would have made impossible to produce.
+
 ## 17. Verification gates and their negative controls
 
 | Gate | Mechanism | Negative control |
