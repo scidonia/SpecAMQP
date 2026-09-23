@@ -1055,6 +1055,17 @@ cost two other agents a plant each today.
 either the shell's SASL header choice or the vector, which is authored from the clauses. One of them is wrong, and the differential found
 where they disagree while still incomplete.
 
+**The SASL header finding, and where the fix belongs.** R4's first wire run found two SASL vectors expecting `414d515003010000` — protocol id 3,
+the SASL layer — where the endpoint announces `414d515000010000`, the AMQP header. Reading the shell settles it, and it is *not* a shell defect:
+the header is a **parameter** of `runConnection`, `serveConn` and `dial`, handed to `Impl.Core.submit`, so the core validates it and the shell merely
+plumbs the octets. What the shell supplies is a *default* — `Impl.Core.announceHeader`, "the fixed header this peer announces", described as "the
+shell's only protocol act of its own" and named by §23.1 as a fixed header. So the **application** decides whether to offer SASL, the **shell**
+plumbs, the **core** checks, and the corpus-driven application is where the vector's header belongs.
+
+That makes the finding a statement rather than a defect: the vectors are written for a peer that offers SASL, the shipped binary's default header
+says AMQP, and the difference is a policy the application owns. It also closes the app-seam question in the direction the design already had — the
+gap was never in the transport, which is parameterised for exactly this, but in the absence of an application to exercise it.
+
 
 ## 23.2 The concurrent server: what is settled, what is proposed, and what must be proved
 
