@@ -17,12 +17,18 @@ no address type, no timeout) is absent because the synchronous endpoint does not
 need it. The count is now in a gate's output, so growing it is a deliberate act
 rather than a convenience.
 
-## Every place the shim has a policy, since it has more than two
+## What the shim decides, beyond making the syscall
 
-A disclosure that lists an operation as absent while the code calls it is worse than
-no list, so this one is exhaustive rather than illustrative. The shim is bare
-syscalls except at these points, each of which is a decision with a reason:
+The shim is a wrapper: each operation issues its syscall and reports what POSIX reports,
+with the two results it has to keep apart — an octet count, and the error that stands
+beside it. It is *not* a bare wrapper, and this section is about the difference. What
+follows is what the code decides, not a claim that nothing else differs: check the list
+against the shim, and where the two disagree the code is the fact.
 
+- **Four calls retry on `EINTR`** — `accept4`, `connect`, `recv` and `send` — because a
+  signal-interrupted call is not a failed one, and reporting a failure for one would make
+  the harness's outcome depend on an unrelated signal. `close` is the exception and the
+  reason is in its own bullet below.
 - **`SO_REUSEADDR` is set on `listen`.** Not a hidden convenience: a loopback harness
   that re-runs has to rebind a port the previous run left in `TIME_WAIT`, and without
   it the second run fails on an address the first one legitimately released. It is set
@@ -38,7 +44,8 @@ syscalls except at these points, each of which is a decision with a reason:
   of killing the process between a test's assertions.
 - **`close` is called once and not retried on `EINTR`**; on Linux the descriptor is
   released either way, so a retry could close an unrelated descriptor that had since
-  taken the same number. A failure is reported, not swallowed.
+  taken the same number. That is why it is the one call without a retry, and a failure
+  is reported rather than swallowed.
 - **An orderly close is `none`, not an error**, and **`send` performs one syscall and
   reports what the kernel accepted** — both argued in their own sections below.
 

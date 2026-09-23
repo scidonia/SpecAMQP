@@ -69,8 +69,20 @@
 # rung exists to prevent; calling it a failure would be a harness that cannot tell one
 # control's reach from another's.
 #
-# Nothing here contacts a network service, a clock or a random source: ports are fixed
-# per case, the payload is generated, and the only ordering is process start-up.
+# ## Ports, and what an invalid run means
+#
+# The four cases need four ports, derived from this script's own process id so that two
+# concurrent runs cannot collide — a contract that fails because a sibling process holds
+# a port reports the environment, not the boundary. Pin them for a record with
+# SPECAMQP_LOOPBACK_PORT_BASE; whatever they are, the runner prints them.
+#
+# A case whose listener could not bind, or whose client could not connect, never tested
+# the boundary: it is reported as INVALID, and it can never satisfy a control's
+# expectation. That distinction is not bookkeeping — the failure being caught would
+# otherwise be "the port was busy", which is the vacuous pass this rung exists to prevent.
+#
+# Nothing here contacts a network service, a clock or a random source: the payload is
+# generated, and the only ordering is process start-up.
 
 set -u
 
@@ -123,6 +135,17 @@ esac
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
+# The four cases need four ports, and they must not collide with another run of this
+# harness — a contract that fails because a sibling process holds a port is a contract
+# that reports the environment rather than the boundary. So the base is derived from
+# this process's id: unique per run, no clock and no random source, and printable, which
+# is what makes it reproducible. Pin it with SPECAMQP_LOOPBACK_PORT_BASE to record a run.
+port_base="${SPECAMQP_LOOPBACK_PORT_BASE:-$((47300 + ($$ % 400) * 10))}"
+p1="$port_base"
+p2="$((port_base + 1))"
+p3="$((port_base + 2))"
+p4="$((port_base + 3))"
+
 if ! command -v timeout >/dev/null; then
   echo "loopback: 'timeout' is required to bound a hung dialogue" >&2
   exit 1
@@ -173,6 +196,8 @@ documented() {
 # Globals set by run_case and read by the caller that knows the expectation.
 case_failed=0
 case_named=0
+case_invalid=0
+invalid_runs=0
 
 # One dialogue. `$1` label, `$2` port, `$3` payload octets, `$4` the server's read
 # size, `$5` the client's. The two sizes differ on purpose: a shim that reorders
@@ -254,24 +279,38 @@ run_case() {
     fi
   fi
 
-  # A failing case is only useful evidence if it says *why*. These are the diagnostics
-  # the harness and the shim produce, each naming the place rather than the fact: a
-  # differing octet, a short transfer, a length disagreement, octets after the
-  # dialogue, or the syscall that failed.
-  if grep -qE 'MISMATCH|peer closed after|length differs|accepted no octets|returned [0-9]+ octets for a request|peer sent [0-9]+ octets after the dialogue|transport shim:' \
+  # A failing case is only useful evidence if it says *why*, and only if the failure is
+  # about the octets. These diagnostics name a differing octet, a short transfer, a
+  # length disagreement, octets after the dialogue, or a failed **transfer** syscall —
+  # never a failure to establish the connection at all, which says the run never happened.
+  if grep -qE 'MISMATCH|peer closed after|length differs|accepted no octets|returned [0-9]+ octets for a request|peer sent [0-9]+ octets after the dialogue|transport shim: (recv|send) failed' \
     "$log" "$client_log"; then
     case_named=1
   else
     case_named=0
   fi
+
+  # An environment failure is not a detection. If the listener could not bind or the
+  # client could not connect, nothing about the boundary was tested, and counting that as
+  # a caught control would be the vacuous pass this whole rung is about — so it is
+  # reported as an invalid run and can never satisfy a control's expectation.
+  if grep -qE 'fail(ed)?: (Address already in use|Connection refused|Cannot assign)' "$log" "$client_log"; then
+    case_invalid=1
+    invalid_runs=$((invalid_runs + 1))
+    printf 'INVALID case %s: the listener could not bind or the client could not connect,\n' "$label"
+    printf '        so nothing about the boundary was tested in this case. Ports in use: %s-%s\n' "$p1" "$p4"
+    printf '        Another run of this harness, or another process, is holding them. Re-run, or pin SPECAMQP_LOOPBACK_PORT_BASE.\n'
+  else
+    case_invalid=0
+  fi
 }
 
 # The four cases, with the read sizes the clean run uses.
 run_all_cases() {
-  run_case single 47311 64 64 3
-  run_case multi 47312 300000 4096 4093
-  run_case fragmented 47313 20000 7 5
-  run_case empty 47314 0 1024 1024
+  run_case single "$p1" 64 64 3
+  run_case multi "$p2" 300000 4096 4093
+  run_case fragmented "$p3" 20000 7 5
+  run_case empty "$p4" 0 1024 1024
 }
 
 printf 'building %s and %s\n' "$server_exe" "$client_exe"
@@ -279,11 +318,16 @@ lake build "$server_exe" "$client_exe" 2>&1 | tail -3
 
 if [ -z "$mutant" ]; then
   run_all_cases
+  printf '\n'
+  if [ "$invalid_runs" -gt 0 ]; then
+    printf 'loopback: INVALID — %s case(s) never ran (see above); this run is not evidence\n' "$invalid_runs"
+    exit 1
+  fi
   if [ "$failures" -eq 0 ]; then
-    printf '\nloopback: all cases passed\n'
+    printf 'loopback: all cases passed\n'
     exit 0
   fi
-  printf '\nloopback: %s check(s) failed\n' "$failures"
+  printf 'loopback: %s check(s) failed\n' "$failures"
   exit 1
 fi
 
@@ -307,7 +351,9 @@ control_case_caught() {
   chunk=$4
   client_chunk=$5
   run_case "$label" "$port" "$octets" "$chunk" "$client_chunk"
-  if [ "$case_failed" = 1 ] && [ "$case_named" = 1 ]; then
+  if [ "$case_invalid" = 1 ]; then
+    control_check "case $label never ran, so this control proves nothing about it" 1
+  elif [ "$case_failed" = 1 ] && [ "$case_named" = 1 ]; then
     control_check "case $label ($octets octets) was caught, with a named diagnostic" 0
   elif [ "$case_failed" = 1 ]; then
     control_check "case $label ($octets octets) failed without a named diagnostic" 1
@@ -325,7 +371,9 @@ control_case_still_passes() {
   client_chunk=$5
   reason=$6
   run_case "$label" "$port" "$octets" "$chunk" "$client_chunk"
-  if [ "$case_failed" = 0 ]; then
+  if [ "$case_invalid" = 1 ]; then
+    documented "case $label never ran, so its expected pass proves nothing" 1
+  elif [ "$case_failed" = 0 ]; then
     documented "case $label passes, and cannot be caught: $reason"
   else
     documented "case $label failed although it cannot be caught: $reason" 1
@@ -343,6 +391,10 @@ if [ "$mutant" = "short-send" ]; then
     chunk=$4
     client_chunk=$5
     run_case "$label" "$port" "$octets" "$chunk" "$client_chunk"
+    if [ "$case_invalid" = 1 ]; then
+      documented "case $label never ran, so short-send proves nothing about it" 1
+      return
+    fi
     if [ "$case_failed" = 1 ]; then
       control_check "case $label ($octets octets) failed under short-send, which must not happen" 1
       return
@@ -365,25 +417,25 @@ if [ "$mutant" = "short-send" ]; then
       documented "case $label ($octets octets) did not show the short-write loop running" 1
     fi
   }
-  short_send_case single 47311 64 64 3
-  short_send_case multi 47312 300000 4096 4093
-  short_send_case fragmented 47313 20000 7 5
-  short_send_case empty 47314 0 1024 1024
+  short_send_case single "$p1" 64 64 3
+  short_send_case multi "$p2" 300000 4096 4093
+  short_send_case fragmented "$p3" 20000 7 5
+  short_send_case empty "$p4" 0 1024 1024
 elif [ "$mutant" = "truncating-recv" ]; then
   # Every read loses an octet, and the length header is a read (always exactly eight
   # octets, whatever the dialogue carries), so all four cases are caught — the empty
   # dialogue included, because its header is what gets shortened.
-  control_case_caught single 47311 64 64 3
-  control_case_caught multi 47312 300000 4096 4093
-  control_case_caught fragmented 47313 20000 7 5
-  control_case_caught empty 47314 0 1024 1024
+  control_case_caught single "$p1" 64 64 3
+  control_case_caught multi "$p2" 300000 4096 4093
+  control_case_caught fragmented "$p3" 20000 7 5
+  control_case_caught empty "$p4" 0 1024 1024
 else
   # `reordering-recv` also acts on the header, but cannot corrupt it here: the empty
   # dialogue's header is eight zero octets, so swapping its first two changes nothing.
-  control_case_caught single 47311 64 64 3
-  control_case_caught multi 47312 300000 4096 4093
-  control_case_caught fragmented 47313 20000 7 5
-  control_case_still_passes empty 47314 0 1024 1024 \
+  control_case_caught single "$p1" 64 64 3
+  control_case_caught multi "$p2" 300000 4096 4093
+  control_case_caught fragmented "$p3" 20000 7 5
+  control_case_still_passes empty "$p4" 0 1024 1024 \
     "its header is eight zero octets, and swapping two of them is not a change"
 fi
 

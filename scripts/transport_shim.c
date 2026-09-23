@@ -14,9 +14,17 @@
  * makes no protocol decision, holds no state between calls, parses nothing, and
  * has no timeout, buffer pool or partial-transfer policy — every one of those is a
  * decision belonging above the boundary, where a test and a proof can reach it.
- * The two places it has an opinion at all are both documented at the operation:
- * an orderly close is `none` rather than an error, and `send` performs a single
- * syscall and reports what it wrote instead of looping.
+ *
+ * It is a wrapper, but not a bare one. `accept4`, `connect`, `recv` and `send` retry
+ * when a signal interrupts them; `SO_REUSEADDR` is set on the listening socket,
+ * `SOCK_CLOEXEC` on every socket and `MSG_NOSIGNAL` on `send`; a zero-length `recv` is
+ * refused rather than performed; `close` is called once and never retried; an orderly
+ * close is `none` rather than an error; and `send` makes one syscall and reports what
+ * it wrote instead of looping. Each is documented at the operation it belongs to and
+ * enumerated in `lean/Impl/Transport.lean`'s header, which is the disclosure to read
+ * against this file. No count of them appears here: an earlier version of this comment
+ * said "two places", which was true when written and stopped being true when the
+ * retries went in — where prose and this code disagree, the code is the fact.
  *
  * ## Allocation and length discipline
  *
