@@ -78,8 +78,15 @@ therefore:
   `limit:`. A reachable input, two classes, one observable. `Proofs/FrameSendConformance.lean` carries
   that refutation as a theorem, so the day someone weakens the reference rather than fixing it, the
   theorem goes red — which is what a refutation is for.
-* And it reaches the connection instance, whose `ReadersAgree` names the same layer and inherits the
-  receive direction's status: no known divergence, no proof.
+* **And the connection instance's own hypothesis is a frame-layer claim that nothing in the tree
+  produces.** `SpecAMQP.Proofs.ReadersAgree` is `∀ bytes`, the two *frame* readers agree — the
+  reference's answer matched by the specification's, with `FramesAgree` relating the frames, or the same
+  class on refusal — and it is consumed as an argument by `readersAgree_answer_matched` and by
+  `ref_connection_conforms`. **No theorem concludes it**, and the value layer's discharge does not supply
+  it: `ValueLayersAgree` is about the *value* readers, while this demands the stronger `FramesAgree`
+  relation at the frame layer. So the connection instance stays conditional, and **whether it follows from
+  the frame layer's discharge is an open question recorded here rather than assumed** — answered either by
+  deriving it or by a buffer where the stronger relation fails while `ValueLayersAgree` holds.
 
 **What follows was a fix in one of the two readings, and the receive half is done.** Both artefacts
 refused those buffers and differed only about the class, so either one misread the artifact or the
