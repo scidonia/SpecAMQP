@@ -5519,4 +5519,452 @@ theorem readArray_body (F : Nat) (hdec : ElementsDecideBelow F) (decl : Encoding
                         rfl
                     · exact absurd hr (by simp)
 
+/-! ## The element decision, row by row
+
+The decision the element loop and the array body take as `ElementsDecideAt`: one lemma per constructor
+octet, each its own theorem so that the rows that are done are done. A row's content is its declared
+row (a `decide`-checked fact naming the octet's `elementDecl?`), its payload step and its value
+equation; the three stems above are what keeps the shape from being repeated forty times. The rows
+landed here are the twenty whose element data is a payload the two artefacts already read the same way
+- the six zero-width rows, the one-octet payloads, the wide unsigned and `char` widths and the six
+opaque widths; the signed rows, the variable rows, the descriptor prefix and the six container rows are
+owed, and the header's account names them. -/
+
+theorem elementData_ok {g : Nat} {ctor : UInt8} {ed : Option EncodingDecl}
+    (Sv : Value) (Rv : SpecAMQP.Ref.Value) (hval : BodiesAgree Sv Rv)
+    (hspec : ∀ c : Cursor, c.pos ≤ c.data.size → specElementData g ed c = .ok (Sv, c))
+    (href : ∀ c' : SpecAMQP.Ref.Cursor, SpecAMQP.Ref.readElement (g + 1) ctor c' = .ok (Rv, c'))
+    {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c') (hpos : c.pos ≤ c.data.size) :
+    ElementDataAgrees g ctor ed c c' := by
+  constructor
+  · intro other d' h
+    rw [href c'] at h
+    obtain ⟨hother, hcur'⟩ := Prod.mk.inj (Except.ok.inj h)
+    subst hother
+    subst hcur'
+    exact ⟨Sv, c, hspec c hpos, hval, hc, rfl⟩
+  · intro failure h
+    rw [href c'] at h
+    exact absurd h (by simp)
+
+theorem elementData_step {α β : Type} {R : α → β → Prop}
+    {StepS : Cursor → Except Refusal (α × Cursor)}
+    {StepR : SpecAMQP.Ref.Cursor → Except SpecAMQP.Ref.DecodeError (β × SpecAMQP.Ref.Cursor)}
+    {g : Nat} {ctor : UInt8} {ed : Option EncodingDecl}
+    {c : Cursor} {c' : SpecAMQP.Ref.Cursor}
+    (hstep : StepAgreesAt R StepS StepR c c')
+    (Sv : α → Value) (Rv : β → SpecAMQP.Ref.Value)
+    (hval : ∀ (a : α) (b : β), R a b → ∀ f : Cursor, StepS c = .ok (a, f) →
+      BodiesAgree (Sv a) (Rv b))
+    (hspec : ∀ x : Cursor, specElementData g ed x = StepS x >>= fun p => .ok (Sv p.1, p.2))
+    (href : ∀ x' : SpecAMQP.Ref.Cursor,
+      SpecAMQP.Ref.readElement (g + 1) ctor x' = StepR x' >>= fun p => .ok (Rv p.1, p.2)) :
+    ElementDataAgrees g ctor ed c c' := by
+  constructor
+  · intro other d' h
+    rw [href c'] at h
+    obtain ⟨⟨b, d₂'⟩, hb, h⟩ := exists_of_bind_ok h
+    try dsimp only at h
+    obtain ⟨hother, hcur'⟩ := Prod.mk.inj (Except.ok.inj h)
+    subst hother
+    subst hcur'
+    obtain ⟨a, d₂, hf, hrel, hcd, hdat⟩ := hstep.1 b d₂' hb
+    exact ⟨Sv a, d₂, by rw [hspec c, hf, except_bind_ok], hval a b hrel d₂ hf, hcd, hdat⟩
+  · intro failure h
+    rw [href c'] at h
+    cases hb : StepR c' with
+    | error e =>
+      rw [hb, except_bind_error] at h
+      simp only [Except.error.injEq] at h
+      subst h
+      obtain ⟨refusal, hStep, hcl⟩ := hstep.2 e hb
+      exact ⟨refusal, by rw [hspec c, hStep, except_bind_error], hcl⟩
+    | ok p =>
+      rw [hb, except_bind_ok] at h
+      exact absurd h (by simp)
+
+theorem element_0x40 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    (hpos : c.pos ≤ c.data.size) {ed : Option EncodingDecl}
+    (hed : SpecAMQP.Spec.Codec.elementDecl? (0x40 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x40 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x40 : UInt8) = .ok (some ⟨64, none, Generated.Oasis.Category.fixed, 0, "null", "the null value"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_ok (Value.null) (SpecAMQP.Ref.Value.null) (by simp only [BodiesAgree]) ?_ ?_ hc hpos
+  · intro x hx
+    simp only [specElementData, SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    rw [spec_takeBytes_zero x hx, except_bind_ok]
+    rfl
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+
+theorem element_0x41 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    (hpos : c.pos ≤ c.data.size) {ed : Option EncodingDecl}
+    (hed : SpecAMQP.Spec.Codec.elementDecl? (0x41 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x41 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x41 : UInt8) = .ok (some ⟨65, some "true", Generated.Oasis.Category.fixed, 0, "boolean", "the boolean value true"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_ok (Value.boolean true) (SpecAMQP.Ref.Value.boolean true) (by simp only [BodiesAgree]) ?_ ?_ hc hpos
+  · intro x hx
+    simp only [specElementData, SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    rw [spec_takeBytes_zero x hx, except_bind_ok]
+    rfl
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+
+theorem element_0x42 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    (hpos : c.pos ≤ c.data.size) {ed : Option EncodingDecl}
+    (hed : SpecAMQP.Spec.Codec.elementDecl? (0x42 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x42 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x42 : UInt8) = .ok (some ⟨66, some "false", Generated.Oasis.Category.fixed, 0, "boolean", "the boolean value false"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_ok (Value.boolean false) (SpecAMQP.Ref.Value.boolean false) (by simp only [BodiesAgree]) ?_ ?_ hc hpos
+  · intro x hx
+    simp only [specElementData, SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    rw [spec_takeBytes_zero x hx, except_bind_ok]
+    rfl
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+
+theorem element_0x43 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    (hpos : c.pos ≤ c.data.size) {ed : Option EncodingDecl}
+    (hed : SpecAMQP.Spec.Codec.elementDecl? (0x43 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x43 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x43 : UInt8) = .ok (some ⟨67, some "uint0", Generated.Oasis.Category.fixed, 0, "uint", "the uint value 0"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_ok (Value.uint 0) (SpecAMQP.Ref.Value.uint 0) (by simp only [BodiesAgree]; decide) ?_ ?_ hc hpos
+  · intro x hx
+    simp only [specElementData, SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    rw [spec_takeBytes_zero x hx, except_bind_ok]
+    rfl
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+
+theorem element_0x44 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    (hpos : c.pos ≤ c.data.size) {ed : Option EncodingDecl}
+    (hed : SpecAMQP.Spec.Codec.elementDecl? (0x44 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x44 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x44 : UInt8) = .ok (some ⟨68, some "ulong0", Generated.Oasis.Category.fixed, 0, "ulong", "the ulong value 0"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_ok (Value.ulong 0) (SpecAMQP.Ref.Value.ulong 0) (by simp only [BodiesAgree]; decide) ?_ ?_ hc hpos
+  · intro x hx
+    simp only [specElementData, SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    rw [spec_takeBytes_zero x hx, except_bind_ok]
+    rfl
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+
+theorem element_0x45 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    (hpos : c.pos ≤ c.data.size) {ed : Option EncodingDecl}
+    (hed : SpecAMQP.Spec.Codec.elementDecl? (0x45 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x45 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x45 : UInt8) = .ok (some ⟨69, some "list0", Generated.Oasis.Category.fixed, 0, "list", "the empty list (i.e. the list with no elements)"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_ok (Value.list []) (SpecAMQP.Ref.Value.list []) (by simp only [BodiesAgree, BodiesAgreeList]) ?_ ?_ hc hpos
+  · intro x hx
+    simp only [specElementData, SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    rw [spec_takeBytes_zero x hx, except_bind_ok]
+    rfl
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+
+
+/-! ### The one-octet payloads (`0x50`, `0x52`, `0x53`, `0x56`)
+
+One octet, read by the specification through `takeBytes 1` and by the reference through `takeU8`, so the
+relation is `payloadNat` against the octet's own value and the value equations are the width-carrying
+round trips the value arms already use. -/
+
+theorem element_0x50 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0x50 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x50 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x50 : UInt8) =
+      .ok (some ⟨80, none, Generated.Oasis.Category.fixed, 1, "ubyte",
+        "8-bit unsigned integer"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_step (hstep := (stepAgreesAll_takeU8Nat c c' hc))
+    (Sv := fun a => Value.ubyte (payloadNat a)) (Rv := fun b => SpecAMQP.Ref.Value.ubyte b)
+    (hval := fun a b hrel _ _ => by simp only [BodiesAgree]; exact hrel) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨80, none, Generated.Oasis.Category.fixed, 1, "ubyte",
+        "8-bit unsigned integer"⟩) x = SpecAMQP.Spec.Codec.takeBytes 1 x >>= fun p =>
+          .ok (Value.ubyte (payloadNat p.1), p.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+theorem element_0x52 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0x52 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x52 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x52 : UInt8) =
+      .ok (some ⟨82, some "smalluint", Generated.Oasis.Category.fixed, 1, "uint",
+        "unsigned integer value in the range 0 to 255 inclusive"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_step (hstep := (stepAgreesAll_takeU8Nat c c' hc))
+    (Sv := fun a => Value.uint (payloadNat a)) (Rv := fun b => SpecAMQP.Ref.Value.uint b.toUInt32)
+    (hval := fun a b hrel _ _ => by
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact (UInt8.toNat_toUInt32 b).symm) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨82, some "smalluint", Generated.Oasis.Category.fixed, 1,
+        "uint", "unsigned integer value in the range 0 to 255 inclusive"⟩) x =
+        SpecAMQP.Spec.Codec.takeBytes 1 x >>= fun p =>
+          .ok (Value.uint (payloadNat p.1), p.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+theorem element_0x53 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0x53 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x53 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x53 : UInt8) =
+      .ok (some ⟨83, some "smallulong", Generated.Oasis.Category.fixed, 1, "ulong",
+        "unsigned long value in the range 0 to 255 inclusive"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_step (hstep := (stepAgreesAll_takeU8Nat c c' hc))
+    (Sv := fun a => Value.ulong (payloadNat a)) (Rv := fun b => SpecAMQP.Ref.Value.ulong b.toUInt64)
+    (hval := fun a b hrel _ _ => by
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact (UInt8.toNat_toUInt64 b).symm) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨83, some "smallulong", Generated.Oasis.Category.fixed, 1,
+        "ulong", "unsigned long value in the range 0 to 255 inclusive"⟩) x =
+        SpecAMQP.Spec.Codec.takeBytes 1 x >>= fun p =>
+          .ok (Value.ulong (payloadNat p.1), p.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+theorem element_0x56 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0x56 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x56 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x56 : UInt8) =
+      .ok (some ⟨86, none, Generated.Oasis.Category.fixed, 1, "boolean",
+        "boolean with the octet 0x00 being false and octet 0x01 being true"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_step (hstep := (stepAgreesAll_takeU8Nat c c' hc))
+    (Sv := fun a => Value.boolean (payloadNat a != 0))
+    (Rv := fun b => SpecAMQP.Ref.Value.boolean (b != 0x00))
+    (hval := fun a b hrel _ _ => by
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact uint8_ne_zero_bool b) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨86, none, Generated.Oasis.Category.fixed, 1, "boolean",
+        "boolean with the octet 0x00 being false and octet 0x01 being true"⟩) x =
+        SpecAMQP.Spec.Codec.takeBytes 1 x >>= fun p =>
+          .ok (Value.boolean (payloadNat p.1 != 0), p.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+
+theorem element_0x60 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0x60 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x60 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x60 : UInt8) = .ok (some ⟨96, none, Generated.Oasis.Category.fixed, 2, "ushort", "16-bit unsigned integer in network byte order"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_step (hstep := (stepAgreesAll_takeBeNat 2 c c' hc))
+    (Sv := fun a => Value.ushort (payloadNat a)) (Rv := fun n => SpecAMQP.Ref.Value.ushort n.toUInt16)
+    (hval := fun a b hrel f hf => by
+      have hlt : b < 2 ^ 16 := by
+        have h1 := payloadNat_lt_of_takeBytes hf
+        rw [hrel] at h1
+        have h2 : (256 : Nat) ^ 2 = 2 ^ 16 := by decide
+        rw [h2] at h1
+        exact h1
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact (UInt16.toNat_ofNat_of_lt (n := b) hlt).symm) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨96, none, Generated.Oasis.Category.fixed, 2, "ushort", "16-bit unsigned integer in network byte order"⟩) x = SpecAMQP.Spec.Codec.takeBytes 2 x >>= fun p =>
+        .ok (Value.ushort (payloadNat p.1), p.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+theorem element_0x70 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0x70 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x70 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x70 : UInt8) = .ok (some ⟨112, none, Generated.Oasis.Category.fixed, 4, "uint", "32-bit unsigned integer in network byte order"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_step (hstep := (stepAgreesAll_takeBeNat 4 c c' hc))
+    (Sv := fun a => Value.uint (payloadNat a)) (Rv := fun n => SpecAMQP.Ref.Value.uint n.toUInt32)
+    (hval := fun a b hrel f hf => by
+      have hlt : b < 2 ^ 32 := by
+        have h1 := payloadNat_lt_of_takeBytes hf
+        rw [hrel] at h1
+        have h2 : (256 : Nat) ^ 4 = 2 ^ 32 := by decide
+        rw [h2] at h1
+        exact h1
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact (UInt32.toNat_ofNat_of_lt (n := b) hlt).symm) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨112, none, Generated.Oasis.Category.fixed, 4, "uint", "32-bit unsigned integer in network byte order"⟩) x = SpecAMQP.Spec.Codec.takeBytes 4 x >>= fun p =>
+        .ok (Value.uint (payloadNat p.1), p.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+theorem element_0x73 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0x73 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x73 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x73 : UInt8) = .ok (some ⟨115, some "utf32", Generated.Oasis.Category.fixed, 4, "char", "a UTF-32BE encoded Unicode character"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_step (hstep := (stepAgreesAll_takeBeNat 4 c c' hc))
+    (Sv := fun a => Value.char (payloadNat a)) (Rv := fun n => SpecAMQP.Ref.Value.char n.toUInt32)
+    (hval := fun a b hrel f hf => by
+      have hlt : b < 2 ^ 32 := by
+        have h1 := payloadNat_lt_of_takeBytes hf
+        rw [hrel] at h1
+        have h2 : (256 : Nat) ^ 4 = 2 ^ 32 := by decide
+        rw [h2] at h1
+        exact h1
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact (UInt32.toNat_ofNat_of_lt (n := b) hlt).symm) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨115, some "utf32", Generated.Oasis.Category.fixed, 4, "char", "a UTF-32BE encoded Unicode character"⟩) x = SpecAMQP.Spec.Codec.takeBytes 4 x >>= fun p =>
+        .ok (Value.char (payloadNat p.1), p.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+theorem element_0x80 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0x80 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x80 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x80 : UInt8) = .ok (some ⟨128, none, Generated.Oasis.Category.fixed, 8, "ulong", "64-bit unsigned integer in network byte order"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_step (hstep := (stepAgreesAll_takeBeNat 8 c c' hc))
+    (Sv := fun a => Value.ulong (payloadNat a)) (Rv := fun n => SpecAMQP.Ref.Value.ulong n.toUInt64)
+    (hval := fun a b hrel f hf => by
+      have hlt : b < 2 ^ 64 := by
+        have h1 := payloadNat_lt_of_takeBytes hf
+        rw [hrel] at h1
+        have h2 : (256 : Nat) ^ 8 = 2 ^ 64 := by decide
+        rw [h2] at h1
+        exact h1
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact (UInt64.toNat_ofNat_of_lt (n := b) hlt).symm) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨128, none, Generated.Oasis.Category.fixed, 8, "ulong", "64-bit unsigned integer in network byte order"⟩) x = SpecAMQP.Spec.Codec.takeBytes 8 x >>= fun p =>
+        .ok (Value.ulong (payloadNat p.1), p.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+theorem element_0x72 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0x72 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x72 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x72 : UInt8) = .ok (some ⟨114, some "ieee-754", Generated.Oasis.Category.fixed, 4, "float", "IEEE 754-2008 binary32"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_step (hstep := (stepAgreesAll_takeBytes 4 c c' hc))
+    (Sv := fun a => Value.float a) (Rv := fun b => SpecAMQP.Ref.Value.float b)
+    (hval := fun a b hrel _ _ => by simp only [BodiesAgree]; exact hrel) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨114, some "ieee-754", Generated.Oasis.Category.fixed, 4, "float", "IEEE 754-2008 binary32"⟩) x = SpecAMQP.Spec.Codec.takeBytes 4 x >>= fun p =>
+        .ok (Value.float p.1, p.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+theorem element_0x74 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0x74 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x74 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x74 : UInt8) = .ok (some ⟨116, some "ieee-754", Generated.Oasis.Category.fixed, 4, "decimal32", "IEEE 754-2008 decimal32 using the Binary Integer Decimal encoding"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_step (hstep := (stepAgreesAll_takeBytes 4 c c' hc))
+    (Sv := fun a => Value.decimal32 a) (Rv := fun b => SpecAMQP.Ref.Value.decimal32 b)
+    (hval := fun a b hrel _ _ => by simp only [BodiesAgree]; exact hrel) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨116, some "ieee-754", Generated.Oasis.Category.fixed, 4, "decimal32", "IEEE 754-2008 decimal32 using the Binary Integer Decimal encoding"⟩) x = SpecAMQP.Spec.Codec.takeBytes 4 x >>= fun p =>
+        .ok (Value.decimal32 p.1, p.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+theorem element_0x82 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0x82 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x82 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x82 : UInt8) = .ok (some ⟨130, some "ieee-754", Generated.Oasis.Category.fixed, 8, "double", "IEEE 754-2008 binary64"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_step (hstep := (stepAgreesAll_takeBytes 8 c c' hc))
+    (Sv := fun a => Value.double a) (Rv := fun b => SpecAMQP.Ref.Value.double b)
+    (hval := fun a b hrel _ _ => by simp only [BodiesAgree]; exact hrel) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨130, some "ieee-754", Generated.Oasis.Category.fixed, 8, "double", "IEEE 754-2008 binary64"⟩) x = SpecAMQP.Spec.Codec.takeBytes 8 x >>= fun p =>
+        .ok (Value.double p.1, p.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+theorem element_0x84 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0x84 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x84 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x84 : UInt8) = .ok (some ⟨132, some "ieee-754", Generated.Oasis.Category.fixed, 8, "decimal64", "IEEE 754-2008 decimal64 using the Binary Integer Decimal encoding"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_step (hstep := (stepAgreesAll_takeBytes 8 c c' hc))
+    (Sv := fun a => Value.decimal64 a) (Rv := fun b => SpecAMQP.Ref.Value.decimal64 b)
+    (hval := fun a b hrel _ _ => by simp only [BodiesAgree]; exact hrel) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨132, some "ieee-754", Generated.Oasis.Category.fixed, 8, "decimal64", "IEEE 754-2008 decimal64 using the Binary Integer Decimal encoding"⟩) x = SpecAMQP.Spec.Codec.takeBytes 8 x >>= fun p =>
+        .ok (Value.decimal64 p.1, p.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+theorem element_0x94 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0x94 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x94 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x94 : UInt8) = .ok (some ⟨148, some "ieee-754", Generated.Oasis.Category.fixed, 16, "decimal128", "IEEE 754-2008 decimal128 using the Binary Integer Decimal encoding"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_step (hstep := (stepAgreesAll_takeBytes 16 c c' hc))
+    (Sv := fun a => Value.decimal128 a) (Rv := fun b => SpecAMQP.Ref.Value.decimal128 b)
+    (hval := fun a b hrel _ _ => by simp only [BodiesAgree]; exact hrel) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨148, some "ieee-754", Generated.Oasis.Category.fixed, 16, "decimal128", "IEEE 754-2008 decimal128 using the Binary Integer Decimal encoding"⟩) x = SpecAMQP.Spec.Codec.takeBytes 16 x >>= fun p =>
+        .ok (Value.decimal128 p.1, p.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+theorem element_0x98 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0x98 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x98 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x98 : UInt8) = .ok (some ⟨152, none, Generated.Oasis.Category.fixed, 16, "uuid", "UUID as defined in section 4.1.2 of RFC-4122"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_step (hstep := (stepAgreesAll_takeBytes 16 c c' hc))
+    (Sv := fun a => Value.uuid a) (Rv := fun b => SpecAMQP.Ref.Value.uuid b)
+    (hval := fun a b hrel _ _ => by simp only [BodiesAgree]; exact hrel) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨152, none, Generated.Oasis.Category.fixed, 16, "uuid", "UUID as defined in section 4.1.2 of RFC-4122"⟩) x = SpecAMQP.Spec.Codec.takeBytes 16 x >>= fun p =>
+        .ok (Value.uuid p.1, p.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+
 end SpecAMQP.Proofs
