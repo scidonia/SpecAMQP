@@ -175,79 +175,22 @@ def ValueLayersAgree : Prop :=
             SpecAMQP.Spec.Frame.reasonClassOf message)
 ```
 
-```lean
--- lean/Proofs/FrameSendConformance.lean:188  (hypothesis of instance 2)
-def ValueCarrierAgree : Prop :=
-  ∀ (json : Json) (other : SpecAMQP.Ref.Value),
-    SpecAMQP.Ref.Vectors.valueOfJson 64 json = .ok other →
-    ∃ body : SpecAMQP.Spec.Codec.Value,
-      SpecAMQP.Spec.Codec.valueOfJson 64 json = .ok body ∧ BodiesAgree body other
-```
+**The three hypotheses are named here rather than transcribed, and their status as it stands:**
 
-```lean
--- lean/Proofs/FrameSendConformance.lean:202  (hypothesis of instance 2)
-def ValueWriterAgree : Prop :=
-  ∀ (body : SpecAMQP.Spec.Codec.Value) (other : SpecAMQP.Ref.Value),
-    BodiesAgree body other →
-    (∀ octets : Octets, SpecAMQP.Ref.encode other = .ok octets →
-      SpecAMQP.Spec.Codec.encodeValue body = .ok octets) ∧
-    (∀ message : String, SpecAMQP.Ref.encode other = .error message →
-      ∃ specMessage : String,
-        SpecAMQP.Spec.Codec.encodeValue body = .error specMessage ∧
-        SpecAMQP.Spec.Frame.reasonClassOf specMessage =
-          SpecAMQP.Ref.Frame.classOf message)
-```
+- **`ValueCarrierAgree`** (`Proofs/FrameSendConformance.lean`) — **proved**, by `valueCarrierAgree_all`.
+- **`ValueWriterAgree`** (same module) — **undecided**. Its error side was *classed* (the writer now answers with an
+  `EncodeRefusal` carrying `reasonClass`, rather than a `String` whose class had to be recovered by splitting it), the
+  reference's array and zero-width arms were fixed to consult a container's declared constructor, and a refutation with a
+  reachable witness was landed and then **withdrawn in the same slice** once the hole it named was closed. The frame send
+  instance therefore stays conditional.
+- **`ReadersAgree`** (`Proofs/ConnectionConformance.lean`) — **proved**, by `Proofs.readersAgree`.
 
-```lean
--- lean/Proofs/ConnectionConformance.lean:658  (hypothesis of instance 3)
-abbrev ReadersAgree : Prop :=
-  ∀ bytes : Octets,
-    (∀ (rframe : SpecAMQP.Ref.Frame.Frame) (used : Nat),
-        SpecAMQP.Ref.Frame.readFrame bytes = .ok (rframe, used) →
-        ∃ (sframe : SpecAMQP.Spec.Frame.Frame) (consumed : Nat),
-          SpecAMQP.Spec.Frame.readFrame bytes = .ok (sframe, consumed) ∧
-          consumed = used ∧ FramesAgree sframe rframe) ∧
-    (∀ failure : SpecAMQP.Ref.Frame.Refusal,
-        SpecAMQP.Ref.Frame.readFrame bytes = .error failure →
-        ∃ refusal : SpecAMQP.Spec.Frame.Refusal,
-          SpecAMQP.Spec.Frame.readFrame bytes = .error refusal ∧
-          refusal.reasonClass = failure.reasonClass)
-```
-
-Re-locate with `grep -rn "^def ValueLayersAgree\|^def ValueCarrierAgree\|^def ValueWriterAgree\|^abbrev ReadersAgree" lean/Proofs/`.
-`BodiesAgree` is `lean/Proofs/FrameSendConformance.lean:109`; `FrameAgrees` is
-`lean/Proofs/FrameConformance.lean:187`; `FramesAgree` and `ValuesAgree` are
-`lean/Proofs/ConnectionConformance.lean:640` and `:578`.
-
-**No value-layer instance exists.** All three hypotheses are value-layer claims whose proof
-"belongs there" (`grep -n "value-layer claim" lean/Contracts/FrameConformance.lean`),
-and `lean/Contracts/` holds no `Conforms` for the value layer — so today the three instances
-above are conditional on a claim this repository states rather than proves
-(`grep -rn "conformance_public" lean/Contracts/`). See §8 for what discharges it.
-
-## 3. The ledger and the coverage report
-
-`ledger/` is planner-owned; `ledger/clauses.json` keys every normative statement of the vendored
-artifacts, `ledger/coverage.json` is the derived report, `ledger/dispositions/*.json` carry the
-decisions, `ledger/ambiguities/*.json` is the register of places the standard is silent, and
-`ledger/reconciliation.json` explains every difference from `PLAN.md` §1's baseline.
-
-Totals as of the tree at the time of writing:
-
-| Quantity | Value |
-|---|---|
-| clauses | 579 |
-| anchor paths | 234 |
-| MUST-class statements (`MUST` + `MUST NOT`) | 230 |
-| undispositioned MUST-class | the check is the value: `python3 scripts/clause-ledger.py check` |
-| dispositions recorded | 282 in 5 files |
-| by disposition | deferred 129, formalized 64, informative 54, environment 6, underspecified 3, out-of-scope 1, superseded 1, plus 24 picture-review entries |
-| keyword-free but normative (`UNKEYED`) | 178 |
-| pictures: reviewable / total | 23 / 104 |
-
-**Run the check** — offline, standard library only, no shell needed:
-
-```sh
+**The statements themselves are not copied here, and that is a decision with evidence behind it**: each of the three drifted
+within days of being transcribed — the writer's twice, once by a classing and once by a domain restriction — while the
+transcriptions stayed as written. **The module is what a proof is checked against**, so a reader who wants the exact
+statement should take it from the declaration named above (and `#print` it) rather than from prose that was true when it
+was typed.
+sh
 python3 scripts/clause-ledger.py check
 shell bash tests/contracts/s0_sources_ledger.sh   # the same content as a gate, plus planted controls
 ```

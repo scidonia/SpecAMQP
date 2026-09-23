@@ -823,6 +823,25 @@ invisible to every gate into a theorem with a witness. The law's statement is be
 elements — the same shape as `elementDecl?` and patch 3 — and the refutation lands as the record of the state *before* the fix and is then replaced by the proof, with the witness kept in prose, because a
 refutation of a defect that has been fixed argues for a world a later commit changed.
 
+**And the writer law's second cycle closed by removing the hole rather than the refutation.** `ValueWriterAgree` is **undecided** at HEAD: it was *refuted* with a reachable witness — `Ref.encode` of an array
+whose declared constructor is unassigned and whose item list is empty wrote octets that its own reader then refused — the reference's arm was fixed to consult the declared constructor, and the refutation was
+**withdrawn in the same slice**, replaced by `arrayUnassignedEmpty_class_agrees` (the law's error conjunct at the witness, stated in the law's own form) and `ref_encode_unassignedConstructor` (the closure: every
+array whose declared constructor is unassigned, whatever it carries, nested included). The send instance stays conditional, and **the classing removed the *type* obstruction that made its endpoint-level
+refutation inexpressible** — so that refutation is now landable and is not yet landed.
+
+**Why the corpus missed it is a fact about the corpus, and worth the sentence**: **no vector in `vectors/**` uses an unassigned array constructor at all** — the corpus spells `"constructor": "a1"`, `"a3"` and
+assigned siblings — so 68,395 vectors and a 114,225-buffer class sweep said nothing about a hole that one authored vector found immediately. **A corpus that samples a space rather than sweeping it cannot report
+what it never visits**, which is the argument for the widening slice and the reason three defects this session were invisible to every gate.
+
+**And a third family of the same shape is being removed rather than recorded.** The reference writes a four-octet size, count or length through `u32be`, **truncating** where the specification refuses `limit`. The
+octets a truncating writer emits are well-formed and wrong — a reader accepts them and calls the value something else — so it is the same defect as the array hole and the same fix (refuse rather than truncate). Its
+distinguishing feature is that **no term can instantiate it**: a body reaching 2^32 octets is representable in the vocabulary and cannot be constructed, so the law is *unprovable and unrefutable* there until the
+truncation goes. A specification quantified over a domain the assistant can denote but not build is a boundary worth naming.
+
+**And the shadowing hazard bit a third time, by a different mechanism from the first two.** Naming the new classed failure `SpecAMQP.Ref.Refusal` shadowed `SpecAMQP.Harness.Refusal` through an `open` in a file the
+change did not otherwise touch, breaking 23 elaborations. The rule extends: when adding a declaration, grep for `open`s that would **capture** it, not only for modules that **declare** the same name.
+
+
 ## 11. Specification test vectors
 
 One shared format for everything the specification is tested against: NDJSON, schema-validated (`tests/contracts/vector.schema.json`), **logical time only** — timestamps are ordering tags, never wall-clock, so replay is deterministic on any machine.
