@@ -16,7 +16,12 @@
 # itself.
 #
 # The driver reports a case whose listener could not bind as INVALID and exits non-zero for it, so the
-# "the port was busy" failure can never satisfy this gate.
+# "the port was busy" failure can never satisfy this gate. It does collide, though, and systematically rather
+# than rarely: the driver derives its port base from its own pid, which cannot collide with itself but does
+# collide with the *previous* gate in filename order, since `r1_transport_shell.sh` runs immediately before
+# this one and leaves servers alive inside their timeouts. Measured once by running the suite in that order.
+# The driver's own fix — try the next port on a bind failure, deterministically, and print which port it took
+# — is owed; until it lands, a full-suite run reports this gate as INVALID and the reason is not the shell.
 
 set -euo pipefail
 
