@@ -1356,11 +1356,11 @@
    "kind": "MUST",
    "ref": "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:annotations.1",
    "references": [
-    "amqp-error",
+    "amqp-error/choice:not-implemented",
     "symbol",
     "ulong"
    ],
-   "statement_sha256": "b0bd84da5a2f95e625a4f96a0df3d2a8d57c86cebbf2b5ace1d9a35061f7a54d",
+   "statement_sha256": "aebf71ff62f127fc3f8ae5620cddcfa2e2682953c590a1a35024e931aa1d5572",
    "text": "Keys beginning with \"x-opt-\" MUST be ignored if not understood.",
    "text_sha256": "155a5682238451e72caeceb5989fea4344d1cefd35d5448948f2e54f9403db7d"
   },
@@ -1372,7 +1372,7 @@
    "kind": "UNKEYED",
    "ref": "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:annotations.u1",
    "references": [
-    "amqp-error",
+    "amqp-error/choice:not-implemented",
     "symbol",
     "ulong"
    ],
@@ -1391,13 +1391,13 @@
    "kind": "MUST",
    "ref": "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:annotations.2",
    "references": [
-    "amqp-error",
+    "amqp-error/choice:not-implemented",
     "symbol",
     "ulong"
    ],
-   "statement_sha256": "b0bd84da5a2f95e625a4f96a0df3d2a8d57c86cebbf2b5ace1d9a35061f7a54d",
-   "text": "On receiving an annotation key which is not understood, and which does not begin with \"x-opt\", the receiving AMQP container MUST detach the link with a \u00abamqp-error\u00bb error.",
-   "text_sha256": "475f98f9e3c9fee9793b7b6e4c0dea4f295116718976e5ffd37290fddee5ff3e"
+   "statement_sha256": "aebf71ff62f127fc3f8ae5620cddcfa2e2682953c590a1a35024e931aa1d5572",
+   "text": "On receiving an annotation key which is not understood, and which does not begin with \"x-opt\", the receiving AMQP container MUST detach the link with a \u00abnot-implemented\u00bb error.",
+   "text_sha256": "bb2a4fc7ed91f09d14f03246695adfb5a2899fdde5d7045ca70756d74ffd5be6"
   },
   {
    "anchor": "amqp:messaging/section:message-format/type:delivery-annotations",
@@ -1515,10 +1515,10 @@
    "kind": "MUST NOT",
    "ref": "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:durable.1",
    "references": [
-    "amqp-error",
+    "amqp-error/choice:precondition-failed",
     "rejected"
    ],
-   "statement_sha256": "15369a6d51bfd139c2b2dcfb86b6fbe102b553272e6cf568a37acb91569ec0f5",
+   "statement_sha256": "70ec29d6446819cf6a799659eb5e5bcec965277ca437cfdbba25d5bd56c57a19",
    "text": "Durable messages MUST NOT be lost even if an intermediary is unexpectedly terminated and restarted.",
    "text_sha256": "7e1587a646699cb8604115b7fb7e0b63f39c2d22c6001dc001846788e1b5517c"
   },
@@ -1530,12 +1530,12 @@
    "kind": "MUST NOT",
    "ref": "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:durable.2",
    "references": [
-    "amqp-error",
+    "amqp-error/choice:precondition-failed",
     "rejected"
    ],
-   "statement_sha256": "15369a6d51bfd139c2b2dcfb86b6fbe102b553272e6cf568a37acb91569ec0f5",
-   "text": "A target which is not capable of fulfilling this guarantee MUST NOT accept messages where the durable header is set to true: if the source allows the \u00abrejected\u00bb outcome then the message SHOULD be rejected with the \u00abamqp-error\u00bb error, otherwise the link MUST be detached by the receiver with the same error.",
-   "text_sha256": "4c08dac3334f8132f0bbcba2a94cc7bfb10f2fe84c9fd38ed2c5ae021bd778f5"
+   "statement_sha256": "70ec29d6446819cf6a799659eb5e5bcec965277ca437cfdbba25d5bd56c57a19",
+   "text": "A target which is not capable of fulfilling this guarantee MUST NOT accept messages where the durable header is set to true: if the source allows the \u00abrejected\u00bb outcome then the message SHOULD be rejected with the \u00abprecondition-failed\u00bb error, otherwise the link MUST be detached by the receiver with the same error.",
+   "text_sha256": "1b567685e9f8846144f1b1d844ff335967f2f48ba372dfc98fe8a3fc6a6d0a73"
   },
   {
    "anchor": "amqp:messaging/section:message-format/type:header/field:durable",
@@ -1545,12 +1545,12 @@
    "kind": "SHOULD",
    "ref": "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:durable.3",
    "references": [
-    "amqp-error",
+    "amqp-error/choice:precondition-failed",
     "rejected"
    ],
-   "statement_sha256": "15369a6d51bfd139c2b2dcfb86b6fbe102b553272e6cf568a37acb91569ec0f5",
-   "text": "A target which is not capable of fulfilling this guarantee MUST NOT accept messages where the durable header is set to true: if the source allows the \u00abrejected\u00bb outcome then the message SHOULD be rejected with the \u00abamqp-error\u00bb error, otherwise the link MUST be detached by the receiver with the same error.",
-   "text_sha256": "4c08dac3334f8132f0bbcba2a94cc7bfb10f2fe84c9fd38ed2c5ae021bd778f5"
+   "statement_sha256": "70ec29d6446819cf6a799659eb5e5bcec965277ca437cfdbba25d5bd56c57a19",
+   "text": "A target which is not capable of fulfilling this guarantee MUST NOT accept messages where the durable header is set to true: if the source allows the \u00abrejected\u00bb outcome then the message SHOULD be rejected with the \u00abprecondition-failed\u00bb error, otherwise the link MUST be detached by the receiver with the same error.",
+   "text_sha256": "1b567685e9f8846144f1b1d844ff335967f2f48ba372dfc98fe8a3fc6a6d0a73"
   },
   {
    "anchor": "amqp:messaging/section:message-format/type:header/field:durable",
@@ -1560,12 +1560,12 @@
    "kind": "MUST",
    "ref": "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:durable.4",
    "references": [
-    "amqp-error",
+    "amqp-error/choice:precondition-failed",
     "rejected"
    ],
-   "statement_sha256": "15369a6d51bfd139c2b2dcfb86b6fbe102b553272e6cf568a37acb91569ec0f5",
-   "text": "A target which is not capable of fulfilling this guarantee MUST NOT accept messages where the durable header is set to true: if the source allows the \u00abrejected\u00bb outcome then the message SHOULD be rejected with the \u00abamqp-error\u00bb error, otherwise the link MUST be detached by the receiver with the same error.",
-   "text_sha256": "4c08dac3334f8132f0bbcba2a94cc7bfb10f2fe84c9fd38ed2c5ae021bd778f5"
+   "statement_sha256": "70ec29d6446819cf6a799659eb5e5bcec965277ca437cfdbba25d5bd56c57a19",
+   "text": "A target which is not capable of fulfilling this guarantee MUST NOT accept messages where the durable header is set to true: if the source allows the \u00abrejected\u00bb outcome then the message SHOULD be rejected with the \u00abprecondition-failed\u00bb error, otherwise the link MUST be detached by the receiver with the same error.",
+   "text_sha256": "1b567685e9f8846144f1b1d844ff335967f2f48ba372dfc98fe8a3fc6a6d0a73"
   },
   {
    "anchor": "amqp:messaging/section:message-format/type:header/field:first-acquirer",
@@ -2728,9 +2728,9 @@
    "kind": "MUST",
    "ref": "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:coordination/type:declare/field:global-id.1",
    "references": [
-    "txn-capability"
+    "txn-capability/choice:distributed-transactions"
    ],
-   "statement_sha256": "a9d6e521d27abb6c9118e443a025b32190876357575981650fcfe9f1f18a9567",
+   "statement_sha256": "8831994551c8c36dd5aa00c1ef59330168f10d29a3d579610914b2de8b2929d6",
    "text": "Specifies that the txn-id allocated by this declare MUST be associated with the indicated global transaction.",
    "text_sha256": "c8627220eefb4aed8d14452a4bf838bbf5989d7cb4c341cb34e1125e5bc81036"
   },
@@ -2742,11 +2742,11 @@
    "kind": "MUST NOT",
    "ref": "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:coordination/type:declare/field:global-id.2",
    "references": [
-    "txn-capability"
+    "txn-capability/choice:distributed-transactions"
    ],
-   "statement_sha256": "a9d6e521d27abb6c9118e443a025b32190876357575981650fcfe9f1f18a9567",
-   "text": "This field MUST NOT be set if the coordinator does not have the \u00abtxn-capability\u00bb capability.",
-   "text_sha256": "6b3f68c2b03e7aea14192669f76066cd383feec7939376031d0e040a507ac064"
+   "statement_sha256": "8831994551c8c36dd5aa00c1ef59330168f10d29a3d579610914b2de8b2929d6",
+   "text": "This field MUST NOT be set if the coordinator does not have the \u00abdistributed-transactions\u00bb capability.",
+   "text_sha256": "9c425f05eb4d566b0fc63ccd07a8f43cffc2f5acf043d5114d2f531c2e93d7a5"
   },
   {
    "anchor": "amqp:transactions/section:coordination/type:discharge/field:fail",
@@ -3238,11 +3238,11 @@
    "kind": "MUST",
    "ref": "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.2",
    "references": [
-    "transaction-error",
+    "transaction-error/choice:transaction-rollback",
     "transactional-state",
     "transfer"
    ],
-   "statement_sha256": "1b3a500be5bee5426f9ba0bdf9420eb01eb6dbda1d6eeaffdd98959bf6946faa",
+   "statement_sha256": "36cc828655f67c952792265b8cce0fc85e990bb660a95736be45d92539aa9374",
    "text": "If the transaction controller wishes to associate an outgoing \u00abtransfer\u00bb with a transaction, it MUST set the state of the transfer with a \u00abtransactional-state\u00bb carrying the appropriate transaction identifier.",
    "text_sha256": "2a131d83be0814a74cef4e17d7960009ce5f74a77edb2d36accc9d853c259721"
   },
@@ -3254,7 +3254,7 @@
    "kind": "UNKEYED",
    "ref": "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.u2",
    "references": [
-    "transaction-error",
+    "transaction-error/choice:transaction-rollback",
     "transactional-state",
     "transfer"
    ],
@@ -3273,11 +3273,11 @@
    "kind": "MUST",
    "ref": "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.3",
    "references": [
-    "transaction-error",
+    "transaction-error/choice:transaction-rollback",
     "transactional-state",
     "transfer"
    ],
-   "statement_sha256": "1b3a500be5bee5426f9ba0bdf9420eb01eb6dbda1d6eeaffdd98959bf6946faa",
+   "statement_sha256": "36cc828655f67c952792265b8cce0fc85e990bb660a95736be45d92539aa9374",
    "text": "Note that if delivery is split across several \u00abtransfer\u00bb frames then all frames MUST be explicitly associated with the same transaction.",
    "text_sha256": "124522050efce6fbe424dabb6e6e7addf744881c18f684ba5023534195196dcd"
   },
@@ -3304,13 +3304,13 @@
    "kind": "MUST",
    "ref": "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.4",
    "references": [
-    "transaction-error",
+    "transaction-error/choice:transaction-rollback",
     "transactional-state",
     "transfer"
    ],
-   "statement_sha256": "1b3a500be5bee5426f9ba0bdf9420eb01eb6dbda1d6eeaffdd98959bf6946faa",
-   "text": "If this happens, the control link MUST be terminated with the \u00abtransaction-error\u00bb error.",
-   "text_sha256": "ed56101244d7afadcaf78be7e6dd27fbef5dd1a21a486351afea28c36489db5c"
+   "statement_sha256": "36cc828655f67c952792265b8cce0fc85e990bb660a95736be45d92539aa9374",
+   "text": "If this happens, the control link MUST be terminated with the \u00abtransaction-rollback\u00bb error.",
+   "text_sha256": "67515942059ecfa1029f0fa1c6a04976fde87130e4c66bd1e6163c9fd46de705"
   },
   {
    "anchor": "amqp:transactions/section:txn-work",
@@ -3400,9 +3400,9 @@
    "kind": "MUST NOT",
    "ref": "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.7",
    "references": [
-    "transaction-error"
+    "transaction-error/choice:transaction-rollback"
    ],
-   "statement_sha256": "fb399ddbd825411de80e02ab9145b906dd637249dfe9a75b3ad113220156fa3c",
+   "statement_sha256": "32411d742a2fe5f3a1bb8f198ba55b6f3f6e80e8872e3ecfdc4ce0b73825578d",
    "text": "However, the delivery MUST NOT be associated with a different non-discharged transaction than the outcome.",
    "text_sha256": "de481c15dc949fe565f7723678cf2ff0de1497e0aaf7b98b466f25060b6016f0"
   },
@@ -3429,11 +3429,11 @@
    "kind": "MUST",
    "ref": "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.8",
    "references": [
-    "transaction-error"
+    "transaction-error/choice:transaction-rollback"
    ],
-   "statement_sha256": "fb399ddbd825411de80e02ab9145b906dd637249dfe9a75b3ad113220156fa3c",
-   "text": "If this happens then the control link MUST be terminated with a \u00abtransaction-error\u00bb error.",
-   "text_sha256": "3025689e69f8f5887ec85d5b795d772c5b57b49342242e52075e2513237a9c92"
+   "statement_sha256": "32411d742a2fe5f3a1bb8f198ba55b6f3f6e80e8872e3ecfdc4ce0b73825578d",
+   "text": "If this happens then the control link MUST be terminated with a \u00abtransaction-rollback\u00bb error.",
+   "text_sha256": "f0fd2828322a7f166e997794c145a1696a1581be4ae8351c924c6822a28c058f"
   },
   {
    "anchor": "amqp:transactions/section:txn-work",
@@ -3458,11 +3458,11 @@
    "kind": "MUST",
    "ref": "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.9",
    "references": [
-    "amqp-error"
+    "amqp-error/choice:not-implemented"
    ],
-   "statement_sha256": "c04b4f68aa9a5ae80137b667a27db6296468baaaa762810f81515146640ba4e2",
-   "text": "If the link endpoint does not support transactional acquisition, the link MUST be terminated with a \u00abamqp-error\u00bb error.",
-   "text_sha256": "c04b4f68aa9a5ae80137b667a27db6296468baaaa762810f81515146640ba4e2"
+   "statement_sha256": "1978622f7817594e7506b3e171d949d505efb8280ccb9c8b3b4a42bd62ee8d07",
+   "text": "If the link endpoint does not support transactional acquisition, the link MUST be terminated with a \u00abnot-implemented\u00bb error.",
+   "text_sha256": "1978622f7817594e7506b3e171d949d505efb8280ccb9c8b3b4a42bd62ee8d07"
   },
   {
    "anchor": "amqp:transactions/section:txn-work",
@@ -4995,7 +4995,7 @@
    "kind": "UNKEYED",
    "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.u1",
    "references": [
-    "link-error"
+    "link-error/choice:stolen"
    ],
    "statement_sha256": "80cbe63b7f8ae3d37842db01c699499fdd6174c727d21478b8425ca59c6e7dad",
    "text": "Consequently, a link can only be active in one connection at a time.",
@@ -5012,11 +5012,11 @@
    "kind": "MUST",
    "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.2",
    "references": [
-    "link-error"
+    "link-error/choice:stolen"
    ],
-   "statement_sha256": "4c86c0f4facaea9e3c449ac7b91e38a59c423b51cfd94f6e26ef128c91420754",
-   "text": "If an attempt is made to attach the link subsequently when it is not suspended, then the link can be 'stolen', i.e., the second attach succeeds and the first attach MUST then be closed with a link error of \u00ablink-error\u00bb.",
-   "text_sha256": "39b86a096396de45b474c0f912912baa70d5c08e429e45ff1aa6da0d909f2082"
+   "statement_sha256": "4028da0e0f1d7f960da5f678c80dd730d82403030e466c59012d211ed226b278",
+   "text": "If an attempt is made to attach the link subsequently when it is not suspended, then the link can be 'stolen', i.e., the second attach succeeds and the first attach MUST then be closed with a link error of \u00abstolen\u00bb.",
+   "text_sha256": "7f5a409c32ee9925c6a6a226f2c8c6f3fde9cfbe66bce21a6e31f831ae140349"
   },
   {
    "anchor": "amqp:transport/section:links",
@@ -5301,9 +5301,9 @@
    "references": [
     "attach",
     "detach",
-    "session-error"
+    "session-error/choice:errant-link"
    ],
-   "statement_sha256": "5145958a6601aca8a5f3dc967291a1f73e7b0b6a0b95d1cca8754bb19decabc6",
+   "statement_sha256": "bc2a5f8d5248a1936ca27dccd4fcf513b09bc569d834558c10b56ea4173d53b6",
    "text": "When an error occurs at a link endpoint, the endpoint MUST be detached with appropriate error information supplied in the error field of the \u00abdetach\u00bb frame.",
    "text_sha256": "dea021b92bcb97a43439b2ef2949e58d05a275970344180d2d60ad8498b2f03b"
   },
@@ -5317,9 +5317,9 @@
    "references": [
     "attach",
     "detach",
-    "session-error"
+    "session-error/choice:errant-link"
    ],
-   "statement_sha256": "5145958a6601aca8a5f3dc967291a1f73e7b0b6a0b95d1cca8754bb19decabc6",
+   "statement_sha256": "bc2a5f8d5248a1936ca27dccd4fcf513b09bc569d834558c10b56ea4173d53b6",
    "text": "The link endpoint MUST then be destroyed.",
    "text_sha256": "ff8fb5b3f81d9ec41a059ab57dd9668ad56065bdc0b3602df0ae2145a36a5544"
   },
@@ -5333,11 +5333,11 @@
    "references": [
     "attach",
     "detach",
-    "session-error"
+    "session-error/choice:errant-link"
    ],
-   "statement_sha256": "5145958a6601aca8a5f3dc967291a1f73e7b0b6a0b95d1cca8754bb19decabc6",
-   "text": "If any input (other than a detach) related to the endpoint either via the input handle or delivery-ids be received, the session MUST be terminated with an \u00absession-error\u00bb session-error.",
-   "text_sha256": "7557c5963db758e5e556c2b93672c7bb1e3b4fffeec828d49374ed7f331c9d90"
+   "statement_sha256": "bc2a5f8d5248a1936ca27dccd4fcf513b09bc569d834558c10b56ea4173d53b6",
+   "text": "If any input (other than a detach) related to the endpoint either via the input handle or delivery-ids be received, the session MUST be terminated with an \u00aberrant-link\u00bb session-error.",
+   "text_sha256": "404f14ef26120eedfb8350bb859bd8fd454e343653edb1464b0ffbc9d328651c"
   },
   {
    "anchor": "amqp:transport/section:links",
@@ -5349,9 +5349,9 @@
    "references": [
     "attach",
     "detach",
-    "session-error"
+    "session-error/choice:errant-link"
    ],
-   "statement_sha256": "5145958a6601aca8a5f3dc967291a1f73e7b0b6a0b95d1cca8754bb19decabc6",
+   "statement_sha256": "bc2a5f8d5248a1936ca27dccd4fcf513b09bc569d834558c10b56ea4173d53b6",
    "text": "Since the link endpoint has been destroyed, the peer cannot reattach, and MUST resume the link in order to restore communication.",
    "text_sha256": "e0926f88699e41138bfc126c110866cb72d72f8e295cf53dbd870a5192c42d2c"
   },
@@ -5365,9 +5365,9 @@
    "references": [
     "attach",
     "detach",
-    "session-error"
+    "session-error/choice:errant-link"
    ],
-   "statement_sha256": "5145958a6601aca8a5f3dc967291a1f73e7b0b6a0b95d1cca8754bb19decabc6",
+   "statement_sha256": "bc2a5f8d5248a1936ca27dccd4fcf513b09bc569d834558c10b56ea4173d53b6",
    "text": "In order to disambiguate the resume request from a pipelined re-attach the resuming \u00abattach\u00bb performative MUST contain a non-null value for its unsettled field.",
    "text_sha256": "053cdb007b98d30f96c73894c15d308c61233b531d6fb3bbea72ff519609c11a"
   },
@@ -5381,11 +5381,11 @@
    "references": [
     "attach",
     "detach",
-    "session-error"
+    "session-error/choice:errant-link"
    ],
-   "statement_sha256": "5145958a6601aca8a5f3dc967291a1f73e7b0b6a0b95d1cca8754bb19decabc6",
-   "text": "Receipt of a pipelined \u00abattach\u00bb MUST result in the session being terminated with an \u00absession-error\u00bb session-error.",
-   "text_sha256": "8e96ff83b68b05ea41342fada9b2804c156662bc45e7eacd13cd515f0e0e9159"
+   "statement_sha256": "bc2a5f8d5248a1936ca27dccd4fcf513b09bc569d834558c10b56ea4173d53b6",
+   "text": "Receipt of a pipelined \u00abattach\u00bb MUST result in the session being terminated with an \u00aberrant-link\u00bb session-error.",
+   "text_sha256": "e37ed3aa09b4f038432ae6582af8ae39beacf77fb26a7a0ea75e42c2e267de32"
   },
   {
    "anchor": "amqp:transport/section:links",
@@ -6203,11 +6203,11 @@
    "kind": "MAY",
    "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:attach/field:unsettled.3",
    "references": [
-    "amqp-error"
+    "amqp-error/choice:frame-size-too-small"
    ],
-   "statement_sha256": "29908a0efd8f67a283eb4593519e31b40c814e2c7ed72d2d87f051dec1e75477",
-   "text": "If the local unsettled map is too large to be encoded within a frame of the agreed maximum frame size then the session MAY be ended with the \u00abamqp-error\u00bb error.",
-   "text_sha256": "2c64fd25a10ee34c5b227a2086a503cbee8f9de34a116c4c300024835a2a9d7d"
+   "statement_sha256": "45693eb2f985cf218309a3b63aad2755a10dea135c3518c4d560cffe5f85c8f2",
+   "text": "If the local unsettled map is too large to be encoded within a frame of the agreed maximum frame size then the session MAY be ended with the \u00abframe-size-too-small\u00bb error.",
+   "text_sha256": "60a14607b12d7a1ad0a2453c74514f2ce1f634c4cce8741b890dcbd4051c2f14"
   },
   {
    "anchor": "amqp:transport/section:performatives/type:attach/field:unsettled",
@@ -6217,9 +6217,9 @@
    "kind": "SHOULD",
    "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:attach/field:unsettled.4",
    "references": [
-    "amqp-error"
+    "amqp-error/choice:frame-size-too-small"
    ],
-   "statement_sha256": "29908a0efd8f67a283eb4593519e31b40c814e2c7ed72d2d87f051dec1e75477",
+   "statement_sha256": "45693eb2f985cf218309a3b63aad2755a10dea135c3518c4d560cffe5f85c8f2",
    "text": "The endpoint SHOULD make use of the ability to send an incomplete unsettled map (see below) to avoid sending an error.",
    "text_sha256": "6e98a6aa1adaebab8cd6f362e6a8e93f894c47544f1efbc9b32fa60b9ea3bcdc"
   },
@@ -6594,11 +6594,11 @@
    "kind": "MUST",
    "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:handle.1",
    "references": [
-    "session-error"
+    "session-error/choice:unattached-handle"
    ],
-   "statement_sha256": "2f7e8e501648c06d0192eed034481fcff456cfbe888d1b0d70193f221429a9e6",
-   "text": "If set to a handle that is not currently associated with an attached link, the recipient MUST respond by ending the session with an \u00absession-error\u00bb session error.",
-   "text_sha256": "2f7e8e501648c06d0192eed034481fcff456cfbe888d1b0d70193f221429a9e6"
+   "statement_sha256": "92c400d488db74e9cb9e4b8e782cb066511748d7afaabec5767ed69c89e95f49",
+   "text": "If set to a handle that is not currently associated with an attached link, the recipient MUST respond by ending the session with an \u00abunattached-handle\u00bb session error.",
+   "text_sha256": "92c400d488db74e9cb9e4b8e782cb066511748d7afaabec5767ed69c89e95f49"
   },
   {
    "anchor": "amqp:transport/section:performatives/type:flow/field:link-credit",
@@ -7242,11 +7242,11 @@
    "kind": "MUST",
    "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:rcv-settle-mode.1",
    "references": [
-    "receiver-settle-mode"
+    "receiver-settle-mode/choice:first"
    ],
-   "statement_sha256": "3c136f9b2a1dd8f2d074b0cf77f2ad686cda54b05961100ea4404c0245d8c23f",
-   "text": "If \u00abreceiver-settle-mode\u00bb, this indicates that the receiver MUST settle the delivery once it has arrived without waiting for the sender to settle first.",
-   "text_sha256": "3c136f9b2a1dd8f2d074b0cf77f2ad686cda54b05961100ea4404c0245d8c23f"
+   "statement_sha256": "cd296d39539a2fb04ebcb46420845abe3fad25e24a93f45275972d308ad3cf0d",
+   "text": "If \u00abfirst\u00bb, this indicates that the receiver MUST settle the delivery once it has arrived without waiting for the sender to settle first.",
+   "text_sha256": "cd296d39539a2fb04ebcb46420845abe3fad25e24a93f45275972d308ad3cf0d"
   },
   {
    "anchor": "amqp:transport/section:performatives/type:transfer/field:rcv-settle-mode",
@@ -7256,11 +7256,12 @@
    "kind": "UNKEYED",
    "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:rcv-settle-mode.u1",
    "references": [
-    "receiver-settle-mode"
+    "receiver-settle-mode/choice:first",
+    "receiver-settle-mode/choice:second"
    ],
-   "statement_sha256": "3c3963c72790e68e044e90698a8af94075b745447ee6d39d60fec1aa4adb8ef3",
-   "text": "If the negotiated link value is \u00abreceiver-settle-mode\u00bb, then it is illegal to set this field to \u00abreceiver-settle-mode\u00bb.",
-   "text_sha256": "3c3963c72790e68e044e90698a8af94075b745447ee6d39d60fec1aa4adb8ef3",
+   "statement_sha256": "21e8ebd42fecf76f9f8f1c83e95306e873f4ff715a5d1ac242d01c1e9f061186",
+   "text": "If the negotiated link value is \u00abfirst\u00bb, then it is illegal to set this field to \u00absecond\u00bb.",
+   "text_sha256": "21e8ebd42fecf76f9f8f1c83e95306e873f4ff715a5d1ac242d01c1e9f061186",
    "unkeyed_phrases": [
     "then it is"
    ]
@@ -7273,11 +7274,11 @@
    "kind": "MUST NOT",
    "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:rcv-settle-mode.2",
    "references": [
-    "receiver-settle-mode"
+    "receiver-settle-mode/choice:second"
    ],
-   "statement_sha256": "a3f8555bffb469fd01400b988fe3f3d06c5e7b1e6cdc83680206ecce2ebf7b37",
-   "text": "If \u00abreceiver-settle-mode\u00bb, this indicates that the receiver MUST NOT settle until sending its disposition to the sender and receiving a settled disposition from the sender.",
-   "text_sha256": "a3f8555bffb469fd01400b988fe3f3d06c5e7b1e6cdc83680206ecce2ebf7b37"
+   "statement_sha256": "978d0fdac88234f75b34d2cdb9542fe2b2f9d2c48e46187e64bac70dc895049d",
+   "text": "If \u00absecond\u00bb, this indicates that the receiver MUST NOT settle until sending its disposition to the sender and receiving a settled disposition from the sender.",
+   "text_sha256": "978d0fdac88234f75b34d2cdb9542fe2b2f9d2c48e46187e64bac70dc895049d"
   },
   {
    "anchor": "amqp:transport/section:performatives/type:transfer/field:rcv-settle-mode",
@@ -7425,11 +7426,11 @@
    "kind": "MUST",
    "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:settled.4",
    "references": [
-    "sender-settle-mode"
+    "sender-settle-mode/choice:settled"
    ],
-   "statement_sha256": "5162f8c1fc8dce2f873d20244cbafa8ae651f1d059664d2e1e3476ea7fb51f41",
-   "text": "If the negotiated value for snd-settle-mode at attachment is \u00absender-settle-mode\u00bb, then this field MUST be true on at least one transfer frame for a delivery (i.e., the delivery MUST be settled at the sender at the point the delivery has been completely transferred).",
-   "text_sha256": "5162f8c1fc8dce2f873d20244cbafa8ae651f1d059664d2e1e3476ea7fb51f41"
+   "statement_sha256": "1e792e6e05999409e27149c7e496cc61e6b96f6841a248732d64cfb7125fc1f5",
+   "text": "If the negotiated value for snd-settle-mode at attachment is \u00absettled\u00bb, then this field MUST be true on at least one transfer frame for a delivery (i.e., the delivery MUST be settled at the sender at the point the delivery has been completely transferred).",
+   "text_sha256": "1e792e6e05999409e27149c7e496cc61e6b96f6841a248732d64cfb7125fc1f5"
   },
   {
    "anchor": "amqp:transport/section:performatives/type:transfer/field:settled",
@@ -7439,11 +7440,11 @@
    "kind": "MUST",
    "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:settled.5",
    "references": [
-    "sender-settle-mode"
+    "sender-settle-mode/choice:settled"
    ],
-   "statement_sha256": "5162f8c1fc8dce2f873d20244cbafa8ae651f1d059664d2e1e3476ea7fb51f41",
-   "text": "If the negotiated value for snd-settle-mode at attachment is \u00absender-settle-mode\u00bb, then this field MUST be true on at least one transfer frame for a delivery (i.e., the delivery MUST be settled at the sender at the point the delivery has been completely transferred).",
-   "text_sha256": "5162f8c1fc8dce2f873d20244cbafa8ae651f1d059664d2e1e3476ea7fb51f41"
+   "statement_sha256": "1e792e6e05999409e27149c7e496cc61e6b96f6841a248732d64cfb7125fc1f5",
+   "text": "If the negotiated value for snd-settle-mode at attachment is \u00absettled\u00bb, then this field MUST be true on at least one transfer frame for a delivery (i.e., the delivery MUST be settled at the sender at the point the delivery has been completely transferred).",
+   "text_sha256": "1e792e6e05999409e27149c7e496cc61e6b96f6841a248732d64cfb7125fc1f5"
   },
   {
    "anchor": "amqp:transport/section:performatives/type:transfer/field:settled",
@@ -7453,11 +7454,11 @@
    "kind": "MUST",
    "ref": "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:settled.6",
    "references": [
-    "sender-settle-mode"
+    "sender-settle-mode/choice:unsettled"
    ],
-   "statement_sha256": "b66599bad03ca0054397ec328f7157971e9b6e9da54d50db1ad641bc91feab35",
-   "text": "If the negotiated value for snd-settle-mode at attachment is \u00absender-settle-mode\u00bb, then this field MUST be false (or unset) on every transfer frame for a delivery (unless the delivery is aborted).",
-   "text_sha256": "b66599bad03ca0054397ec328f7157971e9b6e9da54d50db1ad641bc91feab35"
+   "statement_sha256": "a238ee047d7824eb826403c5a812bb23c5c693b57dd8be1457c780b09f4f8d8b",
+   "text": "If the negotiated value for snd-settle-mode at attachment is \u00abunsettled\u00bb, then this field MUST be false (or unset) on every transfer frame for a delivery (unless the delivery is aborted).",
+   "text_sha256": "a238ee047d7824eb826403c5a812bb23c5c693b57dd8be1457c780b09f4f8d8b"
   },
   {
    "anchor": "amqp:transport/section:sessions",
