@@ -290,6 +290,68 @@
           # through elan and try to download a toolchain during an offline run.
           export PATH="${leanDistribution}/bin''${PATH:+:$PATH}"
 
+          # Lean elaborates with every core it can find, which on a working
+          # desktop starves interactive audio and editors for minutes at a time.
+          # `lake` and `lean` are therefore wrapped to run under `nice -n 19` by
+          # default. The wrapper execs the pinned binary by absolute path, so the
+          # tool, its version, arguments, output and exit status are the pinned
+          # ones and only the scheduling priority differs; elaboration then
+          # consumes genuinely idle CPU and yields to anything interactive.
+          #
+          # Targets are written from `${leanDistribution}/bin`, never from a
+          # `command -v` lookup. A lookup can return an exported shell function's
+          # name, or some other host tool of the same name, and a wrapper built
+          # from that re-enters itself instead of reaching the pinned binary.
+          # Installation is all-or-nothing for the same kind of reason: a shell
+          # that announces low-priority Lean and then runs it at normal priority
+          # is reporting success for something it did not do.
+          #
+          # Applied to every command this shell runs, interactive or not. The
+          # classification is per repository and rests on that repository's
+          # evidence contract: nothing here compares a recorded environment.
+          # `s0_lean_environment.sh` reads `lean --version` and the planner-owned
+          # manifest rather than executable-path identity, and the wrapper execs
+          # the same pinned store binary unchanged, so what a contract observes is
+          # unchanged by construction. SPECAMQP_LEAN_NICE=0 is the only opt-out:
+          # set it before entering the shell for a diagnostic or evidence shell
+          # that must see an unmodified PATH.
+          if [ "''${SPECAMQP_LEAN_NICE:-1}" != "0" ]; then
+            spec_nice_dir="''${TMPDIR:-/tmp}/specamqp-lean-nice"
+            spec_nice_failure=""
+            mkdir -p "$spec_nice_dir" || spec_nice_failure="mkdir -p $spec_nice_dir"
+            if [ -z "$spec_nice_failure" ]; then
+              for spec_tool in lake lean; do
+                printf '#!/bin/sh\nexec nice -n 19 %s "$@"\n' "${leanDistribution}/bin/$spec_tool" \
+                  >"$spec_nice_dir/$spec_tool" &&
+                  chmod +x "$spec_nice_dir/$spec_tool" ||
+                  { spec_nice_failure="installing the $spec_tool wrapper in $spec_nice_dir"; break; }
+              done
+            fi
+            if [ -z "$spec_nice_failure" ]; then
+              export PATH="$spec_nice_dir:$PATH"
+              # The pinned toolchain must win, which the PATH entry above only
+              # achieves against executables: in bash a function beats a PATH
+              # entry, so an inherited `lake` function would shadow the shim and
+              # silently run an unniced, possibly unrelated tool. These
+              # definitions close that hole. `export -n` matters: redefining an
+              # imported exported function would otherwise inherit its export
+              # attribute and hand the function to every child shell, so
+              # clearing it is what keeps child processes resolving through the
+              # shim.
+              lake() { command "${pkgs.coreutils}/bin/nice" -n 19 "${leanDistribution}/bin/lake" "$@"; }
+              lean() { command "${pkgs.coreutils}/bin/nice" -n 19 "${leanDistribution}/bin/lean" "$@"; }
+              export -nf lake lean
+            else
+              printf 'spec: the low-priority Lean shim could not be installed: %s\n' "$spec_nice_failure" >&2
+              printf 'spec: Lean would run at normal priority, which this shell does not do\n' >&2
+              printf 'spec: set SPECAMQP_LEAN_NICE=0 if an unshimmed shell is what you want\n' >&2
+              # Louder than the provisioning policy below, which warns in an
+              # interactive shell: an unshimmed Lean is not the state this shell
+              # promises, and the escape hatch exists to make that deliberate.
+              exit 1
+            fi
+          fi
+
           # The Lean project resolves its pinned mathlib closure from its
           # gitignored `lean/.lake`, and `lean/lake-manifest.json` records
           # exactly that layout. Lake rewrites artifacts there when it considers
