@@ -633,6 +633,29 @@ theorem spec_takeU8_next_le {c : SpecAMQP.Spec.Codec.Cursor} {b : UInt8}
   subst hd
   dsimp only
   omega
+
+/-- A payload read leaves its cursor inside the buffer: it asked for `n` octets at a position whose
+remaining octets covered them, and its cursor is that position plus `n`. The companion of
+`spec_takeU8_next_le` for the reads the rows perform. -/
+theorem spec_takeBytes_le {n : Nat} {c d : SpecAMQP.Spec.Codec.Cursor} {bytes : Array UInt8}
+    (h : SpecAMQP.Spec.Codec.takeBytes n c = .ok (bytes, d)) : d.pos ≤ d.data.size := by
+  unfold SpecAMQP.Spec.Codec.takeBytes at h
+  split at h
+  · simp only [Except.ok.injEq, Prod.mk.injEq] at h
+    rw [← h.2]
+    dsimp only
+    omega
+  · exact absurd h (by simp)
+
+/-- The same for a big-endian field, which reads through the payload read. -/
+theorem spec_takeBe_le {w : Nat} {c d : SpecAMQP.Spec.Codec.Cursor} {v : Nat}
+    (h : SpecAMQP.Spec.Codec.takeBe w c = .ok (v, d)) : d.pos ≤ d.data.size := by
+  unfold SpecAMQP.Spec.Codec.takeBe at h
+  obtain ⟨⟨bytes, d₁⟩, hb, h⟩ := exists_of_bind_ok h
+  dsimp only at h
+  rw [except_pure_ok, Except.ok.injEq, Prod.mk.injEq] at h
+  rw [← h.2]
+  exact spec_takeBytes_le hb
 theorem spec_takeBytes_zero (c : SpecAMQP.Spec.Codec.Cursor) (h : c.pos ≤ c.data.size) :
     SpecAMQP.Spec.Codec.takeBytes 0 c = .ok (#[], ⟨c.data, c.pos + 0⟩) := by
   have hempty : c.data.extract c.pos (c.pos + 0) = #[] := by
@@ -3104,6 +3127,34 @@ theorem readScalarData_data (decl : EncodingDecl) (c : Cursor) (v : Value) (c' :
     | exact readVariable_data decl c v c' h
     | exact absurd h (by simp)
 
+/-- **A fixed row's read lands inside its buffer.** The row's read is one payload read, and a payload
+read leaves its cursor at the position it asked for plus the octets it asked for — so the landing
+position is inside the buffer *because* the read asked for octets the buffer held. No hypothesis
+about where the read started is needed: the fit is the read's own. -/
+theorem readFixed_le (decl : EncodingDecl) (c : Cursor) (v : Value) (c' : Cursor)
+    (h : readFixed decl c = .ok (v, c')) : c'.pos ≤ c'.data.size := by
+  obtain ⟨payload, c₁, hb, hc⟩ := readFixed_ok decl c v c' h
+  rw [← hc]
+  exact spec_takeBytes_le hb
+
+/-- The same for a variable row, whose read is the length field and then the payload; the text
+families' decode is not a cursor step, so the payload read is still where the cursor stops. -/
+theorem readVariable_le (decl : EncodingDecl) (c : Cursor) (v : Value) (c' : Cursor)
+    (h : readVariable decl c = .ok (v, c')) : c'.pos ≤ c'.data.size := by
+  obtain ⟨length, c₁, payload, c₂, hbe, hbp, hc, -⟩ := readVariable_ok decl c v c' h
+  rw [← hc]
+  exact spec_takeBytes_le hbp
+
+/-- ... and so for a scalar row, whichever category it declares. -/
+theorem readScalarData_le (decl : EncodingDecl) (c : Cursor) (v : Value) (c' : Cursor)
+    (h : readScalarData decl c = .ok (v, c')) : c'.pos ≤ c'.data.size := by
+  unfold readScalarData at h
+  split at h
+  all_goals first
+    | exact readFixed_le decl c v c' h
+    | exact readVariable_le decl c v c' h
+    | exact absurd h (by simp)
+
 /-- **Every reader in the value cluster hands back the buffer it was given.**
 
 The companion of `readValue_progress`, and the fact the fuel-irrelevance clauses need: a loop's tail
@@ -3356,6 +3407,312 @@ theorem readRows_data : ∀ (fuel : Nat),
         simp only [Except.ok.injEq, Prod.mk.injEq] at h
         rw [← h.2, d2, d1]
     exact ⟨hValue, hItems, hCompound, hArrayData, hElements, hElementsLoop⟩
+
+/-- **Every reader in the value cluster keeps its cursor inside the buffer it was given.**
+
+The third companion of `readValue_progress` and `readRows_data`, and the fact the array's element loop
+needs. An element whose row declares no width reads *nothing* — through `takeBytes 0` — and that read
+succeeds exactly when the cursor is inside the buffer, a position equal to the buffer's size counting
+as inside: the elements of an array of zero-width values are read at exactly that cursor. So the
+agreement of an array of such elements rests on the caller knowing where its cursor is.
+
+The clauses carry the position as a hypothesis rather than asserting it, because it is not a fact about
+a reader alone: a read's tail is inside the buffer *because* its start was. Every step either consumed
+octets it had checked for or consumed none, and a read that starts outside the buffer refuses rather
+than landing further outside. The six clauses are one induction on the fuel in the same dependency
+order as `readRows_data`: the compound's items are read at the compound's own fuel and the element
+decision at its own, so those clauses are reached at the level they are proved at, and the scalar rows
+are free of the hypothesis altogether (`readScalarData_le`). -/
+theorem readRows_le_size : ∀ (fuel : Nat),
+    (∀ (c : Cursor) (v : Value) (c' : Cursor), readValue fuel c = .ok (v, c') →
+      c.pos ≤ c.data.size → c'.pos ≤ c'.data.size) ∧
+    (∀ (count : Nat) (c : Cursor) (items : List Value) (c' : Cursor),
+      readItems fuel count c = .ok (items, c') → c.pos ≤ c.data.size → c'.pos ≤ c'.data.size) ∧
+    (∀ (decl : EncodingDecl) (c : Cursor) (v : Value) (c' : Cursor),
+      readCompound fuel decl c = .ok (v, c') → c.pos ≤ c.data.size → c'.pos ≤ c'.data.size) ∧
+    (∀ (decl : EncodingDecl) (c : Cursor) (v : Value) (c' : Cursor),
+      readArrayData fuel decl c = .ok (v, c') → c.pos ≤ c.data.size → c'.pos ≤ c'.data.size) ∧
+    (∀ (elementDecl : Option EncodingDecl) (count : Nat) (c : Cursor) (items : List Value)
+      (c' : Cursor), readElements fuel elementDecl count c = .ok (items, c') →
+        c.pos ≤ c.data.size → c'.pos ≤ c'.data.size) ∧
+    (∀ (elementDecl : Option EncodingDecl) (count : Nat) (c : Cursor) (items : List Value)
+      (c' : Cursor), readElementsLoop fuel elementDecl count c = .ok (items, c') →
+        c.pos ≤ c.data.size → c'.pos ≤ c'.data.size) := by
+  intro fuel
+  induction fuel with
+  | zero =>
+    have hValue : ∀ (c : Cursor) (v : Value) (c' : Cursor),
+        readValue 0 c = .ok (v, c') → c.pos ≤ c.data.size → c'.pos ≤ c'.data.size := by
+      intro c v c' h _
+      simp only [readValue] at h
+      exact absurd h (by simp)
+    have hItems : ∀ (count : Nat) (c : Cursor) (items : List Value) (c' : Cursor),
+        readItems 0 count c = .ok (items, c') → c.pos ≤ c.data.size → c'.pos ≤ c'.data.size := by
+      intro count c items c' h _
+      simp only [readItems] at h
+      exact absurd h (by simp)
+    have hCompound : ∀ (decl : EncodingDecl) (c : Cursor) (v : Value) (c' : Cursor),
+        readCompound 0 decl c = .ok (v, c') → c.pos ≤ c.data.size → c'.pos ≤ c'.data.size := by
+      intro decl c v c' h _
+      unfold readCompound at h
+      obtain ⟨⟨size, c₁⟩, h1, h⟩ := exists_of_bind_ok h
+      try dsimp only at h
+      obtain ⟨⟨count, c₂⟩, h2, h⟩ := exists_of_bind_ok h
+      try dsimp only at h
+      have p2 := spec_takeBe_le h2
+      split at h
+      · obtain ⟨⟨items, c₃⟩, h3, h⟩ := exists_of_bind_ok h
+        try dsimp only at h
+        have p3 := hItems count c₂ items c₃ h3 p2
+        split at h
+        · simp only [Except.ok.injEq, Prod.mk.injEq] at h
+          rw [← h.2]
+          exact p3
+        · exact absurd h (by simp)
+      · split at h
+        · exact absurd h (by simp)
+        · obtain ⟨⟨items, c₃⟩, h3, h⟩ := exists_of_bind_ok h
+          try dsimp only at h
+          have p3 := hItems count c₂ items c₃ h3 p2
+          split at h
+          · simp only [Except.ok.injEq, Prod.mk.injEq] at h
+            rw [← h.2]
+            exact p3
+          · exact absurd h (by simp)
+      · exact absurd h (by simp)
+    have hArrayData : ∀ (decl : EncodingDecl) (c : Cursor) (v : Value) (c' : Cursor),
+        readArrayData 0 decl c = .ok (v, c') → c.pos ≤ c.data.size → c'.pos ≤ c'.data.size := by
+      intro decl c v c' h _
+      simp only [readArrayData] at h
+      exact absurd h (by simp)
+    have hElements : ∀ (elementDecl : Option EncodingDecl) (count : Nat) (c : Cursor)
+        (items : List Value) (c' : Cursor),
+        readElements 0 elementDecl count c = .ok (items, c') →
+          c.pos ≤ c.data.size → c'.pos ≤ c'.data.size := by
+      intro elementDecl count c items c' h _
+      simp only [readElements] at h
+      exact absurd h (by simp)
+    have hElementData : ∀ (elementDecl : Option EncodingDecl) (c : Cursor) (v : Value)
+        (c' : Cursor), specElementData 0 elementDecl c = .ok (v, c') →
+          c.pos ≤ c.data.size → c'.pos ≤ c'.data.size := by
+      intro elementDecl c v c' h hpos
+      unfold specElementData at h
+      split at h <;> try (split at h)
+      all_goals first
+        | (obtain ⟨⟨dsc, c₁⟩, h1, h⟩ := exists_of_bind_ok h
+           try dsimp only at h
+           simp only [readValue] at h1
+           exact absurd h1 (by simp))
+        | exact readScalarData_le _ c v c' h
+        | exact hCompound _ c v c' h hpos
+        | exact hArrayData _ c v c' h hpos
+    have hElementsLoop : ∀ (elementDecl : Option EncodingDecl) (count : Nat) (c : Cursor)
+        (items : List Value) (c' : Cursor),
+        readElementsLoop 0 elementDecl count c = .ok (items, c') →
+          c.pos ≤ c.data.size → c'.pos ≤ c'.data.size := by
+      intro elementDecl count
+      induction count with
+      | zero =>
+        intro c items c' h hpos
+        simp only [readElementsLoop] at h
+        simp only [Except.ok.injEq, Prod.mk.injEq] at h
+        rw [← h.2]
+        exact hpos
+      | succ k ihk =>
+        intro c items c' h hpos
+        rw [specElementData_loop] at h
+        obtain ⟨⟨item, c₁⟩, h1, h⟩ := exists_of_bind_ok h
+        try dsimp only at h
+        obtain ⟨⟨rest, c₂⟩, h2, h⟩ := exists_of_bind_ok h
+        try dsimp only at h
+        have p1 := hElementData elementDecl c item c₁ h1 hpos
+        have p2 := ihk c₁ rest c₂ h2 p1
+        simp only [Except.ok.injEq, Prod.mk.injEq] at h
+        rw [← h.2]
+        exact p2
+    exact ⟨hValue, hItems, hCompound, hArrayData, hElements, hElementsLoop⟩
+  | succ n ih =>
+    obtain ⟨ihValue, ihItems, ihCompound, ihArrayData, ihElements, ihElementsLoop⟩ := ih
+    have hValue : ∀ (c : Cursor) (v : Value) (c' : Cursor),
+        readValue (n + 1) c = .ok (v, c') → c.pos ≤ c.data.size → c'.pos ≤ c'.data.size := by
+      intro c v c' h hpos
+      unfold readValue at h
+      obtain ⟨⟨code, c₁⟩, hu, h⟩ := exists_of_bind_ok h
+      try dsimp only at h
+      have p0 := spec_takeU8_next_le hu
+      split at h
+      all_goals first
+        | (obtain ⟨⟨descriptor, c₂⟩, h1, h⟩ := exists_of_bind_ok h
+           try dsimp only at h
+           obtain ⟨⟨inner, c₃⟩, h2, h⟩ := exists_of_bind_ok h
+           try dsimp only at h
+           have p1 := ihValue c₁ descriptor c₂ h1 p0
+           have p2 := ihValue c₂ inner c₃ h2 p1
+           simp only [except_pure_ok, Except.ok.injEq, Prod.mk.injEq] at h
+           rw [← h.2]
+           exact p2)
+        | (obtain ⟨decl, hd, h⟩ := exists_of_bind_ok h
+           try dsimp only at h
+           split at h <;> try (split at h)
+           all_goals first
+             | exact readScalarData_le decl c₁ v c' h
+             | (have hh := ihCompound decl c₁ v c' h p0; exact hh)
+             | (have hh := ihArrayData decl c₁ v c' h p0; exact hh))
+        | exact absurd h (by simp)
+    have hItems : ∀ (count : Nat) (c : Cursor) (items : List Value) (c' : Cursor),
+        readItems (n + 1) count c = .ok (items, c') → c.pos ≤ c.data.size →
+          c'.pos ≤ c'.data.size := by
+      intro count
+      cases count with
+      | zero =>
+        intro c items c' h hpos
+        simp only [readItems] at h
+        simp only [Except.ok.injEq, Prod.mk.injEq] at h
+        rw [← h.2]
+        exact hpos
+      | succ k =>
+        intro c items c' h hpos
+        unfold readItems at h
+        obtain ⟨⟨item, c₁⟩, h1, h⟩ := exists_of_bind_ok h
+        try dsimp only at h
+        obtain ⟨⟨rest, c₂⟩, h2, h⟩ := exists_of_bind_ok h
+        try dsimp only at h
+        have p1 := ihValue c item c₁ h1 hpos
+        have p2 := ihItems k c₁ rest c₂ h2 p1
+        simp only [except_pure_ok, Except.ok.injEq, Prod.mk.injEq] at h
+        rw [← h.2]
+        exact p2
+    have hCompound : ∀ (decl : EncodingDecl) (c : Cursor) (v : Value) (c' : Cursor),
+        readCompound (n + 1) decl c = .ok (v, c') → c.pos ≤ c.data.size →
+          c'.pos ≤ c'.data.size := by
+      intro decl c v c' h _
+      unfold readCompound at h
+      obtain ⟨⟨size, c₁⟩, h1, h⟩ := exists_of_bind_ok h
+      try dsimp only at h
+      obtain ⟨⟨count, c₂⟩, h2, h⟩ := exists_of_bind_ok h
+      try dsimp only at h
+      have p2 := spec_takeBe_le h2
+      split at h
+      · obtain ⟨⟨items, c₃⟩, h3, h⟩ := exists_of_bind_ok h
+        try dsimp only at h
+        have p3 := hItems count c₂ items c₃ h3 p2
+        split at h
+        · simp only [Except.ok.injEq, Prod.mk.injEq] at h
+          rw [← h.2]
+          exact p3
+        · exact absurd h (by simp)
+      · split at h
+        · exact absurd h (by simp)
+        · obtain ⟨⟨items, c₃⟩, h3, h⟩ := exists_of_bind_ok h
+          try dsimp only at h
+          have p3 := hItems count c₂ items c₃ h3 p2
+          split at h
+          · simp only [Except.ok.injEq, Prod.mk.injEq] at h
+            rw [← h.2]
+            exact p3
+          · exact absurd h (by simp)
+      · exact absurd h (by simp)
+    have hArrayData : ∀ (decl : EncodingDecl) (c : Cursor) (v : Value) (c' : Cursor),
+        readArrayData (n + 1) decl c = .ok (v, c') → c.pos ≤ c.data.size →
+          c'.pos ≤ c'.data.size := by
+      intro decl c v c' h _
+      unfold readArrayData at h
+      obtain ⟨⟨size, c₁⟩, h1, h⟩ := exists_of_bind_ok h
+      try dsimp only at h
+      obtain ⟨⟨count, c₂⟩, h2, h⟩ := exists_of_bind_ok h
+      try dsimp only at h
+      split at h
+      · exact absurd h (by simp)
+      · obtain ⟨⟨constructor, c₃⟩, h3, h⟩ := exists_of_bind_ok h
+        try dsimp only at h
+        have p3 := spec_takeU8_next_le h3
+        obtain ⟨elementDecl, h4, h⟩ := exists_of_bind_ok h
+        try dsimp only at h
+        obtain ⟨⟨items, c₄⟩, h5, h⟩ := exists_of_bind_ok h
+        try dsimp only at h
+        have p4 := ihElements elementDecl count c₃ items c₄ h5 p3
+        split at h
+        · simp only [Except.ok.injEq, Prod.mk.injEq] at h
+          rw [← h.2]
+          exact p4
+        · exact absurd h (by simp)
+    have hElements : ∀ (elementDecl : Option EncodingDecl) (count : Nat) (c : Cursor)
+        (items : List Value) (c' : Cursor),
+        readElements (n + 1) elementDecl count c = .ok (items, c') →
+          c.pos ≤ c.data.size → c'.pos ≤ c'.data.size := by
+      intro elementDecl count c items c' h hpos
+      simp only [readElements] at h
+      exact ihElementsLoop elementDecl count c items c' h hpos
+    have hElementData : ∀ (elementDecl : Option EncodingDecl) (c : Cursor) (v : Value)
+        (c' : Cursor), specElementData (n + 1) elementDecl c = .ok (v, c') →
+          c.pos ≤ c.data.size → c'.pos ≤ c'.data.size := by
+      intro elementDecl c v c' h hpos
+      unfold specElementData at h
+      split at h <;> try (split at h)
+      all_goals first
+        | (obtain ⟨⟨dsc, c₁⟩, h1, h⟩ := exists_of_bind_ok h
+           try dsimp only at h
+           obtain ⟨⟨val, c₂⟩, h2, h⟩ := exists_of_bind_ok h
+           try dsimp only at h
+           have p1 := hValue c dsc c₁ h1 hpos
+           have p2 := hValue c₁ val c₂ h2 p1
+           simp only [except_pure_ok, Except.ok.injEq, Prod.mk.injEq] at h
+           rw [← h.2]
+           exact p2)
+        | exact readScalarData_le _ c v c' h
+        | exact hCompound _ c v c' h hpos
+        | exact hArrayData _ c v c' h hpos
+    have hElementsLoop : ∀ (elementDecl : Option EncodingDecl) (count : Nat) (c : Cursor)
+        (items : List Value) (c' : Cursor),
+        readElementsLoop (n + 1) elementDecl count c = .ok (items, c') →
+          c.pos ≤ c.data.size → c'.pos ≤ c'.data.size := by
+      intro elementDecl count
+      induction count with
+      | zero =>
+        intro c items c' h hpos
+        simp only [readElementsLoop] at h
+        simp only [Except.ok.injEq, Prod.mk.injEq] at h
+        rw [← h.2]
+        exact hpos
+      | succ k ihk =>
+        intro c items c' h hpos
+        rw [specElementData_loop] at h
+        obtain ⟨⟨item, c₁⟩, h1, h⟩ := exists_of_bind_ok h
+        try dsimp only at h
+        obtain ⟨⟨rest, c₂⟩, h2, h⟩ := exists_of_bind_ok h
+        try dsimp only at h
+        have p1 := hElementData elementDecl c item c₁ h1 hpos
+        have p2 := ihk c₁ rest c₂ h2 p1
+        simp only [Except.ok.injEq, Prod.mk.injEq] at h
+        rw [← h.2]
+        exact p2
+    exact ⟨hValue, hItems, hCompound, hArrayData, hElements, hElementsLoop⟩
+
+/-- **The element decision keeps its cursor inside the buffer**, which is the clause the element loop
+needs: the next element is read where the last one stopped. -/
+theorem specElementData_le {fuel : Nat} {elementDecl : Option EncodingDecl}
+    {c : Cursor} {v : Value} {c' : Cursor}
+    (h : specElementData fuel elementDecl c = .ok (v, c')) (hpos : c.pos ≤ c.data.size) :
+    c'.pos ≤ c'.data.size := by
+  cases elementDecl with
+  | none =>
+    unfold specElementData at h
+    obtain ⟨⟨dsc, c₁⟩, h1, h⟩ := exists_of_bind_ok h
+    try dsimp only at h
+    obtain ⟨⟨val, c₂⟩, h2, h⟩ := exists_of_bind_ok h
+    try dsimp only at h
+    have p1 := (readRows_le_size fuel).1 c dsc c₁ h1 hpos
+    have p2 := (readRows_le_size fuel).1 c₁ val c₂ h2 p1
+    simp only [except_pure_ok, Except.ok.injEq, Prod.mk.injEq] at h
+    rw [← h.2]
+    exact p2
+  | some decl =>
+    simp only [specElementData] at h
+    split at h
+    all_goals first
+      | exact readScalarData_le decl c v c' h
+      | exact (readRows_le_size fuel).2.2.1 decl c v c' h hpos
+      | exact (readRows_le_size fuel).2.2.2.1 decl c v c' h hpos
 
 /-- **A value read spends its constructor octet before anything else**, so at a fuel at least one it
 leaves the cursor strictly further on. The weak progress `readValue_progress` gives is not enough for
