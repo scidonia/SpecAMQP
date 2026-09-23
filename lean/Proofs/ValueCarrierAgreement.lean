@@ -8,8 +8,10 @@ open Lean (Json)
 
 `FrameSendConformance.ValueCarrierAgree` is the value layer's claim in the corpus vocabulary: a
 value the reference's carrier reads is one the specification's also reads, and the two readings
-agree as values. This module is its proof, one clause at a time, and it is **in progress**: the
-three clauses below are proved, and the remaining twenty-two are the work this module exists for.
+agree as values. This module is its proof, one clause at a time, and it is **in progress**: nine
+of the twenty-five clauses are proved — `null`, `boolean`, `string`, `symbol`, `binary` and the
+five unsigned widths `ubyte`, `ushort`, `uint`, `ulong` (with `char` on the same route, below) —
+and the remaining sixteen are the work this module exists for.
 
 ## Why clause by clause, and why the discriminant is a hypothesis
 
@@ -49,6 +51,45 @@ The integer clauses add the arithmetic the two value types need (`BodiesAgree` c
 against a `UInt8`/`UInt32`/…, or an `Int` against the bound-checked `Int8`/`Int16`/…); the
 compound clauses (`list`, `map`, `array`, `described`) add recursion, at the fuel the reader hands
 down, through `List.mapM` for the items and a pair-level analogue for a map's.
+
+## The unsigned clauses: two bridges and one round trip
+
+Three facts carry every unsigned width, and they are stated below rather than inlined so the next
+clause costs three lines:
+
+* `unsignedOf_eq` — the two readers' range-check helpers are *one function written twice*, so a
+  clause can `rw [← unsignedOf_eq]` and case on a single call, reading the answer off both sides;
+* `unsignedOf_le` — the width bound the reference's check enforces, read off its own success;
+  without it the round trip is not an identity;
+* `uN_toNat` — `(n.toUIntN).toNat = n` for `n < 2^N`, which is `UIntN.toNat_ofNat_of_lt` with the
+  size goal discharged (`show n < 2 ^ N; omega`).
+
+`BodiesAgree`'s unsigned case compares the *specification's* `Nat` against the reference's carrier,
+so the identity is used at `.symm`.
+
+Two shapes of the reference's answers appear in the clauses and they do not take the same proof:
+some branches are written `.ok v` and some `return v`, the latter leaving a `pure`, so
+`simp only [Except.ok.injEq] at h` **makes no progress** on those. `injection h with hb` handles
+both, and is what the symbol, binary and unsigned-widest clauses use.
+
+## What remains, and the route to it
+
+* **The signed family** — `byte`, `short`, `int`, `long` and `timestamp`, where the reference
+  builds `IntN.ofBitVec (BitVec.ofNat N (i % 2^N).toNat)`. The round trip is
+  `BitVec.toInt_ofNat'` (rewriting to `Int.bmod ((i % 2^N).toNat) (2^N)`) followed by
+  `Int.bmod_eq_iff` — or `bmod_pos`/`bmod_neg` — against the range `signedOf`/`boundedField`
+  carry. A named `signedOf_le`/`boundedField_range` will be needed, the way `unsignedOf_le` was.
+* **`char`** — the same round trip as `ubyte`, at 1114111, but *not* on the same read: the
+  specification reads `getObjValAs? Nat "codepoint"` through `codePointOf`, while the reference
+  reads `boundedField json "codepoint" 0 1114111` through `getObjValAs? Int`. That disagreement is
+  in the *accessor*, not the width, so this clause needs a `Nat`/`Int` accessor bridge before its
+  arithmetic.
+* **The four compounds** — `list`, `binary` already proved, `map`, `array`, `described` — where the
+  recursion's fuel and the item reads are the work, and where `BodiesAgree` recurses.
+* **Then the joint development**: prefix determinism and fuel monotonicity, which is what lets
+  the clause lemmas be joined into one `valueOfJson` agreement over all buffers rather than
+  re-derived per `Json`. `ValueLayersAgree` (`Proofs/ValueLayerLaws`) needs the same treatment on
+  the wire-reading side.
 -/
 
 namespace SpecAMQP.Proofs
@@ -106,5 +147,175 @@ theorem carrier_clause_string (fuel : Nat) (json : Json)
     simp only [Except.ok.injEq] at h
     subst h
     exact ⟨.string text, rfl, by simp only [BodiesAgree]⟩
+
+/-! ## The numeric helpers the scalar clauses need -/
+
+/-- `n` below 2^8 read back from its `UInt8` spelling: the reference's value domain is
+width-carrying where the specification's is not, so `BodiesAgree` compares a `Nat` against the
+unsigned round trip of one. -/
+theorem u8_toNat (n : Nat) (h : n < 2 ^ 8) : (n.toUInt8).toNat = n :=
+  UInt8.toNat_ofNat_of_lt (n := n) h
+
+theorem u16_toNat (n : Nat) (h : n < 2 ^ 16) : (n.toUInt16).toNat = n :=
+  UInt16.toNat_ofNat_of_lt (n := n) h
+
+theorem u32_toNat (n : Nat) (h : n < 2 ^ 32) : (n.toUInt32).toNat = n :=
+  UInt32.toNat_ofNat_of_lt (n := n) h
+
+theorem u64_toNat (n : Nat) (h : n < 2 ^ 64) : (n.toUInt64).toNat = n :=
+  UInt64.toNat_ofNat_of_lt (n := n) h
+
+/-- The bound the reference's unsigned range check enforces, read off its own success: the answer
+a successful `unsignedOf` gives is within the width it was asked for, which is what makes the
+`UInt` round trip an identity. -/
+theorem unsignedOf_le (json : Json) (bound : Nat) (n : Nat)
+    (h : SpecAMQP.Ref.Vectors.unsignedOf json bound = .ok n) : n ≤ bound := by
+  unfold SpecAMQP.Ref.Vectors.unsignedOf at h
+  simp only [Bind.bind, Except.bind] at h
+  cases hv : json.getObjValAs? Nat "value" with
+  | error err => simp [hv] at h
+  | ok v =>
+    simp only [hv] at h
+    split at h
+    · rename_i hle
+      injection h with hb
+      subst hb
+      exact hle
+    · simp at h
+
+/-- The two readers' range-check helpers are one function written twice, so a clause can case on
+one call and read the answer off both. -/
+theorem unsignedOf_eq : SpecAMQP.Ref.Vectors.unsignedOf = SpecAMQP.Harness.unsignedOf := rfl
+
+theorem signedOf_eq : SpecAMQP.Ref.Vectors.signedOf = SpecAMQP.Harness.signedOf := rfl
+
+/-- **The `"symbol"` clause**, on the same read as `"string"`. -/
+theorem carrier_clause_symbol (fuel : Nat) (json : Json)
+    (hk : json.getObjValAs? String "type" = .ok "symbol") (other : SpecAMQP.Ref.Value)
+    (h : SpecAMQP.Ref.Vectors.valueOfJson (fuel + 1) json = .ok other) :
+    ∃ body : SpecAMQP.Spec.Codec.Value,
+      SpecAMQP.Spec.Codec.valueOfJson (fuel + 1) json = .ok body ∧ BodiesAgree body other := by
+  unfold SpecAMQP.Ref.Vectors.valueOfJson at h
+  unfold SpecAMQP.Spec.Codec.valueOfJson
+  simp only [Bind.bind, Except.bind] at h ⊢
+  simp only [hk] at h ⊢
+  cases ht : json.getObjValAs? String "text" with
+  | error err => simp [ht] at h
+  | ok text =>
+    simp only [ht] at h ⊢
+    injection h with hb
+    subst hb
+    exact ⟨.symbol text, rfl, by simp only [BodiesAgree]⟩
+
+/-- **The `"binary"` clause.** Both read the same hex, one as octets and one as a list;
+`BodiesAgree`'s `.binary` case is `a.toList = b`, which is what the two spellings of one
+`ofHex` give. -/
+theorem carrier_clause_binary (fuel : Nat) (json : Json)
+    (hk : json.getObjValAs? String "type" = .ok "binary") (other : SpecAMQP.Ref.Value)
+    (h : SpecAMQP.Ref.Vectors.valueOfJson (fuel + 1) json = .ok other) :
+    ∃ body : SpecAMQP.Spec.Codec.Value,
+      SpecAMQP.Spec.Codec.valueOfJson (fuel + 1) json = .ok body ∧ BodiesAgree body other := by
+  unfold SpecAMQP.Ref.Vectors.valueOfJson at h
+  unfold SpecAMQP.Spec.Codec.valueOfJson
+  simp only [Bind.bind, Except.bind] at h ⊢
+  simp only [hk] at h ⊢
+  cases hs : json.getObjValAs? String "hex" with
+  | error err => simp [hs] at h
+  | ok hex =>
+    simp only [hs] at h ⊢
+    cases hx : SpecAMQP.Harness.ofHex hex with
+    | error err => simp [hx] at h
+    | ok bytes =>
+      simp only [hx] at h ⊢
+      injection h with hb
+      subst hb
+      exact ⟨.binary bytes, rfl, by simp only [BodiesAgree]⟩
+
+/-- **The `"ubyte"` clause.** One shared read through the two spellings of `unsignedOf`; the
+bound the answer carries is what makes the round trip an identity. -/
+theorem carrier_clause_ubyte (fuel : Nat) (json : Json)
+    (hk : json.getObjValAs? String "type" = .ok "ubyte") (other : SpecAMQP.Ref.Value)
+    (h : SpecAMQP.Ref.Vectors.valueOfJson (fuel + 1) json = .ok other) :
+    ∃ body : SpecAMQP.Spec.Codec.Value,
+      SpecAMQP.Spec.Codec.valueOfJson (fuel + 1) json = .ok body ∧ BodiesAgree body other := by
+  unfold SpecAMQP.Ref.Vectors.valueOfJson at h
+  unfold SpecAMQP.Spec.Codec.valueOfJson
+  simp only [Bind.bind, Except.bind] at h ⊢
+  simp only [hk] at h ⊢
+  rw [← unsignedOf_eq] at ⊢
+  cases hu : SpecAMQP.Ref.Vectors.unsignedOf json 255 with
+  | error err => simp [hu] at h
+  | ok n =>
+    simp only [hu] at h ⊢
+    injection h with hb
+    subst hb
+    exact ⟨.ubyte n, rfl,
+      by simp only [BodiesAgree]; exact (u8_toNat n (by have := unsignedOf_le json 255 n hu; omega)).symm⟩
+
+/-- **The `"ushort"` clause.** The same shared read and the same width-carrying round trip as
+`"ubyte"`, at 65535. -/
+theorem carrier_clause_ushort (fuel : Nat) (json : Json)
+    (hk : json.getObjValAs? String "type" = .ok "ushort") (other : SpecAMQP.Ref.Value)
+    (h : SpecAMQP.Ref.Vectors.valueOfJson (fuel + 1) json = .ok other) :
+    ∃ body : SpecAMQP.Spec.Codec.Value,
+      SpecAMQP.Spec.Codec.valueOfJson (fuel + 1) json = .ok body ∧ BodiesAgree body other := by
+  unfold SpecAMQP.Ref.Vectors.valueOfJson at h
+  unfold SpecAMQP.Spec.Codec.valueOfJson
+  simp only [Bind.bind, Except.bind] at h ⊢
+  simp only [hk] at h ⊢
+  rw [← unsignedOf_eq] at ⊢
+  cases hu : SpecAMQP.Ref.Vectors.unsignedOf json 65535 with
+  | error err => simp [hu] at h
+  | ok n =>
+    simp only [hu] at h ⊢
+    injection h with hb
+    subst hb
+    exact ⟨.ushort n, rfl,
+      by simp only [BodiesAgree];
+         exact (u16_toNat n (by have := unsignedOf_le json 65535 n hu; omega)).symm⟩
+
+/-- **The `"uint"` clause.** The same shared read and the same width-carrying round trip as
+`"ubyte"`, at 4294967295. -/
+theorem carrier_clause_uint (fuel : Nat) (json : Json)
+    (hk : json.getObjValAs? String "type" = .ok "uint") (other : SpecAMQP.Ref.Value)
+    (h : SpecAMQP.Ref.Vectors.valueOfJson (fuel + 1) json = .ok other) :
+    ∃ body : SpecAMQP.Spec.Codec.Value,
+      SpecAMQP.Spec.Codec.valueOfJson (fuel + 1) json = .ok body ∧ BodiesAgree body other := by
+  unfold SpecAMQP.Ref.Vectors.valueOfJson at h
+  unfold SpecAMQP.Spec.Codec.valueOfJson
+  simp only [Bind.bind, Except.bind] at h ⊢
+  simp only [hk] at h ⊢
+  rw [← unsignedOf_eq] at ⊢
+  cases hu : SpecAMQP.Ref.Vectors.unsignedOf json 4294967295 with
+  | error err => simp [hu] at h
+  | ok n =>
+    simp only [hu] at h ⊢
+    injection h with hb
+    subst hb
+    exact ⟨.uint n, rfl,
+      by simp only [BodiesAgree];
+         exact (u32_toNat n (by have := unsignedOf_le json 4294967295 n hu; omega)).symm⟩
+
+/-- **The `"ulong"` clause.** The same shared read and the same width-carrying round trip as
+`"ubyte"`, at 18446744073709551615. -/
+theorem carrier_clause_ulong (fuel : Nat) (json : Json)
+    (hk : json.getObjValAs? String "type" = .ok "ulong") (other : SpecAMQP.Ref.Value)
+    (h : SpecAMQP.Ref.Vectors.valueOfJson (fuel + 1) json = .ok other) :
+    ∃ body : SpecAMQP.Spec.Codec.Value,
+      SpecAMQP.Spec.Codec.valueOfJson (fuel + 1) json = .ok body ∧ BodiesAgree body other := by
+  unfold SpecAMQP.Ref.Vectors.valueOfJson at h
+  unfold SpecAMQP.Spec.Codec.valueOfJson
+  simp only [Bind.bind, Except.bind] at h ⊢
+  simp only [hk] at h ⊢
+  rw [← unsignedOf_eq] at ⊢
+  cases hu : SpecAMQP.Ref.Vectors.unsignedOf json 18446744073709551615 with
+  | error err => simp [hu] at h
+  | ok n =>
+    simp only [hu] at h ⊢
+    injection h with hb
+    subst hb
+    exact ⟨.ulong n, rfl,
+      by simp only [BodiesAgree];
+         exact (u64_toNat n (by have := unsignedOf_le json 18446744073709551615 n hu; omega)).symm⟩
 
 end SpecAMQP.Proofs
