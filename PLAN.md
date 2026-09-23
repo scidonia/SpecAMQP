@@ -112,6 +112,22 @@ otherwise a future pass would have the vocabulary available and no reason to use
 It also confirmed the earlier lesson about *where* a batch's order comes from: the check's own report, not a list handed to the pass — the
 list I handed over was the *tail* of the report's order rather than its head, which would have started the batch at the wrong anchor.
 
+**A forward promise is exempt only while the module it names is absent from the tree *and* named by the plan.** That is the rule the gate now implements, and
+it closes the hole the two resumption pictures fell through: their file's conventions block used the word "commitment", which exempted its `formalized:`
+values from resolution, so a value naming a module that was never *planned* rode along with the sixty that were. Both scopes are now printed — "N
+value(s) whose module the tree holds: the exemption no longer reaches them" and "N value(s) name a module no record names: resolved, not exempt" — so
+the exemption can hide nothing silently in either direction, and the failure message advises the remedy that still applies rather than the one that no
+longer does.
+
+**Reading the plan's own tree took care, and the care is the argument for having a rule rather than a convention.** Read literally the plan names no
+module under `Spec/` at all, so a literal reading would have failed 33 legitimately-promised values. The scope is read from two records — the tree, and
+`PLAN.md` §9's `lean/Spec/` header with its bare `Name.lean` lines — and the fact that the second needed interpreting is why the first was worth checking.
+
+**And the rule exposed a declaration scanner that was wrong in both directions at once**: `lean_declarations` treated `mutual … end` as a namespace
+close, so every declaration after a module's first `mutual` block was registered under a bare name — `SpecAMQP.Spec.Codec.specCodec` did not resolve while
+`writeArrayData` did. A gate that rejects correct values *and* accepts names that name nothing is worse than one that does either, and it was found by
+the exemption repair rather than by a failing check, because a gate that resolves too little fails silently in the accepting direction.
+
 ## 7. Generated definition tables
 
 `scripts/gen-oasis-lean.py` reads the pinned bytes and emits `lean/Generated/Oasis/`, one module per declaration kind:
