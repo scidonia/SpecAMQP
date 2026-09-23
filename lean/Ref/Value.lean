@@ -707,6 +707,21 @@ def requireAssignedConstructor (constructor : UInt8) : Except EncodeRefusal Unit
   else .error (encodeRefusal "unassigned" s!"octet {constructor.toNat} is not an encoding the \
     constructor grammar assigns")
 
+/-- The refusal an array element gets when the array's declared element constructor cannot carry the
+item: `unassigned` when the grammar assigns the constructor no encoding at all, `malformed` when it
+does and the item is not one of the values that constructor carries. Both classes are the
+specification's own — `Spec.Codec.elementDecl?` for the first, its declared-surface writers for the
+second — and they are factored here because two places name them: the catch-all that answers every
+ordinary mismatch, and the zero-width forms, which *are* their value and so have to refuse an item of
+another kind rather than write the form's own. -/
+def elementShapeRefusal (constructor : UInt8) (value : Value) : Except EncodeRefusal Octets :=
+  if !assignedConstructor constructor then
+    .error (encodeRefusal "unassigned" s!"octet {constructor.toNat} is not an encoding the \
+      constructor grammar assigns")
+  else
+    .error (encodeRefusal "malformed" s!"an array whose element constructor is {constructor.toNat} \
+      cannot carry a {typeName value}")
+
 mutual
 
 /-- The constructor-and-data encoding of a value. Equation-style clauses rather
@@ -828,9 +843,30 @@ def arrayElement : UInt8 → Value → Except EncodeRefusal Octets
     let head ← encode descriptor
     let tail ← encode value
     return head ++ tail
-  | 0x40, _ => .ok #[]
-  | 0x41, _ => .ok #[]
-  | 0x42, _ => .ok #[]
+  -- The zero-width forms, each of which *is* its value: `null0` carries null, `true` carries true,
+  -- `false` carries false, `uint0` zero, `ulong0` zero, `list0` the empty list. The item's kind is
+  -- therefore part of the check and not decoration — a zero-width form writes no data at all, so an
+  -- item of another kind would be written as *something else*, not merely refused. These three arms
+  -- used to match any item (`0x40, _ => .ok #[]`), which made `[.ubyte 7]` under `%x40` come out as
+  -- the two octets of `[null]`: the reader accepts them, the value is gone, and nothing downstream can
+  -- tell. The check is made inside the arm rather than by refining the pattern because refining these
+  -- three patterns makes the match compiler build the whole 40-by-25 product tree and it exhausts its
+  -- heartbeat budget; the arms below keep a variable in the item position, so the outer tree stays
+  -- what it was and the item is examined once, in a two-branch decision. The zero-value arms below
+  -- never had this defect — `0x43` matches `.uint 0` and nothing else — which is why only these three
+  -- had to change.
+  | 0x40, item =>
+    match item with
+    | .null => .ok #[]
+    | other => elementShapeRefusal 0x40 other
+  | 0x41, item =>
+    match item with
+    | .boolean true => .ok #[]
+    | other => elementShapeRefusal 0x41 other
+  | 0x42, item =>
+    match item with
+    | .boolean false => .ok #[]
+    | other => elementShapeRefusal 0x42 other
   | 0x43, .uint 0 => .ok #[]
   | 0x44, .ulong 0 => .ok #[]
   | 0x45, .list [] => .ok #[]
@@ -911,13 +947,10 @@ def arrayElement : UInt8 → Value → Except EncodeRefusal Octets
     -- no encoding. It is kept for the same reason `readElement`'s own `unassigned` clause is —
     -- `arrayElement` is a public function and a caller may ask it for one element under a
     -- constructor an array path would have refused — and a guard that cannot be reached from this
-    -- module's own paths is still the right answer for the call that reaches it.
-    if !assignedConstructor constructor then
-      .error (encodeRefusal "unassigned" s!"octet {constructor.toNat} is not an encoding the \
-        constructor grammar assigns")
-    else
-      .error (encodeRefusal "malformed" s!"an array whose element constructor is \
-        {constructor.toNat} cannot carry a {typeName value}")
+    -- module's own paths is still the right answer for the call that reaches it. The zero-width arms
+    -- above route their mismatches here too, which is why the two classes live in
+    -- `elementShapeRefusal` rather than in this arm's body.
+    elementShapeRefusal constructor value
 termination_by _ value => sizeOf value
 
 end
