@@ -136,6 +136,14 @@ shell bash tests/contracts/s0_spec_manifest.sh       # planner-owned files as th
 shell bash tests/contracts/s0_vector_citations.sh    # every citation in the corpus resolves
 shell bash tests/contracts/s0_generator_fidelity.sh  # each corpus is what its generator produces
 
+# the artefacts, their proofs, and their corpora
+shell bash tests/contracts/s1_proof_integrity.sh     # no sorry, no native_decide; axiom inventories per theorem
+shell bash tests/contracts/s1_differential.sh        # specification and reference agree on the wire
+shell bash tests/contracts/s2_frame_vectors.sh       # the frame layer's corpus
+shell bash tests/contracts/s3_exchanges.sh           # the exchange corpora, both artefacts, per-step refusals
+shell bash tests/contracts/s5_messages.sh            # the message layer's differential
+shell bash tests/contracts/s6_transactions.sh        # the transaction layer's differential
+
 shell python3 scripts/clause-ledger.py check         # ledger + audit + reconciliation
 shell python3 scripts/gen-oasis-lean.py --check      # generated tables current
 shell python3 scripts/gen-oasis-lean.py              # regenerate after an artifact change (never edit by hand)
