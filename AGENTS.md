@@ -187,6 +187,8 @@ shell bash tests/contracts/s7_sasl.sh                # the security layer: both 
 
 # the implementation track: R1's transport shell (PLAN.md §23.1)
 shell bash scripts/run-transport-loopback.sh         # two Lean processes over loopback; shim evidence
+shell bash scripts/run-transport-loopback.sh --mutant NAME   # one control: truncating-recv | reordering-recv | short-send
+shell bash tests/contracts/r1_transport_shell.sh     # R1's evidence, and each control's pinned reach
 
 shell python3 scripts/clause-ledger.py check         # ledger + audit + reconciliation
 shell python3 scripts/gen-oasis-lean.py --check      # generated tables current
