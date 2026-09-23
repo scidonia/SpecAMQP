@@ -53,7 +53,7 @@ c661a0341ee5572bd716861459bcfbedbae36a7f  ledger/ambiguities/unmapped-begin.json
 2dd54d7eeae541a3df93bd52a17aae4d8cff5a6e  ledger/ambiguities/version-mismatch-condition.json
 003cbf78615e5a2c39ff63ce21b19ef4ab0b6b68  ledger/ambiguities/zero-width-array-count.json
 5f651a63266b6a944c3db9748c868787bd2e07e6  ledger/clauses.json
-3fb787dd6222cde24e5ccbf0a0458a2906c63156  ledger/coverage.json
+20617f1d836b0939625f42d61aee259bb9954970  ledger/coverage.json
 488a1f07e99b47a49e013dc61ac1d89908d55f1e  ledger/dispositions/part0-conformance-and-transport-lifecycle.json
 b806ad2406f8fac2d686c5ed1f343029df8afa8e  ledger/dispositions/part1-types.json
 f5ec2898d2a8febbe01b6f01db47f3e019407c97  ledger/dispositions/part2-connection-establishment.json
@@ -81,7 +81,7 @@ d3d45a51befd4d402fc0d1f6e32da0f0cdcc1474  tests/contracts/r1_transport_shell.sh
 3930a6a9fcc8b607e3a93c38b77e20455bfa6805  tests/contracts/r2_endpoint_shell.sh
 d077d693422502c1a2bc57f017c5db98cef01289  tests/contracts/s0_generator_fidelity.sh
 f5457f3e3647561dc84ed0761556857f431bcad9  tests/contracts/s0_lean_environment.sh
-c20885bbdb17ab564cfbacc1ee8b57a338ba7d88  tests/contracts/s0_sources_ledger.sh
+8f1b7c67a05fb6bda033be31f3819d3bde09f123  tests/contracts/s0_sources_ledger.sh
 83e3aada053d4523368b9aeee74d96a081613cd3  tests/contracts/s0_spec_manifest.sh
 c2ad5a412456853b4de79bc3a893d4b2c1d7252d  tests/contracts/s0_tables_fidelity.sh
 c86fe5435dc380611e92f80f069a812dc9f48a3a  tests/contracts/s0_vector_citations.sh

@@ -15,7 +15,11 @@
 #      adjective REQUIRED recorded, and a named constant resolved through `<xref>`;
 #   4. disposition gates bite: a correct disposition passes, a stale text hash
 #      fails, and an unknown clause reference fails;
-#   5. the repository's own ledger, dispositions, audit and baseline
+#   5. a cross-reference that selects a choice of the element it names renders the
+#      choice, and records it: `<xref name="sender-settle-mode" choice="settled"/>`
+#      renders `«settled»`, so the two clauses with opposite obligations on that
+#      negotiated flag are distinguishable in the text;
+#   6. the repository's own ledger, dispositions, audit and baseline
 #      reconciliation check clean.
 #
 # Runs offline, writes only inside a temporary directory.
@@ -190,7 +194,51 @@ run_case unknown 1 "no such clause"
 run_case picture-missing 1 "has no disposition"
 run_case picture-stale 1 "STALE picture disposition"
 
-# 5. The repository's own ledger ---------------------------------------------
+# 5. A choice-selecting cross-reference renders the choice --------------------
+# `<xref name="X" choice="settled"/>` names a *choice* of the element `X`, and the artifact
+# names that choice (`<choice name="settled">`). Rendering the element's name instead made
+# `settled.4` and `settled.6` — opposite obligations on the same negotiated flag — share their
+# antecedent, so the two read as the same rule and one was applied under the other's condition.
+# The pin reads a *fresh* generation rather than the committed ledger, so it holds the renderer
+# and not a record: reverting the branch puts `«sender-settle-mode»` back into both clauses and
+# this step fails, which is the only thing it is here to say.
+python3 - "$ledger" "$root/spec/oasis" <<'PYCHOICE' || die "a choice-selecting cross-reference does not render its choice"
+import importlib.util, pathlib, sys, tempfile
+spec = importlib.util.spec_from_file_location('cl', sys.argv[1])
+cl = importlib.util.module_from_spec(spec); spec.loader.exec_module(cl)
+with tempfile.TemporaryDirectory() as td:
+    g = cl.generate(pathlib.Path(sys.argv[2]), pathlib.Path(td))
+anchor = ('amqp-core-transport-v1.0-os.xml'
+          '#amqp:transport/section:performatives/type:transfer/field:settled')
+# Each clause must name the choice it selects, must not name the element alone, and must record
+# the selection in `references` — a list holding only the bare element name reintroduces the
+# collapse this pins against, because a consumer of the list cannot tell `.4` from `.6`.
+want = {
+    f'{anchor}.4': ('is \u00absettled\u00bb', 'sender-settle-mode/choice:settled'),
+    f'{anchor}.6': ('is \u00abunsettled\u00bb', 'sender-settle-mode/choice:unsettled'),
+}
+by_ref = {c['ref']: c for c in g['clauses']}
+problems = []
+for ref, (needle, reference) in sorted(want.items()):
+    clause = by_ref.get(ref)
+    if clause is None:
+        problems.append(f'{ref}: no such clause in the ledger')
+        continue
+    if needle not in clause['text']:
+        problems.append(f'{ref}: the selected choice is not in the rendered text: {clause["text"]}')
+    if '\u00absender-settle-mode\u00bb' in clause['text']:
+        problems.append(
+            f'{ref}: the cross-reference rendered the element name, not its choice: {clause["text"]}'
+        )
+    if reference not in clause['references']:
+        problems.append(f'{ref}: the recorded reference lost the choice: {clause["references"]}')
+for problem in problems:
+    print(f'  choice rendering: {problem}')
+raise SystemExit(1 if problems else 0)
+PYCHOICE
+note "a choice-selecting cross-reference renders its choice"
+
+# 6. The repository's own ledger ---------------------------------------------
 python3 "$ledger" check >"$tmp/repo.log" 2>&1 ||
   die "repository ledger check failed: $(tail -5 "$tmp/repo.log")"
 grep -q "check passed" "$tmp/repo.log" || die "unexpected repository ledger output"
