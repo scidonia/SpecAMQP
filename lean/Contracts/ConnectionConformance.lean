@@ -35,13 +35,23 @@ It does not claim the transport: the endpoint's alphabet is octets and API calls
 is outside the relation entirely (`PLAN.md` §23.1 names it as the implementation's one unproved
 dependency). A conformance instance says nothing about how the octets arrive.
 
-And it raises a question about §10's own contract, recorded here because it is the interface's rather
-than this proof's: the composition needs each step's two answers to be the *same* answer, and the
-per-slice relations as first written admitted a vacuous reading when the two sides answered with
-different constructors — two implications, both true, concluding nothing. The shape facts that close
-that are carried by per-slice lemmas in `Proofs.ConnectionConformance`; whether the relation itself
-should carry them, so that no instance can be satisfied vacuously where two answers differ in kind, is
-under review, and a strengthening of §10 is a planner decision rather than an edit to a proof module.
+And it raises a point about the *per-step vocabulary* rather than about §10, recorded here because the
+question was raised against this declaration. The composition needs each step's two answers to be the
+**same** answer; the per-step relation as first written was `AnswersMatch`, whose two conjuncts are
+`spec = ok → ref = ok` and `ref = error → spec = error`, and those are **both vacuous in exactly one
+direction**: when the specification refuses and the reference accepts. That is the direction that
+matters — a reference strictly more permissive than the specification would escape the relation
+entirely — while the reverse mismatch is *not* vacuous, because `spec = ok` makes the first conjunct
+demand the opposite constructor of the reference's answer.
+
+A *shape equality* (`so.isOk = ro.isOk`), delivered by each step slice alongside the implications, is
+what closes it, and it is load-bearing in the composition rather than decorative: without it the
+`spec = error` / `ref = ok` case cannot be eliminated and the output sequences cannot be compared.
+
+**No strengthening of §10 is needed and none was made.** `ConformsVia` already demands a concrete
+matching permitted step, a related successor, and exact equality of the two output lists — the
+weakness was never in the contract. It was in a step vocabulary written inside the proof module, and
+it is closed there.
 -/
 
 namespace SpecAMQP.Contracts
