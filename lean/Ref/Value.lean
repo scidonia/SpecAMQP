@@ -67,6 +67,14 @@ Deliberate choices, none of which a clause fixes:
   or array whose size or count does not fit the declared width — the writer refuses
   it by name rather than masking a field or writing a different form, so the
   writer's domain stays inside what the reader accepts.
+* **A four-octet size, count or length field is refused rather than truncated.** Every field of
+  that width is written through `fieldOctets`, which refuses class `limit` where it cannot announce
+  the value — the class the specification's `filled`, `compoundOctets` and `arrayOctets` name for
+  the same field. The one-octet fields have made that check all along; the four-octet ones wrote
+  the value's low four octets, which announce a size, a count or a length the octets do not carry.
+  Those octets are well formed, so a reader accepts them and calls the value something else — the
+  same defect as a zero-width element form writing the wrong item, and answered the same way:
+  refuse rather than write something a reader will misread.
 * **An array's declared element constructor is consulted before its elements**, by
   `requireAssignedConstructor`, whether or not the array carries any. The check itself has
   always been here — `arrayElement`'s catch-all refuses a constructor the grammar assigns no
@@ -612,13 +620,36 @@ octets that follow the size field — the count field (whose width depends on th
 form), the array element constructor, then the items — exactly as the reader
 requires. -/
 
+/-- Four octets of a size, count or length field — or a `limit` refusal when the value does not
+fit them, never the value's low four octets.
+
+This is the reference's counterpart of the specification's `filled 4`, and it exists for the reason
+that function does: a field that silently lost its high octets announces a size, a count or a length
+the octets do not carry, and the octets are well formed — so a reader accepts them and calls the
+value something else. The class is the specification's own, so a field neither artefact can announce
+is a refusal on both sides rather than a refusal on one and a wrapped write on the other.
+
+`what` names the quantity the field carries, so the refusal says which field ran out of room — a
+list's size and its count are different quantities, and a reader of the message should not have to
+guess which one could not be announced. The one-octet fields have made this check all along
+(`elementOctet`, `elementSignedOctet`, and the narrow branches of `variableData` and
+`elementCompoundData`); this is the same check at the width the wide forms use, where it was
+missing. -/
+def fieldOctets (what : String) (n : Nat) : Except EncodeRefusal Octets :=
+  if n < 2 ^ 32 then .ok (u32be n)
+  else .error (encodeRefusal "limit" s!"a four-octet {what} field cannot announce {n}")
+
 /-- A variable-width encoding: the narrow form when the payload fits its octet,
-the wide form otherwise, constructor included. -/
-def variableData (narrow wide : UInt8) (payload : List UInt8) : Octets :=
+the wide form otherwise, constructor included. The wide form's length is a four-octet field, so a
+payload too long to announce is refused rather than written with a wrapped length; `what` names that
+field in the refusal. -/
+def variableData (narrow wide : UInt8) (what : String) (payload : List UInt8) :
+    Except EncodeRefusal Octets :=
   if payload.length ≤ 255 then
-    #[narrow, payload.length.toUInt8] ++ payload.toArray
-  else
-    #[wide] ++ u32be payload.length ++ payload.toArray
+    .ok (#[narrow, payload.length.toUInt8] ++ payload.toArray)
+  else do
+    let length ← fieldOctets what payload.length
+    return #[wide] ++ length ++ payload.toArray
 
 /-- Variable-width element data, whose length width is the array's constructor's, not
 the element's preference: an array of `str8` elements carries one-octet lengths, an
@@ -628,7 +659,7 @@ announce a payload the octets do not carry. -/
 def elementVariableData (constructor : UInt8) (form : String) (payload : List UInt8) :
     Except EncodeRefusal Octets :=
   if constructor == 0xB0 || constructor == 0xB1 || constructor == 0xB3 then
-    .ok (u32be payload.length ++ payload.toArray)
+    (fieldOctets s!"{form} length" payload.length).map (fun length => length ++ payload.toArray)
   else if payload.length ≤ 255 then
     .ok (#[payload.length.toUInt8] ++ payload.toArray)
   else
@@ -686,8 +717,10 @@ def elementCompoundData (width : Nat) (kind : String) (count : Nat) (body : Octe
     if size ≤ 255 && count ≤ 255 then .ok (#[size.toUInt8, count.toUInt8] ++ body)
     else .error (encodeRefusal "limit" s!"a {kind}8 element carries {count} item(s) in {body.size} \
       octet(s), which a one-octet size or count field cannot announce")
-  else
-    .ok (u32be size ++ u32be count ++ body)
+  else do
+    let sizeField ← fieldOctets s!"{kind} size" size
+    let countField ← fieldOctets s!"{kind} count" count
+    return sizeField ++ countField ++ body
 
 /-- An array's declared element constructor, refused by name when the grammar assigns it no encoding.
 
@@ -729,14 +762,17 @@ than a `match`: a mutual block's `termination_by` hint binds the function's
 parameters, and a body that abstracts them itself leaves the hint with nothing to
 bind.
 
-Three families are refused rather than written: an array whose element count exceeds
+Four families are refused rather than written: an array whose element count exceeds
 `arrayElementLimit`, an array whose declared element constructor the grammar assigns no
-encoding, and an array whose declared element form cannot carry one of its elements. The
-first and the third are the specification's own checks; the second is the one this writer
-was missing, and its absence was the defect the third family exists to prevent — the
-writer's domain has to sit inside what the reader accepts, and emitting octets the reader
-would then refuse, or masking a value into a different one, would make this
-implementation's own output unreadable or untrue. -/
+encoding, an array whose declared element form cannot carry one of its elements, and a
+size, count or length the four-octet field it is written in cannot announce
+(`fieldOctets`). The first, the third and the fourth are the specification's own checks —
+`compoundOctets`, `arrayOctets` and `filled` refuse the same fields with the same class —
+and the second is the one this writer was missing, whose absence was the defect the third
+family exists to prevent. All four are one rule: the writer's domain has to sit inside what
+the reader accepts, and emitting octets the reader would then refuse, or masking a value or
+a field into a different one, would make this implementation's own output unreadable or
+untrue. -/
 def encode : Value → Except EncodeRefusal Octets
   | .null => .ok #[0x40]
   | .boolean true => .ok #[0x41]
@@ -759,27 +795,31 @@ def encode : Value → Except EncodeRefusal Octets
   | .decimal64 b => .ok (#[0x84] ++ b)
   | .decimal128 b => .ok (#[0x94] ++ b)
   | .uuid b => .ok (#[0x98] ++ b)
-  | .binary b => .ok (variableData 0xA0 0xB0 b)
-  | .string s => .ok (variableData 0xA1 0xB1 s.toUTF8.toList)
-  | .symbol s => .ok (variableData 0xA3 0xB3 s.toUTF8.toList)
+  | .binary b => variableData 0xA0 0xB0 "binary length" b
+  | .string s => variableData 0xA1 0xB1 "string length" s.toUTF8.toList
+  | .symbol s => variableData 0xA3 0xB3 "symbol length" s.toUTF8.toList
   | .list [] => .ok #[0x45]
   | .list items => do
     let body ← encodeAll items
     let count := items.length
-    return if 1 + body.size ≤ 255 && count ≤ 255 then
-      #[0xC0, (1 + body.size).toUInt8, count.toUInt8] ++ body
-    else
-      #[0xD0] ++ u32be (4 + body.size) ++ u32be count ++ body
+    if 1 + body.size ≤ 255 && count ≤ 255 then
+      return #[0xC0, (1 + body.size).toUInt8, count.toUInt8] ++ body
+    else do
+      let sizeField ← fieldOctets "list size" (4 + body.size)
+      let countField ← fieldOctets "list count" count
+      return #[0xD0] ++ sizeField ++ countField ++ body
   -- There is no map0 form, so even the empty map is a map8 with an empty item
   -- sequence: size 1 (the count octet), count 0.
   | .map [] => .ok #[0xC1, 0x01, 0x00]
   | .map pairs => do
     let body ← encodePairs pairs
     let count := 2 * pairs.length           -- the count field counts items, not pairs
-    return if 1 + body.size ≤ 255 && count ≤ 255 then
-      #[0xC1, (1 + body.size).toUInt8, count.toUInt8] ++ body
-    else
-      #[0xD1] ++ u32be (4 + body.size) ++ u32be count ++ body
+    if 1 + body.size ≤ 255 && count ≤ 255 then
+      return #[0xC1, (1 + body.size).toUInt8, count.toUInt8] ++ body
+    else do
+      let sizeField ← fieldOctets "map size" (4 + body.size)
+      let countField ← fieldOctets "map count" count
+      return #[0xD1] ++ sizeField ++ countField ++ body
   | .array constructor items =>
     if items.length > arrayElementLimit then
       .error (encodeRefusal "limit" s!"an array of {items.length} element(s): this writer \
@@ -788,10 +828,12 @@ def encode : Value → Except EncodeRefusal Octets
       let _ ← requireAssignedConstructor constructor
       let body ← arrayElementItems constructor items
       let count := items.length
-      .ok (if 2 + body.size ≤ 255 && count ≤ 255 then
-        #[0xE0, (2 + body.size).toUInt8, count.toUInt8, constructor] ++ body
-      else
-        #[0xF0] ++ u32be (5 + body.size) ++ u32be count ++ #[constructor] ++ body)
+      if 2 + body.size ≤ 255 && count ≤ 255 then
+        return #[0xE0, (2 + body.size).toUInt8, count.toUInt8, constructor] ++ body
+      else do
+        let sizeField ← fieldOctets "array size" (5 + body.size)
+        let countField ← fieldOctets "array count" count
+        return #[0xF0] ++ sizeField ++ countField ++ #[constructor] ++ body
   | .described descriptor value => do
     let head ← encode descriptor
     let tail ← encode value
@@ -931,7 +973,9 @@ def arrayElement : UInt8 → Value → Except EncodeRefusal Octets
       let _ ← requireAssignedConstructor constructor
       let body ← arrayElementItems constructor items
       let count := items.length
-      return u32be (5 + body.size) ++ u32be count ++ #[constructor] ++ body
+      let sizeField ← fieldOctets "array size" (5 + body.size)
+      let countField ← fieldOctets "array count" count
+      return sizeField ++ countField ++ #[constructor] ++ body
   | constructor, value =>
     -- Two different defects, refused with the two classes the specification names for them: an
     -- element constructor the declared surface assigns no encoding is `unassigned` — the same

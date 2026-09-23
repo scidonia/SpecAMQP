@@ -58,18 +58,19 @@ been fixed earlier and its proof needing a value-layer instance that does not ex
     consulted at all. `.array 0x57 [.null]` refused correctly and `.array 0x57 []` did not — the same
     constructor, one element apart — and what the second wrote was four octets this module's own reader
     then refused.
-  * *What blocks a proof is two things now, and neither of them is a witness.* The **wide-form family**
-    is one: the reference writes a four-octet size, count or length field through `u32be`, which
-    truncates, where the specification's `filled`, `compoundOctets` and `arrayOctets` refuse `limit` for
-    a field that cannot carry the value — so the first conjunct fails for a compound, a variable value
-    or an array whose body reaches 2^32 octets. That input is representable in the corpus vocabulary
-    (`ofHex` of a long enough string) and no term can carry it, so the law is *unprovable* there and
-    *unrefutable* too; a third check of the same family as this one — the writer refusing a field it
-    cannot write rather than truncating it — would remove it, and it is reported rather than made,
-    because it is a behaviour change this sitting's scope does not name. The other is the **traversal**:
-    the two encoders were written independently, and relating them means a mutual induction over
-    `encode`, `encodeAll`, `encodePairs`, `arrayElementItems` and `arrayElement` against `writeValue`,
-    `writeItems`, `writePairs`, `writeElements`, `writeDeclared`, `writeCompoundData` and
+  * *What blocks a proof is one thing now, and it is not a witness.* The **wide-form family** used to
+    be the other: the reference wrote a four-octet size, count or length field through `u32be`, which
+    truncates, where the specification's `filled`, `compoundOctets` and `arrayOctets` refuse `limit`
+    for a field that cannot carry the value — so the first conjunct failed for a compound, a variable
+    value or an array whose body reaches 2^32 octets. That input is representable in the corpus
+    vocabulary (`ofHex` of a long enough string) and no term can carry it, so the law was *unprovable*
+    there and *unrefutable* too. **That third check of the same family was made rather than reported:**
+    every four-octet size, count and length field is written through `Ref.fieldOctets`, which refuses
+    `limit` where it cannot announce the value, and the section at the end of this module carries the
+    closure in general and states what it does to the first conjunct. What that leaves is the
+    **traversal**: the two encoders were written independently, and relating them means a mutual
+    induction over `encode`, `encodeAll`, `encodePairs`, `arrayElementItems` and `arrayElement` against
+    `writeValue`, `writeItems`, `writePairs`, `writeElements`, `writeDeclared`, `writeCompoundData` and
     `writeArrayData`, with a table reduction (`rowOf`, `tagOf`, `elementDecl?`, `filled`,
     `lengthPrefixed`, `twosComplement`) per shape and a constructor-by-constructor correspondence on the
     element forms. That is the shape of `Proofs.ValueWireAgreement` for the readers, and its size is the
@@ -594,5 +595,109 @@ theorem ref_listWitness_decode :
   unfold SpecAMQP.Ref.decode
   rw [listWitness_size, hstep, hlist]
   try dsimp only []
+
+/-! ## The four-octet field family, and what closes it
+
+The reference's writer emitted a compound's size, a variable value's length and an array's size and
+count through `u32be`, which reads a `Nat` four octets wide and keeps its low thirty-two bits. Where
+the value did not fit — a body that reaches 2^32 octets — the specification's `filled`,
+`compoundOctets` and `arrayOctets` refuse class `limit`, so those octets were ones the specification
+refused while a reader accepted them and called the value something else: the same defect as a
+zero-width element form writing the wrong item, one field to the left.
+
+**This is the family the module header called reported rather than made, and it is closed now:** every
+four-octet size, count and length field is written through `Ref.fieldOctets`, which refuses `limit`
+where it cannot announce the value. The lemmas below are the closure *in general* — they hold for every
+field value, not at a witness — and that is what this family needs, because it has no witness:
+`ofHex` of a 2^33-character string is representable in the corpus vocabulary and no term can carry it,
+which is why the law was *unprovable* and *unrefutable* here rather than one of the two. A refutation
+needs a value and a proof needs the traversal; the check needed neither, only the field writer, and
+that is what landed.
+
+**What this does to `ValueWriterAgree`'s first conjunct at that boundary: it is true, and trivially.**
+The conjunct is `Ref.encode other = .ok octets → Spec.encodeValue body = .ok octets`; at a body whose
+encoding reaches 2^32 octets the reference now *refuses*, so there is no `octets` for the hypothesis to
+be given and the implication holds through the refusal rather than through the octets. So the closest
+true statement is about the refusal's *existence*, and it is the first lemma below: no value too wide
+for its four-octet field reaches the writer's output at all. What remains between the law and a proof
+is the traversal alone — the family that made it false at this point is gone, for every shape and not
+only for the shapes with a nameable witness. -/
+
+/-- **The field writer refuses what it cannot announce**, for every field: the statement that replaces
+the law's first conjunct where it used to fail. Stated for an arbitrary `what` because the check is the
+field's width and not the quantity it carries — the same shape the specification's `filled` has. -/
+theorem ref_fieldOctets_refuses (what : String) (n : Nat) (h : 2 ^ 32 ≤ n) :
+    SpecAMQP.Ref.fieldOctets what n =
+      .error (SpecAMQP.Ref.encodeRefusal "limit"
+        s!"a four-octet {what} field cannot announce {n}") := by
+  unfold SpecAMQP.Ref.fieldOctets
+  rw [if_neg (Nat.not_lt.mpr h)]
+
+/-- Where the value fits, the guard writes exactly what the raw four-octet writer writes: the refusal
+moved no octets the writer had produced before it existed. -/
+theorem ref_fieldOctets_writes (what : String) (n : Nat) (h : n < 2 ^ 32) :
+    SpecAMQP.Ref.fieldOctets what n = .ok (SpecAMQP.Ref.u32be n) := by
+  unfold SpecAMQP.Ref.fieldOctets
+  rw [if_pos h]
+
+/-- **Where both artefacts can announce the value, they write the same four octets** — the reference's
+`u32be` against the specification's `beOctets 4`, through the two shape lemmas the frame layer already
+carries. So `fieldOctets` is a refusal attached to a shared encoding rather than a second convention
+beside the specification's: the two agree on the octets where they write and on the class where they
+do not. -/
+theorem ref_u32be_eq_beOctets (n : Nat) :
+    (SpecAMQP.Ref.u32be n).toList = SpecAMQP.Spec.Codec.beOctets 4 n := by
+  rw [SpecAMQP.Proofs.u32be_form, SpecAMQP.Proofs.beOctets_four]
+
+/-- The specification's side of the boundary: `filled 4` refuses class `limit` for the same value,
+which is the class the reference's `fieldOctets` names. -/
+theorem spec_filled_refuses (n : Nat) (h : 2 ^ 32 ≤ n) :
+    SpecAMQP.Spec.Codec.filled 4 n =
+      .error (SpecAMQP.Spec.Codec.refusal "limit"
+        s!"{n} does not fit in {4} big-endian octet(s)") := by
+  unfold SpecAMQP.Spec.Codec.filled
+  rw [if_neg (Nat.not_lt.mpr h)]
+
+/-- **The closure at a writer, general over the payload**: a binary value whose payload reaches 2^32
+octets is refused, classed `limit`, where before the change its length field kept the payload's low
+four octets. No term can carry such a payload, so this is a statement about the writer's *domain*
+rather than a measurement at a value — which is exactly why the family needed a check and not a
+witness, and why the check is where the fix belongs. -/
+theorem ref_encode_binary_wide_refuses (payload : List UInt8) (h : 2 ^ 32 ≤ payload.length) :
+    SpecAMQP.Ref.encode (.binary payload) =
+      .error (SpecAMQP.Ref.encodeRefusal "limit"
+        s!"a four-octet binary length field cannot announce {payload.length}") := by
+  unfold SpecAMQP.Ref.encode SpecAMQP.Ref.variableData
+  try dsimp only []
+  have hlt : (255 : Nat) < payload.length :=
+    Nat.lt_of_lt_of_le (by decide : (255 : Nat) < 2 ^ 32) h
+  rw [if_neg (Nat.not_le_of_lt hlt)]
+  try dsimp only []
+  rw [ref_fieldOctets_refuses "binary length" payload.length h]
+  try simp only [Bind.bind, Except.bind]
+  rfl
+
+/-- **The closure at the compound and array sites, stated by class.** A body too wide for the
+four-octet size field is refused, classed `limit`: the shape the writer takes for a `list32`, a
+`map32`, an `array32`, a wide compound array element and an inner `array32` element alike — every one
+of them reaches `elementCompoundData` or the array arm's two `fieldOctets` calls, and each refuses
+here rather than wrapping the size. Stated over the class rather than over the sentence because the
+class is what `ValueWriterAgree` compares, and the sentence is the field writer's own, named in
+`ref_fieldOctets_refuses` and reached through `fieldOctets` at every one of these sites. -/
+theorem ref_elementCompoundData_wide_size_class (kind : String) (count : Nat) (body : Octets)
+    (h : 2 ^ 32 ≤ 4 + body.size) :
+    ∀ failure : SpecAMQP.Ref.EncodeRefusal,
+      SpecAMQP.Ref.elementCompoundData 4 kind count body = .error failure →
+      failure.reasonClass = "limit" := by
+  intro failure hf
+  have hfield := ref_fieldOctets_refuses s!"{kind} size" (4 + body.size) h
+  unfold SpecAMQP.Ref.elementCompoundData at hf
+  try dsimp only at hf
+  rw [if_neg (by decide : ¬ (4 = 1))] at hf
+  try dsimp only at hf
+  rw [hfield] at hf
+  try simp only [Bind.bind, Except.bind] at hf
+  rw [← Except.error.inj hf]
+  rfl
 
 end SpecAMQP.Proofs
