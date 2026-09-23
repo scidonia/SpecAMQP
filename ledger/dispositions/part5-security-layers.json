@@ -1,0 +1,35 @@
+{
+ "conventions": {
+  "class": "What the coverage gate counts: MUST for both MUST and MUST NOT, else the clause's own keyword. Read from ledger/clauses.json rather than inferred, and carried on every entry beside `kind` so the two can be compared - they diverge for exactly the MUST NOT clauses, whose number this file states in design_consequences.",
+  "deferred:": "A real obligation this plan carries; the suffix names the milestone whose scope in PLAN.md the clause falls in. The note names the gap that keeps the clause out of the carrier set. That the milestone's slice has landed does not make the entry stale: what it records is that the obligation was left uncarried, which is the finding.",
+  "environment:": "An assumption the specification rests on, named so that a claim can state that it depends on it: behaviour of the world outside the protocol that no clause of the artifact can be enforced against here.",
+  "formalized:": "A Lean declaration path that carries this clause's meaning. `check` resolves each value against the module tree and the declaration's own enclosing namespace, so a value names a declaration that exists; the note gives the file and line, and says which part of the declaration is the carrier when the declaration is larger than the rule.",
+  "kind": "The clause's own keyword, read from the ledger's clause rather than inferred from the coverage class. The class is MUST for both forms, so a file whose entries all read MUST has lost the MUST NOT half of its own subject.",
+  "out-of-scope:": "Deliberately outside core AMQP 1.0 as this specification bounds it (PLAN.md §3), with the reason.",
+  "superseded:": "The clause's open question is decided by an entry in ledger/ambiguities/, named by id.",
+  "test:": "A vector that witnesses the clause's rule. `check` resolves the id against vectors/**/*.ndjson, and the note says what the vector's verdict would be if the rule were absent.",
+  "uncarried": "No declaration and no vector carries the clause's requirement. A declaration that only recognises the vocabulary a clause is written in - reading a field without acting on it, or holding a quantity nothing consults - is not a carrier; where one of those exists the note names it as the near-miss, with a file and a line, so the note can be checked against the tree rather than against itself."
+ },
+ "design_consequences": [
+  "One of these two entries is carried and the other is an environment assumption, and the split is the artifact's own: the first sentence is about a transition between layers inside the endpoint, and the second is about the byte stream underneath it. The carried entry is the one transition in Part 5 with a named law and a proof (`OnlyAnOkOutcomeEstablishesTheLayer`, lean/Contracts/Sasl.lean:147-151, proved at lean/Proofs/SaslDialogue.lean:151), which is why it is `formalized:` rather than a note about a branch.",
+  "Both entries name a half of their sentence the model does not carry, which is the honest shape for a clause whose first half is enforced: `sasl-outcome.1`'s nested security layer has no state to reach (`Layer` is amqp or sasl), and `security-layers.1`'s shutdown order is the environment's. A reader who took either `formalized:` or `environment:` as full coverage of the sentence would be wrong, so each note says which half is which."
+ ],
+ "dispositions": {
+  "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl/type:sasl-outcome.1": {
+   "class": "MUST",
+   "clause_text": "Upon successful completion of the SASL dialog the security layer has been established, and the peers MUST exchange protocol headers to either start a nested security layer, or to establish the AMQP connection.",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.stepSaslFrame; formalized:SpecAMQP.Contracts.OnlyAnOkOutcomeEstablishesTheLayer; test:sasl-plain-client-init-to-open",
+   "kind": "MUST",
+   "note": "Carried for the establishment this sentence states, and the nested-layer half is where the model stops. Spec.Connection.stepSaslFrame's ok arm (lean/Spec/Connection.lean:1158-1168) is the transition the sentence describes: an outcome whose code is ok moves the endpoint out of the SASL dialogue and into the first state of the protocol-header exchange, which is what \"the peers MUST exchange protocol headers\" is in this machine. The law is named and proved rather than implied by the branch: SpecAMQP.Contracts.OnlyAnOkOutcomeEstablishesTheLayer (lean/Contracts/Sasl.lean:147-151), bound to its proof by lean/Contracts/SaslAcceptance.lean:68-72 and proved at lean/Proofs/SaslDialogue.lean:151. The witness is sasl-plain-client-init-to-open in vectors/sasl.ndjson, whose steps run the dialogue to an open. What is not carried is the sentence's other branch: Layer has two members, amqp and sasl (lean/Spec/Connection.lean:114-117), and protocol id two maps to none (:138-141), so a nested security layer has no state to reach and no vector could pin one.",
+   "text_sha256": "9e6806e988423a20a6e93900e8ecd21f87942451393340a5d0349c32ed515bf6"
+  },
+  "amqp-core-security-v1.0-os.xml#amqp:security/section:security-layers.1": {
+   "class": "MUST",
+   "clause_text": "When a security layer terminates (either before or after a secure tunnel is established), the TCP connection MUST be closed by first shutting down the outgoing stream and then reading the incoming stream until it is terminated.",
+   "disposition": "environment:tcp-close-order",
+   "kind": "MUST",
+   "note": "Uncarried, and recorded as an environment assumption because the object whose shutdown order it mandates is outside this specification: the ordered close - shut down the outgoing stream, then read the incoming one until it terminates - is the byte stream's behaviour, and the tree's only notion of a stream ending is `Impl.Stream.closed` (lean/Impl/Stream.lean:479-480), which drops the inbox and whose own documentation places it outside every conformance claim. The near-miss read and rejected is the connection's action table: `State.action` (lean/Spec/Connection.lean:307-314) carries the `.closeWrite` and `.tcpClose` labels for the states that owe a shutdown, and the only declaration that consults them is `Spec.ConnectionCodec.actionNote` (lean/Spec/ConnectionCodec.lean:79-82), which prints the label into corpus prose rather than performing an ordered shutdown. PLAN.md §10 names the ordered byte stream beside TLS and crypto as an assumption the conformance relation rests on, which is why this is `environment:` rather than deferred: no endpoint behaviour in this repository could make the sentence true or false.",
+   "text_sha256": "0baf84300a32e3c76d93ae68655c73569c7373ecd127551f88151eca7662c04c"
+  }
+ }
+}

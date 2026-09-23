@@ -1,0 +1,125 @@
+{
+ "conventions": {
+  "class": "What the coverage gate counts: MUST for both MUST and MUST NOT, else the clause's own keyword. Read from ledger/clauses.json rather than inferred, and carried on every entry beside `kind` so the two can be compared - they diverge for exactly the MUST NOT clauses, whose number this file states in design_consequences.",
+  "deferred:": "A real obligation this plan carries; the suffix names the milestone whose scope in PLAN.md the clause falls in. The note names the gap that keeps the clause out of the carrier set. That the milestone's slice has landed does not make the entry stale: what it records is that the obligation was left uncarried, which is the finding.",
+  "environment:": "An assumption the specification rests on, named so that a claim can state that it depends on it: behaviour of the world outside the protocol that no clause of the artifact can be enforced against here.",
+  "formalized:": "A Lean declaration path that carries this clause's meaning. `check` resolves each value against the module tree and the declaration's own enclosing namespace, so a value names a declaration that exists; the note gives the file and line, and says which part of the declaration is the carrier when the declaration is larger than the rule.",
+  "kind": "The clause's own keyword, read from the ledger's clause rather than inferred from the coverage class. The class is MUST for both forms, so a file whose entries all read MUST has lost the MUST NOT half of its own subject.",
+  "out-of-scope:": "Deliberately outside core AMQP 1.0 as this specification bounds it (PLAN.md §3), with the reason.",
+  "superseded:": "The clause's open question is decided by an entry in ledger/ambiguities/, named by id.",
+  "test:": "A vector that witnesses the clause's rule. `check` resolves the id against vectors/**/*.ndjson, and the note says what the vector's verdict would be if the rule were absent.",
+  "uncarried": "No declaration and no vector carries the clause's requirement. A declaration that only recognises the vocabulary a clause is written in - reading a field without acting on it, or holding a quantity nothing consults - is not a carrier; where one of those exists the note names it as the near-miss, with a file and a line, so the note can be checked against the tree rather than against itself."
+ },
+ "design_consequences": [
+  "Ten of these thirteen entries are carried and three are not, and the carried ten divide into two shapes: the five `flow` field clauses are one declaration (`Spec.Session.flowLink`'s five-field coupling), the two `transfer` first-transfer clauses are one guard, and the rest are single rules in the layer that owns them.",
+  "Three of the carried entries are the *write* side of a rule whose read side another entry already has, and that asymmetry is worth naming: `type:close.1` is carried by the connection's state table saying which states owe a close (`State.action`'s `.closeWrite` rows) and by `Endpoint.afterFrame`'s outbound close arm, and `definition:MIN-MAX-FRAME-SIZE.1` is carried by the limits an open sets. A model that only read frames would carry neither, which is why both notes name the declaration that moves the endpoint rather than the one that inspects the frame.",
+  "One entry is out-of-scope rather than deferred, and the distinction is the plan's: `desired-capabilities.1` forbids *using* an undeclared capability, and what it means to use one is defined by the extension that introduces it (PLAN.md §3 keeps extensions out of core). The neighbouring capability clauses in ledger/dispositions/part2-connection-establishment.json name `Spec.Endpoint.capabilityUse` and `Spec.Endpoint.capabilityDesire`, which the check now reports as demoted because `lean/Spec/Endpoint.lean` does not exist; this entry therefore names the module rather than a declaration, and says it is a plan-named module rather than a carrier.",
+  "Two entries decide the same words: `transfer/field:delivery-tag.1` and `transfer/field:message-format.1` carry identical text and one digest (5b180aad...), and the same guard (lean/Spec/Session.lean:842-846) enforces both, so the pair is recorded twice rather than once and each note says so."
+ ],
+ "dispositions": {
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/definition:MIN-MAX-FRAME-SIZE.1": {
+   "class": "MUST",
+   "clause_text": "During the initial connection negotiation, the two peers MUST agree upon a maximum frame size.",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.openLimits; formalized:SpecAMQP.Spec.Connection.stepAmqpFrame; test:exchange-oversized-frame-received",
+   "kind": "MUST",
+   "note": "Carried, in three pieces that together are the agreement. Spec.Connection.minMaxFrameSize reads the artifact's constant (constantNat \"MIN-MAX-FRAME-SIZE\", lean/Spec/Connection.lean:677), and Spec.Connection.Limits.aPriori (:683) is the size in force before any open has been exchanged - the artifact's own sentence, quoted in the module header at :26. Spec.Connection.openLimits (:686-689) is the negotiation itself: the peer's open carries max-frame-size and the two endpoints' maxima become the limits each enforces. The enforcement is Spec.Connection.stepAmqpFrame's size refusal (:1228-1231), which refuses a frame larger than the agreed maximum. The witness is exchange-oversized-frame-received in vectors/generated-exchanges.ndjson, which cites the open's max-frame-size clauses and pins the refusal; exchange-pipelined-frame-size-limit pins the other direction.",
+   "text_sha256": "fb19d5d275cb4f6349953e2e7edda009bed2c5cd810207909e390fafb67c8e44"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:attach/field:desired-capabilities.1": {
+   "class": "MUST",
+   "clause_text": "The sender MUST NOT attempt to use any capability other than those it has declared in desired-capabilities field.",
+   "disposition": "deferred:S4",
+   "kind": "MUST NOT",
+   "note": "Uncarried: the ledger keys this sentence a second time under the begin anchor, with the same text and the same digest (82e2369d...), where part0-conformance-and-transport-lifecycle.json records deferred:S4 for it; nothing in the tree reads `desired-capabilities`, so no capability is ever *used* for this sentence to forbid. The near-miss read and rejected is `Spec.Session.attachLink` (lean/Spec/Session.lean:656-736), which reads the attach's `role`, `handle`, `initial-delivery-count` and `snd-settle-mode` and never capability; the field's only trace is the generated declared surface (lean/Generated/Oasis/Fields.lean:98 for the attach, :106 for the begin, :138 for the open). The second near-miss is the module the neighbouring entries name for their capability clauses: `formalized:Spec.Endpoint.capabilityUse` and `formalized:Spec.Endpoint.capabilityDesire` sit in ledger/dispositions/part2-connection-establishment.json for this family, and no `lean/Spec/Endpoint.lean` exists - the check prints those values as demoted for exactly that reason - so the declaration that would carry a capability-use rule is a plan-named module and not a carrier today. PLAN.md §3 bounds extensions out of core, what it means to use a capability is defined by the extension that introduces it (PLAN.md section 3 keeps extensions out of core), which is why no rule here could enforce the sentence even with a capability set to consult.",
+   "text_sha256": "82e2369ddc4cc1918c3074d9e7414d07dff2e581a8a0b94e8faa8aec8d677f8f"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:attach/field:initial-delivery-count.1": {
+   "class": "MUST",
+   "clause_text": "This MUST NOT be null if role is sender, and it is ignored if the role is receiver.",
+   "disposition": "formalized:SpecAMQP.Spec.Session.attachLink",
+   "kind": "MUST NOT",
+   "note": "Carried in both halves. `Spec.Session.attachLink` refuses an attach whose role is the link's sender and which carries no `initial-delivery-count` (`refuseUnless`-style failure at lean/Spec/Session.lean:690-697: absent, and the role is `sender`, is the refusal \"a sender's attach MUST carry its initial delivery-count\"), which is the MUST NOT half. The ignoring half is the same function's role branch: a receiver's position starts at zero whatever the frame carried (:707-710), and on an inbound attach the partner's count is recorded only when the partner is the link's *sender* (:729-730), so a receiver's value is read and dropped as the sentence says.",
+   "text_sha256": "245cd562f757f94781f89e3b4fe7e4231d662dcad4fb279bc5f91eee60b6f4f6"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:close.1": {
+   "class": "MUST",
+   "clause_text": "Orderly shutdown requires that this frame MUST be written by the sender.",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.Endpoint.afterFrame; test:exchange-close-sent-first",
+   "kind": "MUST",
+   "note": "Carried as the model's write-side rule for this frame. A close this endpoint sends moves the connection into the state that means the frame has been written: Endpoint.afterFrame's .close arm maps an outbound close from OPEN_SENT, OPEN_PIPE, CLOSE_RCVD and every other state to CLOSE_PIPE, OC_PIPE, END and CLOSE_SENT respectively (lean/Spec/Connection.lean:961-967), and State.closeSent is named \"CLOSE_SENT\" with the artifact's state table beside it (:192, :215). The table's own Legal Connection Actions column states the converse obligation - the states whose action is .closeWrite (State.action, :307-314), so a connection that reaches one of them has a close owed - and the codec performs the write where the model writes one (Spec.SessionCodec.stepOf, :172-181). The witness is exchange-close-sent-first in vectors/generated-exchanges.ndjson, whose citation array names the connection's close clauses: a close sent before the peer's is admitted and moves the endpoint to the state this sentence requires.",
+   "text_sha256": "fcf00e615a930a3579ee485f6e46921da39c88355a7787ff0e08bacf036813be"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:available.1": {
+   "class": "MUST",
+   "clause_text": "When the handle field is not set, this field MUST NOT be set.",
+   "disposition": "formalized:SpecAMQP.Spec.Session.flowLink; superseded:flow-link-field-without-handle; test:exchange-link-flow-field-without-handle",
+   "kind": "MUST NOT",
+   "note": "Carried, by the same declaration as its four sibling fields. Spec.Session.flowLink refuses a flow whose handle is unset and which carries any of the five link fields - this one among them - by collecting the fields the frame sets and requiring that list to be empty (lean/Spec/Session.lean:749-763). The condition it reports is decided rather than quoted: superseded:flow-link-field-without-handle adopts amqp:invalid-field for exactly this case. The witness is exchange-link-flow-field-without-handle in vectors/generated-exchanges.ndjson, whose citation array names this ref along with the four siblings: it is a flow that names no link and carries one of them, and the corpus's note records that available is the field chosen precisely because the other four are read by rules of their own.",
+   "text_sha256": "29f0e6894addb861e1ea4b484a300718cbe2908d81bdb8c3f1ed10e574d8c61c"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:drain.1": {
+   "class": "MUST",
+   "clause_text": "When the handle field is not set, this field MUST NOT be set.",
+   "disposition": "formalized:SpecAMQP.Spec.Session.flowLink; superseded:flow-link-field-without-handle; test:exchange-link-flow-field-without-handle",
+   "kind": "MUST NOT",
+   "note": "Carried, by the same declaration as its four sibling fields. Spec.Session.flowLink refuses a flow whose handle is unset and which carries any of the five link fields - this one among them - by collecting the fields the frame sets and requiring that list to be empty (lean/Spec/Session.lean:749-763). The condition it reports is decided rather than quoted: superseded:flow-link-field-without-handle adopts amqp:invalid-field for exactly this case. The witness is exchange-link-flow-field-without-handle in vectors/generated-exchanges.ndjson, whose citation array names this ref along with the four siblings: it is a flow that names no link and carries one of them, and the corpus's note records that available is the field chosen precisely because the other four are read by rules of their own.",
+   "text_sha256": "29f0e6894addb861e1ea4b484a300718cbe2908d81bdb8c3f1ed10e574d8c61c"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:handle.1": {
+   "class": "MUST",
+   "clause_text": "If set to a handle that is not currently associated with an attached link, the recipient MUST respond by ending the session with an «session-error» session error.",
+   "disposition": "formalized:SpecAMQP.Spec.Session.linkHandleOf; test:exchange-link-flow-unattached-handle",
+   "kind": "MUST",
+   "note": "Carried. Spec.Session.linkHandleOf resolves the handle a frame names against the endpoint's own and refuses every other value with the session error this sentence names: unattachedHandle (lean/Spec/Session.lean:219) is the unattached-handle member of the session-error family read from the generated choice table (:213-220), and the two refusals are the frame's handle matching no attached link (:621-622) and one that differs from the attached one (:623-625). The refusal's own placement is Spec.Session.step's: a link-level refusal is answered with the END an error that the session state permits, which is the \"ending the session\" this sentence requires. The witness is exchange-link-flow-unattached-handle in vectors/generated-exchanges.ndjson, whose citation array names this ref.",
+   "text_sha256": "2f7e8e501648c06d0192eed034481fcff456cfbe888d1b0d70193f221429a9e6"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:link-credit.1": {
+   "class": "MUST",
+   "clause_text": "When the handle field is not set, this field MUST NOT be set.",
+   "disposition": "formalized:SpecAMQP.Spec.Session.flowLink; superseded:flow-link-field-without-handle; test:exchange-link-flow-field-without-handle",
+   "kind": "MUST NOT",
+   "note": "Carried, by the same declaration as its four sibling fields. Spec.Session.flowLink refuses a flow whose handle is unset and which carries any of the five link fields - this one among them - by collecting the fields the frame sets and requiring that list to be empty (lean/Spec/Session.lean:749-763). The condition it reports is decided rather than quoted: superseded:flow-link-field-without-handle adopts amqp:invalid-field for exactly this case. The witness is exchange-link-flow-field-without-handle in vectors/generated-exchanges.ndjson, whose citation array names this ref along with the four siblings: it is a flow that names no link and carries one of them, and the corpus's note records that available is the field chosen precisely because the other four are read by rules of their own.",
+   "text_sha256": "29f0e6894addb861e1ea4b484a300718cbe2908d81bdb8c3f1ed10e574d8c61c"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:properties.1": {
+   "class": "MUST",
+   "clause_text": "When the handle field is not set, this field MUST NOT be set.",
+   "disposition": "formalized:SpecAMQP.Spec.Session.flowLink; superseded:flow-link-field-without-handle; test:exchange-link-flow-field-without-handle",
+   "kind": "MUST NOT",
+   "note": "Carried, by the same declaration as its four sibling fields. Spec.Session.flowLink refuses a flow whose handle is unset and which carries any of the five link fields - this one among them - by collecting the fields the frame sets and requiring that list to be empty (lean/Spec/Session.lean:749-763). The condition it reports is decided rather than quoted: superseded:flow-link-field-without-handle adopts amqp:invalid-field for exactly this case. The witness is exchange-link-flow-field-without-handle in vectors/generated-exchanges.ndjson, whose citation array names this ref along with the four siblings: it is a flow that names no link and carries one of them, and the corpus's note records that available is the field chosen precisely because the other four are read by rules of their own.",
+   "text_sha256": "29f0e6894addb861e1ea4b484a300718cbe2908d81bdb8c3f1ed10e574d8c61c"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:aborted.2": {
+   "class": "MUST",
+   "clause_text": "Aborted messages SHOULD be discarded by the recipient (any payload within the frame carrying the performative MUST be ignored).",
+   "disposition": "formalized:SpecAMQP.Spec.Session.transferLink; test:exchange-link-aborted-discarded",
+   "kind": "MUST",
+   "note": "Carried for its MUST half, and the SHOULD half is the reason the code reads the field at all. Spec.Session.transferLink reads aborted (lean/Spec/Session.lean:868) and discards the delivery in progress when it is set - if aborted then pure none (:872-873), with more computed as !aborted && ... (:871) so an aborted frame cannot also be a continuation - which is the parenthetical MUST: any payload the frame carried is ignored rather than appended to a delivery. The witness is exchange-link-aborted-discarded in vectors/generated-exchanges.ndjson, whose citation array names the transfer field family. The SHOULD itself (\"SHOULD be discarded\") is the layer's choice, taken here in the direction the artifact recommends.",
+   "text_sha256": "6512e880b43e87a7ed7f299d53ab47feaf07ae45e916a130e7d9eaf249856cb7"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:delivery-id.1": {
+   "class": "MUST",
+   "clause_text": "The delivery-id MUST be supplied on the first transfer of a multi-transfer delivery.",
+   "disposition": "formalized:SpecAMQP.Spec.Session.transferLink; test:exchange-link-first-transfer-needs-its-fields",
+   "kind": "MUST",
+   "note": "Carried. Spec.Session.transferLink requires the field on the transfer that begins a delivery: when the frame carries no delivery-id and no delivery is in progress, the step fails with \"the first transfer of a delivery MUST carry its delivery-id\" (lean/Spec/Session.lean:831-838), and a continuation is allowed to omit it because the held delivery supplies the id (:835-836). The witness is exchange-link-first-transfer-needs-its-fields in vectors/generated-exchanges.ndjson, whose citation array names this ref.",
+   "text_sha256": "6487ca21e4d84ca737f444537161c1f80d92519af64402ae37ab00f4643270e4"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:delivery-tag.1": {
+   "class": "MUST",
+   "clause_text": "This field MUST be specified for the first transfer of a multi-transfer message and can only be omitted for continuation transfers.",
+   "disposition": "formalized:SpecAMQP.Spec.Session.transferLink; test:exchange-link-first-transfer-needs-its-fields",
+   "kind": "MUST",
+   "note": "Carried. The same function requires this field on a first transfer and allows a continuation to omit it: refuseUnless (continued || (fieldSet \"transfer\" \"delivery-tag\" body && fieldSet \"transfer\" \"message-format\" body)) (lean/Spec/Session.lean:842-846). The witness is exchange-link-first-transfer-needs-its-fields in vectors/generated-exchanges.ndjson, whose citation array names this ref. The ledger keys this sentence twice - .1 here and type:transfer/field:message-format.1 carry the same text and the same digest (5b180aad...) - so the two entries decide the same words, and the sibling entry's note repeats this one's argument rather than its own.",
+   "text_sha256": "5b180aadcb44c63ac13dc3482b90100d57bf90eee921ca0a214235179aec21e7"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:message-format.1": {
+   "class": "MUST",
+   "clause_text": "This field MUST be specified for the first transfer of a multi-transfer message and can only be omitted for continuation transfers.",
+   "disposition": "formalized:SpecAMQP.Spec.Session.transferLink; test:exchange-link-first-transfer-needs-its-fields",
+   "kind": "MUST",
+   "note": "Carried by the same guard as delivery-tag.1 (lean/Spec/Session.lean:842-846), and the ledger keys one sentence under both refs with one digest (5b180aad...), so the two entries decide the same words. The witness is exchange-link-first-transfer-needs-its-fields in vectors/generated-exchanges.ndjson, whose citation array names this ref.",
+   "text_sha256": "5b180aadcb44c63ac13dc3482b90100d57bf90eee921ca0a214235179aec21e7"
+  }
+ }
+}
