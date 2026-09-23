@@ -315,12 +315,20 @@ def State.action : State → Option ConnAction
 
 /-! ## Refusals -/
 
-/-- A refusal the connection layer raises: the protocol condition, the detail — which
-leads with the reason class the corpus vocabulary names, `truncated`, `malformed`,
-`unsupported`, `limit` or `illegalState` — the state the refusal leaves the peer in
-where it moves it, and the octets the peer writes while refusing. -/
+/-- A refusal the connection layer raises: the protocol condition, the reason class, the
+detail — which leads with the reason class the corpus vocabulary names, `truncated`,
+`malformed`, `unsupported`, `limit` or `illegalState` — the state the refusal leaves the
+peer in where it moves it, and the octets the peer writes while refusing.
+
+The class is a **field** rather than a token a reader recovers by splitting the detail: it
+is the part of a refusal that is interface — the corpus compares classes between the
+artefacts — and a class read back out of prose by `String.splitOn` is one no kernel proof can
+reason about. The detail still leads with the class, so a caller and a vector see the strings
+they always saw. -/
 structure Refusal where
   condition : String
+  /-- The reason class this refusal names, which is the token its detail leads with. -/
+  reasonClass : String
   detail : String
   /-- The state the refusal leaves the peer in, or `none` where it leaves it alone. -/
   state : Option State
@@ -357,12 +365,12 @@ def invalidField : String :=
 
 /-- A refusal of a given class, which moves nothing and writes nothing. -/
 def refusal (reasonClass prose : String) : Refusal :=
-  ⟨framingError, s!"{reasonClass}: {prose}", none, []⟩
+  ⟨framingError, reasonClass, s!"{reasonClass}: {prose}", none, []⟩
 
 /-- A refusal whose cause is a field's value rather than the wire, carrying the
 artifact's own `invalid-field` condition. -/
 def fieldRefusal (reasonClass prose : String) : Refusal :=
-  ⟨invalidField, s!"{reasonClass}: {prose}", none, []⟩
+  ⟨invalidField, reasonClass, s!"{reasonClass}: {prose}", none, []⟩
 
 /-- The condition for a frame that is perfectly well formed and arrives in a state that
 does not permit it: the `amqp-error` family's `illegal-state`, whose definition in the
@@ -383,7 +391,7 @@ def illegalState : String :=
 /-- A refusal whose cause is the moment rather than the octets, carrying the artifact's
 own `illegal-state` condition. -/
 def stateRefusal (reasonClass prose : String) : Refusal :=
-  ⟨illegalState, s!"{reasonClass}: {prose}", none, []⟩
+  ⟨illegalState, reasonClass, s!"{reasonClass}: {prose}", none, []⟩
 
 /-- Refuse unless a condition holds: the guards below are all of this shape, and
 spelling them out keeps each one's diagnostic at the check that raised it. -/
@@ -704,13 +712,16 @@ def SaslFrame.ofBody (body : Value) : SaslFrame :=
 
 /-- The SASL dialogue's position, as the security section orders it: the server
 announces its mechanisms, the partner chooses one and initiates, the challenge and
-response step may occur zero or more times, and the outcome closes the dialogue. -/
+response step may occur zero or more times, and the outcome closes the dialogue.
+
+There are four positions because the section names four, and the established layer does not
+have one: a successful outcome does not leave this endpoint *past* the dialogue, it resets it
+to `absent` on the AMQP layer, where the peers exchange protocol headers again. -/
 inductive SaslPhase where
   | absent
   | awaitingMechanisms
   | mechanismsKnown
   | awaitingOutcome
-  | complete
 deriving Repr, BEq, DecidableEq
 
 /-- The dialogue's position in prose. -/
@@ -719,7 +730,6 @@ def SaslPhase.name : SaslPhase → String
   | .awaitingMechanisms => "waiting for the partner's mechanisms"
   | .mechanismsKnown => "waiting for the sasl-init"
   | .awaitingOutcome => "waiting for the outcome"
-  | .complete => "established"
 
 /-- Which end of the dialogue this peer is: the peer that announced the mechanisms is
 the server, the one that initiates is the client, and the security section requires the
@@ -878,13 +888,22 @@ def limitsFor (endpoint : Endpoint) (outbound : Bool) : Limits :=
     | _ => endpoint.remoteLimits
   else endpoint.localLimits
 
-/-- The endpoint after a header exchange: a SASL exchange that has exchanged both
-headers is in the security layer's dialogue, waiting for the server's mechanisms. -/
+/-- The endpoint after a header exchange: a SASL exchange that has exchanged both headers and
+whose dialogue has not begun is in the security layer's dialogue, waiting for the server's
+mechanisms.
+
+Both conjuncts are load-bearing. The state says the headers are exchanged; the phase says the
+dialogue has not begun, because a header exchange that happens after the mechanisms arrived must
+not restart a dialogue — the mechanisms are announced once and the outcome is terminal, so
+re-entering `awaitingMechanisms` would keep what the peer had learned and wait for it again. The
+reference's guard is the dialogue's stage for the same reason, and its `.idle` arm is this
+`absent` one. -/
 def Endpoint.afterHeaderExchange (endpoint : Endpoint) : Endpoint :=
   match endpoint.layer with
   | .amqp => endpoint
   | .sasl =>
-    if endpoint.state == .hdrExch then { endpoint with phase := .awaitingMechanisms }
+    if endpoint.state == .hdrExch && endpoint.phase == .absent then
+      { endpoint with phase := .awaitingMechanisms }
     else endpoint
 
 /-! ## Applying a step -/
@@ -1019,7 +1038,7 @@ def stepSaslFrame (endpoint : Endpoint) (outbound : Bool) (size : Nat) (body : V
       -- connection and names a close-code for it that the choice table does not define,
       -- so the close is recorded as the state it leaves and no condition is invented.
       return ⟨{ endpoint with state := .end }, []⟩
-  | _ =>
+  | .absent =>
     .error (stateRefusal "illegalState" s!"the SASL layer is not in a place for a SASL \
       performative: the dialogue is {endpoint.phase.name}")
 
@@ -1105,8 +1124,13 @@ def step (endpoint : Endpoint) (outbound : Bool) (submission : Submission) :
               layer, and {endpoint.state.name}'s legal receives are the table's \
               {endpoint.state.receiveClass.name} column")
           else
-            match SpecAMQP.Spec.Frame.decodeFrame octets with
-            | .error message => .error ⟨framingError, message, none, []⟩
+            match SpecAMQP.Spec.Frame.readFrame octets with
+            | .error refusal =>
+              -- the class is the frame layer's own field: the frame layer's instance is where
+              -- the two artefacts' classes are related, and this layer passes the refusal on
+              -- under the condition a wire-level failure carries. The detail is the frame
+              -- layer's message, which is what a caller has always been shown here.
+              .error ⟨framingError, refusal.reasonClass, refusal.message, none, []⟩
             | .ok (frame, consumed) =>
               -- an empty frame carries no performative — "apart from this use, empty frames
               -- have no meaning" — so the endpoint is left as it was and nothing is

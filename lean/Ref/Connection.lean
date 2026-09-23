@@ -481,8 +481,9 @@ def integerField (typeName fieldName : String) (body : Value) :
     match declaredDefault typeName fieldName with
     | some n => .ok n
     | none =>
-      .error (refuse "malformed" s!"{typeName}.{fieldName} is unset and the declared \
-        surface gives it no default")
+      .error (refuseWith invalidFieldCondition "malformed"
+        s!"{typeName}.{fieldName} is unset and the declared \
+          surface gives it no default")
   | some v =>
     match numberOf v with
     | some n =>
@@ -497,8 +498,9 @@ def integerField (typeName fieldName : String) (body : Value) :
               {primitiveName v}")
       | none => .ok n
     | none =>
-      .error (refuse "malformed" s!"{typeName}.{fieldName} is not an integer, and the \
-        artifact declares it one")
+      .error (refuseWith invalidFieldCondition "malformed"
+        s!"{typeName}.{fieldName} is not an integer, and the \
+          artifact declares it one")
 
 /-- The bounds an `open` declares. -/
 def openBounds (body : Value) : Except Refusal Bounds := do
@@ -789,8 +791,12 @@ def apply (peer : Peer) (outbound : Bool) (offer : Offer) : Except Refusal Peer 
         .error (refuse "illegalState" s!"a protocol header is not a frame of this layer, \
           and {peer.state.label}'s receive column excludes HDR")
       else
-        match Ref.Frame.decodeFrame octets with
-        | .error message => .error (fromFrame message)
+        match Ref.Frame.readFrame octets with
+        | .error failure =>
+          -- the class is the frame layer's own field, so this layer never recovers one by
+          -- splitting prose: `fromFrame` still renders the text a caller sees, and the class
+          -- travels beside it rather than out of it.
+          .error { fromFrame failure.message with reasonClass := failure.reasonClass }
         | .ok (frame, used) =>
           match frame.body with
           | none => .ok peer

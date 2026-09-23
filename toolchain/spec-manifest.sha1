@@ -1,5 +1,5 @@
 cd53ded13c0c31f2d6bacd3d04e3195f5c091b76  lean/Spec/Codec.lean
-3471efab814f25db7e86123e89428dc0a1ee6286  lean/Spec/Connection.lean
+fa9c5116b23cd80869a4859c2caac317604c724c  lean/Spec/Connection.lean
 2a205f752ad6833b88e2064a498eba8b86193fba  lean/Spec/ConnectionCodec.lean
 d196467009441b90ba700953415355a5ee002a0a  lean/Spec/Frame.lean
 31e43aed7900e071a7a1615d739be50f716b5b74  lean/Spec/FrameCodec.lean
