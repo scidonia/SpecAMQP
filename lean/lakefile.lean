@@ -216,6 +216,32 @@ lean_exe «amqp-endpoint-probe» where
   root := `EndpointProbe.Client
   moreLinkObjs := #[«transport-shim-controls»]
 
+/--
+R4's wire application: the corpus's *send* side, at the shell's `App` seam. `Shell.Main`'s application
+announces the header and says nothing, which is the right smallest endpoint and the wrong application for
+a differential — every `send` step of an exchange vector asks the endpoint to put a frame on the wire, and
+an application that sends nothing makes the differential report "nothing arrived" for every vector without
+testing the endpoint at all. This application reads a vector, works out which of its `send` steps are the
+application's (the shell announces the header itself, so a step played from `START` is not), and emits a
+step's octets when the core is in the state that step is played from.
+
+It lives beside `EndpointProbe/` and outside `lean/Shell/` for the same reason: the shell is
+parameterised by `App` so that a test application is a different value rather than a different shell, and
+no test-only policy is shipped. Its counterpart is `scripts/endpoint/wire_peer.py`, which plays the
+vector's `receive` side over the socket; `scripts/run-endpoint-wire-differential.sh` runs the pair.
+-/
+@[default_target]
+lean_lib WireApp where
+  srcDir := "../scripts/endpoint"
+  globs := #[.submodules `WireApp]
+
+/-- `lake exe amqp-wire-app server <port> <corpus.ndjson> <vector-id> [read-octets]` — the endpoint with
+the corpus's send side as its application, serving one connection. -/
+lean_exe «amqp-wire-app» where
+  srcDir := "../scripts/endpoint"
+  root := `WireApp.Main
+  moreLinkObjs := #[«transport-shim»]
+
 /-- The reference implementation as a native executable: `lake exe amqp-ref
 <vector-file.ndjson>`. -/
 lean_exe «amqp-ref» where
