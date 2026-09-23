@@ -7,8 +7,10 @@
 This script is the corpus's command line and nothing else: it owns the flags, the output
 paths and the report, and dispatches the families to `scripts/gen/` — the value corpus to
 `gen/values.py`, the frame corpus to `gen/frames.py` when `--frames` names a path, the
-message corpus to `gen/messages.py` when `--messages` does, and the fragmentation adequacy
-control to `gen/flows.py` when `--flow` or `--flow-negative` does.
+message corpus to `gen/messages.py` when `--messages` does, the fragmentation adequacy
+control to `gen/flows.py` when `--flow` or `--flow-negative` does, and the value layer's
+rule-boundary family to `gen/boundaries.py` when `--value-boundaries` or
+`--value-boundary-negatives` does.
 The split exists so that two slices can add corpus families in the same wave without
 editing one file: a family is a module there plus one dispatch line here.
 
@@ -28,7 +30,7 @@ import sys
 # convention is switched off (python3 -P, or PYTHONSAFEPATH=1).
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 
-from gen import flows, frames, messages, slices, values, write_ndjson
+from gen import boundaries, flows, frames, messages, slices, values, write_ndjson
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
@@ -53,6 +55,13 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--flow-negative", default=None, metavar="PATH",
                         help="also emit the fragmentation negatives (the split points the "
                              "artifact does not permit) to PATH")
+    parser.add_argument("--value-boundaries", default=None, metavar="PATH",
+                        help="also emit the rule-boundary family (the value-layer buffers "
+                             "just inside each encoding rule, which must be read) to PATH")
+    parser.add_argument("--value-boundary-negatives", default=None, metavar="PATH",
+                        help="also emit the rule-boundary negatives (the buffers just "
+                             "outside those rules, each naming the class its clause "
+                             "implies) to PATH")
     args = parser.parse_args(argv)
 
     values.self_check()
@@ -98,6 +107,25 @@ def main(argv: list[str]) -> int:
             print(f"generated {len(negative_vectors)} flow negatives into {args.flow_negative}")
             print(f"  sha256: {negative_digest}")
         flows.report(flow_vectors, negative_vectors)
+
+    if args.value_boundaries is not None or args.value_boundary_negatives is not None:
+        # The family's own pin runs first: it checks the builders against the artifact's
+        # published array example, so a corpus measuring the wrong thing is refused here
+        # rather than committed as vectors whose refusals come from bad arithmetic.
+        boundaries.self_check()
+        admitted_vectors = boundaries.boundary_corpus()
+        refused_vectors = boundaries.boundary_negative_corpus()
+        if args.value_boundaries is not None:
+            admitted_digest = write_ndjson(pathlib.Path(args.value_boundaries), admitted_vectors)
+            print(f"generated {len(admitted_vectors)} rule-boundary vectors into "
+                  f"{args.value_boundaries}")
+            print(f"  sha256: {admitted_digest}")
+        if args.value_boundary_negatives is not None:
+            refused_digest = write_ndjson(pathlib.Path(args.value_boundary_negatives), refused_vectors)
+            print(f"generated {len(refused_vectors)} rule-boundary negatives into "
+                  f"{args.value_boundary_negatives}")
+            print(f"  sha256: {refused_digest}")
+        boundaries.report(admitted_vectors, refused_vectors)
 
     if args.frames is not None:
         frame_vectors = frames.frame_corpus()
