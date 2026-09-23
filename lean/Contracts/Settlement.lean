@@ -172,6 +172,34 @@ def SenderSettleModeDeliveriesAreSettledOnATransfer : Prop :=
       transferLink session true body = .error reason ∧
         reason.condition = invalidField
 
+/-- **The negotiated settle mode is the *choice* the artifact selects, not the *element's* name.**
+`attach`'s `snd-settle-mode` field has the declared type `sender-settle-mode`
+(`spec/oasis/amqp-core-transport-v1.0-os.xml:3138`), and that element's *choices* are `settled` and
+`unsettled`. The two sentences that constrain `transfer`'s `settled` field select one choice each:
+`<xref name="sender-settle-mode" choice="settled"/>` introduces "this field MUST be true on at least
+one transfer frame for a delivery" (`:3153`), and `<xref name="sender-settle-mode" choice="unsettled"/>`
+introduces "this field MUST be false (or unset) on every transfer frame for a delivery" (`:3158`).
+
+The element's *name* appears in both sentences — the ledger renders the cross-reference as the
+enclosing element's name and so loses the choice — which makes it possible to read `sender-settle-mode`
+as though it named one value of its own type. It does not: it is the type, and each sentence
+additionally selects a choice within it. A model that reads the name where the artifact selects a
+choice **inverts which sentence governs which negotiated value**, and the inversion is invisible to
+every check this repository has: both artefacts read it the same way, so a differential reports
+agreement, and agreeing on the wrong sentence is still agreement.
+
+So the selection is stated here, on its own, as an equality the model can fail: the flag the session
+records is true exactly when the negotiated value is the `settled` choice. The obligation that
+*consumes* that flag is the proposition above; a reader who wants the pair reads one after the other
+and sees that the second is only as good as the first. -/
+def SenderSettleModeIsTheChoiceTheClauseSelects : Prop :=
+  ∀ (session session' : Session) (outbound : Bool) (body : Value),
+    (fieldValue "attach" "role" body).bind LinkRole.ofValue = some LinkRole.sender →
+    attachLink session outbound body = .ok session' →
+    session'.senderSettleMode =
+      ((fieldValue "attach" "snd-settle-mode" body).bind valueNat ==
+        ((SpecAMQP.Spec.Connection.choiceValue? "sender-settle-mode" "settled").bind String.toNat?))
+
 /-! ## What this file deliberately does not claim
 
 * **The outcome state machine is not this file's.** `received`, `accepted`, `rejected`,
