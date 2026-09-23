@@ -242,6 +242,17 @@ python3 "$tmp/scan.py" "$extern_boundary" "${scanned_dirs[@]/#/$root/lean/}" \
 sed 's/^/     /' "$tmp/scan.log"
 note "no sorry, admit, native_decide, partial, axiom, constant, opaque, unsafe or @"'"'"'[implemented_by] beyond the counted boundary"
 
+# The boundary's other half, which the `extern` count does not cover: nothing inside `lean/Impl`
+# may import it. The count pins *where* the unproved declarations are; this pins that the proved
+# part of the shipped tree does not depend on them, which is what makes "exactly one module in
+# this directory is not proved" a property of the tree rather than a reading of the imports.
+# `Stream.lean` importing `Impl.Core` is the intended shape and is not matched here.
+strays="$(grep -rl '^import Impl[.]Transport' "$root/lean/Impl" 2>/dev/null | grep -v '/Transport[.]lean$' || true)"
+if [ -n "$strays" ]; then
+  problem "a module under lean/Impl imports the boundary: $(echo "$strays" | tr '\n' ' ')"
+fi
+note "no module under lean/Impl imports the boundary, so the proved part of the shipped tree does not depend on the unproved part"
+
 # The accepted theorems' transitive axioms, printed by the kernel. Every proved theorem
 # the specification claims is inventoried here, not only the first: a theorem proved from
 # nothing but the library and another proved through an axiom nobody looked at are
