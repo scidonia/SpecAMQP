@@ -44,7 +44,8 @@ item loops of the two artefacts on the same value-level fuel, and at fuel zero t
 same function — `Ref.readItems 0 0 c` refuses where `Spec.readItems 1 0 c` accepts — so no statement
 of the form "ref `readItems j` ↔ spec `readItems j`" can be proved from the readers as they are.
 
-Two designs close the gap, and a successor should pick one deliberately:
+Two designs close the gap, and a successor should pick one deliberately. **The plan owner chose the
+first** (`4c3c4a0`), and the account below is what designing it showed:
 
 * **The specification's fuel is irrelevant above the bound.** A fuel unit is spent only where a reader
   *descends*, and a descent consumes octets (a described value behind one constructor octet, a
@@ -54,25 +55,39 @@ Two designs close the gap, and a successor should pick one deliberately:
   down. This is the cheaper design and it needs *no* per-octet work: the specification's dispatch is
   on `classify code.toNat` and on the generated table, so its cases are six, and the four width cases
   are uniform in the row (`specElementData` is exactly the reader's own decision, so a whole width
-  case is one application of the element clause). It must be stated as an *agreement* and not an
-  equality (a refusal's prose names the cursor it was refused at), as a joint induction over the six
-  readers (the value reader descends into the compound, the array and the element decision at one fuel
-  less; the compound's items and the element decision read at the *same* fuel, so the level's clauses
-  must be proved in dependency order), and each clause has to carry the *buffer invariance* of a read
-  as well as its answer — `c₂.data = c.data`, which the arms supply per row from the primitive lemmas
-  but which the loops need for the bound arithmetic.
+  case is one application of the element clause). What designing it established, and what a successor
+  should not have to rediscover:
+  - It must be stated as an *agreement* and not an equality (a refusal's prose names the cursor it was
+    refused at), and each clause must carry the *buffer invariance* of its read as well as its answer
+    — `c₂.data = c.data`. The arms supply that per row from the primitive lemmas; the loops need it for
+    the bound arithmetic, because the tail of an item loop is read at a cursor the item read advanced,
+    so the bound at the tail is only expressible through the buffer the read handed back.
+  - It is a joint induction over the six readers, and the level's clauses must be proved in dependency
+    order: the value reader descends into the compound, the array and the element decision at one fuel
+    less, so those three come from the induction hypothesis; the compound's items are read at the
+    *same* fuel the compound was, and the element decision's data likewise, so the item clause and the
+    element clause are read at the same level as the clauses that call them; the element loop is its
+    decision and then itself, the latter by a count induction.
+  - Two clauses are false as stated at the boundary and need a guard. The item loop's is false from
+    fuel zero to one at a *zero count* (`Ref.readItems 0 0` refuses where `Spec.readItems 1 0`
+    accepts), which no octet bound excludes; it is stated from fuel one, and the middle layer never
+    needs it lower because a compound's items are only reached behind a readable header. The compound
+    reader's is false at fuel zero for a declaration of width **zero** (the header consumes nothing, so
+    the two fuels' item loops are reached and they differ at a zero count); the declared surface's
+    compound rows are one and four octets wide, so no reader reaches one, but the *statement* has to
+    carry that width — or the family has to be stated per category — and any successor that omits it
+    will find the clause unprovable rather than false-by-assumption.
+  - At the entry fuel the claim is not in doubt: an entry-point differential over **101,585** buffers
+    (70,644 up to length 3 over a 41-octet alphabet spanning every category, 30,941 up to length 4
+    over a 13-octet alphabet chosen for compounds, arrays and described values) reports **zero**
+    divergences in shape, consumed count, body view and reason class — so the offset is an accounting
+    difference between the readers, not a behavioural one.
 * **The value relation is stated at a fuel pair.** State the middle layer with the reference's fuel
   and the specification's as parameters and carry the offset symbolically. This needs no new fact, but
   it needs the *scalar* rows re-proved at shifted fuel pairs, since the landed arms relate the two
   readers at one fuel: forty branches of the same size as the arms, or the arms restated with a second
-  fuel parameter.
-
-The item loop's own statement is worth one more note, whichever design is chosen: it is false at fuel
-zero-to-one with a zero count (see the measurement above), so a clause for it has to be stated from
-fuel one, and the middle layer never needs it lower — a compound's items are only reached behind a
-header the bound has already made readable, which is also what makes the zero-fuel cases of the
-compound and array clauses close (they are `spec_readCompound_header` and the array's own fuel match).
-
+  fuel parameter. The plan owner rejected it for that reason: it invalidates landed work by
+  construction and buys nothing the first design does not.
 
 ## Why a fuel-indexed formulation, and what it carries
 
