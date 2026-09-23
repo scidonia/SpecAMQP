@@ -984,6 +984,13 @@ needs a reader: **grep for the words, and read the artefact whole when it is a t
 often a paraphrase rather than a repetition. Eleven instances of this defect in one session, two shapes of remedy, and the second one
 found nothing the first could.
 
+**And the counts stay non-zero, which corrects the message that introduced them.** After every fix above, `PLAN.md` still contains
+"proved to conform" twice and "over the proved core" once — and every one of those hits is *this section quoting the defect in the past
+tense* to explain what went wrong. The message claiming the counts were "now all zero" was wrong about its own subject: zero was never
+the target, since a rule that explains a defect has to be able to name it. What the target is: **nothing asserts the overclaim in the
+present tense**, which is checkable and was checked, and the legitimate hits are the rule's own history. A count is a way of finding a
+truncated search, not a score to drive to zero.
+
 The mechanical form is the one that works: **after changing a claim, grep the repository for its words.** The finding is a pointer
 at one copy — it is the copy someone happened to read — and the words are all of them. The words that moved most in this repository
 are "refuted", "vacuous", "as a theorem", "not started", and "vacuous" again; each of them was true somewhere and false in a
