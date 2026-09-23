@@ -40,6 +40,35 @@ vocabulary plus each artefact's own `frameOfJson` is the carrier both already re
 exactly that — so no change to either artefact was needed and none was made. What is genuinely missing is a
 writer *law*, and it is a named hypothesis in the statement rather than an assumption, which is the same
 treatment every other layer boundary gets here.
+
+## The hypothesis this module rests on is false, so the instances are vacuous as stated
+
+A later slice set out to discharge `ValueLayersAgree` and refuted it, and the refutation was checked
+here at the source rather than taken from the report. Six octets are enough:
+
+`#[0xC1, 0x08, 0x03, 0x40, 0x40, 0x40]` — a `map8` whose count field is 3, odd — is refused by the
+specification as `malformed: a map declares 3 item(s): keys and values come in pairs, so an odd count
+is not a map`, and by the reference as `DecodeError.sizeMismatch "map" 8 4`. Both refuse; they disagree
+about **which class names the refusal**, and the class is part of the observable — §10's `Output`
+carries the refusal and the corpus compares the class — so the value layers do not agree. The
+divergence is reachable at the frame layer, so `Conforms specFrame refFrame` is **false** as an
+unconditional statement, and therefore:
+
+* `frame_conformance_public` is *true and vacuous*: its hypothesis is false, so the theorem says
+  nothing about the two artefacts. It is not withdrawn — the proof is real, the relation is
+  load-bearing under both mutation controls, and the composition is honest — but a reader must not
+  take it as the frame layer's agreement established.
+* The same refutation reaches the send direction through `ValueWriterAgree`, whose array-element
+  family is *reachable through the corpus vocabulary*: `.array 0x57 [null]` gets `unassigned` from one
+  artefact and `limit` from the other.
+* And it reaches the connection instance, whose `ReadersAgree` is a frame-layer hypothesis.
+
+**What follows is a fix in one of the two readings, not a proof revision.** Both artefacts refuse
+these buffers and differ only about the class, so either one misreads the artifact or the artifact is
+silent and the register decides. `PLAN.md` §10 records the order of discharge — decide the reading,
+align the artefacts, then add a vector, because a vector written before the fix is authored from the
+artifact and one written after it is authored from the fix. `Proofs/` carries the refutations as
+theorems, since a refuted hypothesis is a theorem or it is a rumour.
 -/
 
 namespace SpecAMQP.Contracts
