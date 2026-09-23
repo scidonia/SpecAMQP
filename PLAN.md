@@ -1580,6 +1580,12 @@ docstrings, while the tool's own printed divergence text was generically worded 
 regression without git archaeology. **A cause belongs in the artefact that will be read when the cause matters**, which is the run's output rather than the history that produced it, and the
 same rule applies to this plan: a finding recorded only in a message is a finding that will be rediscovered as a surprise.
 
+**And a pin should hold the artefact under test rather than a record of it.** The ledger gate's new step does exactly that: it reads a *fresh* generation of the clause texts into a temporary
+directory rather than the committed `ledger/clauses.json`, so what it pins is the *renderer* — and reverting the branch that renders a choice puts `«sender-settle-mode»` back into both clauses and
+fails the step. A pin that read the committed ledger would have been holding a file the same change also updates, and could have gone green on a revert that left the record alone. **Where a check can
+read the generator rather than its output, it should**, because the output is precisely what the change is allowed to move: this is the same rule as the generator-fidelity gates, arriving from the other
+direction — one says the output must equal what the generator produces, the other says the check must look at the generator when the output is legitimately changing under it.
+
 ## 17. Verification gates and their negative controls
 
 | Gate | Mechanism | Negative control |
