@@ -743,6 +743,15 @@ arguments as (steps, values, shapes, relations) rather than the obvious (step, r
 be used to *infer* that step: it is not a higher-order pattern, so the shape has to be given first. Both are the same rule from different sides, and the module now records them where the next reader will
 meet them.
 
+**And the compound step found a second fuel fact, which is worth stating as an accounting difference before someone reads it as a divergence.** The reference's `readCompound` spends one fuel unit on its own
+header — its match is on `fuel+1` — while the specification's `readValue` has already spent that unit by the time it reaches the item loop, so at one value-level fuel the two loops sit one apart and **the
+offset compounds with nesting**: measured, `Ref.readItems 0 0` refuses where `Spec.readItems 1 0` accepts. No statement of the form `ref readItems j ↔ spec readItems j` is therefore provable, and the
+three loop relations cannot be stated at a single fuel. **This is not a behavioural divergence** — the differential over 746,708 buffers answers identically at the fuel the contract uses, and the reason is
+structural rather than lucky: the specification's dispatch is on `classify` and its four width cases are uniform in the row through `specElementData`, so there is no per-octet work for a fuel increment to
+buy, while the reference spends its unit on a header the specification does not have. The route taken is therefore to prove **the specification's fuel irrelevant above the octet bound** — a theorem rather
+than a hypothesis — which aligns the loops without re-proving the 34 landed arms at shifted pairs. It is the *third* instance of the shape this section has now recorded twice: a statement quantified wider
+than its contract needs is not stronger but false, and the repair is a restriction to the domain the contract actually reaches.
+
 ## 11. Specification test vectors
 
 One shared format for everything the specification is tested against: NDJSON, schema-validated (`tests/contracts/vector.schema.json`), **logical time only** — timestamps are ordering tags, never wall-clock, so replay is deterministic on any machine.
