@@ -388,6 +388,32 @@ theorem, but **the witnesses remain in `Proofs/ValueLayerLaws.lean`** with prose
 A reader who tidies the restriction away re-creates a hypothesis already known to be false, and the proof that follows would be a proof of
 something untrue rather than a failure — which is the one outcome this repository's evidence design exists to prevent.
 
+**The remaining development, as a brief — the analysis is complete and only the window is missing.** ImplCore read the module, both
+readers' `map` branches and the JSON instance layer, verified the instance facts the proof turns on, and landed **nothing**: the work is
+multi-iteration, so it belongs outside the tree until it elaborates, which is the window rule applied without being asked twice. What it
+established, for whoever holds the window:
+
+* **The bridge's statement.** Both readers parse the same `.arr` payload and differ only in how far they parse it in place.
+  `Json.getObjValAs? j α k = fromJson? (j.getObjValD k)` (`Basic.lean:275`); the instance for `Json` is the identity (`:79`); and
+  `Array.fromJson? [FromJson α] : Json → Except String (Array α)` is `| .arr a => a.mapM fromJson?` (`:111–116`). So on a `.arr raw` the
+  specification's `getObjValAs? (Array (Array Json)) "pairs"` is `raw.mapM (fun e => match e with | .arr b => b.mapM Except.ok | x => .error …)`,
+  while the reference's `getObjValAs? (Array Json) "pairs"` is `.ok raw` with `getArr?` called per element at the point of use. The lemma to
+  state is therefore: for `j : Json` and `a : Array (Array Json)`, from `Array.fromJson? (α := Array Json) j = .ok a` derive
+  `∃ raw, Array.fromJson? (α := Json) j = .ok raw ∧ raw.toList.mapM (fun e => e.getArr?) = .ok a.toList ∧ raw.toList = a.toList.map Json.arr`
+  — an induction over the array with `mapM` on both sides, and the `Except.ok` analogue of `List.mapM_some` is what collapses the identity
+  instance (`#check` it in the pinned shell; a bare `lean` cannot see the library, which is a limit one probe of this session hit and reported).
+* **`map`'s clause** mirrors `carrier_clause_list`/`carrier_clause_array`, with a pair-level analogue of `mapM_valueOfJson_agrees` whose
+  obligation is `BodiesAgreePairs` (`FrameSendConformance.lean:164`). The pair accord is AMQP content; the array parsing is the bridge.
+* **The step lemma and the join**: `ValueCarrierAgrees fuel → ValueCarrierAgrees (fuel + 1)` by unfolding the reference's reader, `cases hk`
+  on the discriminant out of the reference's own *success*, then `match hkind` over the twenty-five literals with each branch calling its
+  clause by `rw [hk, hkind]` and the compound four also passing `ih` — the default branch closes because the reference's own dispatch errors
+  there. Then `∀ fuel, ValueCarrierAgrees fuel` by `Nat.rec`, and `ValueCarrierAgree` follows, since it *is* `ValueCarrierAgrees 64`
+  (`FrameSendConformance.lean:204` against `ValueCarrierAgreement.lean:802`).
+* **Estimate**: roughly 200 lines in four pieces with a normal number of build iterations — a development window, not an open question.
+* **And it is the fourth instance of the species above**: the specification parses a pair as a nested array where the reference parses lazily
+  and calls `getArr?` at the point of use. Both accept the same JSON, so no differential sees it — which is why the bridge has to be a proof
+  and not a vector.
+
 **What discharging the hypotheses would take, in order, so the next sitting does not rediscover the shape.** The refutations stand as theorems either way — a refuted hypothesis is a theorem or it is a rumour. Then: **(i)** decide the reading for each divergence, which needs the artifact's own text — for the odd-counted map, whether the count names items or entries and whether the *form* of the count is checked before or after its consistency with the octets. Where the artifact is silent, a register entry decides it, which is what the register is for. **(ii)** Align the two artefacts to that reading, one commit per divergence, since each is symmetric in a different place. **(iii)** Add a vector per divergence, because *reachability* is what decides whether the corpus could ever have seen it: the array-element family is reachable through the corpus vocabulary and the odd-count map is not, and that difference is a fact about the corpus rather than about the defect. **(iv)** Only then are the hypotheses provable and the two conditional instances unconditional. **The order is the point**: a vector written last would be a vector written from the fix rather than from the artifact, which is the rule this repository keeps and exactly why the differential cannot be the thing that finds this class of defect.
 
 **And a second divergence sits underneath the first, found by a sharper witness.** The reported buffer violated two rules at once — an odd count *and* a declared size inconsistent with its items — so it could not say which rule either artefact was answering. A buffer violating only parity, `#[0xC1, 0x03, 0x03, 0x40, 0x40, 0x40]` where the items measure exactly the declared three octets, gives `malformed` from the specification and `sizeMismatch "map" 3 4` from the reference: declared 3, **measured 4**. Four is what a map's content measures if the *count field is inside the size*, three if it is not — so the two artefact seem to differ about what a compound value's size field covers, which would change the class for every map and list rather than only the odd ones. The ledger's index yields the parity clause (`amqp:types/section:primitive-type-definitions/type:map.1`) and nothing on the size field's extent, so that question is open and is being settled from the artifact's prose. **It is the more important of the two**: a parity rule affects one malformed encoding, a size-accounting difference affects the whole corpus.
