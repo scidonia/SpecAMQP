@@ -1286,7 +1286,12 @@ it is to quote **the command that reports it**, with the number dated if a numbe
 is the value, and any copy of its output is a claim about a moment.
 
 This is the same defect as the rest of §16 in its purest form — a claim that was true when written and is read as present tense — with the
-aggravating factor that its author knows it will move. Counts of completed work, coverage percentages and gate totals all behave this way, so
+aggravating factor that its author knows it will move.
+
+**And the escape hatch has to be closed properly**: I wrote "145 at the time of writing" beside the command, and it was 95 two batches later.
+*"At the time of writing" is not a date* — it names no moment, so it dates nothing and reads as current forever. A number that deserves to be kept
+deserves the commit it was read at; a number nobody will update does not deserve to be written down, because the command beside it already reports
+the live value. Counts of completed work, coverage percentages and gate totals all behave this way, so
 the rule is about the *kind* of claim rather than about the ledger: **if the number can change without anyone editing the sentence, the
 sentence should carry the command rather than the number.**
 
