@@ -64,7 +64,7 @@ fae3db7cde111a89b20982e85df213054988d697  tests/contracts/exchange-vector.schema
 9addf5e827c82fd34990f9636858ed75de642b64  tests/contracts/frame-vector.schema.json
 470e2cf5c611d8b49637d8fb30e1bfd0f8c1d3fa  tests/contracts/message-vector.schema.json
 d3d45a51befd4d402fc0d1f6e32da0f0cdcc1474  tests/contracts/r1_transport_shell.sh
-511b4e6d2b0018d4f69cf35a0fe110a030377aad  tests/contracts/r2_endpoint_shell.sh
+3343e7a1a49ebe569787099d4edb47bcdd8333da  tests/contracts/r2_endpoint_shell.sh
 d077d693422502c1a2bc57f017c5db98cef01289  tests/contracts/s0_generator_fidelity.sh
 f5457f3e3647561dc84ed0761556857f431bcad9  tests/contracts/s0_lean_environment.sh
 c20885bbdb17ab564cfbacc1ee8b57a338ba7d88  tests/contracts/s0_sources_ledger.sh
