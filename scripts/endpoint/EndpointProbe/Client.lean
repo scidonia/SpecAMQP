@@ -121,19 +121,22 @@ def main (args : List String) : IO UInt32 := do
       catch e =>
         IO.eprintln s!"endpoint-probe: {e}"
         return (1 : UInt32)
-    -- the readiness line is flushed: Lean's stdout is block-buffered, so an unflushed line never reaches
-    -- the harness that is waiting for this process to be about to dial or accept
-    IO.println s!"probe: {role}, frame of {frame.size} octets, read-octets={readOctets.toNat}"
-    (← IO.getStdout).flush
     try
       if role == "server" then
+        -- the listener is bound *before* the readiness line, so a harness that reads it knows the port
+        -- exists: a line printed before the bind would let a collision be read as readiness
         let listener ← listenOn port
         try
+          IO.println s!"probe: listening port={port} read-octets={readOctets.toNat} \
+            frame-of={frame.size} octets"
+          (← IO.getStdout).flush
           let core ← serveConn listener header (serverApp frame) readOctets
           IO.println s!"probe: the connection ended in {core.conn.state.name}"
         finally
           listener.close
       else
+        IO.println s!"probe: client, frame of {frame.size} octets, read-octets={readOctets.toNat}"
+        (← IO.getStdout).flush
         let core ← dial port header (clientApp frame) readOctets
         IO.println s!"probe: the connection ended in {core.conn.state.name}"
       return (0 : UInt32)
