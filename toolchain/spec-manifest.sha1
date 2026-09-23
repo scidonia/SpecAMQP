@@ -1,5 +1,5 @@
 cd53ded13c0c31f2d6bacd3d04e3195f5c091b76  lean/Spec/Codec.lean
-fa9c5116b23cd80869a4859c2caac317604c724c  lean/Spec/Connection.lean
+6a8bfc8b27cc27327bac9707ebc61f8b83f1c237  lean/Spec/Connection.lean
 2a205f752ad6833b88e2064a498eba8b86193fba  lean/Spec/ConnectionCodec.lean
 d196467009441b90ba700953415355a5ee002a0a  lean/Spec/Frame.lean
 31e43aed7900e071a7a1615d739be50f716b5b74  lean/Spec/FrameCodec.lean
@@ -16,6 +16,7 @@ cb61d366aa72347b772dd32399e4e0dfe8a04a42  lean/Contracts/Conformance.lean
 ac372f4848586250e81968f3ead62410d598b57c  lean/Contracts/FrameCodec.lean
 a17f9194a7f52f841e936457cac7b7d9f0c0ed95  lean/Contracts/FrameCodecAcceptance.lean
 eeb3c6c4881c6675670298155ebdb0825d234738  lean/Contracts/FrameConformance.lean
+33b42a63e6a0fc2419774220a7036fc7c3022909  lean/Contracts/MessageFormat.lean
 4451890c1389bf43a3ddf0e9b6ba17a34622c730  lean/Contracts/SessionCredit.lean
 a67c2b5be23a15b617bebef2fb595a10bb5357ca  lean/Contracts/SessionWindows.lean
 c5ee92929caed5a244bae9a85cea9d0af5e7749a  lean/Contracts/TypeSystem.lean
