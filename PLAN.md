@@ -1436,6 +1436,15 @@ the check caught it — twenty-five `duplicate disposition` problems on clauses 
 than a bad artefact is the same mechanism working one level out**: the slice that received the assignment noticed, refused to land a second decision on clauses
 someone else owned, and re-derived its scope from the tree instead.
 
+**And a *claim* has to be an anchor list too, which is the same rule seen from the other side.** A second collision arrived within the hour, from a claim rather than a scope: one agent
+announced "claiming the last 20 refs" precisely to prevent the collision the earlier batch had suffered, and the other already had those nineteen in flight — scouts on eight of them since
+before the announcement, twelve entries staged. Both computed *next* from the same point in the same ordered list, so a claim expressed as a count or a position is not a claim at all.
+
+**The family is one rule with two faces**: the anchors are stable and the order is not, so both the *assignment* and the *announcement* must be lists of anchors. Everything else — "the next
+N", "the tail", "everything after the ones you hold" — is a race with extra steps. What made this instance cost a message rather than a duplicated decision is worth noting as the mechanism:
+one agent had **staged** rather than committed, and the other **asked** before writing. The duplicate rule would have caught it either way, which is the third time today that gate has been
+the thing standing between two agents and one decision.
+
 ## 17. Verification gates and their negative controls
 
 | Gate | Mechanism | Negative control |
