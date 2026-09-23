@@ -1,0 +1,71 @@
+{
+ "conventions": {
+  "deferred:": "A real obligation this plan carries; the suffix names the milestone whose scope in PLAN.md the clause falls in \u2014 S6, the transaction layer's. The note names the gap that keeps the clause out of the carrier set. An entry with this value says that nothing under lean/ or vectors/ carries the clause's requirement: a missing carrier is recorded rather than covered by naming a declaration that does not hold the rule.",
+  "formalized:": "A Lean declaration path that carries this clause's meaning. Every path recorded here names a declaration the module it names actually holds, and the ledger's existence gate resolves it against lean/** rather than taking the note's word for it; where the carrier is the *condition* a refusal carries rather than the frame that would carry it, the note says which half is missing.",
+  "kind": "The clause's own keyword, read from the ledger's clause rather than inferred from the coverage class: the class is MUST for both forms, so kind and class diverge for MUST NOT, and one clause here is a MUST NOT.",
+  "test:": "A vector id whose verdict is the clause's observable form; the ledger's vector gate resolves every id recorded here against vectors/**."
+ },
+ "design_consequences": [
+  "These eight clauses are the coordinator's error paths and the discharge's liveness rule, and the split is the layer boundary `Contracts/Transaction.lean` draws: what the *condition* is, is this machine's and is carried; what *frame* conveys it is the link layer's and is not built, so four clauses that mandate a rejected outcome or a detach are deferred with that boundary named.",
+  "The two `fail` sentences are the register's: the machine completes a `fail=true` discharge unconditionally, which is the artifact's own wording, and the reading that a discharge against an unknown id is refused whatever the flag is recorded in `ledger/ambiguities/fail-true-against-an-unknown-id.json` rather than resolved here."
+ ],
+ "dispositions": {
+  "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-declare.2": {
+   "clause_text": "This message MUST NOT be sent settled as the sender is REQUIRED to receive and interpret the outcome of the declare from the receiver.",
+   "disposition": "formalized:SpecAMQP.Spec.Transactions.declare; test:txn-declare-settled-refused; test:txn-discharge-settled-refused; test:txn-declare-discharge-accepted",
+   "kind": "MUST NOT",
+   "note": "A settled declare is refused, whichever end sends it: `declare`'s first guard is `refuseUnless (!settled)` with the artifact's own reason, that the sender is required to receive and interpret the outcome (lean/Spec/Transactions.lean:286-296). The contract states it as a proposition over the same function (`Contracts.Transaction.DeclareSettledRefused`), and three vectors cite the clause \u2014 two of them the settled declare and the settled discharge, the third the conforming exchange that contrasts with them.",
+   "text_sha256": "1e4e5421a5d4faa2b5663d034e3b934ba675cbd269b20374d017b0c26fba1819"
+  },
+  "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-declare.5": {
+   "clause_text": "If the coordinator was unable to perform the \u00abdeclare\u00bb as specified by the transaction controller, the transaction coordinator MUST convey the error to the controller as a \u00abtransaction-error\u00bb.",
+   "disposition": "formalized:SpecAMQP.Spec.Transactions.Refusal; formalized:SpecAMQP.Spec.Transactions.transactionErrorCondition",
+   "kind": "MUST",
+   "note": "The error reaches the controller as a transaction-error because the layer's refusals carry the artifact's own condition from the generated choice table: `transactionErrorCondition` reads `transaction-error`'s members (lean/Spec/Transactions.lean:138-141) and `Refusal` is what a refused declare or discharge returns (lean/Spec/Transactions.lean:159-163), with `unknown-id` the member a discharge against a dead id carries. The *frame* that conveys it is the link layer's and is not built \u2014 `Contracts/Transaction.lean:30-33` records that the corpus pins the condition and not the frame \u2014 which is the gap this entry records beside the carrier.",
+   "text_sha256": "edcc7311a7f4b939707e3a0ab3d93f5928d02d74d512697db9ed1db981bc0fb5"
+  },
+  "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-declare.6": {
+   "clause_text": "If the \u00absource\u00bb for the link to the \u00abcoordinator\u00bb supports the \u00abrejected\u00bb outcome, then the message MUST be \u00abrejected\u00bb with this outcome carrying the \u00abtransaction-error\u00bb.",
+   "disposition": "deferred:S6",
+   "kind": "MUST",
+   "note": "deferred: S6 \u2014 uncarried: 'the message MUST be \u00abrejected\u00bb with this outcome carrying the \u00abtransaction-error\u00bb' is an obligation to send a rejected outcome, and the choice depends on whether the \u00absource\u00bb for the control link supports the \u00abrejected\u00bb outcome, and nothing in the model carries a source's capabilities: `coordinatorCapabilities` reads only the coordinator's declared `capabilities` (lean/Spec/Transactions.lean:268-277), and the frames the clause names are the link layer's \u2014 `Contracts/Transaction.lean:30-33` records the boundary exactly ('Disposition outcomes are the link layer's ... the frames that carry it ... belong to the link layer, so the corpus pins the condition and not the frame'). The near-miss is the outcome vocabulary itself: `Spec.Message.Outcome.rejected` exists and is applied to a delivery when a corpus asks for it, and `Session.detachLink` releases a link when a detach arrives, so both frames exist as readers \u2014 what is missing is the obligation to *send* one of them by that choice.",
+   "text_sha256": "ed28b9700669d2bc1541d15eaf05b7c5f7c8f84b1f324bd547548e236d011ee0"
+  },
+  "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-declare.7": {
+   "clause_text": "If the \u00absource\u00bb does not support the \u00abrejected\u00bb outcome, the transactional resource MUST \u00abdetach\u00bb the link to the coordinator, with the \u00abdetach\u00bb performative carrying the \u00abtransaction-error\u00bb.",
+   "disposition": "deferred:S6",
+   "kind": "MUST",
+   "note": "deferred: S6 \u2014 uncarried: the other branch of the same choice \u2014 detach the link to the coordinator with the detach carrying the transaction-error. the choice depends on whether the \u00absource\u00bb for the control link supports the \u00abrejected\u00bb outcome, and nothing in the model carries a source's capabilities: `coordinatorCapabilities` reads only the coordinator's declared `capabilities` (lean/Spec/Transactions.lean:268-277), and the frames the clause names are the link layer's \u2014 `Contracts/Transaction.lean:30-33` records the boundary exactly ('Disposition outcomes are the link layer's ... the frames that carry it ... belong to the link layer, so the corpus pins the condition and not the frame'). The near-miss is the outcome vocabulary itself: `Spec.Message.Outcome.rejected` exists and is applied to a delivery when a corpus asks for it, and `Session.detachLink` releases a link when a detach arrives, so both frames exist as readers \u2014 what is missing is the obligation to *send* one of them by that choice.",
+   "text_sha256": "4bda076425309553c04038bd9d855d14a207c18d728213f328a4fecc2c2043f6"
+  },
+  "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-discharge.1": {
+   "clause_text": "If the coordinator is unable to complete the \u00abdischarge\u00bb, the coordinator MUST convey the error to the controller as a \u00abtransaction-error\u00bb.",
+   "disposition": "formalized:SpecAMQP.Spec.Transactions.discharge; formalized:SpecAMQP.Spec.Transactions.unknownId; test:txn-discharge-unknown-id-refused; test:txn-discharge-twice-refused",
+   "kind": "MUST",
+   "note": "The discharge's own error path is carried and exercised: a discharge naming an id this endpoint does not hold live is refused with the `transaction-error` family's `unknown-id` (lean/Spec/Transactions.lean:313-324, with the condition read from the table at :150-160), and two vectors cite the clause \u2014 the unknown id and the second discharge of the same id. What is not built is the frame the condition would travel in, as `.txn-declare.5` records.",
+   "text_sha256": "b6cd032114ff42891642466884a9715a2142c1fdbab54c56ac04a1790c929292"
+  },
+  "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-discharge.2": {
+   "clause_text": "If the \u00absource\u00bb for the link to the \u00abcoordinator\u00bb supports the \u00abrejected\u00bb outcome, then the message MUST be \u00abrejected\u00bb with this outcome carrying the \u00abtransaction-error\u00bb.",
+   "disposition": "deferred:S6",
+   "kind": "MUST",
+   "note": "deferred: S6 \u2014 uncarried: the same rejected-outcome obligation as the declare's, for a discharge the coordinator cannot complete. the choice depends on whether the \u00absource\u00bb for the control link supports the \u00abrejected\u00bb outcome, and nothing in the model carries a source's capabilities: `coordinatorCapabilities` reads only the coordinator's declared `capabilities` (lean/Spec/Transactions.lean:268-277), and the frames the clause names are the link layer's \u2014 `Contracts/Transaction.lean:30-33` records the boundary exactly ('Disposition outcomes are the link layer's ... the frames that carry it ... belong to the link layer, so the corpus pins the condition and not the frame'). The near-miss is the outcome vocabulary itself: `Spec.Message.Outcome.rejected` exists and is applied to a delivery when a corpus asks for it, and `Session.detachLink` releases a link when a detach arrives, so both frames exist as readers \u2014 what is missing is the obligation to *send* one of them by that choice.",
+   "text_sha256": "ed28b9700669d2bc1541d15eaf05b7c5f7c8f84b1f324bd547548e236d011ee0"
+  },
+  "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-discharge.3": {
+   "clause_text": "If the \u00absource\u00bb does not support the \u00abrejected\u00bb outcome, the transactional resource MUST \u00abdetach\u00bb the link to the coordinator, with the \u00abdetach\u00bb performative carrying the \u00abtransaction-error\u00bb.",
+   "disposition": "deferred:S6",
+   "kind": "MUST",
+   "note": "deferred: S6 \u2014 uncarried: the detach alternative for the discharge, as the declare's `.7`. the choice depends on whether the \u00absource\u00bb for the control link supports the \u00abrejected\u00bb outcome, and nothing in the model carries a source's capabilities: `coordinatorCapabilities` reads only the coordinator's declared `capabilities` (lean/Spec/Transactions.lean:268-277), and the frames the clause names are the link layer's \u2014 `Contracts/Transaction.lean:30-33` records the boundary exactly ('Disposition outcomes are the link layer's ... the frames that carry it ... belong to the link layer, so the corpus pins the condition and not the frame'). The near-miss is the outcome vocabulary itself: `Spec.Message.Outcome.rejected` exists and is applied to a delivery when a corpus asks for it, and `Session.detachLink` releases a link when a detach arrives, so both frames exist as readers \u2014 what is missing is the obligation to *send* one of them by that choice.",
+   "text_sha256": "4bda076425309553c04038bd9d855d14a207c18d728213f328a4fecc2c2043f6"
+  },
+  "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-discharge.4": {
+   "clause_text": "Note that the coordinator MUST always be able to complete a \u00abdischarge\u00bb where the fail flag is set to true (since coordinator failure leads to rollback, which is what the controller is asking for).",
+   "disposition": "formalized:SpecAMQP.Spec.Transactions.discharge; formalized:SpecAMQP.Contracts.FailDischargeCompletes; test:txn-discharge-fail-rolls-back",
+   "kind": "MUST",
+   "note": "A `fail=true` discharge completes whatever the register holds, and the machine implements it by retiring the id *before* consulting liveness (lean/Spec/Transactions.lean:313-324) \u2014 the branch the artifact's 'always able to complete' is about. `Contracts.Transaction.FailDischargeCompletes` states it as a law over the same function, the vector cites the clause, and the interaction the sentence provokes \u2014 a `fail=true` discharge naming an id that was never allocated \u2014 is decided in the register at `ledger/ambiguities/fail-true-against-an-unknown-id.json`.",
+   "text_sha256": "faca8676b08a629fc74b7c91345e63c089caac9cf8ef595f980a7fa32f08f738"
+  }
+ },
+ "schema_version": 1
+}
