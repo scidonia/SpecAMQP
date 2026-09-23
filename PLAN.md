@@ -1426,6 +1426,16 @@ identity, so quoting them quotes something that cannot move.
 The rule that follows: **quote the artifacts, paraphrase our own code and name where it lives.** A quotation of a moving source is the §16 defect with a
 compiler-shaped hole — it reads as authoritative, it is a copy, and nothing checks it — and the longer the quote, the more of it can drift.
 
+**Two agents on one ordered backlog are scoped by assigned *anchors*, not by exclusion sets.** An assignment reading "the next 25, excluding the anchors the
+sibling holds and the families already done" cannot work when both agents walk the same list: whatever it takes next, the second takes next, because *next* is
+computed from the same point and neither can see the other's choice. The files-per-anchor disjointness that makes the work parallel assumes *different* anchors,
+and an exclusion list can only describe what is *already* taken rather than what will be taken while the other works.
+
+The remedy is to name the anchors, which are stable while the order is not. What the mistake cost was one batch written and deleted rather than landed, because
+the check caught it — twenty-five `duplicate disposition` problems on clauses another agent had already decided — and **a gate catching a bad dispatch rather
+than a bad artefact is the same mechanism working one level out**: the slice that received the assignment noticed, refused to land a second decision on clauses
+someone else owned, and re-derived its scope from the tree instead.
+
 ## 17. Verification gates and their negative controls
 
 | Gate | Mechanism | Negative control |
