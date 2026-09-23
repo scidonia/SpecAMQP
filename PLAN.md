@@ -150,6 +150,12 @@ clause as discharged. The disposition stays `deferred:` on the *specification's*
 vocabulary with the shell named only in the note. If implementation-side carriers become a *class* rather than an instance, that is a conventions change to make
 deliberately and with a second example in hand, rather than on the strength of the first.
 
+**And the register's own ids are values like the others'.** An `underspecified:` or `superseded:` disposition names an entry in `ledger/ambiguities/`, and the gate resolves that name the
+way it resolves a `formalized:` declaration path or a `test:` corpus: **a register id that names nothing is refused.** The check landed with the last three live sites resolved, and it was
+verified in *both* directions — a one-character change to a live citation fails it on exactly that entry, and the intact ledger reports nothing of the kind. That negative control is the point:
+a resolution check that cannot fail protects nothing, and this one was proved to fail before it was believed. The reason it matters is the reason the ledger exists at all: an
+`underspecified:` value is an *exemption*, and an exemption whose entry does not exist is invisible, which is how two pictures rode for months on a declaration that was never created.
+
 ## 7. Generated definition tables
 
 `scripts/gen-oasis-lean.py` reads the pinned bytes and emits `lean/Generated/Oasis/`, one module per declaration kind:
@@ -1451,6 +1457,14 @@ before the announcement, twelve entries staged. Both computed *next* from the sa
 N", "the tail", "everything after the ones you hold" — is a race with extra steps. What made this instance cost a message rather than a duplicated decision is worth noting as the mechanism:
 one agent had **staged** rather than committed, and the other **asked** before writing. The duplicate rule would have caught it either way, which is the third time today that gate has been
 the thing standing between two agents and one decision.
+
+**And a driver's port is arbitrated by the bind, not by a lock.** Every driver that starts a server derives a candidate port from its own process id, **scans forward over a bounded range**,
+prints the port it took, and reads the *server's own announcement* as its readiness line rather than merely a first line. No lock and no registry: the bind is already exclusive, so two drivers
+scanning concurrently take different ports, and a lock would serialise them to buy nothing. What the derivation contributes is only a starting point, and it is deliberately blind — a
+`pid % 300` window collides *systematically* with a driver that ran immediately before it in filename order, which is why the scan exists rather than a cleverer derivation. **A range
+exhausted without a bind is a named invalid**, "this run tested nothing", and never a pass; the same separation applies inside a case, where an endpoint that refused to start must be
+distinguished by its own words from a port that could not be bound. Each driver names its own `SPECAMQP_*_PORT_BASE` and `*_PORT_ATTEMPTS` — the shape is shared and the ranges are not,
+since a shared base would make two suites race for one window instead of settling it by bind.
 
 ## 17. Verification gates and their negative controls
 
