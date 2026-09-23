@@ -101,6 +101,17 @@ Three independence rules keep the evidence meaningful, and each has a gate (§17
 - **No clause can escape the ledger.** A crude token census (every text node, split by whether it sits in an excluded subtree) is compared against what the ledger accounted for, per artifact and per keyword; a keyword token in non-excluded prose that produced no clause fails `check` and names the offending element and text. This gate is what makes the ledger's completeness a measurement of the walk rather than a property of its author.
 - **The baseline reconciliation cannot drift.** `ledger/reconciliation.json` records the crude-scan numbers per artifact, this ledger's numbers, and the named mechanism explaining every difference; `check` fails if the recorded numbers stop matching the generated ledger, so revising the ledger means revising the record deliberately.
 
+**An uncarried disposition names what was read and rejected, and the first batch made that the convention.** It found that all 25 clauses
+it took are uncarried — no declaration and no vector implements or asserts them — and recorded each with the milestone whose scope owns the
+obligation *and* the near-miss declaration that was read and rejected: `Spec.Transactions.declared` reads an outcome's `txn-id` and registers
+it, which is reading a field rather than associating work; `transferLink` reads `delivery-id`, `delivery-tag`, `message-format`, `settled`,
+`aborted` and `more`, and not the transaction. **A named near-miss makes the note checkable against the tree; an unexplained absence makes
+it a claim.** That is what turned 25 undispositioned clauses into 25 statements of what is missing, and the convention belongs here because
+otherwise a future pass would have the vocabulary available and no reason to use it.
+
+It also confirmed the earlier lesson about *where* a batch's order comes from: the check's own report, not a list handed to the pass — the
+list I handed over was the *tail* of the report's order rather than its head, which would have started the batch at the wrong anchor.
+
 ## 7. Generated definition tables
 
 `scripts/gen-oasis-lean.py` reads the pinned bytes and emits `lean/Generated/Oasis/`, one module per declaration kind:
