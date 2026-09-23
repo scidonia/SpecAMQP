@@ -45,6 +45,7 @@ import pathlib, sys
 root = pathlib.Path(sys.argv[1])
 generated = ['vectors/generated.ndjson', 'vectors/generated-frames.ndjson', 'vectors/generated-exchanges.ndjson', 'vectors/message/generated.ndjson', 'vectors/flow.ndjson', 'vectors/flow-negative.ndjson', 'vectors/value-boundaries.ndjson', 'vectors/value-boundary-negatives.ndjson']
 hand = {
+    'vectors/constructor-disagreement.ndjson',
     'vectors/frames-negative.ndjson',
     'vectors/frames.ndjson',
     'vectors/message/deliveries.ndjson',

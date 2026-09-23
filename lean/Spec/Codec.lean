@@ -743,7 +743,18 @@ type's own form. A value of another type is refused rather than written short. -
 def writeFixedData (decl : EncodingDecl) (value : Value) : Except Refusal (List UInt8) :=
   match decl.owner, value with
   | "null", .null => .ok []
-  | "boolean", .boolean b => if decl.width = 0 then .ok [] else .ok [if b then 1 else 0]
+  -- The zero-width boolean rows are *named* `true` and `false`: the octet count cannot tell them
+  -- apart, so the row's own name is what must agree with the value. It used to write nothing
+  -- whenever the width was zero, which meant a `false` written under the `true` row came out as
+  -- octets that decode to `true` — the value silently replaced by its opposite.
+  | "boolean", .boolean b =>
+    if decl.width = 0 then
+      if decl.name = some (if b then "true" else "false") then .ok []
+      else
+        .error (refusal "malformed" s!"the declared surface calls octet \
+          0x{toHex #[UInt8.ofNat decl.code]} the {decl.name.getD "boolean"} encoding, which \
+          cannot carry the boolean value {b}")
+    else .ok [if b then 1 else 0]
   | "ubyte", .ubyte n => filled decl.width n
   | "ushort", .ushort n => filled decl.width n
   | "uint", .uint n => if decl.width = 0 then zeroForm "uint" n else filled decl.width n
@@ -922,12 +933,27 @@ termination_by item _ _ => sizeOf item + 1
 
 /-- A compound's data: its items, then the size and count fields that announce them. -/
 def writeCompoundData : Value → EncodingDecl → Except Refusal (List UInt8)
-  | .list items, decl => do
-    let body ← writeItems items
-    compoundOctets decl items.length body
-  | .map pairs, decl => do
-    let body ← writePairs pairs
-    compoundOctets decl (2 * pairs.length) body
+  -- The declared row decides which kind of compound may be written, not the item's own form: a list
+  -- under a `map` row and a map under a `list` row are both shape violations, and the row is what a
+  -- reader believes. Matching on the item alone wrote a map's octets under a list row (and the empty
+  -- list's as the empty map's), which the reader then reads as the other kind — the same silent
+  -- substitution the zero-width boolean had.
+  | .list items, decl =>
+    if decl.owner == "list" then do
+      let body ← writeItems items
+      compoundOctets decl items.length body
+    else
+      .error (refusal "malformed" s!"the declared surface calls octet \
+        0x{toHex #[UInt8.ofNat decl.code]} a {decl.owner} encoding, which cannot carry \
+        {typeName (.list items)}")
+  | .map pairs, decl =>
+    if decl.owner == "map" then do
+      let body ← writePairs pairs
+      compoundOctets decl (2 * pairs.length) body
+    else
+      .error (refusal "malformed" s!"the declared surface calls octet \
+        0x{toHex #[UInt8.ofNat decl.code]} a {decl.owner} encoding, which cannot carry \
+        {typeName (.map pairs)}")
   | item, decl =>
     .error (refusal "malformed" s!"the declared surface calls octet \
       0x{toHex #[UInt8.ofNat decl.code]} a {decl.owner} encoding, which cannot carry \

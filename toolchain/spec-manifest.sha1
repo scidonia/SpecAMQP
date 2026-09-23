@@ -14,7 +14,7 @@ f1b824c9c4aeae571c20a0acb2e7ff06d1b50741  lean/Contracts/Sasl.lean
 97f766752ab580a51ca94012988a39678c33f6e0  lean/Contracts/Settlement.lean
 7a52a63a35cda512b63a483e43af4799ae81beea  lean/Contracts/Transaction.lean
 c5ee92929caed5a244bae9a85cea9d0af5e7749a  lean/Contracts/TypeSystem.lean
-f8940df7bf0bffcaf8b2f68d914de108b92f1659  lean/Spec/Codec.lean
+316c36a5a9f758c3dae57928cc7010485da89c40  lean/Spec/Codec.lean
 2ca24c7481f75673b678fb26c48e17deec817629  lean/Spec/Connection.lean
 2a205f752ad6833b88e2064a498eba8b86193fba  lean/Spec/ConnectionCodec.lean
 c92c679a91d5a504610bbd47f27ffe33f7776971  lean/Spec/Frame.lean
@@ -79,13 +79,13 @@ fae3db7cde111a89b20982e85df213054988d697  tests/contracts/exchange-vector.schema
 470e2cf5c611d8b49637d8fb30e1bfd0f8c1d3fa  tests/contracts/message-vector.schema.json
 d3d45a51befd4d402fc0d1f6e32da0f0cdcc1474  tests/contracts/r1_transport_shell.sh
 3930a6a9fcc8b607e3a93c38b77e20455bfa6805  tests/contracts/r2_endpoint_shell.sh
-d077d693422502c1a2bc57f017c5db98cef01289  tests/contracts/s0_generator_fidelity.sh
+71d9ac69341ac360f9b89d01cfc406640e5523af  tests/contracts/s0_generator_fidelity.sh
 f5457f3e3647561dc84ed0761556857f431bcad9  tests/contracts/s0_lean_environment.sh
 8f1b7c67a05fb6bda033be31f3819d3bde09f123  tests/contracts/s0_sources_ledger.sh
 83e3aada053d4523368b9aeee74d96a081613cd3  tests/contracts/s0_spec_manifest.sh
 c2ad5a412456853b4de79bc3a893d4b2c1d7252d  tests/contracts/s0_tables_fidelity.sh
 c86fe5435dc380611e92f80f069a812dc9f48a3a  tests/contracts/s0_vector_citations.sh
-5d12e9058a67f7d1177327349a46f156071aea4f  tests/contracts/s1_differential.sh
+de655d4c1478f351795f9d489899c9d3af3ad8ae  tests/contracts/s1_differential.sh
 e2098809fe46c3652ffe50c0cd9b4f6cb36d7806  tests/contracts/s1_proof_integrity.sh
 e53d486954fbe9a2dac96037e9970ecf70d95732  tests/contracts/s1_ref_vectors.sh
 cd8cf38336ebfd9594ad8d13182da07d711d5295  tests/contracts/s2_frame_vectors.sh
@@ -99,6 +99,7 @@ db82368890d436450b3c199292a6c76d7c1ede34  tests/contracts/value_boundaries.sh
 56f7d28450643ce4131bcb9bf69166378642b803  tests/contracts/value_class_agreement.sh
 7415b0ec31b4819fa0819ba2bfde045dafba9859  tests/contracts/vector.schema.json
 8df812612ca8156e5895814a18385cb775f1e1db  toolchain/sources.toml
+af7bb1f7da0bf50c65238f43394e42eb3d248ae7  vectors/constructor-disagreement.ndjson
 63f3cb8b35942d9451fdbc5dc6b1caf09e224d05  vectors/flow-negative.ndjson
 240d04abf05f593c59062c75e2ed16a2ac6185ed  vectors/flow.ndjson
 0f123312d720c0282d52ceb90467270f289dc6ed  vectors/frames-negative.ndjson

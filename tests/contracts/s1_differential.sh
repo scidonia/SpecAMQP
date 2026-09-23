@@ -27,6 +27,7 @@ set -euo pipefail
 readonly root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 readonly worked="$root/vectors/primitives.ndjson"
 readonly generated="$root/vectors/generated.ndjson"
+readonly disagreement="$root/vectors/constructor-disagreement.ndjson"
 
 die() {
   printf 's1_differential: FAIL: %s\n' "$1" >&2
@@ -51,7 +52,7 @@ run() { # exe corpus outfile
   grep -q "0 failure(s)" "$out.err" || die "$exe reported failures on $(basename "$corpus")"
 }
 
-for corpus in "$worked" "$generated"; do
+for corpus in "$worked" "$generated" "$disagreement"; do
   case "$corpus" in
     "$worked") name=worked ;;
     *) name=generated ;;
