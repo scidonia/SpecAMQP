@@ -8,10 +8,16 @@ open Lean (Json)
 
 `FrameSendConformance.ValueCarrierAgree` is the value layer's claim in the corpus vocabulary: a
 value the reference's carrier reads is one the specification's also reads, and the two readings
-agree as values. This module is its proof, one clause at a time, and it is **in progress**: nine
-of the twenty-five clauses are proved — `null`, `boolean`, `string`, `symbol`, `binary` and the
-five unsigned widths `ubyte`, `ushort`, `uint`, `ulong` (with `char` on the same route, below) —
-and the remaining sixteen are the work this module exists for.
+agree as values. This module is its proof, one clause at a time, and it is **in progress**: fifteen
+of the twenty-five clauses are proved, in four families —
+
+* the structured scalars `null`, `boolean`, `string`, `symbol`;
+* the octet payloads `binary`, `float`, `double`, `decimal32`, `decimal64`, `decimal128`, `uuid`;
+* the unsigned widths `ubyte`, `ushort`, `uint`, `ulong`;
+
+and the remaining ten are the work this module exists for: the signed widths `byte`, `short`,
+`int`, `long` and `timestamp`, `char`, and the four compounds `list`, `map`, `array`, `described`.
+The route to each of those is named at the end of this header.
 
 ## Why clause by clause, and why the discriminant is a hypothesis
 
@@ -72,6 +78,26 @@ some branches are written `.ok v` and some `return v`, the latter leaving a `pur
 `simp only [Except.ok.injEq] at h` **makes no progress** on those. `injection h with hb` handles
 both, and is what the symbol, binary and unsigned-widest clauses use.
 
+## The octet payloads: one bridge each, and a rewrite detail
+
+`float`, `double`, the three decimals and `uuid` read a fixed-width opaque payload through two
+differently named helpers — the specification's `hexPayloadOf`, the reference's `fixedHex` — which
+do the same reads and the same width check and differ only in the failure text. They are therefore
+related by `fixedHex_ok_hexPayloadOf`, a one-directional agreement on the success path, rather
+than by an equality of functions. The two payload types are two abbreviations of `Array UInt8`
+(`Harness.Octets` and `Ref.Octets`), so the bridge names the reference's spelling.
+
+The clause then reads
+
+```lean
+have hspec : SpecAMQP.Spec.Codec.hexPayloadOf json 4 "float" = .ok bytes :=
+  fixedHex_ok_hexPayloadOf json 4 "float" bytes hf
+simp only [hf, hspec] at h ⊢
+```
+
+— a *local hypothesis* used as the rewrite rule, because `simp only`'s argument list takes
+identifiers and not applied terms.
+
 ## What remains, and the route to it
 
 * **The signed family** — `byte`, `short`, `int`, `long` and `timestamp`, where the reference
@@ -84,8 +110,9 @@ both, and is what the symbol, binary and unsigned-widest clauses use.
   reads `boundedField json "codepoint" 0 1114111` through `getObjValAs? Int`. That disagreement is
   in the *accessor*, not the width, so this clause needs a `Nat`/`Int` accessor bridge before its
   arithmetic.
-* **The four compounds** — `list`, `binary` already proved, `map`, `array`, `described` — where the
-  recursion's fuel and the item reads are the work, and where `BodiesAgree` recurses.
+* **The four compounds** — `list`, `map`, `array`, `described` — where the recursion's fuel and the
+  item reads are the work, and where `BodiesAgree` recurses (`BodiesAgreeList`, `BodiesAgreePairs`,
+  and the constructor pair for `array`).
 * **Then the joint development**: prefix determinism and fuel monotonicity, which is what lets
   the clause lemmas be joined into one `valueOfJson` agreement over all buffers rather than
   re-derived per `Json`. `ValueLayersAgree` (`Proofs/ValueLayerLaws`) needs the same treatment on
@@ -317,5 +344,157 @@ theorem carrier_clause_ulong (fuel : Nat) (json : Json)
     exact ⟨.ulong n, rfl,
       by simp only [BodiesAgree];
          exact (u64_toNat n (by have := unsignedOf_le json 18446744073709551615 n hu; omega)).symm⟩
+
+/-- The two readers' fixed-width opaque payloads agree on success: the same reads and the same
+width check, differing only in the failure text, which is why this is a one-directional agreement
+on the success path rather than an equality of the two functions. -/
+theorem fixedHex_ok_hexPayloadOf (json : Json) (width : Nat) (kind : String)
+    (bytes : SpecAMQP.Ref.Octets)
+    (h : SpecAMQP.Ref.Vectors.fixedHex json width = .ok bytes) :
+    SpecAMQP.Spec.Codec.hexPayloadOf json width kind = .ok bytes := by
+  unfold SpecAMQP.Ref.Vectors.fixedHex at h
+  unfold SpecAMQP.Spec.Codec.hexPayloadOf
+  simp only [Bind.bind, Except.bind] at h ⊢
+  cases hv : json.getObjValAs? String "hex" with
+  | error err => simp [hv] at h
+  | ok hex =>
+    simp only [hv] at h ⊢
+    cases hx : SpecAMQP.Harness.ofHex hex with
+    | error err => simp [hx] at h
+    | ok octets =>
+      simp only [hx] at h ⊢
+      by_cases hw : octets.size = width
+      · simp only [hw, beq_iff_eq] at h ⊢
+        injection h with hb
+        subst hb
+        rfl
+      · simp only [hw, beq_iff_eq] at h ⊢
+        simp at h
+
+/-- **The `"float"` clause** — a fixed-width opaque payload, the same read and the same octets on
+both sides. -/
+theorem carrier_clause_float (fuel : Nat) (json : Json)
+    (hk : json.getObjValAs? String "type" = .ok "float") (other : SpecAMQP.Ref.Value)
+    (h : SpecAMQP.Ref.Vectors.valueOfJson (fuel + 1) json = .ok other) :
+    ∃ body : SpecAMQP.Spec.Codec.Value,
+      SpecAMQP.Spec.Codec.valueOfJson (fuel + 1) json = .ok body ∧ BodiesAgree body other := by
+  unfold SpecAMQP.Ref.Vectors.valueOfJson at h
+  unfold SpecAMQP.Spec.Codec.valueOfJson
+  simp only [Bind.bind, Except.bind] at h ⊢
+  simp only [hk] at h ⊢
+  cases hf : SpecAMQP.Ref.Vectors.fixedHex json 4 with
+  | error err => simp [hf] at h
+  | ok bytes =>
+    have hspec : SpecAMQP.Spec.Codec.hexPayloadOf json 4 "float" = .ok bytes :=
+      fixedHex_ok_hexPayloadOf json 4 "float" bytes hf
+    simp only [hf, hspec] at h ⊢
+    injection h with hb
+    subst hb
+    exact ⟨.float bytes, rfl, by simp only [BodiesAgree]⟩
+
+/-- **The `"double"` clause** — a fixed-width opaque payload, the same read and the same octets on
+both sides. -/
+theorem carrier_clause_double (fuel : Nat) (json : Json)
+    (hk : json.getObjValAs? String "type" = .ok "double") (other : SpecAMQP.Ref.Value)
+    (h : SpecAMQP.Ref.Vectors.valueOfJson (fuel + 1) json = .ok other) :
+    ∃ body : SpecAMQP.Spec.Codec.Value,
+      SpecAMQP.Spec.Codec.valueOfJson (fuel + 1) json = .ok body ∧ BodiesAgree body other := by
+  unfold SpecAMQP.Ref.Vectors.valueOfJson at h
+  unfold SpecAMQP.Spec.Codec.valueOfJson
+  simp only [Bind.bind, Except.bind] at h ⊢
+  simp only [hk] at h ⊢
+  cases hf : SpecAMQP.Ref.Vectors.fixedHex json 8 with
+  | error err => simp [hf] at h
+  | ok bytes =>
+    have hspec : SpecAMQP.Spec.Codec.hexPayloadOf json 8 "double" = .ok bytes :=
+      fixedHex_ok_hexPayloadOf json 8 "double" bytes hf
+    simp only [hf, hspec] at h ⊢
+    injection h with hb
+    subst hb
+    exact ⟨.double bytes, rfl, by simp only [BodiesAgree]⟩
+
+/-- **The `"decimal32"` clause** — a fixed-width opaque payload, the same read and the same octets on
+both sides. -/
+theorem carrier_clause_decimal32 (fuel : Nat) (json : Json)
+    (hk : json.getObjValAs? String "type" = .ok "decimal32") (other : SpecAMQP.Ref.Value)
+    (h : SpecAMQP.Ref.Vectors.valueOfJson (fuel + 1) json = .ok other) :
+    ∃ body : SpecAMQP.Spec.Codec.Value,
+      SpecAMQP.Spec.Codec.valueOfJson (fuel + 1) json = .ok body ∧ BodiesAgree body other := by
+  unfold SpecAMQP.Ref.Vectors.valueOfJson at h
+  unfold SpecAMQP.Spec.Codec.valueOfJson
+  simp only [Bind.bind, Except.bind] at h ⊢
+  simp only [hk] at h ⊢
+  cases hf : SpecAMQP.Ref.Vectors.fixedHex json 4 with
+  | error err => simp [hf] at h
+  | ok bytes =>
+    have hspec : SpecAMQP.Spec.Codec.hexPayloadOf json 4 "decimal32" = .ok bytes :=
+      fixedHex_ok_hexPayloadOf json 4 "decimal32" bytes hf
+    simp only [hf, hspec] at h ⊢
+    injection h with hb
+    subst hb
+    exact ⟨.decimal32 bytes, rfl, by simp only [BodiesAgree]⟩
+
+/-- **The `"decimal64"` clause** — a fixed-width opaque payload, the same read and the same octets on
+both sides. -/
+theorem carrier_clause_decimal64 (fuel : Nat) (json : Json)
+    (hk : json.getObjValAs? String "type" = .ok "decimal64") (other : SpecAMQP.Ref.Value)
+    (h : SpecAMQP.Ref.Vectors.valueOfJson (fuel + 1) json = .ok other) :
+    ∃ body : SpecAMQP.Spec.Codec.Value,
+      SpecAMQP.Spec.Codec.valueOfJson (fuel + 1) json = .ok body ∧ BodiesAgree body other := by
+  unfold SpecAMQP.Ref.Vectors.valueOfJson at h
+  unfold SpecAMQP.Spec.Codec.valueOfJson
+  simp only [Bind.bind, Except.bind] at h ⊢
+  simp only [hk] at h ⊢
+  cases hf : SpecAMQP.Ref.Vectors.fixedHex json 8 with
+  | error err => simp [hf] at h
+  | ok bytes =>
+    have hspec : SpecAMQP.Spec.Codec.hexPayloadOf json 8 "decimal64" = .ok bytes :=
+      fixedHex_ok_hexPayloadOf json 8 "decimal64" bytes hf
+    simp only [hf, hspec] at h ⊢
+    injection h with hb
+    subst hb
+    exact ⟨.decimal64 bytes, rfl, by simp only [BodiesAgree]⟩
+
+/-- **The `"decimal128"` clause** — a fixed-width opaque payload, the same read and the same octets on
+both sides. -/
+theorem carrier_clause_decimal128 (fuel : Nat) (json : Json)
+    (hk : json.getObjValAs? String "type" = .ok "decimal128") (other : SpecAMQP.Ref.Value)
+    (h : SpecAMQP.Ref.Vectors.valueOfJson (fuel + 1) json = .ok other) :
+    ∃ body : SpecAMQP.Spec.Codec.Value,
+      SpecAMQP.Spec.Codec.valueOfJson (fuel + 1) json = .ok body ∧ BodiesAgree body other := by
+  unfold SpecAMQP.Ref.Vectors.valueOfJson at h
+  unfold SpecAMQP.Spec.Codec.valueOfJson
+  simp only [Bind.bind, Except.bind] at h ⊢
+  simp only [hk] at h ⊢
+  cases hf : SpecAMQP.Ref.Vectors.fixedHex json 16 with
+  | error err => simp [hf] at h
+  | ok bytes =>
+    have hspec : SpecAMQP.Spec.Codec.hexPayloadOf json 16 "decimal128" = .ok bytes :=
+      fixedHex_ok_hexPayloadOf json 16 "decimal128" bytes hf
+    simp only [hf, hspec] at h ⊢
+    injection h with hb
+    subst hb
+    exact ⟨.decimal128 bytes, rfl, by simp only [BodiesAgree]⟩
+
+/-- **The `"uuid"` clause** — a fixed-width opaque payload, the same read and the same octets on
+both sides. -/
+theorem carrier_clause_uuid (fuel : Nat) (json : Json)
+    (hk : json.getObjValAs? String "type" = .ok "uuid") (other : SpecAMQP.Ref.Value)
+    (h : SpecAMQP.Ref.Vectors.valueOfJson (fuel + 1) json = .ok other) :
+    ∃ body : SpecAMQP.Spec.Codec.Value,
+      SpecAMQP.Spec.Codec.valueOfJson (fuel + 1) json = .ok body ∧ BodiesAgree body other := by
+  unfold SpecAMQP.Ref.Vectors.valueOfJson at h
+  unfold SpecAMQP.Spec.Codec.valueOfJson
+  simp only [Bind.bind, Except.bind] at h ⊢
+  simp only [hk] at h ⊢
+  cases hf : SpecAMQP.Ref.Vectors.fixedHex json 16 with
+  | error err => simp [hf] at h
+  | ok bytes =>
+    have hspec : SpecAMQP.Spec.Codec.hexPayloadOf json 16 "uuid" = .ok bytes :=
+      fixedHex_ok_hexPayloadOf json 16 "uuid" bytes hf
+    simp only [hf, hspec] at h ⊢
+    injection h with hb
+    subst hb
+    exact ⟨.uuid bytes, rfl, by simp only [BodiesAgree]⟩
 
 end SpecAMQP.Proofs
