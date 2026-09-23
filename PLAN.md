@@ -157,8 +157,9 @@ a resolution check that cannot fail protects nothing, and this one was proved to
 `underspecified:` value is an *exemption*, and an exemption whose entry does not exist is invisible, which is how two pictures rode for months on a declaration that was never created.
 
 **The backlog is empty, and it emptied by kind rather than by exhaustion.** Every MUST and MUST NOT clause in the vendored artifacts now carries a disposition:
-`undispositioned must-class: 0` at **452 dispositions across 17 files**, with the ledger's own gate green and the full suite at **18 of 19 contracts passing in 201 seconds** — the single failure
-being a manifest entry behind a generated coverage file, a record catching up rather than a gate failing. The last batch landed with a **four-plant mutation control**: a stale digest, a clause that
+`undispositioned must-class: 0` at **452 dispositions across 17 files**, with the ledger's own gate green and **the full suite at 19 of 19 contracts passing in 134 seconds** — a figure that took two runs
+to earn: the first was 18 of 19, and the one failure was a manifest entry sitting behind the regenerated coverage file, which is a record catching up rather than a gate failing. The
+second run is the number to quote and the first is why the number is worth quoting: a suite that has never been red is a suite nobody has watched work. The last batch landed with a **four-plant mutation control**: a stale digest, a clause that
 does not exist, a renamed declaration and a renamed vector each exit 1 with the diagnostic naming the offending file, while the pristine files in the same copy report zero problems. That control is
 what makes the zero readable: a coverage figure counts what was written down, and the undispositioned count is the one that can only reach zero by the whole corpus being decided.
 
