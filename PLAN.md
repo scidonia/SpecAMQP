@@ -885,12 +885,20 @@ def ReaderReachable (v : SpecAMQP.Ref.Value) : Prop :=
   ∃ region : Octets, ∃ used : Nat, SpecAMQP.Ref.decode region = .ok (v, used)
 ```
 
-`ValueWriterAgree` keeps its name and its two conjuncts and gains this as a hypothesis on the body: quantified over
-`ReaderReachable` values, the octet-equality conjunct is a candidate theorem rather than a refuted one, and the
-class-agreement conjunct is unchanged. The ill-width witness stays in `FrameSendConformance.lean`'s caveat, named, with
-the reason it sits outside the domain — a permissive writer's property over values no protocol path constructs — because
-a narrowed hypothesis with an unexplained narrowing is a defect wearing a domain, which is the sentence this paragraph
-exists to make checkable.
+**Two domains, because two consumers receive values by different paths and neither path implies the other.**
+`ValueWriterAgree` is the *send instance's* law, and its values arrive through the corpus carrier, so its domain is
+**carrier-reachability** — `∃ json, SpecAMQP.Ref.Vectors.valueOfJson 64 json = .ok v` — which is the path the endpoint proof can
+supply from `frameOfJson`'s own construction, and which says the same thing in that endpoint's terms: a body the carrier cannot
+produce is a body that endpoint cannot send. It keeps its name and its two conjuncts, gains the reachability as a hypothesis on
+the body, and takes it as a parameter in `writers_matched`, since that lemma cannot derive it for arbitrary related frames. The
+octet-equality conjunct then becomes a candidate theorem rather than a refuted one, and the class-agreement conjunct is unchanged.
+`ReaderReachable` stays as written and is the domain of the *wire-level* claims, including the value layer's own agreement, where
+the wire reader is the right notion. **Both exclusions go in `FrameSendConformance.lean`'s caveat, named, with their reasons** — a permissive writer's property over
+values no protocol path constructs, and carrier-reachability *not* implying wire-reachability, which is a fact about the artefacts:
+bridging the two would need a reference writer–reader round trip that `Ref` does not expose, the same absence that makes the writer
+law a hypothesis at all. A narrowed hypothesis with an unexplained narrowing is a defect wearing a domain, and a domain whose
+boundary is explained only where it excludes something is half-explained — this one excludes nothing on one side and cannot be
+derived on the other, so both halves get a sentence.
 
 **Ownership is what makes a window possible, and this session bought that rule three times.** A slice editing a file
 another slice needs must say so, and say when the file is buildable again. `ImplCore`'s one line — "frame is green at the
