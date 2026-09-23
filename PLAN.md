@@ -890,6 +890,13 @@ window rather than one per file.** The corollary is the conductor's rather than 
 lets anyone declare a window at all, and where ownership was unstated the collision happened — the announcement is what
 turned each of these into a message instead of a merge.
 
+**A commit message is written from a file, never inline in a command.** `b361bad`'s body lost every backticked identifier
+because it was passed through a shell and the backticks were command-substituted: the subject and the file stats are exact,
+and the body says "seven shape and nine capacity" without naming them. Its author disclosed it, tried a guarded
+`reset --soft`, found three later commits on top, and stopped rather than rewrite history under other slices' work — which is
+the right call and the reason the remedy here is a later commit rather than a rewrite. `git commit -F <file>` or a *quoted*
+heredoc avoids it entirely, and a message is the one artefact in a repository whose loss no compiler and no gate can catch.
+
 ## 17. Verification gates and their negative controls
 
 | Gate | Mechanism | Negative control |
