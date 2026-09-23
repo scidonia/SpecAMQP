@@ -1,6 +1,7 @@
 import Contracts.Conformance
 import Proofs.FrameConformance
 import Proofs.FrameSendConformance
+import Proofs.ValueWireAgreement
 
 /-!
 # The value layer's hypotheses, at the evidence
@@ -78,21 +79,33 @@ been fixed earlier and its proof needing a value-layer instance that does not ex
 * **`ValueCarrierAgree` is untouched here**: it is a claim about the two corpus-vocabulary readers
   (`Spec.Codec.valueOfJson` against `Ref.Vectors.valueOfJson`), not about the wire, and this module
   has no evidence against it.
-* **The send *endpoint*'s consequent is refutable now, and the obstruction to saying so was a type.**
-  Every divergence between the two writers that the corpus vocabulary can express *and that this module
-  has checked* was class-only — both refuse, with different classes (`.array 0x00 [null]` and
-  `.array 0xE0 [null]` were `malformed:` against `limit:`, and both artefacts were aligned) — and the
-  reference's writer answered `Except String Octets`, so its class could only be recovered by
-  `Ref.Frame.classOf`, i.e. by splitting prose. Classing the writer removed that: the class is a field
-  (`Ref.EncodeRefusal.reasonClass`), and the empty-array family above is a *shape* divergence — one
-  writes, the other refuses — that the vocabulary reaches. So `¬ Conforms specFrameSend refFrameSend` is
-  now expressible through a frame whose body is a described performative carrying this array, which is
-  the form the previous sitting said this direction's refutation could not be written in. It is **not**
-  landed here: the value layer's law is what this module is about, and the endpoint's own negation needs
-  a frame in the corpus vocabulary that survives `frameOfJson`'s performative test. What this module
-  lands instead is the value-layer material such an argument would rest on — the witness, and the class
-  both writers name for it — and that material is now a *class agreement* rather than a refutation,
-  because the fix that closed the hole made the two writers agree on it.
+* **The send *endpoint*'s consequent was refutable before patch 3, and is undecided now — and the
+  search that says so is stated here rather than assumed.** The record this bullet used to carry said
+  the negation was *expressible and untried*: the reference's writer answered `Except String Octets`,
+  its class could only be recovered by `Ref.Frame.classOf` (a `String.splitOn ":"`), and the classing
+  turned that into a field, so `¬ Conforms specFrameSend refFrameSend` could be written through a frame
+  whose body is a described performative carrying the empty-array pair. The first half is right and the
+  second is now stale: the pair it was expressible through — an array whose declared element constructor
+  the grammar assigns no encoding — is alignment, not refutation, since the fix that closed the hole,
+  and the class-family divergence that *was* the consequent's falsity (`.array 0x00 [null]` and
+  `.array 0xE0 [null]`: `malformed` against `limit`, patch 3's own split) went with it. So there is a
+  witness **or** there is not, and the two possibilities were told apart rather than left standing:
+  **80,204 frame-encode inputs** — every one of the 256 array element constructors against a 113-item
+  pool of in-range, out-of-range and mismatched shapes; the `0x00` descriptor, `0x40`/`0x41`/`0x42`
+  zero-width, `0xC0`/`0xC1`/`0xD0`/`0xD1` compound and `0xE0`/`0xF0` array rows against the same pool;
+  the array materialisation limit at 65535/65536/65537 elements; nesting depth 30–100; string, symbol
+  and binary lengths 0–300 across the 255/256-octet form boundary; `doff` 0–256, `channel` 0–65536,
+  both frame types, extended and payload combinations; and 16,000 seeded random values over the
+  corpus grammar — draw **identical verdicts from both artefacts**, with no input on which the
+  reference takes a step the specification does not permit and no input on which the two write different
+  octets. The one asymmetry the sweep *does* find is a reader's, not the writers': the specification's
+  corpus reader accepts a `timestamp` outside `[-2^63, 2^63-1]` where the reference's refuses it, and
+  its own writer then refuses that value `limit` — a defect in the specification's reader rather than a
+  divergence a `Conforms` refutation can use, since an input the reference's carrier refuses gives the
+  reference no step to match. The nearest true statement where the refutation lived is therefore not a
+  refutation but a family agreement, and it is landed below: `unassignedConstructor_class_agrees` —
+  and the search's extent is the whole of the evidence that no witness exists, which is why it is a
+  number with its families named rather than a claim.
 
 ## Where the class comparison now stands
 
@@ -103,7 +116,11 @@ classed refusal of its own (`Ref.EncodeRefusal`, whose `reasonClass` is a field)
 either side is a term, and the comparisons this module could only state over prose are goals a kernel
 proof can carry. `bodiesAgree_floatEmpty`'s companions are one place that became possible, and the other
 is `not_valueWriterAgree` — landed with the classing and withdrawn by the fix below, so what the new
-vocabulary carries today is `arrayUnassignedEmpty_class_agrees` and `ref_encode_unassignedConstructor`.
+vocabulary carries today is the same family as a *theorem* rather than a witness:
+`ref_encode_unassignedConstructor` on the reference's side, `spec_encode_unassignedConstructor` on the
+specification's, and `unassignedConstructor_class_agrees` for the pair — plus
+`arrayUnassignedEmpty_class_agrees`, the one value the refutation used, and the zero-width and
+four-octet families below.
 
 **What classing the writer did *not* change, and the reason it is stated here.** `Ref.encode`'s refusal
 messages are byte for byte what they were: the class is a field and the message still leads with it, so
@@ -530,6 +547,73 @@ theorem ref_encode_nestedUnassignedEmpty :
   unfold SpecAMQP.Ref.encode SpecAMQP.Ref.arrayElementItems SpecAMQP.Ref.arrayElement
     SpecAMQP.Ref.requireAssignedConstructor
   rfl
+
+/-! ## The unassigned-constructor family, at the specification, and the law's conjunct over it
+
+`ref_encode_unassignedConstructor` closes the *reference's* side of the family the withdrawn refutation
+lived in, and `arrayUnassignedEmpty_class_agrees` states the law's error conjunct at the one value that
+refuted it. Neither is the *pair* statement — the specification's own refusal for every member of the
+family, and the two answers agreeing on it — and this section lands both, generally in the constructor
+and in the item list.
+
+The gate is the same one the readers' agreement uses (`elementDecl?_refusal`, in
+`Proofs.ValueWireAgreement`), and the reason the statement can be general is the reason the hole existed.
+An array declares its element constructor whether or not it carries elements, so the check belongs on the
+constructor and before any element is written; `Ref.arrayElement`'s catch-all, which is where the class
+lived, ran once per element and an empty list never reached it. A statement that does not read the items
+is one an empty list cannot escape — which is the property the withdrawn hole lacked, stated as a theorem
+instead of as a value. -/
+
+/-- **The specification's writer refuses every array whose declared element constructor the grammar
+assigns no encoding**, whatever it carries: the counterpart of `ref_encode_unassignedConstructor`, and
+general for the same reason — `elementDecl?` is consulted before `writeElements`, so the refusal precedes
+the items. The class is the one the reference names (`unassigned`), which is what makes the pair below
+the law's error conjunct rather than two refusals that happen to both be refusals. -/
+theorem spec_encode_unassignedConstructor {constructor : UInt8}
+    {items : List SpecAMQP.Spec.Codec.Value}
+    (hunassigned : SpecAMQP.Ref.assignedConstructor constructor = false)
+    (hlen : items.length ≤ SpecAMQP.Spec.Codec.arrayElementLimit) :
+    ∃ refusal : SpecAMQP.Spec.Codec.Refusal,
+      SpecAMQP.Spec.Codec.encodeValue (.array constructor items) = .error refusal ∧
+      refusal.reasonClass = "unassigned" := by
+  obtain ⟨refusal, hdecl, hclass⟩ := elementDecl?_refusal hunassigned
+  refine ⟨refusal, ?_, hclass⟩
+  unfold SpecAMQP.Spec.Codec.encodeValue SpecAMQP.Spec.Codec.writeValue
+  rw [if_neg (by omega)]
+  simp only [hdecl, Bind.bind, Except.bind]
+
+/-- **The writer law's error conjunct, over the whole unassigned-constructor family.** Every array whose
+declared element constructor the grammar assigns no encoding is refused by both writers, and always with
+the same class: `arrayUnassignedEmpty_class_agrees` at every member of the family rather than at `%x57`
+with no elements, which is the nearest true statement to the refutation that lived here and the statement
+a regression in either writer would break.
+
+The two item lists are unrelated on purpose, and that is stronger than the law's instantiation rather
+than a gap in it: the constructor decides the answer before any element is written, so no relation
+between the lists is needed for the conclusion and none is assumed — a hypothesis the conclusion does not
+use is a hypothesis a reader has to check for nothing. The first conjunct is the law's write side, and
+here it is vacuous for the same reason the conclusion is general: the reference's answer at this family
+is a refusal, so there is no `octets` for its premise to be given. -/
+theorem unassignedConstructor_class_agrees {constructor : UInt8}
+    {items : List SpecAMQP.Spec.Codec.Value} {otherItems : List SpecAMQP.Ref.Value}
+    (hunassigned : SpecAMQP.Ref.assignedConstructor constructor = false)
+    (hlen : items.length ≤ SpecAMQP.Spec.Codec.arrayElementLimit)
+    (holen : otherItems.length ≤ SpecAMQP.Ref.arrayElementLimit) :
+    (∀ octets : Octets, SpecAMQP.Ref.encode (.array constructor otherItems) = .ok octets →
+      SpecAMQP.Spec.Codec.encodeValue (.array constructor items) = .ok octets) ∧
+    (∀ failure : SpecAMQP.Ref.EncodeRefusal,
+      SpecAMQP.Ref.encode (.array constructor otherItems) = .error failure →
+      ∃ refusal : SpecAMQP.Spec.Codec.Refusal,
+        SpecAMQP.Spec.Codec.encodeValue (.array constructor items) = .error refusal ∧
+        refusal.reasonClass = failure.reasonClass) := by
+  obtain ⟨refusal, hspec, hclass⟩ := spec_encode_unassignedConstructor hunassigned hlen
+  have href := ref_encode_unassignedConstructor (constructor := constructor) hunassigned holen
+  refine ⟨fun octets h => by rw [href] at h; simp at h, fun failure h => ?_⟩
+  rw [href] at h
+  have hf : failure.reasonClass = "unassigned" := by
+    rw [← Except.error.inj h]
+    rfl
+  exact ⟨refusal, hspec, by rw [hf, hclass]⟩
 
 /-! ## The zero-width element forms, and the value they were dropping
 

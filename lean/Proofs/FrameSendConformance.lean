@@ -108,7 +108,15 @@ vocabulary: the specification's own writer (`Spec.Frame.writeFrame`), reached th
 specification's own carrier reader (`Spec.FrameCodec.frameOfJson`). With `choose` widened to
 `Set.univ` the simulation below still compiles — it only ever consumes membership — and the
 tie-back and the two emptiness lemmas fail.
--/
+
+## Whether the negation is true, asked and answered
+
+The question this direction's record has carried and never tested — is `¬ Conforms specFrameSend
+refFrameSend` true, is there a reachable input where the two writers part? — is answered at the end of
+this module, in the section *the consequent's status*: **undecided**, false before patch 3 and aligned
+since, with the search that says so (80,204 frame-encode inputs, its families named, no input on which
+the reference takes a step the specification does not permit) and the family agreement that stands where
+the last reachable refutation did (`Proofs.ValueLayerLaws.unassignedConstructor_class_agrees`). -/
 
 namespace SpecAMQP.Proofs
 
@@ -937,5 +945,58 @@ than a lookalike. -/
 theorem ref_frame_send_conforms_existential (carriers : ValueCarrierAgree)
     (writers : ValueWriterAgree) : Conforms specFrameSend refFrameSend :=
   conforms_of_conforms_via specFrameSend refFrameSend R' (ref_frame_send_conforms carriers writers)
+
+/-! ## The consequent's status: **undecided**, and the search that says so
+
+This module is where the send direction's status is recorded, and the question it was written to answer
+is the negative one: is `¬ Conforms specFrameSend refFrameSend` true — is there a reachable input where
+the reference writes and the specification refuses, or the two write different octets, or both refuse
+with different classes? The record's answer, and the evidence for it, are these:
+
+* **It was true before patch 3, at the array-body class divergence, and no longer.** `.array 0x00 [null]`
+  and `.array 0xE0 [null]` were accepted by both carriers, refused `malformed` by the specification's
+  writer (the item is not what the declared row carries) and refused `limit` by the reference's
+  `arrayElement` catch-all. Two classes for one observable, on a reachable body: that was the falsity.
+  Patch 3 split the catch-all into `unassigned` and `malformed`, and the classes agree.
+* **The classing made the negation expressible, and by then the hole it was expressible at had closed.**
+  The reference's writer answers a classed `EncodeRefusal` now, so its class is a field rather than
+  something recovered by splitting a sentence — which removed the *type* obstruction the earlier record
+  named, and is what let `Proofs.ValueLayerLaws` carry (and then withdraw) the value-layer refutation at
+  the empty-array hole. That hole was the *shape* divergence: `Ref.encode (.array 0x57 [])` wrote
+  `#[0xE0,0x02,0x00,0x57]`, octets the reference's own reader refused, where the specification refused
+  `unassigned`. The fix that made the reference consult an array's declared constructor before its
+  elements withdrew that refutation, and the family it lived in is a *class agreement* now —
+  `Proofs.ValueLayerLaws.unassignedConstructor_class_agrees`, general in the constructor and in the item
+  list, is the nearest true statement where the refutation stood.
+* **So the question is empirical, and it was asked of the artefacts rather than left untried.** A
+  witness is a corpus frame whose body is a described performative carrying a value the two writers part
+  on, so the search is over the frames this layer's carrier can build: **80,204 frame-encode inputs**
+  through each artefact's own `frameOfJson` and `writeFrame`, compared on class and octets. The families:
+  every one of the 256 array element constructors against a **113-item pool** of in-range, out-of-range
+  and mismatched shapes (28,928 inputs), and against 43 shapes at one and two elements (22,016); the
+  `%x00` descriptor prefix and the `%x40`–`%x45`, `%xC0`/`%xC1`, `%xD0`/`%xD1`, `%xE0`/`%xF0` rows
+  against that pool; the materialisation limit at 65,535 / 65,536 / 65,537 elements; nesting depth 30–100
+  across the corpus reader's fuel bound; string, symbol and binary lengths 0–300 across the 255/256-octet
+  narrow/wide boundary; list and map sizes across the same boundary; `doff` 0–256, `channel` 0–65,536,
+  both frame types, and extended/payload combinations; empty, single and multiple bodies; and 16,000
+  seeded random values over the corpus grammar. **Identical verdicts from both artefacts on every one**:
+  no input where the reference takes a step the specification does not permit, no input where both write
+  and the octets differ, no input where both refuse and the classes differ.
+* **The one asymmetry the search found is a reader's, and it is the specification's.** Its corpus reader
+  accepts a `timestamp` outside `[-2^63, 2^63-1]`, where the reference's reader refuses the value as a
+  corpus defect; the specification's own writer then refuses those octets `limit`. That is a reader
+  defect on the specification's side (a value its reader produces and its writer will not write) and it
+  cannot be used for this direction's negation: an input the reference's carrier refuses gives the
+  reference no step, and `Conforms` constrains only the implementation's steps.
+* **What would make the negation live again, and what a witness would have to be.** Either writer
+  weakened at a member of any family above — the classes coming apart again at the declared-row family,
+  or a shape divergence returning to the constructor family — makes the corresponding agreement theorem
+  go red, and a *new* family outside the sweep would need its own witness. The shape of such a witness is
+  fixed by `carriers_matched` and `writers_matched`: the frame must survive both carriers with related
+  bodies, and the divergence must survive `frameOfJson`'s performative test, so it is a described
+  performative carrying a value the two writers part on. Until one is exhibited, the honest statement of
+  this consequent is **undecided** — false before patch 3, aligned since, and unrefuted now — and the
+  search's extent above is the whole of the evidence rather than a claim, which is why it is a number
+  with its families named. -/
 
 end SpecAMQP.Proofs
