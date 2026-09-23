@@ -36,8 +36,7 @@ conform — a state machine over a frozen interface alphabet — and that interf
 implementation existed* for exactly this reason: proving an instance of it for a concrete programme is
 downstream work. This repository now supplies **two** things to that work: an **executable oracle and a
 definite contract to prove against**, and — since the implementation track of `PLAN.md` §23.1 — **a
-reference endpoint of its own**, written in Lean and compiled natively, whose protocol core is a proved
-instance of that same conformance relation. TemperMint's Rust programme, its extraction through Charon and
+reference endpoint of its own**, written in Lean and compiled natively, whose protocol core carries a *stated* instance of that same conformance relation, with its proof owed. TemperMint's Rust programme, its extraction through Charon and
 Aeneas, and the proofs about it remain TemperMint's work and are not replaced by it: the endpoint here is a
 second instance of the relation, and the corpus is what the two are compared over.
 
