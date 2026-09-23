@@ -85,6 +85,24 @@ lean_lib Impl where
   globs := #[.submodules `Impl]
 
 /--
+## The shell (R2, `PLAN.md` §23.1)
+
+`Shell/` holds the driver: the `IO` that surrounds the proved core — the read and write loops, the
+feed-and-write cycle, the socket's lifecycle. It is a tree of its own rather than a module under `Impl/`
+because the directory is the claim: nothing inside `lean/Impl/` may import `Impl.Transport`, so "the only
+unproved module in the shipped tree is the boundary" is a directory-level fact, and the driver must import
+that module.
+
+The shell is the implementation's *second* unproved part, and §23.1 has been amended to say so: it lives
+outside the conformance relation, which quantifies over octets and answers rather than over file
+descriptors, and R4's wire differential is the tier that covers it. `Shell/Driver.lean`'s header states
+the three obligations that make up its unproved correctness.
+-/
+@[default_target]
+lean_lib Shell where
+  globs := #[.submodules `Shell]
+
+/--
 The shim those declarations call, compiled by the shell's C compiler.
 
 A custom `target` rather than `extern_lib`, which Lake's README deprecates in favour
@@ -165,6 +183,16 @@ lean_exe «amqp-loopback-control-client» where
   srcDir := "../scripts/loopback"
   root := `Loopback.ControlClientMain
   moreLinkObjs := #[«transport-shim-controls»]
+
+/--
+The reference endpoint as a native process: `lake exe amqp-endpoint server <port> [read-octets]`, or
+`... client <port> [read-octets]`. It links the transport shim, like R1's loopback binaries and for the
+same reason: the shell reaches the kernel through `Impl.Transport`, which is the boundary those binaries
+exercise.
+-/
+lean_exe «amqp-endpoint» where
+  root := `Shell.Main
+  moreLinkObjs := #[«transport-shim»]
 
 /-- The reference implementation as a native executable: `lake exe amqp-ref
 <vector-file.ndjson>`. -/
