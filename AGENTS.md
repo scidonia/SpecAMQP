@@ -14,7 +14,7 @@ There is no Rust here, no Charon/Aeneas extraction of a Rust implementation, and
 performance claim: those belong to TemperMint and are scheduled there, and `PLAN.md`
 §23 records what downstream work needs from this repository. The endpoint is compiled
 by Lean's own C backend, which is **trusted rather than verified**, and its socket
-layer is the one named unproved dependency. Saying "a specification, not an
+layer is one of the two named unproved parts. Saying "a specification, not an
 implementation" would now be false, and saying which parts of the implementation are
 proved is the point of that track's record.
 
@@ -39,9 +39,13 @@ proved is the point of that track's record.
   `tests/contracts/exchange-vector.schema.json` — which is why it is planner-owned below.
 - `lean/Contracts/` — acceptance declarations for every specification claim.
 - `lean/Proofs/` — proofs.
+- `lean/Shell/` — the shipped *process*: the recv/feed/write loop and the socket lifecycle,
+  which own the `IO` and therefore import the boundary. Outside `lean/Impl/` on purpose, so that
+  directory's claim ("only the boundary module here is not proved") stays a fact about its files
+  rather than a reading of the imports — the trust gate checks that import half.
 - `lean/Impl/` — the shipped endpoint's Lean side. One module so far:
   `Transport.lean`, the six `@[extern]` operations that are the implementation's
-  entire unproved trust, alongside its C shim `scripts/transport_shim.c`. The pure
+  boundary to the kernel, alongside its C shim `scripts/transport_shim.c`. The pure
   protocol core joins it at R2. Nothing else in this directory may be `unsafe` or
   import `Transport`, so "only the boundary module here is not proved" stays a
   property of the directory rather than a reading of two files — which is why R1's
@@ -69,7 +73,7 @@ requires an explicit planner update plus a regenerated SHA-1 manifest:
 - `vectors/**` once a vector is committed as contract
 
 Coder-owned: `flake.nix`, `flake.lock`, `scripts/**` (including `scripts/loopback/**`),
-`lean/Proofs/**`, `lean/Ref/**`, `lean/Impl/**`, `lean/Generated/**` (regenerated only),
+`lean/Proofs/**`, `lean/Ref/**`, `lean/Impl/**`, `lean/Shell/**`, `lean/Generated/**` (regenerated only),
 `AGENTS.md` under planner review. `lean/Impl/Transport.lean` is the one coder-owned file whose
 *content* is a declared trust claim, and it is deliberately asymmetric: the trust gate pins
 `@[extern]` to that path and prints how many there are, so a change to it shows up in a gate's

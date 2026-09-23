@@ -7,7 +7,7 @@ with a clause-level ledger that makes completeness and fidelity *measurable* rat
 conforming AMQP 1.0 endpoint must do, states that as mathematics a machine can run, records for every clause
 of the standard how — and to what extent — the specification accounts for it, and ships an endpoint written
 in Lean whose protocol core is proved to conform to the specification it states. What it does not ship is a
-*verified binary*: Lean's compiler is trusted and the socket layer is the one named unproved dependency, and
+*verified binary*: Lean's compiler is trusted, the socket boundary and the Lean shell that drives it are the unproved parts, and
 `PLAN.md` §23.1 names both rather than leaving them to be inferred.
 
 ## What is here
@@ -19,6 +19,7 @@ in Lean whose protocol core is proved to conform to the specification it states.
 | `lean/Spec/` | the handwritten semantics: executable, total, and independent of every consumer |
 | `lean/Ref/` | an independently written reference implementation, authored from the artifacts and sharing no definition with `lean/Spec/` |
 | `lean/Impl/` | the shipped endpoint: a pure protocol core proved to conform to `lean/Spec/`, and the one module that is not proved — the socket boundary (`PLAN.md` §23.1) |
+| `lean/Shell/` | the shipped process: the recv/feed/write loop and the socket lifecycle over the proved core. It imports the boundary because it owns the `IO`, which is why it sits outside `lean/Impl/` — that directory's claim is about its own files |
 | `lean/Contracts/` | acceptance declarations: the exact propositions the specification claims |
 | `lean/Proofs/` | proofs of those declarations |
 | `ledger/` | the clause ledger, its coverage and reconciliation, the dispositions, and the **ambiguity register** — every place the standard is silent and a reading was taken |
