@@ -199,6 +199,10 @@ Defining rules, decided here so the specification is not retrofitted later:
 
 Proving an instance of `Conforms` for a concrete programme is downstream work (§23) and requires the extraction toolchain; defining it correctly is this repository's job, and it is the reason the interface is frozen before any implementation exists.
 
+**The interface is landed, and its first instance is the reference rather than a downstream programme — a scope decision taken on the user's instruction that revises the sentence above.** The reference implementation is in Lean and is the only implementation in this repository, so proving `Conforms spec ref` needs no extraction toolchain: both sides are trees this repository already builds. The reason to do it here rather than to wait is the same reason the interface was frozen early — a relation nobody has instantiated is a definition nobody has tested, and the first instance is where a conformance relation turns out to be either usable or under-specified. What it buys is a tier change: the reference's agreement with the specification stops being evidence from a differential over a corpus (V2) and becomes a theorem (V1), with the differential left doing what only it can do — falsifying *readings* of the prose.
+
+The proof's shape is fixed by `lean/Contracts/Conformance.lean` and is the same for every layer: the specification as an `Endpoint` whose `choose` is the singleton of a step's permitted outcome, with each `MAY` a named parameter rather than a silent branch; the reference as an `Endpoint` whose `step` is the partial function it already is; a simulation relation `R` between their states; and `ConformsVia R`. `R` is the work. The layers land one at a time, the frame layer first because its observable is the wire and its state is smallest, and each instance is a contract that a later refactor of either side must keep.**
+
 ## 11. Specification test vectors
 
 One shared format for everything the specification is tested against: NDJSON, schema-validated (`tests/contracts/vector.schema.json`), **logical time only** — timestamps are ordering tags, never wall-clock, so replay is deterministic on any machine.
