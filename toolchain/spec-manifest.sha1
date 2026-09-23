@@ -55,6 +55,8 @@ c661a0341ee5572bd716861459bcfbedbae36a7f  ledger/ambiguities/unmapped-begin.json
 18dc26b3c3328b31c9524e7b34ca3e6a23b4e71e  ledger/dispositions/part0-conformance-and-transport-lifecycle.json
 b9adec25fda0261806d98c5ab248e8ea25beb310  ledger/dispositions/part1-types.json
 622542fe3d74b1a5fc091e3f6d021cf3fac9f12d  ledger/dispositions/part2-connection-establishment.json
+6d5224fab04182c060bd3d4c9b24719cc3a76d29  ledger/dispositions/part2-links.json
+f573411597e689159173d0bf6184b92501675f43  ledger/dispositions/part4-transactions.json
 360149c9ca009a25aa8976b63ecf81e9a6137eca  ledger/dispositions/picture-review.json
 0e242a9a3ad286d7e9ce70707b0fc9b640e9f074  ledger/dispositions/unkeyed-normative.json
 fd83990fdb34dca23fc732e566fa109c98af71b5  ledger/lowercase-keywords.json
