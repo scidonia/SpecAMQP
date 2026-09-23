@@ -512,7 +512,19 @@ than a function of it; `readFrame`'s suffix-independence — the property that m
 invisible — is **unproved**, so no present-tense claim about arbitrary fragmentation is available;
 **no committed test executes the shipped shell's loops** (R1's contract exercises a different
 implementation); and two documents claimed the core's `Conforms` instance and the corpus's endpoint
-runner as existing, which they are not — that one was mine and is corrected.
+runner as existing, which they are not — that one was mine and is corrected. **Updated as the fixes landed:**
+
+the second transcription is gone — `0f75923` made the front end's extent computation a call to
+`Spec.Frame.frameExtent` rather than a second copy of the reader's progress decision, and `Spec` rebuilt
+with the same branch order, the same messages and the same refusals, which is what the corpus would have
+caught if the refactor had moved an observable. The shipped shell now has a committed test:
+`tests/contracts/r2_endpoint_shell.sh` drives both shipped binaries over loopback and pins the four
+*forcing* conditions — a 3-octet server read against a 5-octet client read, so the eight-octet header
+cannot arrive whole, and a 3 kB frame written through a shim that caps `send` at 1024 octets — because a
+run that stopped asserting reassembly would pass while testing nothing. And the unproved fragmentation
+property is the one finding still open, now *inside* the value layer's carrier development rather than
+beside it: prefix determinism and fuel monotonicity are what both it and that layer's agreement need, so
+they are one development rather than two.
 
 ```sh
 git log --oneline -1 -- lean/Impl lean/Shell
