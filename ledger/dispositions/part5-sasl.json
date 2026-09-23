@@ -1,0 +1,57 @@
+{
+ "conventions": {
+  "deferred:": "A real obligation this plan carries; the suffix names the milestone whose scope in PLAN.md the clause falls in \u2014 R2, the endpoint core of the implementation track, for the one clause that needs a transport role the specification's alphabet does not have. The note names the gap.",
+  "formalized:": "A Lean declaration path that carries this clause's meaning. Every path recorded here names a declaration the module it names actually holds, and the ledger's existence gate resolves it against lean/** rather than taking the note's word for it; where a clause obliges a peer to *send* a frame and the model has no sending side, the note says which half is carried.",
+  "kind": "The clause's own keyword, read from the ledger's clause rather than inferred from the coverage class; all six clauses of this anchor are MUSTs, and `.4`/`.5` are the two MUSTs of one sentence, keyed separately.",
+  "test:": "A vector id whose verdict is the clause's observable form; the ledger's vector gate resolves every id recorded here against vectors/**."
+ },
+ "design_consequences": [
+  "Five of the section's six must-class clauses are carried by the connection layer's SASL dialogue: the header that fixes the layer, the `provides` set a SASL frame's body must satisfy, and the two phase guards that make the announcement the server's and the choice the partner's. The sixth, `.8`, names a correspondence between the SASL roles and the TCP roles that the endpoint's alphabet cannot express, and `Contracts/Sasl.lean` states that and the goal verbatim.",
+  "Every carried clause here has a discriminating negative vector: a SASL frame before the header, an AMQP performative inside the SASL layer, a second mechanisms frame, an init from the announcing peer, and an init naming a mechanism that was not offered. That is the S7 corpus's shape \u2014 each rule pinned by the frame that breaks it rather than by a conforming exchange."
+ ],
+ "dispositions": {
+  "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl.1": {
+   "clause_text": "To establish a SASL layer, each peer MUST start by sending a protocol header.",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.stepHeader; test:exchange-sasl-frame-before-header",
+   "kind": "MUST",
+   "note": "The layer an exchange is in is fixed by the protocol header: `stepHeader` reads the header's own protocol id and refuses a header that names a layer other than the one this peer has already chosen (lean/Spec/Connection.lean:1015-1050), and the state table's send class for HDR is what makes a header the first frame. The vector offers a SASL frame before the header exchange and is refused because the layer does not exist yet; the SASL corpus's own vectors all cite this clause as the layer's entry.",
+   "text_sha256": "bf6be747c7f5254bd960941a141835b0a2d568f3b520fc977bec8ab5d0945d45"
+  },
+  "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl.4": {
+   "clause_text": "The frame body of a SASL frame MUST contain exactly one AMQP type, whose type encoding MUST have provides=\"sasl-frame\".",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.roleOfBody; formalized:SpecAMQP.Spec.Connection.SaslFrame.ofBody; test:exchange-amqp-frame-in-sasl-layer",
+   "kind": "MUST",
+   "note": "A SASL frame's body is a described value whose declared type provides `sasl-frame`: `roleOfBody` decides the frame's role from the declared type the descriptor names, and the `sasl` role is exactly the `provides` set the clause names (lean/Spec/Connection.lean:480-490), with `SaslFrame.ofBody` classifying the five performatives (lean/Spec/Connection.lean:705-720). The vector offers an AMQP performative inside the SASL layer and is refused, which is the clause read as a membership rule.",
+   "text_sha256": "6b06dbf8169b343591fff072ab562f82435041b2a0f048590f8b5b2c977eb4a9"
+  },
+  "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl.5": {
+   "clause_text": "The frame body of a SASL frame MUST contain exactly one AMQP type, whose type encoding MUST have provides=\"sasl-frame\".",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.roleOfBody; formalized:SpecAMQP.Spec.Connection.SaslFrame.ofBody; test:exchange-sasl-frame-in-amqp-layer",
+   "kind": "MUST",
+   "note": "The same sentence as `.4`, keyed again for its second MUST \u2014 'whose type encoding MUST have provides=sasl-frame' \u2014 which is the half the `roleOfBody` check reads; both entries decide the same words. The vector here is the mirror of `.4`'s: a SASL frame in the AMQP layer, refused in the receive direction.",
+   "text_sha256": "6b06dbf8169b343591fff072ab562f82435041b2a0f048590f8b5b2c977eb4a9"
+  },
+  "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl.6": {
+   "clause_text": "The peer acting as the SASL server MUST announce supported authentication mechanisms using the \u00absasl-mechanisms\u00bb frame.",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.stepSaslFrame; test:sasl-init-from-the-server; test:sasl-mechanisms-twice",
+   "kind": "MUST",
+   "note": "The announcement is what the dialogue turns on: `stepSaslFrame`'s awaiting-mechanisms branch refuses anything but a mechanisms frame and takes the announced mechanism list from it, and the announcing peer *is* the server \u2014 the role is decided by the announcement (lean/Spec/Connection.lean:1079-1102, and `SaslRole` at :802-807). The obligation is carried from the receiving side: the model has no sending side, so what is enforced is that the partner awaits the announcement and that an init from the announcing peer is refused (the gap `connections.5`'s entry records for every clause that obliges a peer to *send* a frame).",
+   "text_sha256": "e67c50b71e6c80518e2d28b257dd504c28536ff4980d39b26690eed66ab9c1d7"
+  },
+  "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl.7": {
+   "clause_text": "The partner MUST then choose one of the supported mechanisms and initiate a sasl exchange.",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.stepSaslFrame; test:sasl-init-from-the-server; test:sasl-init-mechanism-not-offered-from-a-list",
+   "kind": "MUST",
+   "note": "The partner must choose one of the announced mechanisms and initiate: the mechanismsKnown branch refuses anything but an init (lean/Spec/Connection.lean:1102-1106), and the mechanism that init names is checked against the announced list, refused as `amqp:invalid-field` when it is not in it (lean/Spec/Connection.lean:1107-1125). Both vectors cite the clause, one for who may initiate and one for the choice being from the list.",
+   "text_sha256": "580597c43abd1b83df693dc0ad2af203f2ae85cfd9f5bfacb047f0be845491b0"
+  },
+  "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl.8": {
+   "clause_text": "The peer playing the role of the SASL client and the peer playing the role of the SASL server MUST correspond to the TCP client and server respectively.",
+   "disposition": "deferred:R2",
+   "kind": "MUST",
+   "note": "deferred: R2 \u2014 uncarried: `Contracts/Sasl.lean:75-90` states the position exactly and is the record this entry defers to: `Endpoint` has no field for which end opened the socket, the SASL role is *decided* by the announcement rather than negotiated against a transport role, and a peer cannot therefore be refused for announcing when it was the TCP client, which is what the correspondence forbids. The goal is stated there verbatim \u2014 an `Endpoint` carrying the transport role it was given, an environment assumption fixing it when the socket is opened, and a guard on the announcement \u2014 and R2 is the rung whose core is that endpoint, which is why the obligation is deferred there rather than to the layer that cannot express it.",
+   "text_sha256": "c1de522af7d32b9deba7035748d5192da90af58af5fa4b7e1ab3b518a5670b20"
+  }
+ },
+ "schema_version": 1
+}

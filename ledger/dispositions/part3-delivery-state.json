@@ -1,0 +1,93 @@
+{
+ "conventions": {
+  "deferred:": "A real obligation this plan carries; the suffix names the milestone whose scope in PLAN.md the clause falls in \u2014 S5 for the messaging layer, which owns this doc. The note names the gap that keeps the clause out of the carrier set. An entry with this value says that nothing under lean/ or vectors/ carries the clause's requirement: a missing carrier is recorded rather than covered by naming a declaration that does not hold the rule.",
+  "formalized:": "A Lean declaration path that carries this clause's meaning. Every path recorded here names a declaration the module it names actually holds, and the ledger's existence gate resolves it against lean/** rather than taking the note's word for it.",
+  "kind": "The clause's own keyword, read from the ledger's clause rather than inferred from the coverage class: the class is MUST for both forms, so kind and class diverge for MUST NOT. Two of this file's clauses are the MUST NOT half of a sentence whose MUST half is keyed beside them.",
+  "test:": "A vector id whose verdict is the clause's observable form; the ledger's vector gate resolves every id recorded here against vectors/**."
+ },
+ "design_consequences": [
+  "This doc is the artifact's worked resumption example, and it is the one place the resumption family's obligations are stated as MUSTs rather than as narrative: the sender resends, does not set `resume` when the receiver has no record, does set it when the receiver has a record but no data, and restates a terminal outcome the receiver asks for.",
+  "Ten of its eleven must-class clauses are uncarried and one is carried, and the split is the model's shape rather than the doc's subject: the carried one (`.15`) is a law about a *delivery state* \u2014 terminal states do not change \u2014 which the message layer's machine implements and 27 vectors cite, while the other ten are obligations on a *sender* acting over an unsettled map, and this model has no sender and no map.",
+  "Four of the ten are two sentences keyed twice each (`.1`/`.2` and `.12`/`.13`), because each sentence contains both a MUST and a MUST NOT: the ledger's keyword split makes two clauses of one statement, which is the relationship sessions.3/.4 already have."
+ ],
+ "dispositions": {
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.1": {
+   "clause_text": "To preserve \"exactly once\" or \"at least once\" delivery guarantees, the sender MUST resend the message; however, the delivery is not being resumed (since the receiver does not remember the delivery tag) so transfers MUST NOT have the resume flag set to true.",
+   "disposition": "deferred:S5",
+   "kind": "MUST",
+   "note": "deferred: S5 \u2014 uncarried: the sender's side of link recovery: which deliveries it resends, from where, and whether the resending transfer carries `resume`. The model has no sending side and no unsettled map \u2014 `Session` holds one delivery in progress rather than a map from delivery-tags to states (lean/Spec/Session.lean:464), `transferLink` reads the transfer's `resume` field nowhere (lean/Spec/Session.lean:819-921), and `Contracts/Settlement.lean:185-189` records the restriction for exactly this family ('the clauses that talk about *entries* - resumption, in-doubt resolution, `unsettled`'s completeness - have no state to range over'). The receiver's half of the same rules is the links side's and is recorded there: `links/doc:resuming-deliveries.2` and `.8` name the same missing flag. The clause itself is one sentence carrying two obligations \u2014 the sender MUST resend, and transfers MUST NOT set `resume` \u2014 which the ledger keys as two clauses, `.1` for the MUST and `.2` for the MUST NOT; the same sentence is keyed again at `.12`/`.13` for the delivery-tag 5 case, so four clauses decide two statements.",
+   "text_sha256": "c4ee489d69c92b891217be474600e143513eff5e1dbb82078a0a1372f853ea81"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.12": {
+   "clause_text": "To preserve \"exactly once\" or \"at least once\" delivery guarantees, the sender MUST resend the message; however, the delivery is not being resumed (since the receiver does not remember the delivery tag) so transfers MUST NOT have the resume flag set to true.",
+   "disposition": "deferred:S5",
+   "kind": "MUST",
+   "note": "deferred: S5 \u2014 uncarried: the same sentence as `.1`, written again for the delivery-tag 5 case, with the same digest. the sender's side of link recovery: which deliveries it resends, from where, and whether the resending transfer carries `resume`. The model has no sending side and no unsettled map \u2014 `Session` holds one delivery in progress rather than a map from delivery-tags to states (lean/Spec/Session.lean:464), `transferLink` reads the transfer's `resume` field nowhere (lean/Spec/Session.lean:819-921), and `Contracts/Settlement.lean:185-189` records the restriction for exactly this family ('the clauses that talk about *entries* - resumption, in-doubt resolution, `unsettled`'s completeness - have no state to range over'). The receiver's half of the same rules is the links side's and is recorded there: `links/doc:resuming-deliveries.2` and `.8` name the same missing flag.",
+   "text_sha256": "c4ee489d69c92b891217be474600e143513eff5e1dbb82078a0a1372f853ea81"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.13": {
+   "clause_text": "To preserve \"exactly once\" or \"at least once\" delivery guarantees, the sender MUST resend the message; however, the delivery is not being resumed (since the receiver does not remember the delivery tag) so transfers MUST NOT have the resume flag set to true.",
+   "disposition": "deferred:S5",
+   "kind": "MUST NOT",
+   "note": "deferred: S5 \u2014 uncarried: the MUST NOT half of `.12`, as `.2` is of `.1`; the two pairs are one sentence each, keyed twice because each contains both keywords. the sender's side of link recovery: which deliveries it resends, from where, and whether the resending transfer carries `resume`. The model has no sending side and no unsettled map \u2014 `Session` holds one delivery in progress rather than a map from delivery-tags to states (lean/Spec/Session.lean:464), `transferLink` reads the transfer's `resume` field nowhere (lean/Spec/Session.lean:819-921), and `Contracts/Settlement.lean:185-189` records the restriction for exactly this family ('the clauses that talk about *entries* - resumption, in-doubt resolution, `unsettled`'s completeness - have no state to range over'). The receiver's half of the same rules is the links side's and is recorded there: `links/doc:resuming-deliveries.2` and `.8` name the same missing flag.",
+   "text_sha256": "c4ee489d69c92b891217be474600e143513eff5e1dbb82078a0a1372f853ea81"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.15": {
+   "clause_text": "Once the sender has arrived at a terminal outcome it MUST NOT change.",
+   "disposition": "formalized:SpecAMQP.Spec.Message.terminal_absorbing; test:delivery-received-then-accepted",
+   "kind": "MUST NOT",
+   "note": "A terminal delivery state is absorbing: `terminal_absorbing` states it over the machine that applies states (lean/Spec/Message.lean:1077-1084) \u2014 applying any state to a delivery whose state is terminal is refused \u2014 and `Contracts/Settlement.lean:37` cites this clause as the artifact's own MUST NOT of it. The vector that cites the clause pins a terminal outcome followed by another state, and the reading that settles the *neighbouring* question (settlement) is `ledger/ambiguities/settlement-is-absorbing.json`, which the same contract names.",
+   "text_sha256": "cc9d1ab7611a97d21524dcd206574329d448a74a35862f96e8d9ee135fdcd16d"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.16": {
+   "clause_text": "As such, if a sender is capable of resuming a delivery (even if the only possible outcome of the delivery is a pre-defined terminal outcome such as \u00abaccepted\u00bb) it MUST NOT use this state as the value of the state in its unsettled map until it is sure that the receiver will not require the resending of the message data.",
+   "disposition": "deferred:S5",
+   "kind": "MUST NOT",
+   "note": "deferred: S5 \u2014 uncarried: the clause constrains a value the sender puts in its unsettled map \u2014 `accepted` as the state of a delivery it may still have to resend \u2014 and the model has no such map and no sender-side choice. the sender's side of link recovery: which deliveries it resends, from where, and whether the resending transfer carries `resume`. The model has no sending side and no unsettled map \u2014 `Session` holds one delivery in progress rather than a map from delivery-tags to states (lean/Spec/Session.lean:464), `transferLink` reads the transfer's `resume` field nowhere (lean/Spec/Session.lean:819-921), and `Contracts/Settlement.lean:185-189` records the restriction for exactly this family ('the clauses that talk about *entries* - resumption, in-doubt resolution, `unsettled`'s completeness - have no state to range over'). The receiver's half of the same rules is the links side's and is recorded there: `links/doc:resuming-deliveries.2` and `.8` name the same missing flag.",
+   "text_sha256": "1a3d56fcb1c4fff67829aaf004ec08607571c0664166c194bec72b08f6415fc6"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.17": {
+   "clause_text": "For delivery-tag 11 it MUST be assumed that the sender spontaneously attained the terminal outcome (and is unable to resume).",
+   "disposition": "deferred:S5",
+   "kind": "MUST",
+   "note": "deferred: S5 \u2014 uncarried: what an endpoint must *assume* about a delivery-tag absent from the partner's map. Nothing in the model holds a map of unsettled tags at either end, so there is nothing to be absent from, and the assumption has no subject. the sender's side of link recovery: which deliveries it resends, from where, and whether the resending transfer carries `resume`. The model has no sending side and no unsettled map \u2014 `Session` holds one delivery in progress rather than a map from delivery-tags to states (lean/Spec/Session.lean:464), `transferLink` reads the transfer's `resume` field nowhere (lean/Spec/Session.lean:819-921), and `Contracts/Settlement.lean:185-189` records the restriction for exactly this family ('the clauses that talk about *entries* - resumption, in-doubt resolution, `unsettled`'s completeness - have no state to range over'). The receiver's half of the same rules is the links side's and is recorded there: `links/doc:resuming-deliveries.2` and `.8` name the same missing flag.",
+   "text_sha256": "1ec36c405891e9d69eb6b99c26929ef9d655e9b279f013c546e66330f1f50ab0"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.19": {
+   "clause_text": "The sender thus MUST restate this as the terminal outcome, and the receiver SHOULD then echo this and settle.",
+   "disposition": "deferred:S5",
+   "kind": "MUST",
+   "note": "deferred: S5 \u2014 uncarried: the sender restating a terminal outcome the receiver asked for, and the receiver echoing it \u2014 two sides of a resuming exchange neither layer holds. The outcome vocabulary itself is carried (`Spec.Message.DeliveryState`, the five outcomes and their terminality), which is why the clause reads as close to carried; what is missing is the exchange. the sender's side of link recovery: which deliveries it resends, from where, and whether the resending transfer carries `resume`. The model has no sending side and no unsettled map \u2014 `Session` holds one delivery in progress rather than a map from delivery-tags to states (lean/Spec/Session.lean:464), `transferLink` reads the transfer's `resume` field nowhere (lean/Spec/Session.lean:819-921), and `Contracts/Settlement.lean:185-189` records the restriction for exactly this family ('the clauses that talk about *entries* - resumption, in-doubt resolution, `unsettled`'s completeness - have no state to range over'). The receiver's half of the same rules is the links side's and is recorded there: `links/doc:resuming-deliveries.2` and `.8` name the same missing flag.",
+   "text_sha256": "0f650539f3eace95616a84d589b00b8b37b44f7dfa723cf9e9d52210e13e6085"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.2": {
+   "clause_text": "To preserve \"exactly once\" or \"at least once\" delivery guarantees, the sender MUST resend the message; however, the delivery is not being resumed (since the receiver does not remember the delivery tag) so transfers MUST NOT have the resume flag set to true.",
+   "disposition": "deferred:S5",
+   "kind": "MUST NOT",
+   "note": "deferred: S5 \u2014 uncarried: the MUST NOT half of the sentence `.1` carries, keyed separately because one statement contains both keywords. the sender's side of link recovery: which deliveries it resends, from where, and whether the resending transfer carries `resume`. The model has no sending side and no unsettled map \u2014 `Session` holds one delivery in progress rather than a map from delivery-tags to states (lean/Spec/Session.lean:464), `transferLink` reads the transfer's `resume` field nowhere (lean/Spec/Session.lean:819-921), and `Contracts/Settlement.lean:185-189` records the restriction for exactly this family ('the clauses that talk about *entries* - resumption, in-doubt resolution, `unsettled`'s completeness - have no state to range over'). The receiver's half of the same rules is the links side's and is recorded there: `links/doc:resuming-deliveries.2` and `.8` name the same missing flag.",
+   "text_sha256": "c4ee489d69c92b891217be474600e143513eff5e1dbb82078a0a1372f853ea81"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.3": {
+   "clause_text": "To do this the sender MUST send a resuming transfer to associate delivery-tag 3 with a delivery-id.",
+   "disposition": "deferred:S5",
+   "kind": "MUST",
+   "note": "deferred: S5 \u2014 uncarried: 'the sender MUST send a resuming transfer to associate delivery-tag 3 with a delivery-id' \u2014 an action of the sender's over its own map, which is the missing object described at `.1`. What the model does carry is the *reading* half of a resuming transfer: `transferLink` compares a continuation's identity fields against the delivery it continues (lean/Spec/Session.lean:855-866), which is what such a transfer would be checked against.",
+   "text_sha256": "ce94c4dcdec5d8b518c9d2224ffc80de1df8f46702269a925301e50fd462b166"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.6": {
+   "clause_text": "To preserve \"exactly once\" or \"at least once\" delivery guarantees, the sender MUST resend the whole message.",
+   "disposition": "deferred:S5",
+   "kind": "MUST",
+   "note": "deferred: S5 \u2014 uncarried: 'the sender MUST resend the whole message' for a delivery the receiver knows only as an entry. Nothing decides what a sender resends, and the model holds no record of what a receiver retained: the whole clause is over state neither layer has. the sender's side of link recovery: which deliveries it resends, from where, and whether the resending transfer carries `resume`. The model has no sending side and no unsettled map \u2014 `Session` holds one delivery in progress rather than a map from delivery-tags to states (lean/Spec/Session.lean:464), `transferLink` reads the transfer's `resume` field nowhere (lean/Spec/Session.lean:819-921), and `Contracts/Settlement.lean:185-189` records the restriction for exactly this family ('the clauses that talk about *entries* - resumption, in-doubt resolution, `unsettled`'s completeness - have no state to range over'). The receiver's half of the same rules is the links side's and is recorded there: `links/doc:resuming-deliveries.2` and `.8` name the same missing flag.",
+   "text_sha256": "396c5c9d7fad4cb823dfdbefdbd12ce149e3a4f9d3a0b6c6f854d4b5ea31ef20"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.7": {
+   "clause_text": "Unlike the case with delivery-tag 1 the resent delivery MUST be sent with the resume flag set to true and the delivery-tag set to 4. (While this use of null in the receivers map is valid, it is discouraged.",
+   "disposition": "deferred:S5",
+   "kind": "MUST",
+   "note": "deferred: S5 \u2014 uncarried: this is `.8` of the links resumption doc read from the sender's side \u2014 the resent delivery MUST be sent with `resume` set to true \u2014 and the flag is read nowhere (lean/Spec/Session.lean:819-921). The clause's own caveat about a null entry in the receiver's map is a RECOMMENDED sentence in the artifact and is keyed separately.",
+   "text_sha256": "2acbffc4b71ca4ee2075f71cfd86bef471fc06efdb0ba535e046bd2c1fb86e7e"
+  }
+ },
+ "schema_version": 1
+}

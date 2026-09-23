@@ -1,0 +1,70 @@
+{
+ "conventions": {
+  "kind": "The clause's own keyword, read from the ledger's clause rather than inferred from the coverage class; every clause in this file is a MUST.",
+  "out-of-scope:": "Deliberately outside core AMQP 1.0 as this specification bounds it, with the reason: a node's treatment of a message, which PLAN.md \u00a73 excludes ('core defines links and termini, not what a destination does with a message'). The reason is written in every note, so the bound can be read against the plan rather than against this file's summary of it."
+ },
+ "design_consequences": [
+  "The eight must-class clauses of the header's `priority` field are all one rule: how an AMQP intermediary maps the message priorities it receives onto the effective levels it implements. They are bounded out rather than deferred, because the subject is a node's behaviour rather than an endpoint's: this specification formalizes links and termini and reads no `priority` value anywhere.",
+  "The same bound is already recorded in the transport section for containers and nodes (`out-of-scope:container-node-topology`), and the two agree: a rule whose subject is deployment is outside the core this repository bounds.",
+  "Three of the eight are the artifact's own repeated text, keyed twice each with one digest (.3/.4, .5/.6, .8/.9), so the file decides three statements six times and says so in each note."
+ ],
+ "dispositions": {
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:priority.2": {
+   "clause_text": "An AMQP intermediary implementing distinct priority levels MUST do so in the following manner:",
+   "disposition": "out-of-scope:intermediary-priority-treatment",
+   "kind": "MUST",
+   "note": "out-of-scope: intermediary priority treatment \u2014 the sentence constrains how an *intermediary* maps message priorities onto its own effective levels, which is a node's treatment of a message rather than a protocol-visible obligation at an endpoint. The plan bounds that out (PLAN.md \u00a73: 'No broker or queue semantics. AMQP core defines links and termini, not what a destination does with a message'), the same bound the transport section's `container-node-topology` entry records for containers and nodes. The model has no intermediary, and no declaration reads the header's `priority` field at all: the value is carried as a declared field of the header section (`Spec.Message.SectionKind.header` and the generated field table) and nothing acts on it. This is a bound rather than a missing carrier, and it is recorded as one. This clause is the rule's umbrella: an intermediary that implements distinct levels MUST do so in the manner the following clauses state.",
+   "text_sha256": "adbab542d9d1ab5284662c5992828a4c7280fda24abaea059ea52a3c251a4195"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:priority.3": {
+   "clause_text": "If n distinct priorities are implemented and n is less than 10 -- priorities 0 to (5 - ceiling(n/2)) MUST be treated equivalently and MUST be the lowest effective priority.",
+   "disposition": "out-of-scope:intermediary-priority-treatment",
+   "kind": "MUST",
+   "note": "out-of-scope: intermediary priority treatment \u2014 the sentence constrains how an *intermediary* maps message priorities onto its own effective levels, which is a node's treatment of a message rather than a protocol-visible obligation at an endpoint. The plan bounds that out (PLAN.md \u00a73: 'No broker or queue semantics. AMQP core defines links and termini, not what a destination does with a message'), the same bound the transport section's `container-node-topology` entry records for containers and nodes. The model has no intermediary, and no declaration reads the header's `priority` field at all: the value is carried as a declared field of the header section (`Spec.Message.SectionKind.header` and the generated field table) and nothing acts on it. This is a bound rather than a missing carrier, and it is recorded as one. This clause is the low end for fewer than ten levels: priorities 0 to (5 - ceiling(n/2)) are equivalent and are the lowest effective priority. The ledger keys the same sentence twice, at `.3` and `.4`, with one digest.",
+   "text_sha256": "0b7d16e4b0732b0aaf51f0e029bcb5b465a972014284900c18c435bf2f209966"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:priority.4": {
+   "clause_text": "If n distinct priorities are implemented and n is less than 10 -- priorities 0 to (5 - ceiling(n/2)) MUST be treated equivalently and MUST be the lowest effective priority.",
+   "disposition": "out-of-scope:intermediary-priority-treatment",
+   "kind": "MUST",
+   "note": "out-of-scope: intermediary priority treatment \u2014 the same sentence as `.3`, keyed again because the artifact writes it as a bullet and then as the paragraph under it; both entries decide the same words. the sentence constrains how an *intermediary* maps message priorities onto its own effective levels, which is a node's treatment of a message rather than a protocol-visible obligation at an endpoint. The plan bounds that out (PLAN.md \u00a73: 'No broker or queue semantics. AMQP core defines links and termini, not what a destination does with a message'), the same bound the transport section's `container-node-topology` entry records for containers and nodes. The model has no intermediary, and no declaration reads the header's `priority` field at all: the value is carried as a declared field of the header section (`Spec.Message.SectionKind.header` and the generated field table) and nothing acts on it. This is a bound rather than a missing carrier, and it is recorded as one.",
+   "text_sha256": "0b7d16e4b0732b0aaf51f0e029bcb5b465a972014284900c18c435bf2f209966"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:priority.5": {
+   "clause_text": "The priorities (4 + floor(n/2)) and above MUST be treated equivalently and MUST be the highest effective priority.",
+   "disposition": "out-of-scope:intermediary-priority-treatment",
+   "kind": "MUST",
+   "note": "out-of-scope: intermediary priority treatment \u2014 the sentence constrains how an *intermediary* maps message priorities onto its own effective levels, which is a node's treatment of a message rather than a protocol-visible obligation at an endpoint. The plan bounds that out (PLAN.md \u00a73: 'No broker or queue semantics. AMQP core defines links and termini, not what a destination does with a message'), the same bound the transport section's `container-node-topology` entry records for containers and nodes. The model has no intermediary, and no declaration reads the header's `priority` field at all: the value is carried as a declared field of the header section (`Spec.Message.SectionKind.header` and the generated field table) and nothing acts on it. This is a bound rather than a missing carrier, and it is recorded as one. This clause is the high end: priorities (4 + floor(n/2)) and above are equivalent and are the highest effective priority. Keyed twice, at `.5` and `.6`, with one digest.",
+   "text_sha256": "6be6c53945e9f330d820bc3da766a2662b778b8cbac625bcd0edef4664f31419"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:priority.6": {
+   "clause_text": "The priorities (4 + floor(n/2)) and above MUST be treated equivalently and MUST be the highest effective priority.",
+   "disposition": "out-of-scope:intermediary-priority-treatment",
+   "kind": "MUST",
+   "note": "out-of-scope: intermediary priority treatment \u2014 the same sentence as `.5`, keyed again. the sentence constrains how an *intermediary* maps message priorities onto its own effective levels, which is a node's treatment of a message rather than a protocol-visible obligation at an endpoint. The plan bounds that out (PLAN.md \u00a73: 'No broker or queue semantics. AMQP core defines links and termini, not what a destination does with a message'), the same bound the transport section's `container-node-topology` entry records for containers and nodes. The model has no intermediary, and no declaration reads the header's `priority` field at all: the value is carried as a declared field of the header section (`Spec.Message.SectionKind.header` and the generated field table) and nothing acts on it. This is a bound rather than a missing carrier, and it is recorded as one.",
+   "text_sha256": "6be6c53945e9f330d820bc3da766a2662b778b8cbac625bcd0edef4664f31419"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:priority.7": {
+   "clause_text": "The priorities (5 - ceiling(n/2)) to (4 + floor(n/2)) inclusive MUST be treated as distinct priorities.",
+   "disposition": "out-of-scope:intermediary-priority-treatment",
+   "kind": "MUST",
+   "note": "out-of-scope: intermediary priority treatment \u2014 the sentence constrains how an *intermediary* maps message priorities onto its own effective levels, which is a node's treatment of a message rather than a protocol-visible obligation at an endpoint. The plan bounds that out (PLAN.md \u00a73: 'No broker or queue semantics. AMQP core defines links and termini, not what a destination does with a message'), the same bound the transport section's `container-node-topology` entry records for containers and nodes. The model has no intermediary, and no declaration reads the header's `priority` field at all: the value is carried as a declared field of the header section (`Spec.Message.SectionKind.header` and the generated field table) and nothing acts on it. This is a bound rather than a missing carrier, and it is recorded as one. This clause is the middle band: (5 - ceiling(n/2)) to (4 + floor(n/2)) inclusive are the distinct priorities, which is what makes the two end bands 'equivalent' rather than arbitrary.",
+   "text_sha256": "db2f531f8ac39d49895e3864c822d7cabfbe710d27210ce84655079c3bb651b7"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:priority.8": {
+   "clause_text": "If n distinct priorities are implemented and n is 10 or greater -- priorities 0 to (n - 1) MUST be distinct, and priorities n and above MUST be equivalent to priority (n - 1).",
+   "disposition": "out-of-scope:intermediary-priority-treatment",
+   "kind": "MUST",
+   "note": "out-of-scope: intermediary priority treatment \u2014 the sentence constrains how an *intermediary* maps message priorities onto its own effective levels, which is a node's treatment of a message rather than a protocol-visible obligation at an endpoint. The plan bounds that out (PLAN.md \u00a73: 'No broker or queue semantics. AMQP core defines links and termini, not what a destination does with a message'), the same bound the transport section's `container-node-topology` entry records for containers and nodes. The model has no intermediary, and no declaration reads the header's `priority` field at all: the value is carried as a declared field of the header section (`Spec.Message.SectionKind.header` and the generated field table) and nothing acts on it. This is a bound rather than a missing carrier, and it is recorded as one. This clause is the ten-or-more case: 0 to (n - 1) distinct, n and above equivalent to (n - 1). Keyed twice, at `.8` and `.9`, with one digest.",
+   "text_sha256": "a3d7b7814f42d679c71cadbb2f7b7c9d055f7f949545b648d11d1808cf216a7a"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:priority.9": {
+   "clause_text": "If n distinct priorities are implemented and n is 10 or greater -- priorities 0 to (n - 1) MUST be distinct, and priorities n and above MUST be equivalent to priority (n - 1).",
+   "disposition": "out-of-scope:intermediary-priority-treatment",
+   "kind": "MUST",
+   "note": "out-of-scope: intermediary priority treatment \u2014 the same sentence as `.8`, keyed again. the sentence constrains how an *intermediary* maps message priorities onto its own effective levels, which is a node's treatment of a message rather than a protocol-visible obligation at an endpoint. The plan bounds that out (PLAN.md \u00a73: 'No broker or queue semantics. AMQP core defines links and termini, not what a destination does with a message'), the same bound the transport section's `container-node-topology` entry records for containers and nodes. The model has no intermediary, and no declaration reads the header's `priority` field at all: the value is carried as a declared field of the header section (`Spec.Message.SectionKind.header` and the generated field table) and nothing acts on it. This is a bound rather than a missing carrier, and it is recorded as one.",
+   "text_sha256": "a3d7b7814f42d679c71cadbb2f7b7c9d055f7f949545b648d11d1808cf216a7a"
+  }
+ },
+ "schema_version": 1
+}
