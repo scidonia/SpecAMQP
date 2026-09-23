@@ -654,6 +654,18 @@ Both refuse the first with the *same* class and the *same* arithmetic (2 declare
 
 **And how much of the proof is doing work is measured rather than assumed.** Of the file's 69 `try`-guarded reductions, removing all of them produces exactly eleven errors — so eleven were dead weight and are deleted, while the other 58 reduce something and remain. That is the number a downstream reader wants when asking whether a proof of this size is load-bearing at the points it claims, and it exists because the author measured a claim they had first made in prose.
 
+**And a defect the ledger batches found by reading, which no gate in this repository can see.** The artifact's two conditions on `transfer`'s `settled` field select *choices* of the
+`sender-settle-mode` element — `<xref name="sender-settle-mode" choice="settled"/>` for "MUST be true on at least one transfer frame", `choice="unsettled"` for "MUST be false (or unset) on
+every transfer frame" — and **both** artefacts read the element's *name* where each sentence selects a *choice*, so the flag that gates the obligation is computed from the opposite
+negotiation. The inversion is invisible to every check here: the ledger renders the cross-reference as the element's name and so loses the choice, so the two sentences look identical; a
+differential between the two artefacts reports agreement because both are wrong in the same direction; and the proofs are conditional on the flag the code computes. It was found by a
+batch that read the rendered sentences as identical and went back to the artifact to see why they could be — which is the argument for a clause-by-clause ledger over a summary of what the
+model happens to do: the summary would have said "settlement is handled", and been wrong in a way nothing could catch.
+
+**The contract for it is stated as an equality, so it fails on the current code rather than describing it**: `Contracts/Settlement.lean`'s `SenderSettleModeIsTheChoiceTheClauseSelects`
+requires the flag to equal the comparison against the `settled` choice, which the model cannot satisfy while it reads `unsettled`. A contract stated as the fix would be as good as the
+mistake.
+
 ## 11. Specification test vectors
 
 One shared format for everything the specification is tested against: NDJSON, schema-validated (`tests/contracts/vector.schema.json`), **logical time only** — timestamps are ordering tags, never wall-clock, so replay is deterministic on any machine.
