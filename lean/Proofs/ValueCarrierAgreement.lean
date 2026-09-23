@@ -8,16 +8,20 @@ open Lean (Json)
 
 `FrameSendConformance.ValueCarrierAgree` is the value layer's claim in the corpus vocabulary: a
 value the reference's carrier reads is one the specification's also reads, and the two readings
-agree as values. This module is its proof, one clause at a time, and it is **in progress**: fifteen
-of the twenty-five clauses are proved, in four families —
+agree as values. This module is its proof, one clause at a time, and it is **in progress**: twenty
+of the twenty-five clauses are proved, in five families —
 
 * the structured scalars `null`, `boolean`, `string`, `symbol`;
 * the octet payloads `binary`, `float`, `double`, `decimal32`, `decimal64`, `decimal128`, `uuid`;
 * the unsigned widths `ubyte`, `ushort`, `uint`, `ulong`;
+* the signed widths `byte`, `short`, `int`, `long`, and `timestamp`;
 
-and the remaining ten are the work this module exists for: the signed widths `byte`, `short`,
-`int`, `long` and `timestamp`, `char`, and the four compounds `list`, `map`, `array`, `described`.
-The route to each of those is named at the end of this header.
+and the remaining five are `char` and the four compounds `list`, `map`, `array`, `described`.
+The route to each is named at the end of this header. What is *not* yet done is the join: the
+statement is at fuel 64 (`Ref.Vectors.valueOfJson 64 json = .ok other → ∃ body, …`), while every
+clause here is at `valueOfJson (fuel + 1)` with the discriminant as a hypothesis, so discharging it
+needs a 25-way case on the kind, the extraction of the discriminant equality from the reference's
+own success, and the instantiation at fuel 63.
 
 ## Why clause by clause, and why the discriminant is a hypothesis
 
@@ -98,13 +102,31 @@ simp only [hf, hspec] at h ⊢
 — a *local hypothesis* used as the rewrite rule, because `simp only`'s argument list takes
 identifiers and not applied terms.
 
+## The signed widths: what the route needed
+
+Each signed clause is a bound-checked shared read (`signedOf`) plus the reference's width-carrying
+carrier read back to the specification's `Int`. Three moves, and two of them are core-only
+corrections worth naming because the obvious spellings are Mathlib's and do not exist here:
+
+* `signedOf_range` reads the bounds off the reference's own success, the way `unsignedOf_le` does
+  for the unsigned widths. Note that `cases … ` must be *followed* by `simp only [hv] at h`; on
+  its own the `cases` does not rewrite the hypothesis.
+* the round trip: `BitVec.toInt_ofNat'` turns
+  `(IntN.ofBitVec (BitVec.ofNat N x)).toInt` into an `Int.bmod`, `Int.bmod_eq_iff` turns that into
+  the two range facts plus the divisibility, and `Int.emod_add_mul_ediv` supplies the divisibility.
+  `norm_num` and `ring` are Mathlib and are not available; `decide` and `omega` replace them.
+* `BodiesAgree`'s signed case compares the *specification's* `Int` on the left, so the round trip is
+  used at `.symm` — as in the unsigned clauses.
+
+`timestamp` is the exception that carries a read agreement: the reference range-checks
+`"milliseconds"` through `boundedField` where the specification reads it bare, so the clause needs
+`boundedField_ok_getObjValAs` (a successful bounded read *is* a read of that key) and
+`boundedField_range`. Its failure branch closes with `simp_all` and not with a named hypothesis,
+because the two branches of the reader spell the bounds differently — symbolically in one,
+numerically in the other — and a closer that depends on the spelling is a closer that breaks.
+
 ## What remains, and the route to it
 
-* **The signed family** — `byte`, `short`, `int`, `long` and `timestamp`, where the reference
-  builds `IntN.ofBitVec (BitVec.ofNat N (i % 2^N).toNat)`. The round trip is
-  `BitVec.toInt_ofNat'` (rewriting to `Int.bmod ((i % 2^N).toNat) (2^N)`) followed by
-  `Int.bmod_eq_iff` — or `bmod_pos`/`bmod_neg` — against the range `signedOf`/`boundedField`
-  carry. A named `signedOf_le`/`boundedField_range` will be needed, the way `unsignedOf_le` was.
 * **`char`** — the same round trip as `ubyte`, at 1114111, but *not* on the same read: the
   specification reads `getObjValAs? Nat "codepoint"` through `codePointOf`, while the reference
   reads `boundedField json "codepoint" 0 1114111` through `getObjValAs? Int`. That disagreement is
