@@ -1709,7 +1709,12 @@ lands beside its predecessor reads as two facts rather than as one fact and its 
 `Proofs.ValueWireAgreement` declares a parameterised one — two different relations sharing a fully-qualified name in a shared namespace, neither module importing the other, so neither had any reason to
 notice and neither was wrong. **The discharge of the value layer's instance added `import Proofs.ValueWireAgreement` to `Contracts/FrameConformance.lean`**, which put both modules in one environment for
 the first time (the trust gate's axiom probe imports the accepted-theorem modules together), and the whole-package build failed with `environment already contains 'SpecAMQP.Proofs.StepAgrees' from
-Proofs.ValueWireAgreement`. **The cost of finding out was an import three modules away from either declaration.** Lean has no module-private declarations by default; `private` is the annotation that makes
+Proofs.ValueWireAgreement`. **There were two such names, not one, and the reported error was a sample rather than the set.** Fixing the first — `StepAgrees` — revealed
+`SpecAMQP.Proofs.ReadersAgree`, declared nullary in the connection module and parameterised in the wire module, because **Lean aborts an import on the first collision it meets and says nothing about the rest**. The
+slice that fixed it went to the built `.ilean` declaration tables and enumerated *every* name the two modules share, which is the method that makes the second one a fix rather than another red gate; a single name
+handed over from a gate's output is a sample of a class. **And the name was pinned from outside**: `Contracts/ConnectionConformance.lean` states `connection_conformance_public (readers : SpecAMQP.Proofs.ReadersAgree)`,
+so for that one the *wire* side had to move and the connection side could not — checked before the annotation was applied rather than after, which is the difference between a local fix and a contract broken three
+directories away. The cost of finding out was an import three modules away from either declaration. Lean has no module-private declarations by default; `private` is the annotation that makes
 a helper local, and a name only ever used inside one file should carry it — the alternative is a name that is global by accident and a build that fails when two such accidents meet.
 
 ## 17. Verification gates and their negative controls
