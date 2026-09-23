@@ -88,6 +88,12 @@ output rather than only in a diff. Right now that count is six.
   landed on the agent that respected the boundary rather than on the one that forgot
   the commit. Accept, verify, commit, in that order and without a pause between.
 
+- **The push is the same movement, made about the world outside this machine.** An accepted
+  slice that exists only in this working tree is invisible to anyone not standing in it: a
+  reviewer on another host, a backup, a downstream checkout. That is the local-commit problem
+  one level out, and it has the same remedy — push when you commit, and if the remote rejects
+  the branch, say so rather than reporting the commit as though it had travelled.
+
 - **The workspace's git index is shared between agents.** `git add <paths>` does not
   protect a commit from another slice's staged entries: an explicit-paths commit still
   commits whatever is already staged, and one session's nineteen-file commit went out
