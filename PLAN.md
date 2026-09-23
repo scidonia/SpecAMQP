@@ -718,6 +718,21 @@ makes the proof definitional and leaves every runtime branch unchanged, which th
 while `.6` stays deferred — its obligation is a safety over *every* transfer that the layer still does not check, and it is now *omitted* rather than *inverted*, which is a different sentence in the
 ledger because it is a different fact.
 
+**And the wire module's state is a map rather than an impression.** Three commits landed the foundation, the octet-step bridges, and the described branch with the zero-width and payload patterns —
+**3 of 40 arms** — against a formulation that had to change: `WireAgrees fuel` as first landed quantified over *every* fuel a cursor can be paired with and is **false**, refuted by the array element
+loop, where the specification spends one more fuel entering the loop than the reference spends entering its own, so the two align only where the fuel covers the octets left at the cursor. The law now
+carries `c.data.size - c.pos ≤ fuel`, `StepAgrees` carries both conjuncts, and **the contract is untouched** because `ValueLayersAgree` only ever needs `readValue region.size ⟨region,0⟩`, where
+`size - 0 ≤ size` holds free.
+
+**And the evidence for the strengthened claim is a measurement rather than a proof obligation.** An entry-point differential of the two readers over **~313,000 buffers** — all buffers up to length 4
+over a 26-octet alphabet, and up to length 6 over a 12-octet alphabet chosen for arrays, compounds and described values — reports **zero divergences** in shape, in reason class, in consumed count and,
+for every success, in the body view. That is the target's own evidence that the bound is the true statement at the fuel the contract uses, and the two pieces of evidence do different jobs: the witness
+says the law as written was *false*, the differential says the law as fixed is the one this contract *needed*.
+
+**What remains is mapped by cost, which is what makes the next sitting mechanical.** Twenty-three arms are cheap — the remaining zero-width and width-one rows, the unsigned and opaque widths, and six
+variable rows needing only a one-directional success-and-class bridge of the same shape the corpus side already uses — and seven are signed, each needing a `signedOfOctets` round trip for which
+`Proofs/ValueCarrierAgreement` already holds `i8_toInt`…`i64_toInt`. Then three loop relations, the `split at H` dispatch, the `Nat.rec` induction and an entry point the slice reports as free.
+
 ## 11. Specification test vectors
 
 One shared format for everything the specification is tested against: NDJSON, schema-validated (`tests/contracts/vector.schema.json`), **logical time only** — timestamps are ordering tags, never wall-clock, so replay is deterministic on any machine.
