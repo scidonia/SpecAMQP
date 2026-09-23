@@ -4306,4 +4306,287 @@ theorem readCompound_list_body (F : Nat) (ih : WireAgreesUpTo (F - 2)) (decl : E
                 rfl
             · exact absurd hr (by simp)
 
+/-! ## The compound body on the map rows
+
+The map rows share the list body's skeleton — the two size fields through the same bridges, the item
+loops one fuel apart met by the irrelevance, the size comparison over the same window — and differ in
+the two places the map's own clause puts between them: the item count's parity is decided *before* the
+items are read, and the value is the items' *pairing* rather than the items. Both readers make that
+decision in the same place and refuse an odd count as `malformed`, which is what lets the two
+computations be walked in step; the pairing is where the landed `pairUp_agrees` is the value equation.
+
+The one arm here without a counterpart is the reference's own second line of defence: `Ref.pairUp`
+answers `none` for an odd tail and `Ref.readMap` reports that as a further malformed. An even count
+excludes it, and that is a fact about the reference's item loop rather than an assumption — the loop
+answers one item per unit of the count it was handed, so the list the reference pairs is exactly
+`count` long. `ref_readItems_length` and `ref_pairUp_isSome_of_even` are those two facts. The arm is
+not removed, because removing it would change the reference; a branch closes the arms the reader has. -/
+
+/-- **The reference's item loop answers `count` items.** The count is one of the loop's own parameters,
+so the list it answers is exactly that long — which is the parity of the list the reference's own
+pairing is handed. -/
+theorem ref_readItems_length : ∀ (count : Nat) (fuel : Nat) (c : SpecAMQP.Ref.Cursor)
+    (items : List SpecAMQP.Ref.Value) (c' : SpecAMQP.Ref.Cursor),
+    SpecAMQP.Ref.readItems fuel count c = .ok (items, c') → items.length = count := by
+  intro count
+  induction count with
+  | zero =>
+    intro fuel c items c' h
+    cases fuel with
+    | zero => simp only [SpecAMQP.Ref.readItems] at h; exact absurd h (by simp)
+    | succ f =>
+      simp only [SpecAMQP.Ref.readItems] at h
+      obtain ⟨ho, -⟩ : [] = items ∧ c = c' := by
+        simpa only [Except.ok.injEq, Prod.mk.injEq] using h
+      subst ho
+      rfl
+  | succ k ih =>
+    intro fuel c items c' h
+    cases fuel with
+    | zero => simp only [SpecAMQP.Ref.readItems] at h; exact absurd h (by simp)
+    | succ f =>
+      unfold SpecAMQP.Ref.readItems at h
+      obtain ⟨⟨item, d₁⟩, h1, h⟩ := exists_of_bind_ok h
+      try dsimp only at h
+      obtain ⟨⟨rest, d₂⟩, h2, h⟩ := exists_of_bind_ok h
+      try dsimp only at h
+      obtain ⟨ho, -⟩ : item :: rest = items ∧ d₂ = c' := by
+        simpa only [except_pure_ok, Except.ok.injEq, Prod.mk.injEq] using h
+      subst ho
+      simp only [List.length_cons]
+      rw [ih f d₁ rest d₂ h2]
+
+/-- **An even item count leaves the reference's pairing something to answer.** The reference's
+`pairUp` is the partial function that answers `none` for an odd tail, so a list of even length has a
+pairing — the direction a reader needs, with the half-count carried explicitly so that the induction
+is on the list's own structure rather than on a division. The empty list is its own pairing at every
+count, and the singleton is the shape an even length excludes. -/
+theorem ref_pairUp_isSome_of_even : ∀ (k : Nat) (ys : List SpecAMQP.Ref.Value),
+    ys.length = 2 * k → ∃ zs, SpecAMQP.Ref.pairUp ys = some zs
+  | _, [], _ => ⟨[], rfl⟩
+  | _, [_], h => by simp only [List.length_cons, List.length_nil] at h; omega
+  | k + 1, y :: y' :: ys', h => by
+    have hpar : ys'.length = 2 * k := by
+      simp only [List.length_cons] at h
+      omega
+    obtain ⟨zs, hz⟩ := ref_pairUp_isSome_of_even k ys' hpar
+    exact ⟨(y, y') :: zs, by simp only [SpecAMQP.Ref.pairUp, hz, Option.map_some]⟩
+
+/-- **The compound body on a map row.** The specification's `readCompound` against the reference's
+`readMap`, at the fuel the value's constructor octet handed down. The two size fields are the landed
+bridge, the item loops are one fuel apart and met by the irrelevance, the parity decision is the same
+decision over the same count, and the size comparisons are the same numbers over the same window —
+which is what makes the reference's negated inequality the specification's equality. The value is the
+items' pairing, and `pairUp_agrees` is the equation between the two pairings. -/
+theorem readCompound_map_body (F : Nat) (ih : WireAgreesUpTo (F - 2)) (decl : EncodingDecl)
+    (hw : 1 ≤ decl.width) (howner : decl.owner = "map")
+    {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    (hb : c.data.size - c.pos ≤ F) :
+    StepAgreesAt BodiesAgree (SpecAMQP.Spec.Codec.readCompound F decl)
+      (SpecAMQP.Ref.readMap F decl.width) c c' := by
+  cases F with
+  | zero =>
+    constructor
+    · intro other d' hr
+      simp only [SpecAMQP.Ref.readMap] at hr
+      exact absurd hr (by simp)
+    · intro failure hr
+      simp only [SpecAMQP.Ref.readMap] at hr
+      have hcl : (SpecAMQP.Ref.Frame.valueFailure failure).reasonClass = "truncated" := by
+        rw [← Except.error.inj hr]
+        simp only [SpecAMQP.Ref.Frame.valueFailure]
+        rfl
+      cases h1 : SpecAMQP.Spec.Codec.takeBe decl.width c with
+      | error e =>
+        refine ⟨e, ?_, ?_⟩
+        · simp only [SpecAMQP.Spec.Codec.readCompound]; rw [h1, except_bind_error]
+        · rw [spec_takeBe_error_class h1, hcl]
+      | ok p =>
+        obtain ⟨size, c₁⟩ := p
+        cases h2 : SpecAMQP.Spec.Codec.takeBe decl.width c₁ with
+        | error e =>
+          refine ⟨e, ?_, ?_⟩
+          · simp only [SpecAMQP.Spec.Codec.readCompound]
+            rw [h1, except_bind_ok, h2, except_bind_error]
+          · rw [spec_takeBe_error_class h2, hcl]
+        | ok q =>
+          -- the bound says the cursor holds nothing, so its header cannot have been read
+          have hcontra := spec_takeBe_exhausted (w := decl.width) hw (c := c) (by omega)
+          rw [h1] at hcontra
+          exact absurd hcontra (by simp)
+  | succ G =>
+    constructor
+    · intro other d' hr
+      unfold SpecAMQP.Ref.readMap at hr
+      obtain ⟨⟨size, c₁'⟩, hr1, hr⟩ := exists_of_bind_ok hr
+      try dsimp only at hr
+      obtain ⟨⟨count, c₂'⟩, hr2, hr⟩ := exists_of_bind_ok hr
+      try dsimp only at hr
+      split at hr
+      · exact absurd hr (by simp)
+      · rename_i hpar
+        obtain ⟨⟨items', c₃'⟩, hr3, hr⟩ := exists_of_bind_ok hr
+        try dsimp only at hr
+        split at hr
+        · exact absurd hr (by simp)
+        · rename_i hpass
+          have hsz : c₃'.pos - c₁'.pos = size := by simpa using hpass
+          cases hp : SpecAMQP.Ref.pairUp items' with
+          | none =>
+            have habs : False := by rw [hp] at hr; simp at hr
+            exact habs.elim
+          | some pairs =>
+            obtain ⟨hother, hcur'⟩ : SpecAMQP.Ref.Value.map pairs = other ∧ c₃' = d' := by
+              rw [hp] at hr
+              simpa using hr
+            subst hother
+            subst hcur'
+            obtain ⟨d₁, hs1, hc1⟩ := takeBe_agrees hc decl.width size c₁' hr1
+            obtain ⟨d₂, hs2, hc2⟩ := takeBe_agrees hc1 decl.width count c₂' hr2
+            have hdd : d₂.data.size = c.data.size := by
+              rw [spec_takeBe_data hs2, spec_takeBe_data hs1]
+            have hp1 := takeBe_advances decl.width c size d₁ hs1
+            have hp2 := takeBe_advances decl.width d₁ count d₂ hs2
+            have hb₂ : d₂.data.size - d₂.pos ≤ (G + 1) - 1 := by rw [hdd, hp2, hp1]; omega
+            have hge : 1 ≤ G := by
+              have := two_le_fuel_of_header hw hc hb hr1 hr2
+              omega
+            obtain ⟨items, c₃, hs3, hc3, hbl⟩ :=
+              (itemsAgree2_of_irrel
+                (readItems_loop G (wireAgreesUpTo_mono ih (by omega)) hge count d₂ c₂' hc2
+                  (by omega))
+                (readItems_irrel (Nat.le_succ G) hge (by omega))).1 items' c₃' hr3
+            have hmeasured : c₃.pos - d₁.pos = size := by rw [hc3.2, hc1.2]; exact hsz
+            refine ⟨.map (SpecAMQP.Spec.Codec.pairUp items), c₃, ?_, ?_, hc3, ?_⟩
+            · simp only [SpecAMQP.Spec.Codec.readCompound]
+              rw [hs1, except_bind_ok, hs2, except_bind_ok]
+              simp only [howner]
+              rw [if_neg hpar]
+              rw [hs3, except_bind_ok, if_pos hmeasured]
+            · simp only [BodiesAgree]
+              exact pairUp_agrees pairs items items' hbl hp
+            · rw [(readRows_data (G + 1)).2.1 count d₂ items c₃ hs3, spec_takeBe_data hs2,
+                spec_takeBe_data hs1]
+    · intro failure hr
+      unfold SpecAMQP.Ref.readMap at hr
+      cases hr1 : SpecAMQP.Ref.takeBeU decl.width c' with
+      | error e =>
+        rw [hr1, except_bind_error] at hr
+        simp only [Except.error.injEq] at hr
+        subst hr
+        obtain ⟨refusal, hs, hcl⟩ := takeBe_fails hc decl.width e hr1
+        refine ⟨refusal, ?_, hcl⟩
+        simp only [SpecAMQP.Spec.Codec.readCompound]
+        rw [hs, except_bind_error]
+      | ok p =>
+        obtain ⟨size, c₁'⟩ := p
+        rw [hr1, except_bind_ok] at hr
+        try dsimp only at hr
+        cases hr2 : SpecAMQP.Ref.takeBeU decl.width c₁' with
+        | error e =>
+          rw [hr2, except_bind_error] at hr
+          simp only [Except.error.injEq] at hr
+          subst hr
+          obtain ⟨d₁, hs1, hc1⟩ := takeBe_agrees hc decl.width size c₁' hr1
+          obtain ⟨refusal, hs2, hcl⟩ := takeBe_fails hc1 decl.width e hr2
+          refine ⟨refusal, ?_, hcl⟩
+          simp only [SpecAMQP.Spec.Codec.readCompound]
+          rw [hs1, except_bind_ok, hs2, except_bind_error]
+        | ok q =>
+          obtain ⟨count, c₂'⟩ := q
+          rw [hr2, except_bind_ok] at hr
+          try dsimp only at hr
+          split at hr
+          · -- the reference refuses the odd count, and the specification refuses it in the same class
+            rename_i hpar
+            obtain ⟨d₁, hs1, hc1⟩ := takeBe_agrees hc decl.width size c₁' hr1
+            obtain ⟨d₂, hs2, hc2⟩ := takeBe_agrees hc1 decl.width count c₂' hr2
+            have hcond : (count % 2 != 0) = true := hpar
+            simp only [Except.error.injEq] at hr
+            subst hr
+            refine ⟨SpecAMQP.Spec.Codec.refusal "malformed" s!"a map declares {count} item(s): keys and values come in pairs, so an odd count is not a map", ?_, ?_⟩
+            · simp only [SpecAMQP.Spec.Codec.readCompound]
+              rw [hs1, except_bind_ok, hs2, except_bind_ok]
+              simp only [howner]
+              rw [if_pos hcond]
+            · simp only [SpecAMQP.Ref.Frame.valueFailure]
+              rfl
+          · rename_i hpar
+            cases hr3 : SpecAMQP.Ref.readItems G count c₂' with
+            | error e =>
+              rw [hr3, except_bind_error] at hr
+              simp only [Except.error.injEq] at hr
+              subst hr
+              obtain ⟨d₁, hs1, hc1⟩ := takeBe_agrees hc decl.width size c₁' hr1
+              obtain ⟨d₂, hs2, hc2⟩ := takeBe_agrees hc1 decl.width count c₂' hr2
+              have hdd : d₂.data.size = c.data.size := by
+                rw [spec_takeBe_data hs2, spec_takeBe_data hs1]
+              have hp1 := takeBe_advances decl.width c size d₁ hs1
+              have hp2 := takeBe_advances decl.width d₁ count d₂ hs2
+              have hge : 1 ≤ G := by
+                have := two_le_fuel_of_header hw hc hb hr1 hr2
+                omega
+              obtain ⟨refusal, hs3, hcl⟩ :=
+                (itemsAgree2_of_irrel
+                  (readItems_loop G (wireAgreesUpTo_mono ih (by omega)) hge count d₂ c₂' hc2
+                    (by rw [hdd, hp2, hp1]; omega))
+                  (readItems_irrel (Nat.le_succ G) hge (by rw [hdd, hp2, hp1]; omega))).2 e hr3
+              refine ⟨refusal, ?_, hcl⟩
+              simp only [SpecAMQP.Spec.Codec.readCompound]
+              rw [hs1, except_bind_ok, hs2, except_bind_ok]
+              simp only [howner]
+              rw [if_neg hpar, hs3, except_bind_error]
+            | ok r =>
+              obtain ⟨items', c₃'⟩ := r
+              rw [hr3, except_bind_ok] at hr
+              try dsimp only at hr
+              split at hr
+              · -- the reference's size comparison refuses, and the specification measures the same
+                simp only [Except.error.injEq] at hr
+                subst hr
+                obtain ⟨d₁, hs1, hc1⟩ := takeBe_agrees hc decl.width size c₁' hr1
+                obtain ⟨d₂, hs2, hc2⟩ := takeBe_agrees hc1 decl.width count c₂' hr2
+                have hdd : d₂.data.size = c.data.size := by
+                  rw [spec_takeBe_data hs2, spec_takeBe_data hs1]
+                have hp1 := takeBe_advances decl.width c size d₁ hs1
+                have hp2 := takeBe_advances decl.width d₁ count d₂ hs2
+                have hge : 1 ≤ G := by
+                  have := two_le_fuel_of_header hw hc hb hr1 hr2
+                  omega
+                obtain ⟨items, c₃, hs3, hc3, hbl⟩ :=
+                  (itemsAgree2_of_irrel
+                    (readItems_loop G (wireAgreesUpTo_mono ih (by omega)) hge count d₂ c₂' hc2
+                      (by rw [hdd, hp2, hp1]; omega))
+                    (readItems_irrel (Nat.le_succ G) hge (by rw [hdd, hp2, hp1]; omega))).1
+                      items' c₃' hr3
+                rename_i hfail
+                have hne : c₃.pos - d₁.pos ≠ size := by
+                  intro hcon
+                  have hz : c₃'.pos - c₁'.pos = size := by rw [← hc3.2, ← hc1.2]; exact hcon
+                  rw [hz] at hfail
+                  exact absurd hfail (by simp)
+                refine ⟨SpecAMQP.Spec.Codec.refusal "sizeMismatch" s!"a map declares {size} \
+                  octet(s) after its size field and measures {c₃.pos - d₁.pos}", ?_, ?_⟩
+                · simp only [SpecAMQP.Spec.Codec.readCompound]
+                  rw [hs1, except_bind_ok, hs2, except_bind_ok]
+                  simp only [howner]
+                  rw [if_neg hpar, hs3, except_bind_ok]
+                  dsimp only
+                  rw [if_neg hne]
+                · simp only [SpecAMQP.Ref.Frame.valueFailure]
+                  rfl
+              · -- the size comparison passed: the reference's pairing arm, which an even count
+                -- excludes — the item loop answered `count` items and the count is even
+                have hbool : (count % 2 != 0) = false := by
+                  cases hb : (count % 2 != 0) with
+                  | false => rfl
+                  | true => exact absurd hb hpar
+                have hodd : count % 2 = 0 := by simpa using hbool
+                have hlen := ref_readItems_length count G c₂' items' c₃' hr3
+                obtain ⟨k, hk⟩ := Nat.dvd_iff_mod_eq_zero.mpr hodd
+                obtain ⟨zs, hzs⟩ := ref_pairUp_isSome_of_even k items' (by rw [hlen]; exact hk)
+                rw [hzs] at hr
+                simp only [except_pure_ok] at hr
+                exact absurd hr (by simp)
+
 end SpecAMQP.Proofs
