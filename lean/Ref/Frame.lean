@@ -196,7 +196,15 @@ def valueFailure (error : DecodeError) : Refusal :=
   | .malformed reason => refusal "malformed" reason
   | .limit context => refusal "limit" context
 
-/-- The reason class a rendered refusal leads with. -/
+/-- The reason class a rendered refusal leads with.
+
+**No caller, and kept deliberately rather than removed on this change's own judgement.** The
+value layer's writer answers with a classed refusal now, so `writeFrame` hands that class on as
+a field instead of recovering it from a sentence, and nothing in the tree splits a message to
+find a class any more. The definition says nothing false — it is the grammar of a message this
+layer still renders, and it is the recovery a caller outside this tree would need if it held
+only prose. Whether it should go is a question about the layer's surface rather than about
+this change, so it is reported rather than decided here. -/
 def classOf (message : String) : String := (message.splitOn ":").head?.getD ""
 
 /-! ## Reading and writing -/
@@ -334,7 +342,7 @@ def writeFrame (frame : Frame) : Except Refusal Octets :=
             {frame.kind.role} role a {frame.kind.name} frame carries")
       else
         match encode body with
-        | .error e => .error ⟨classOf e, e⟩
+        | .error failure => .error ⟨failure.reasonClass, failure.message⟩
         | .ok body =>
           let size := headerOctets + frame.extended.size + body.size + frame.payload.size
           if size ≤ maxSize then

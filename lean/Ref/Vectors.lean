@@ -199,7 +199,7 @@ def refCodec : Codec where
     | .error e => .error (refusalText e)
   encode := fun json => do
     let value ← valueOfJson 64 json
-    encode value
+    (encode value).mapError SpecAMQP.Ref.EncodeRefusal.message
 
 /-- A frame in the corpus vocabulary: the layout's fields, the body as the one
 described value the layout requires, and the payload as octets. -/

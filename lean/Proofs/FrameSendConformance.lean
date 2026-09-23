@@ -238,10 +238,11 @@ def ValueWriterAgree : Prop :=
     BodiesAgree body other →
     (∀ octets : Octets, SpecAMQP.Ref.encode other = .ok octets →
       SpecAMQP.Spec.Codec.encodeValue body = .ok octets) ∧
-    (∀ message : String, SpecAMQP.Ref.encode other = .error message →
+    (∀ failure : SpecAMQP.Ref.EncodeRefusal,
+      SpecAMQP.Ref.encode other = .error failure →
       ∃ refusal : SpecAMQP.Spec.Codec.Refusal,
         SpecAMQP.Spec.Codec.encodeValue body = .error refusal ∧
-        refusal.reasonClass = SpecAMQP.Ref.Frame.classOf message)
+        refusal.reasonClass = failure.reasonClass)
 
 /-! ## The layer's answer, and the two endpoints -/
 
@@ -819,8 +820,8 @@ theorem writers_matched (writers : ValueWriterAgree)
                       writers (.described descriptor value) (.described oDescriptor oValue)
                         (reach _ rfl) hbodies
                     cases henc : SpecAMQP.Ref.encode (.described oDescriptor oValue) with
-                    | error message =>
-                      obtain ⟨specMessage, hspecEnc, hclass⟩ := hwerr message henc
+                    | error failure =>
+                      obtain ⟨specRefusal, hspecEnc, hclass⟩ := hwerr failure henc
                       simp only [hspecEnc, hclass] at ⊢
                       exact writeAgrees_error _ _ _
                     | ok octets =>

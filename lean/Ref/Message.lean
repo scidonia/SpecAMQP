@@ -818,7 +818,8 @@ def encodeSectionValue (sec : Section) : Except String Octets :=
     | none => .error s!"{decl.name} carries no descriptor, so it is not a section of a message"
     | some descriptor =>
       let code := descriptor.domain * 2 ^ 32 + descriptor.code
-      encode (.described (.ulong (UInt64.ofNat code)) sec.body.bodyAsValue)
+      (encode (.described (.ulong (UInt64.ofNat code)) sec.body.bodyAsValue)).mapError
+        SpecAMQP.Ref.EncodeRefusal.message
 
 /-- Sections written one after the other, which is what a payload is. -/
 def encodeSections : List Section → Except String Octets

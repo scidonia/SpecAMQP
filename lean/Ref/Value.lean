@@ -559,6 +559,44 @@ def decode (bytes : Octets) : Except DecodeError (Value × Nat) :=
   | .ok (value, c) => .ok (value, c.pos)
   | .error e => .error e
 
+/-! ## Refusals
+
+A writer refuses in three families, and each names its reason: an array element
+constructor the declared surface assigns no encoding is `unassigned`, a value the
+declared constructor cannot carry is `malformed`, and a size, count or length no
+declared field can announce is `limit`.
+
+The class is a **field** of a refusal, not a token a reader recovers from the message,
+for the reason `Spec.Codec` gives: the class is the part of a refusal that is interface
+— the corpus compares classes between the artefacts, and a proof can quantify only over
+a class that is a term — and a class read back out of prose by `String.splitOn` is one
+the kernel cannot reason about, because `splitOn` is a well-founded scan over
+`String.Pos.Raw` that no kernel tactic reduces. The message travels with it, so that
+every caller and every vector still sees byte for byte what this module reported before
+the class became a field.
+
+This is the value layer's own refusal type rather than a shared one: this module imports
+nothing — it is written to be extracted — so it can no more reach the frame layer's
+`Refusal` than `Spec.Codec` can reach `Spec.Frame`'s. It is named for the direction it
+belongs to, as `DecodeError` is, so that it neither shadows the harness's `Refusal` in a
+module that opens `SpecAMQP.Harness` nor reads as one of the frame layer's. The shape is
+the same as every other layer's, which is what lets each layer hand its own refusal on
+unchanged, exactly as the specification's codec and frame layers do. -/
+
+/-- A refusal: the reason class this layer names, and the message a caller sees. -/
+structure EncodeRefusal where
+  /-- The reason class this refusal names. -/
+  reasonClass : String
+  /-- The message a caller sees: the class, a colon, and the prose. -/
+  message : String
+deriving Repr, DecidableEq
+
+/-- A refusal whose class this layer named itself: the class, a colon, a space, and the
+prose. It is the one place this module spells a refusal, so that a caller reading the
+message and a proof reading the class cannot disagree about either. -/
+def encodeRefusal (reasonClass prose : String) : EncodeRefusal :=
+  ⟨reasonClass, s!"{reasonClass}: {prose}"⟩
+
 /-! ## Writing
 
 Encoders emit the narrowest encoding that carries the value, and sizes count the
@@ -580,14 +618,14 @@ array of `str32` elements four-octet ones. A payload whose length does not fit t
 declared width is refused rather than masked into a shorter length, which would
 announce a payload the octets do not carry. -/
 def elementVariableData (constructor : UInt8) (form : String) (payload : List UInt8) :
-    Except String Octets :=
+    Except EncodeRefusal Octets :=
   if constructor == 0xB0 || constructor == 0xB1 || constructor == 0xB3 then
     .ok (u32be payload.length ++ payload.toArray)
   else if payload.length ≤ 255 then
     .ok (#[payload.length.toUInt8] ++ payload.toArray)
   else
-    .error s!"limit: a {form} element carries {payload.length} octet(s), which a \
-      one-octet length field cannot announce"
+    .error (encodeRefusal "limit" s!"a {form} element carries {payload.length} octet(s), which a \
+      one-octet length field cannot announce")
 
 /-- A value's type in the corpus's own words: what a refusal names when the value and the
 constructor disagree. -/
@@ -621,25 +659,25 @@ def typeName : Value → String
 /-- A one-octet unsigned element, refused by name when the value does not fit the octet
 the array's declared constructor gives it: masking the value would write a different
 value, which a reader would then accept. -/
-def elementOctet (kind : String) (n : Nat) : Except String Octets :=
+def elementOctet (kind : String) (n : Nat) : Except EncodeRefusal Octets :=
   if n ≤ 255 then .ok #[n.toUInt8]
-  else .error s!"limit: a {kind} element carries one octet and {n} does not fit"
+  else .error (encodeRefusal "limit" s!"a {kind} element carries one octet and {n} does not fit")
 
 /-- A one-octet signed element, on the same terms. -/
-def elementSignedOctet (kind : String) (n : Int) : Except String Octets :=
+def elementSignedOctet (kind : String) (n : Int) : Except EncodeRefusal Octets :=
   if -128 ≤ n && n ≤ 127 then .ok #[(n % 256).toNat.toUInt8]
-  else .error s!"limit: a {kind} element carries one signed octet and {n} does not fit"
+  else .error (encodeRefusal "limit" s!"a {kind} element carries one signed octet and {n} does not fit")
 
 /-- A compound element's data: its items' octets, announced by the size and count
 fields of the width the array's constructor fixes. A count or a size the declared width
 cannot announce is refused rather than masked. -/
 def elementCompoundData (width : Nat) (kind : String) (count : Nat) (body : Octets) :
-    Except String Octets :=
+    Except EncodeRefusal Octets :=
   let size := width + body.size
   if width = 1 then
     if size ≤ 255 && count ≤ 255 then .ok (#[size.toUInt8, count.toUInt8] ++ body)
-    else .error s!"limit: a {kind}8 element carries {count} item(s) in {body.size} \
-      octet(s), which a one-octet size or count field cannot announce"
+    else .error (encodeRefusal "limit" s!"a {kind}8 element carries {count} item(s) in {body.size} \
+      octet(s), which a one-octet size or count field cannot announce")
   else
     .ok (u32be size ++ u32be count ++ body)
 
@@ -655,7 +693,7 @@ Two values are refused rather than written: an array whose element count exceeds
 elements. The writer's domain has to sit inside what the reader accepts, and emitting
 octets the reader would then refuse — or masking a value into a different one — would
 make this implementation's own output unreadable or untrue. -/
-def encode : Value → Except String Octets
+def encode : Value → Except EncodeRefusal Octets
   | .null => .ok #[0x40]
   | .boolean true => .ok #[0x41]
   | .boolean false => .ok #[0x42]
@@ -700,8 +738,8 @@ def encode : Value → Except String Octets
       #[0xD1] ++ u32be (4 + body.size) ++ u32be count ++ body
   | .array constructor items =>
     if items.length > arrayElementLimit then
-      .error s!"limit: an array of {items.length} element(s): this writer materialises \
-        at most {arrayElementLimit}"
+      .error (encodeRefusal "limit" s!"an array of {items.length} element(s): this writer \
+        materialises at most {arrayElementLimit}")
     else do
       let body ← arrayElementItems constructor items
       let count := items.length
@@ -717,7 +755,7 @@ termination_by value => sizeOf value
 
 /-- Items concatenated in order. Structural recursion over the list, so that the
 mutual block's measure is `sizeOf` on each function's own argument. -/
-def encodeAll : List Value → Except String Octets
+def encodeAll : List Value → Except EncodeRefusal Octets
   | [] => .ok #[]
   | item :: rest => do
     let head ← encode item
@@ -727,7 +765,7 @@ termination_by items => sizeOf items
 
 /-- A map's items concatenated in order: each key followed by its value, both with
 their own constructors, exactly as a compound's items are written. -/
-def encodePairs : List (Value × Value) → Except String Octets
+def encodePairs : List (Value × Value) → Except EncodeRefusal Octets
   | [] => .ok #[]
   | (key, value) :: rest => do
     let head ← encode key
@@ -738,7 +776,7 @@ termination_by pairs => sizeOf pairs
 
 /-- An array's elements, each in the array's declared element constructor form: what an
 array's octets carry after its size, its count and its one constructor octet. -/
-def arrayElementItems (constructor : UInt8) : List Value → Except String Octets
+def arrayElementItems (constructor : UInt8) : List Value → Except EncodeRefusal Octets
   | [] => .ok #[]
   | item :: rest => do
     let head ← arrayElement constructor item
@@ -755,7 +793,7 @@ count, element constructor and elements. A value of another type, or a size or c
 declared width cannot announce, is refused by name rather than written in another form —
 writing each element in whatever form it would choose alone produces an array no reader
 can follow, which the corpus caught. -/
-def arrayElement : UInt8 → Value → Except String Octets
+def arrayElement : UInt8 → Value → Except EncodeRefusal Octets
   | 0x00, .described descriptor value => do
     let head ← encode descriptor
     let tail ← encode value
@@ -807,8 +845,8 @@ def arrayElement : UInt8 → Value → Except String Octets
   -- refused rather than written wide.
   | 0xE0, .array constructor items =>
     if items.length > arrayElementLimit then
-      .error s!"limit: an array of {items.length} element(s): this writer materialises \
-        at most {arrayElementLimit}"
+      .error (encodeRefusal "limit" s!"an array of {items.length} element(s): this writer \
+        materialises at most {arrayElementLimit}")
     else do
       let body ← arrayElementItems constructor items
       let count := items.length
@@ -816,12 +854,12 @@ def arrayElement : UInt8 → Value → Except String Octets
       if size ≤ 255 && count ≤ 255 then
         return #[size.toUInt8, count.toUInt8, constructor] ++ body
       else
-        .error s!"limit: an array8 element carries {count} element(s) in \
-          {body.size} octet(s), which a one-octet size or count field cannot announce"
+        .error (encodeRefusal "limit" s!"an array8 element carries {count} element(s) in \
+          {body.size} octet(s), which a one-octet size or count field cannot announce")
   | 0xF0, .array constructor items =>
     if items.length > arrayElementLimit then
-      .error s!"limit: an array of {items.length} element(s): this writer materialises \
-        at most {arrayElementLimit}"
+      .error (encodeRefusal "limit" s!"an array of {items.length} element(s): this writer \
+        materialises at most {arrayElementLimit}")
     else do
       let body ← arrayElementItems constructor items
       let count := items.length
@@ -835,11 +873,11 @@ def arrayElement : UInt8 → Value → Except String Octets
     -- peer could not agree with, and it made an array element the one place where the two
     -- artefacts' writers differed in class on a body the corpus vocabulary can express.
     if !assignedConstructor constructor then
-      .error s!"unassigned: octet {constructor.toNat} is not an encoding the constructor \
-        grammar assigns"
+      .error (encodeRefusal "unassigned" s!"octet {constructor.toNat} is not an encoding the \
+        constructor grammar assigns")
     else
-      .error s!"malformed: an array whose element constructor is {constructor.toNat} cannot \
-        carry a {typeName value}"
+      .error (encodeRefusal "malformed" s!"an array whose element constructor is \
+        {constructor.toNat} cannot carry a {typeName value}")
 termination_by _ value => sizeOf value
 
 end

@@ -8,10 +8,11 @@ import Proofs.FrameSendConformance
 `Proofs.FrameConformance.ValueLayersAgree`, `Proofs.FrameSendConformance.ValueCarrierAgree` and
 `Proofs.FrameSendConformance.ValueWriterAgree` are the three value-layer hypotheses the frame
 layer's two `Conforms` instances rest on. This module asks what is provable about them, and the
-answer is not the one the instances' prose hoped for: **`ValueWriterAgree` is false as stated**, at a
-witness in the repository's own vocabulary; **`ValueLayersAgree` was false as stated and is
-undecided now**, because the divergence it named has been fixed and what remains is a statement with
-no witness and no available proof; and **`ValueCarrierAgree` is untested here**.
+answer is not the one the instances' prose hoped for: **`ValueWriterAgree` is false as stated**, and
+this module carries a refutation of it — classing the reference's writer is what made that refutation
+expressible; **`ValueLayersAgree` was false as stated and is undecided now**, because the divergence it
+named has been fixed and what remains is a statement with no witness and no available proof; and
+**`ValueCarrierAgree` is untested here**.
 
 ## What the evidence says, statement by statement
 
@@ -30,50 +31,76 @@ no witness and no available proof; and **`ValueCarrierAgree` is untested here**.
   available here because it would need the value layer's own `Conforms` instance, which does not
   exist. That state is *undecided*, and this module leaves it there rather than writing either
   direction.
-* **`ValueWriterAgree` is false**, and its first conjunct alone is enough: the reference's writer
-  writes a raw payload at whatever width the value carries (`#[0x72] ++ payload`), while the
-  specification's writer looks the width up in the declared surface and refuses a payload the type
-  has no encoding for. The reference's octets for that value are not the specification's answer, and
-  the hypothesis demands they be the same octets.
+* **`ValueWriterAgree` is false**, on two families that are different in kind.
+  * *The ill-width family is out of the carrier's reach.* The reference's writer emits a raw payload at
+    whatever width the value carries (`#[0x72] ++ payload`) while the specification's writer looks the
+    width up in the declared surface and refuses a payload the type has no encoding for, so `.float #[]`
+    has the reference write `#[0x72]` where the specification refuses. `valueOfJson` fixes that payload
+    at four octets on the way in, so this family refutes the *every-related-pair* statement of this law
+    rather than the one landed here; `bodiesAgree_floatEmpty` and its two companions are that
+    measurement, and they are what narrowed the domain to `CarrierReachable`.
+  * *The empty-array family is in the carrier's reach, and it refutes the law as landed.* An array whose
+    declared element constructor the grammar assigns no encoding, carrying **no elements**, is written
+    by the reference and refused by the specification: `not_valueWriterAgree` below, with
+    `Ref.encode (.array 0x57 []) = .ok #[0xE0,0x02,0x00,0x57]` against
+    `Spec.Codec.encodeValue (.array 0x57 []) = .error (unassigned …)`, on a value the corpus
+    vocabulary produces. The reference's own reader refuses those octets
+    (`Ref.decode = .error (.unassigned 87)`), so this is one implementation's arm skipping the check the
+    specification makes, rather than two readings of the standard.
+
+    The mechanism is worth naming because it is why patch 3 missed it: `Ref.arrayElementItems` writes
+    no element data when the element list is empty, so `Ref.arrayElement`'s catch-all — the arm patch 3
+    split into `unassigned` and `malformed` — is never reached. `.array 0x57 [.null]` therefore refused
+    correctly before this sitting and `.array 0x57 []` did not: the same declared constructor, one
+    element apart.
 * **`ValueCarrierAgree` is untouched here**: it is a claim about the two corpus-vocabulary readers
   (`Spec.Codec.valueOfJson` against `Ref.Vectors.valueOfJson`), not about the wire, and this module
   has no evidence against it.
-* **The send *endpoint* is not refutable here, and the reason is a type rather than a missing
-  witness.** Every divergence between the two writers that the corpus vocabulary can express is
-  *class-only* — both refuse, with different classes (`.array 0x00 [null]` and `.array 0xE0 [null]`
-  were `malformed:` against `limit:`) — and the reference's writer answers `Except String Octets`, so
-  its class can only be recovered by `Ref.Frame.classOf`, i.e. by splitting prose. The only *shape*
-  divergence (one writes, the other refuses) is the ill-width family, which `valueOfJson`'s
-  fixed-width payload checks put out of the carrier's reach. So `¬ Conforms specFrameSend
-  refFrameSend` has no witness a kernel proof can carry until the reference's value writer reports
-  its class as a field, the way `Spec.Codec` now does.
+* **The send *endpoint*'s consequent is refutable now, and the obstruction to saying so was a type.**
+  Every divergence between the two writers that the corpus vocabulary can express *and that this module
+  has checked* was class-only — both refuse, with different classes (`.array 0x00 [null]` and
+  `.array 0xE0 [null]` were `malformed:` against `limit:`, and both artefacts were aligned) — and the
+  reference's writer answered `Except String Octets`, so its class could only be recovered by
+  `Ref.Frame.classOf`, i.e. by splitting prose. Classing the writer removed that: the class is a field
+  (`Ref.EncodeRefusal.reasonClass`), and the empty-array family above is a *shape* divergence — one
+  writes, the other refuses — that the vocabulary reaches. So `¬ Conforms specFrameSend refFrameSend` is
+  now expressible through a frame whose body is a described performative carrying this array, which is
+  the form the previous sitting said this direction's refutation could not be written in. It is **not**
+  landed here: the value layer's law is what this module is about, and the endpoint's own negation needs
+  a frame in the corpus vocabulary that survives `frameOfJson`'s performative test. What *is* landed is
+  the value-layer refutation the endpoint argument would have to rest on.
 
 ## Where the class comparison now stands
 
-The vocabulary that blocked the class-comparing statements has been removed on one side. The
-specification's class is a **field** (`Spec.Codec.Refusal.reasonClass`), and the reference's
-*reader* carries its class as a variant (`Ref.DecodeError`), so a comparison between those two is a
-`decide`-able goal — measured, not assumed: `(Spec.Codec.refusal "malformed" "prose").reasonClass =
-"malformed"` closes by `rfl`, and a mismatch between a `Ref.DecodeError` variant's class and a
-`Spec.Codec.Refusal` field's class closes by `decide`.
+The vocabulary that blocked the class-comparing statements has been removed on **both** sides. The
+specification's class is a **field** (`Spec.Codec.Refusal.reasonClass`); the reference's *reader*
+carries its class as a variant (`Ref.DecodeError`); and the reference's *writer* now answers with a
+classed refusal of its own (`Ref.EncodeRefusal`, whose `reasonClass` is a field). So every class on
+either side is a term, and the comparisons this module could only state over prose are goals a kernel
+proof can carry. `bodiesAgree_floatEmpty`'s companions and `not_valueWriterAgree` below are the two
+places that became possible.
 
-What is still prose is the reference's *writer*: `Ref.encode` returns `Except String Octets`, so its
-class exists only as the leading token of a message that `Ref.Frame.classOf` recovers with
-`String.splitOn ":"`. That function is not reducible in the kernel — it is
-`if sep == "" then [s] else splitOnAux s sep 0 0 0 []`, and `splitOnAux` is a well-founded scan over
-`String.Pos.Raw` whose `atEnd`/`get`/`next` do not reduce either, so
+**What classing the writer did *not* change, and the reason it is stated here.** `Ref.encode`'s refusal
+messages are byte for byte what they were: the class is a field and the message still leads with it, so
+`refusalText`-style rendering at the corpus boundary (`Ref.Vectors.refCodec`, `Ref.Message`) produces the
+same string, and the corpus's own comparisons see exactly what they saw before. A class is what the law
+compares and the sentence is what a human reads; a classed failure that dropped the sentence would keep
+every gate green and make the reference worse to debug. `Ref.Frame.classOf` — the `String.splitOn ":"`
+recovery — therefore has no caller any more, and it is kept and reported rather than deleted, because
+whether the layer should still offer that recovery is a question about its surface.
+
+The `splitOn` observation is kept because it is *why* the earlier refutation had to be written against
+the first conjunct, and the next reader deserves to know that the limit was a type and not a taste:
 
   `example : ("a:b".splitOn ":") == ["a", "b"]` is closed by neither `decide`, `simp`, nor
   `with_unfolding_all decide`; only `native_decide`, which this repository does not use.
 
-`ValueWriterAgree`'s second conjunct compares exactly that prose, which is why the landed refutation
-is written against the first conjunct, where no class appears at all.
-
 What this module lands, then, is the artefacts' answers for a witness, in each artefact's own terms:
 the two readers' answers to `mapWitness`, the two writers' answers for the ill-width and
-array-constructor families, and the reference's size accounting. Where a class-comparing statement
-follows from them it is named in the docstring beside the fact, and where no witness exists it is
-named as undecided rather than written.
+array-constructor families, the refutation of `ValueWriterAgree` at a value the corpus vocabulary
+produces, and the reference's size accounting. Where a class-comparing statement follows from them it is
+named in the docstring beside the fact, and where no witness exists it is named as undecided rather than
+written.
 -/
 
 -- The cursor types carry no `DecidableEq`, because no proof has needed to compare cursors yet.
@@ -86,6 +113,7 @@ namespace SpecAMQP.Proofs
 
 open SpecAMQP.Contracts
 open SpecAMQP.Harness (Octets)
+open Lean (Json)
 
 
 /-! ## The witness for the readers
@@ -259,13 +287,13 @@ The reference's writer writes a fixed-width payload unchanged (`#[0x72] ++ paylo
 specification's writer looks the payload's width up in the declared surface
 (`rowOf "float" bits.size`) and refuses a width the surface does not declare. Values reach a writer
 from a reader, so this witness is outside the corpus vocabulary — `valueOfJson` and `hexPayloadOf`
-fix a `float`'s payload at four octets — and `ValueWriterAgree` quantifies over every pair of
-values `BodiesAgree` relates, not only over the reachable ones. The specification's refusal for
-this value leads with `limit` — it spelled the bare prose until the classless refusals in
-`Spec/Codec.lean` were given their class, and that change moved this theorem's message and
-nothing else in this module. Another divergence in the same
-hypothesis is reachable through the vocabulary (an array whose element does not fit its declared
-element constructor), and it is reported with its two messages below. -/
+fix a `float`'s payload at four octets — and that is why these three theorems refute the
+*every-related-pair* statement of `ValueWriterAgree` and not the one landed now: the domain is
+`CarrierReachable`, and `.float #[]` is not in it. They are kept as the measurement that narrowed the
+domain. The specification's refusal for this value leads with `limit` — it spelled the bare prose
+until the classless refusals in `Spec/Codec.lean` were given their class, and that change moved this
+theorem's message and nothing else in this module. The divergence that *is* in the carrier's reach is
+the empty-array family, and it is landed with its refutation below. -/
 
 theorem bodiesAgree_floatEmpty : BodiesAgree (.float #[]) (.float #[]) := by
   unfold BodiesAgree
@@ -297,16 +325,19 @@ said `limit`. `Ref.arrayElement`'s catch-all has since been split — `unassigne
 assigns the constructor no encoding, `malformed` where the value does not fit the constructor it does
 assign — so the two now agree, and these two theorems are the pair that goes red if either side's
 class is weakened rather than aligned. The specification's two *classless* refusals in this family
-(`.array %x00 [x]` and `.array %xE0 [x]`) were given `malformed` in the same pass. -/
+(`.array %x00 [x]` and `.array %xE0 [x]`) were given `malformed` in the same pass.
+
+This check is reached once per element, which is the whole of the next section's subject: an array
+whose element list is empty never reaches it. -/
 
 theorem ref_encode_arrayUnassigned :
     SpecAMQP.Ref.encode (.array 0x57 [.null]) =
-      .error "unassigned: octet 87 is not an encoding the constructor grammar assigns" := by
+      .error (SpecAMQP.Ref.encodeRefusal "unassigned"
+        "octet 87 is not an encoding the constructor grammar assigns") := by
   unfold SpecAMQP.Ref.encode SpecAMQP.Ref.arrayElementItems SpecAMQP.Ref.arrayElement
   try dsimp only []
   try simp only [SpecAMQP.Ref.assignedConstructor]
-  try (first | rfl | (split <;> first | rfl | simp_all))
-  try decide
+  try rfl
 
 theorem spec_encodeValue_arrayUnassigned :
     SpecAMQP.Spec.Codec.encodeValue (.array 0x57 [.null]) =
@@ -321,6 +352,112 @@ theorem spec_encodeValue_arrayUnassigned :
 theorem bodiesAgree_arrayUnassigned :
     BodiesAgree (.array 0x57 [.null]) (.array 0x57 [.null]) := by
   simp [BodiesAgree, BodiesAgreeList]
+
+/-! ## The empty-array hole, and the refutation it carries
+
+The pair above is the *non-empty* case of the family, and it is the case patch 3 fixed. The check it
+names lives in `Ref.arrayElement`'s catch-all, which runs once per element — so an array with no
+elements never reaches it, and the declared constructor that is refused with one `null` in the array is
+written when the array is empty. `.array 0x57 [.null]` and `.array 0x57 []` differ by one element and
+answer differently; the second is the hole.
+
+It is reachable through the corpus vocabulary, so it refutes `ValueWriterAgree` as landed rather than
+being a curiosity about values no reader produces. The witness is the smallest one there is: `%x57` is
+in the fixed range and the declared surface assigns it no encoding, and the array declares no elements.
+
+The four facts are each artefact's own answer, plus the one that makes this a defect rather than a
+divergence of readings: the reference's **own** reader refuses the octets its writer wrote. A writer's
+domain is meant to sit inside its reader's — `Ref/Value.lean`'s head says so, and so does
+`Spec.Spec.Codec`'s array path by construction — and here it does not.
+
+**How the reachability is proved, since `valueOfJson` on a literal is the part that resists.** The
+three accessor facts are `decide`-able for the `String` keys and one rewrite for the `items` key; the
+`items` case is the one to know about, because `getObjValAs?` is `fromJson?` of a lookup and the
+`FromJson` instance for `Array` is an `Array.mapM` whose empty case is **not** definitionally reducible
+— `Array.mapM_empty` is the lemma that closes it, and without it `rfl` leaves
+`Array.mapM.map✝ … 0 #[] = .ok #[]`. With the three facts in hand the whole reader reduces: `unfold`,
+three `rw`s, `rfl`. Note also what is *not* available here — `DecidableEq` for `Ref.Value` (the type
+deliberately does not derive it) and for `Lean.Json`, so `decide` cannot be asked the question
+directly and the reduction has to be done in steps. -/
+
+/-- The corpus value that produces the witness: an array whose declared element constructor is `%x57`
+— inside the fixed range, assigned no encoding — carrying no elements. -/
+def arrayUnassignedEmptyJson : Json :=
+  Json.mkObj [("type", "array"), ("constructor", "57"), ("items", Json.arr #[])]
+
+theorem arrayUnassignedEmptyJson_type :
+    arrayUnassignedEmptyJson.getObjValAs? String "type" = .ok "array" := by decide
+
+theorem arrayUnassignedEmptyJson_constructor :
+    arrayUnassignedEmptyJson.getObjValAs? String "constructor" = .ok "57" := by decide
+
+/-- The corpus reader's `items` read: an empty JSON array as an empty `Array Json`. `Array.mapM_empty`
+is the step that has to be named; the `FromJson` instance's own body does not reduce on its own. -/
+theorem arrayUnassignedEmptyJson_items :
+    arrayUnassignedEmptyJson.getObjValAs? (Array Json) "items" = .ok #[] := by
+  simp only [Json.getObjValAs?]
+  rw [show arrayUnassignedEmptyJson.getObjValD "items" = Json.arr #[] from rfl]
+  simp only [Lean.FromJson.fromJson?, Array.fromJson?, Array.mapM_empty]
+  rfl
+
+/-- **The witness is carrier-reachable**, which is the domain `ValueWriterAgree` is stated over and
+the thing the previous sitting's refutations could not supply for a shape divergence. -/
+theorem carrier_witness_arrayUnassignedEmpty :
+    SpecAMQP.Ref.Vectors.valueOfJson 64 arrayUnassignedEmptyJson = .ok (.array 0x57 []) := by
+  unfold SpecAMQP.Ref.Vectors.valueOfJson
+  rw [arrayUnassignedEmptyJson_type, arrayUnassignedEmptyJson_constructor,
+    arrayUnassignedEmptyJson_items]
+  rfl
+
+theorem carrierReachable_arrayUnassignedEmpty : CarrierReachable (.array 0x57 []) :=
+  carrierReachable_of_valueOfJson carrier_witness_arrayUnassignedEmpty
+
+/-- The reference writes it: an `array8`, its size field `2` (the count octet and the constructor),
+its count `0`, the constructor `%x57`, and no element data. -/
+theorem ref_encode_arrayUnassignedEmpty :
+    SpecAMQP.Ref.encode (.array 0x57 []) = .ok #[0xE0, 0x02, 0x00, 0x57] := by
+  unfold SpecAMQP.Ref.encode SpecAMQP.Ref.arrayElementItems
+  rfl
+
+/-- The specification refuses the same value, and names `unassigned`: its element-constructor lookup
+runs *before* any element is written, so an empty array reaches it too. -/
+theorem spec_encodeValue_arrayUnassignedEmpty :
+    SpecAMQP.Spec.Codec.encodeValue (.array 0x57 ([] : List SpecAMQP.Spec.Codec.Value)) =
+      .error (SpecAMQP.Spec.Codec.refusal "unassigned"
+        "octet 0x57 lies in the fixed range of width 1 but the declared surface assigns it no encoding") := by
+  unfold SpecAMQP.Spec.Codec.encodeValue SpecAMQP.Spec.Codec.writeValue
+    SpecAMQP.Spec.Codec.elementDecl?
+  rfl
+
+theorem bodiesAgree_arrayUnassignedEmpty :
+    BodiesAgree (.array 0x57 []) (.array 0x57 []) := by
+  simp [BodiesAgree, BodiesAgreeList]
+
+/-- **The reference's own reader refuses the octets its writer wrote.** This is the fact that makes the
+divergence a defect and not two readings of Part 1: `Ref.readArray` looks the element constructor up
+before it reads an element, exactly as the specification's writer does, so the octets
+`ref_encode_arrayUnassignedEmpty` produces are octets this implementation cannot read back. -/
+theorem ref_decode_arrayUnassignedEmpty :
+    SpecAMQP.Ref.decode #[0xE0, 0x02, 0x00, 0x57] = .error (.unassigned 0x57) := by
+  unfold SpecAMQP.Ref.decode SpecAMQP.Ref.readValue SpecAMQP.Ref.readArray
+  rfl
+
+/-- **`ValueWriterAgree` is false.** Its first conjunct demands that whatever the reference writes, the
+specification writes the same octets; the witness has the reference write four octets and the
+specification refuse, on a value `CarrierReachable` supplies.
+
+This is a refutation of a *defect*, not of a reading: the two writers agree on every class this corpus
+reaches, and the reason they answer differently here is that one of them skipped a check the other
+makes. It is stated so that the day the reference consults its declared constructor before it writes its
+elements — the check the specification makes through `elementDecl?` — this theorem goes red and the fix
+is recorded rather than remembered. -/
+theorem not_valueWriterAgree : ¬ ValueWriterAgree := by
+  intro h
+  obtain ⟨hwok, _⟩ := h (.array 0x57 []) (.array 0x57 [])
+    carrierReachable_arrayUnassignedEmpty bodiesAgree_arrayUnassignedEmpty
+  have hok := hwok #[0xE0, 0x02, 0x00, 0x57] ref_encode_arrayUnassignedEmpty
+  rw [spec_encodeValue_arrayUnassignedEmpty] at hok
+  simp at hok
 
 /-! ## The size accounting, settled by the artefacts
 
