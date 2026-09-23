@@ -1181,6 +1181,19 @@ thing* converts one real failure into several misleading ones.** That is worse t
 there and the report now points at a dozen places it is not — and it is the same family as the gates whose scope was a list rather
 than a walk, and the floors that were reported rather than asserted. Every one of them passed while checking less than it claimed.
 
+**A brief is scoped by its unit of work, and an ordering has to be named — both bought by one ticket.** A batch was scoped as "the next 25
+undispositioned must-class clauses in the check's own anchor order (largest first), taking only anchors that sort after
+`amqp:transport/section:links`", plus "do not edit a file whose name contains `links`". The agent found two defects in that, both mine.
+The **ordering was ambiguous**: "anchor order (largest first)" is the report's printed order and "sort after" is lexicographic, and the two
+disagree about which anchors are in range — it resolved them by asking which reading could be satisfied *at all*, and only one ends on an
+anchor boundary rather than cutting a group in half. The **scope was over-constrained**: excluding by filename was a proxy for *do not
+collide*, and it stranded fifteen clauses between two agents, because their file would have been named after a shared ancestor rather than
+after the work.
+
+**The boundary is the unit of work, not the name of the file it lands in**, and **"the next N in order" is not a scope until the order is
+named**. Both are this repository's recurring defect — a rule that passes while doing less than it says — arriving in an instruction rather
+than in a check, which is where a dispatch is easiest to get wrong and hardest to notice.
+
 ## 17. Verification gates and their negative controls
 
 | Gate | Mechanism | Negative control |
