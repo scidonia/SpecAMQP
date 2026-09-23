@@ -43,7 +43,11 @@
 set -euo pipefail
 
 readonly root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-readonly scanned_dirs=(Spec Contracts Proofs Ref Harness Impl)
+# Every handwritten Lean tree, and the list is the whole of the gate's scope: `Shell` was added
+# today, and until it was, the shipped process was unscanned for exactly the constructs this
+# gate exists for — `axiom`, `opaque`, `partial`, `unsafe`, `implemented_by` — each of which
+# compiles clean, so the package-build clause does not cover it either.
+readonly scanned_dirs=(Spec Contracts Proofs Ref Harness Impl Shell)
 readonly scanned_extra=("$root/scripts/loopback")
 readonly extern_boundary="Impl/Transport.lean"
 readonly accepted_theorem="SpecAMQP.Contracts.constructor_grammar_public"

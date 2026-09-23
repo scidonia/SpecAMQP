@@ -79,7 +79,15 @@ def resolves(cand):
 
 CITE = re.compile(r'amqp-core-[a-z0-9-]+-v1\.0-os\.xml#([A-Za-z0-9:._/+-]+)')
 bad, total, sections = [], 0, 0
-for root in (pathlib.Path('lean/Contracts'), pathlib.Path('lean/Spec')):
+# Every handwritten tree, matching the trust gate's list. It was `Contracts` and `Spec`, so
+# "all 33 resolve" meant all 33 in those two — `Proofs` (19 modules), `Ref` (10), `Harness`,
+# `Impl` and `Shell` were unchecked, and a citation to a clause that does not exist reads the
+# same in a proof or an implementation as it does in a contract. `Generated/Oasis` is excluded
+# on purpose: those tables are produced from the artifacts, so their citations are the
+# generator's business and not a hand-writer's.
+for root in (pathlib.Path('lean/Contracts'), pathlib.Path('lean/Spec'), pathlib.Path('lean/Proofs'),
+             pathlib.Path('lean/Ref'), pathlib.Path('lean/Harness'), pathlib.Path('lean/Impl'),
+             pathlib.Path('lean/Shell')):
     for f in sorted(root.rglob('*.lean')):
         text = f.read_text(encoding='utf-8')
         for m in CITE.finditer(text):

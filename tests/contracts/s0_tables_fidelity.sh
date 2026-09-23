@@ -167,4 +167,26 @@ else
   printf 'skip generated modules compile: run inside the pinned `spec` shell\n'
 fi
 
+
+# The produced set is *exact*. `gen-oasis-lean.py --check` iterates what the generator produces and
+# compares each to its committed counterpart, so a produced file that is stale fails — but a committed
+# module the generator does not produce is invisible to it, and would be compiled like any other module
+# in a registered library. Since `Generated/` is never hand-edited, a file there that the generator does
+# not produce is a hand-edit that has stopped being regenerable. Measured: the directory can hold such a
+# file and `--check` still reports success.
+python3 - "$root" <<'PRODUCED' || exit 1
+import pathlib, sys
+root = pathlib.Path(sys.argv[1])
+produced = {'Choices.lean', 'Constants.lean', 'Encodings.lean', 'Fields.lean', 'Types.lean', 'provenance.json'}
+have = {p.name for p in (root / 'lean/Generated/Oasis').iterdir()}
+extra = sorted(have - produced)
+missing = sorted(produced - have)
+for name in extra:
+    print(f'problem: lean/Generated/Oasis/{name} is not a file the generator produces')
+for name in missing:
+    print(f'problem: lean/Generated/Oasis/{name} is produced and is not in the tree')
+print(f'generated tables: {len(have)} file(s), exactly the produced set')
+sys.exit(1 if (extra or missing) else 0)
+PRODUCED
+
 printf 's0_tables_fidelity: PASS\n'

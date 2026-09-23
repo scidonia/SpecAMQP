@@ -34,6 +34,45 @@ check flow          "$tmp/flow.ndjson"          vectors/flow.ndjson
 check flow-negative "$tmp/flow-negative.ndjson" vectors/flow-negative.ndjson
 check value-boundaries "$tmp/boundaries.ndjson" vectors/value-boundaries.ndjson
 check value-boundary-negatives "$tmp/boundaries-negative.ndjson" vectors/value-boundary-negatives.ndjson
+
+# Every corpus is accounted for, which eight `check` lines could not say: a corpus no line named was
+# checked by nothing and the gate passed in silence. A hand-authored corpus has no generator to be
+# reproduced by — it is authored from the clause text or from a recording — so it is named here rather
+# than merely absent from the list above, and a corpus of a new family fails this clause until someone
+# says which kind it is.
+python3 - "$root" <<'CORPORA' || status=1
+import pathlib, sys
+root = pathlib.Path(sys.argv[1])
+generated = ['vectors/generated.ndjson', 'vectors/generated-frames.ndjson', 'vectors/generated-exchanges.ndjson', 'vectors/message/generated.ndjson', 'vectors/flow.ndjson', 'vectors/flow-negative.ndjson', 'vectors/value-boundaries.ndjson', 'vectors/value-boundary-negatives.ndjson']
+hand = {
+    'vectors/frames-negative.ndjson',
+    'vectors/frames.ndjson',
+    'vectors/message/deliveries.ndjson',
+    'vectors/message/messages-negative.ndjson',
+    'vectors/message/messages.ndjson',
+    'vectors/message/sections-negative.ndjson',
+    'vectors/message/sections.ndjson',
+    'vectors/messages.ndjson',
+    'vectors/open-bad-field.ndjson',
+    'vectors/primitives.ndjson',
+    'vectors/sasl-negative.ndjson',
+    'vectors/sasl.ndjson',
+    'vectors/slice.ndjson',
+    'vectors/txn-negative.ndjson',
+    'vectors/txn.ndjson',
+}
+have = {str(p.relative_to(root)) for p in (root / 'vectors').rglob('*.ndjson')}
+missing = sorted(have - set(generated) - set(hand))
+stale = sorted(set(hand) - have)
+for path in missing:
+    print(f'problem: {path} is neither generated-and-checked nor named as hand-authored')
+for path in stale:
+    print(f'problem: {path} is named as hand-authored and is not in the tree')
+print(f'corpora: {len(have)} accounted for — {len(set(generated) & have)} generated and checked, '
+      f'{len(set(hand) & have)} hand-authored and named')
+sys.exit(1 if (missing or stale) else 0)
+CORPORA
+
 if [ "$status" -ne 0 ]; then
   echo "check FAILED: a generated corpus is not what its generator produces"
   echo "a hand-edit to generated output reverts at the next regeneration, and the gate that"
