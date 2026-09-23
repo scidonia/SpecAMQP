@@ -879,6 +879,32 @@ produced.
 278 pre-existing verdicts changed** — the sweep added coverage without moving anything it touched. Twenty-one vectors are carried, and fifteen are staged as the next fix slice's opening evidence: **four divergences**
 and **eleven shared gaps**, where a shared gap is a clause neither artefact enforces, so no differential can see it and the corpus is the only instrument that can.
 
+**And the sweep's own inference about two of those four divergences was wrong, in a way that earned a rule.** It staged the credit an aborted delivery spends as *undecided* — "the register is silent, which is why this is staged rather
+than decided" — and the register is indeed silent about it, because the reading does not live in the register. `flow-control.5` ("whenever the sender increases delivery-count, it MUST decrease link-credit by the same amount"),
+`flow-control.9` and `links.33` are each dispositioned **`formalized:SpecAMQP.Spec.Session.transferLink`**: the specification implements a reading, and the disposition names the declaration that carries it. **The register's silence does not make
+a question open.** A `formalized:` disposition is a decision too, and it is the one a divergence should be read against *first*, because a `formalized:` that names a declaration turns the divergence into a defect and takes it out of the register's
+jurisdiction altogether. The pair was waiting for a reading that already existed, one layer away from where the sweep looked.
+
+**The same audit found the defect the deferred clauses were hiding, and it is the sharpest case yet of a family inheriting its reading from one reader.** Both artefacts read the three transfer booleans — `settled`, `aborted`, `more` — by
+**presence**: `fieldSet`/`present` asks whether a field is there, so a peer writing `settled=False` was read as having written `true`. The authority is not the deferred clauses: `settled.6` ("MUST be false (or unset)") and `more.u1` are
+`deferred:S4` and `deferred:S3-session`, but `settled.1`, `settled.2` and `settled.4` are formalized — and `settled.4` is the one a presence reader cannot satisfy, because it obliges the flag to be **true** under the «settled» negotiation, which a
+presence read satisfies with a frame that sets it false. **The artifact's own worked diagrams are the practical form of the argument**: they write `settled=False` on transfers *and* on dispositions, so the encoding both artefacts collapsed is the
+one the standard's examples use. `Delivery.step`'s docstring had already assumed a value was passed to it ("false is the first transfer's value when the field is unset"); the call site contradicted the function's own contract.
+
+**And why it stayed invisible is worth naming**: the clause that makes the explicit-false encoding *common* — `settled.6` under the «unsettled» negotiation — is deferred, so every vector exercising the defect classifies as a shared gap rather than
+as a regression, and a shared gap is exactly what a differential cannot see. *A defect against a formalized clause can hide behind a deferred sibling*, and the instrument that finds it is the corpus, not the differential.
+
+**The check that produced the right scope was the disposition read, not the clause read.** The same grep that found the three presence reads first looked like a fixable defect against `settled.6` — which is **deferred**. Dispatching that fix
+would have implemented an S4 obligation in both artefacts and moved a milestone boundary without anyone deciding to move it; the disposition read is what stopped it, and it is why the repair that did land reads bool**values** and adds no refusal
+anywhere.
+
+**The fix ran as one reading across two owners** — the shape the ownership rule forces, and the reason the reading had to be settled before either half moved: `lean/Spec/**` is the planner's, `lean/Ref/**` a coder's. `fieldBool` and `valueBool` join
+`lean/Spec/Connection.lean` beside the other value readers, and the session layer's explicit `open SpecAMQP.Spec.Connection (…)` list is what makes a new definition visible to it at all — the compiler reports a missing name as an *unknown
+identifier*, not as an unexported one, which cost two misdiagnoses of a stale olean before the list was read. One shared `booleanAtField` reader in `lean/Ref/Session.lean` is where the family's reading now lives. **Two sites came back beyond the
+three**: the reference's `disposition`'s `settled` and the `settled` the transaction layer is handed, both the same defect, and the specification's disposition site had already been changed here — so leaving them would have been a divergence
+rather than a deferral, and the field's *declaration* (`type="boolean" default="false"`, "If true, indicates that the referenced deliveries are considered settled") is the authority the clause list does not carry. **Five sites, one reading, and
+no committed verdict moved** (`d50abc1`, `1540777`).
+
 **The priority family produced sixteen of the thirty-six, and it is the session layer's form of the shape the value sweep found three of** — a declared or negotiated value against what the frame carries. Where the
 value layer's version was a *constructor* against its *contents*, the session layer's is a *negotiated mode* against a *field* (a settlement flag under the choice that forbids it, a receiver's mode under a
 `first` negotiation, a count against the credit actually held), and the same three-reading split appears: what the flag says, what its presence implies, and what the negotiated state permits.
