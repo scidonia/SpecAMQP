@@ -439,6 +439,25 @@ is one `cases a <;> rfl` from being available. The cons case of `List.mapM_bind`
 failed for that reason rather than for want of the right hypothesis — which is the difference between a dead end and a known property of the
 environment, and the reason it is recorded rather than remembered.
 
+**A plausible law that is false, caught by testing it rather than by assuming it.** `List.mapM_bind` —
+`(l.mapM f >>= fun xs => xs.mapM g) = l.mapM (fun a => f a >>= g)` — does **not** hold for `Except String`, and using it to collapse the
+specification's two-stage read into the one-stage form would have produced a *false* lemma. `Except` short-circuits with a message, so the
+two-stage form runs every first-stage read before any second-stage read while the one-stage form interleaves them, and the two report
+**different failures**: verified by `rfl` on `[1, 2]`, the two-stage form gives `error "two"` and the one-stage form `error "g"`. The law was
+reached for because it is what such a collapse *looks* like it needs; what made the discovery safe was that the attempt was to *prove* it —
+**a plausible law whose proof fails is a signal to test it, not to add it to a simp set.**
+
+**What is true, and the route that follows.** `Except.bind_assoc` (`cases a <;> rfl`), `Except.pure_bind` (`rfl`) and `Except.bind_pure`
+(`cases a <;> rfl`), none of them in core; and `bind_assoc` is what makes the collapse work, because it *rewrites one computation into an
+equal one* rather than *reordering two independent ones* — the difference between reassociation and commutation, and the reason one is true
+and the other cannot be. So the accord stays stated over the specification's **two-stage** read, which is the reader's actual shape: the
+*value* has to agree, not the term. In the cons step, with `split pair = Except.ok (key, value)` from `hpairs`, the specification's side is
+`(rest.mapM split) >>= fun v => ((key, value) :: v).mapM R`; `mapM_cons` and `pure_bind` turn the head's reads into
+`Except.ok (bodyKey, bodyValue)` from `hbodyKey`/`hbodyValue`; then **one** `bind_assoc` in the direction
+`(X >>= A) >>= F = X >>= fun ps => A ps >>= F` lands exactly on the induction hypothesis `hbodies'`. The slice's own diagnosis of its
+earlier attempts is the other half: unfolding `mapM_cons` in the goal loses the do-shape the hypothesis is stated in, so the step stays in
+bind form and reassociates. Caution recorded with it: `bind_assoc` in a `simp` set can loop, so it may need to be a directed `rw`.
+
 **What discharging the hypotheses would take, in order, so the next sitting does not rediscover the shape.** The refutations stand as theorems either way — a refuted hypothesis is a theorem or it is a rumour. Then: **(i)** decide the reading for each divergence, which needs the artifact's own text — for the odd-counted map, whether the count names items or entries and whether the *form* of the count is checked before or after its consistency with the octets. Where the artifact is silent, a register entry decides it, which is what the register is for. **(ii)** Align the two artefacts to that reading, one commit per divergence, since each is symmetric in a different place. **(iii)** Add a vector per divergence, because *reachability* is what decides whether the corpus could ever have seen it: the array-element family is reachable through the corpus vocabulary and the odd-count map is not, and that difference is a fact about the corpus rather than about the defect. **(iv)** Only then are the hypotheses provable and the two conditional instances unconditional. **The order is the point**: a vector written last would be a vector written from the fix rather than from the artifact, which is the rule this repository keeps and exactly why the differential cannot be the thing that finds this class of defect.
 
 **And a second divergence sits underneath the first, found by a sharper witness.** The reported buffer violated two rules at once — an odd count *and* a declared size inconsistent with its items — so it could not say which rule either artefact was answering. A buffer violating only parity, `#[0xC1, 0x03, 0x03, 0x40, 0x40, 0x40]` where the items measure exactly the declared three octets, gives `malformed` from the specification and `sizeMismatch "map" 3 4` from the reference: declared 3, **measured 4**. Four is what a map's content measures if the *count field is inside the size*, three if it is not — so the two artefact seem to differ about what a compound value's size field covers, which would change the class for every map and list rather than only the odd ones. The ledger's index yields the parity clause (`amqp:types/section:primitive-type-definitions/type:map.1`) and nothing on the size field's extent, so that question is open and is being settled from the artifact's prose. **It is the more important of the two**: a parity rule affects one malformed encoding, a size-accounting difference affects the whole corpus.
