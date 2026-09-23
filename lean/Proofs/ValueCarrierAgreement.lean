@@ -795,4 +795,77 @@ theorem valueCarrierAgrees_zero : ValueCarrierAgrees 0 := by
 the clause family and `ValueCarrierAgree`. -/
 theorem valueCarrierAgree_of_agrees (h : ValueCarrierAgrees 64) : ValueCarrierAgree := h
 
+/-! ## The compound clauses: the recursion at the fuel beneath
+
+A compound clause reads its items with `valueOfJson fuel`, so its item-level obligation is the
+claim one fuel down - which is why these clauses take the induction hypothesis
+(`ValueCarrierAgrees fuel`) as a parameter, and why they are the cases of the step lemma the join
+section describes. The accord over a list of items is its own lemma, since `list` and `array` share
+it and `map`'s is the pair-level analogue. -/
+
+/-- The corpus readers agree on a list of items, given that they agree at every item. -/
+theorem mapM_valueOfJson_agrees (fuel : Nat) (ih : ValueCarrierAgrees fuel) :
+    ∀ (items : List Json) (values : List SpecAMQP.Ref.Value),
+      items.mapM (SpecAMQP.Ref.Vectors.valueOfJson fuel) = .ok values →
+      ∃ bodies : List SpecAMQP.Spec.Codec.Value,
+        items.mapM (SpecAMQP.Spec.Codec.valueOfJson fuel) = .ok bodies ∧
+        BodiesAgreeList bodies values := by
+  intro items
+  induction items with
+  | nil =>
+    intro values h
+    simp only [List.mapM_nil] at h
+    injection h with hb
+    subst hb
+    exact ⟨[], rfl, by simp only [BodiesAgreeList]⟩
+  | cons item rest ihrest =>
+    intro values h
+    simp only [List.mapM_cons, Bind.bind, Except.bind] at h
+    cases hv : SpecAMQP.Ref.Vectors.valueOfJson fuel item with
+    | error err => simp [hv] at h
+    | ok value =>
+      simp only [hv] at h
+      cases hvs : rest.mapM (SpecAMQP.Ref.Vectors.valueOfJson fuel) with
+      | error err => simp [hvs] at h
+      | ok values' =>
+        simp only [hvs] at h
+        injection h with hb
+        subst hb
+        obtain ⟨body, hbody, hagree⟩ := ih item value hv
+        obtain ⟨bodies, hbodies, hlist⟩ := ihrest values' hvs
+        exact ⟨body :: bodies, by
+          simp only [List.mapM_cons, Bind.bind, Except.bind, hbody, hbodies]
+          rfl, by
+          simp only [BodiesAgreeList]
+          exact ⟨hagree, hlist⟩⟩
+
+/-- **The `"list"` clause.** The same items array on both sides, the same recursive reader over it,
+and the item-level agreement supplied by the fuel beneath. -/
+theorem carrier_clause_list (fuel : Nat) (json : Json)
+    (hk : json.getObjValAs? String "type" = .ok "list") (other : SpecAMQP.Ref.Value)
+    (h : SpecAMQP.Ref.Vectors.valueOfJson (fuel + 1) json = .ok other)
+    (ih : ValueCarrierAgrees fuel) :
+    ∃ body : SpecAMQP.Spec.Codec.Value,
+      SpecAMQP.Spec.Codec.valueOfJson (fuel + 1) json = .ok body ∧ BodiesAgree body other := by
+  unfold SpecAMQP.Ref.Vectors.valueOfJson at h
+  unfold SpecAMQP.Spec.Codec.valueOfJson
+  simp only [Bind.bind, Except.bind] at h ⊢
+  simp only [hk] at h ⊢
+  cases hi : json.getObjValAs? (Array Json) "items" with
+  | error err => simp [hi] at h
+  | ok items =>
+    simp only [hi] at h ⊢
+    cases hm : items.toList.mapM (SpecAMQP.Ref.Vectors.valueOfJson fuel) with
+    | error err => simp [hm] at h
+    | ok values =>
+      simp only [hm] at h
+      injection h with hb
+      subst hb
+      obtain ⟨bodies, hbodies, hlist⟩ := mapM_valueOfJson_agrees fuel ih items.toList values hm
+      exact ⟨.list bodies, by
+        simp only [hbodies]
+        rfl, by
+        simp only [BodiesAgree]
+        exact hlist⟩
+
 end SpecAMQP.Proofs
