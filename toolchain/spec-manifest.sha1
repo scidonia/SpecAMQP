@@ -58,7 +58,7 @@ c661a0341ee5572bd716861459bcfbedbae36a7f  ledger/ambiguities/unmapped-begin.json
 b806ad2406f8fac2d686c5ed1f343029df8afa8e  ledger/dispositions/part1-types.json
 fb65f4047b683315bf859f5b7cda00fc48027c17  ledger/dispositions/part2-connection-establishment.json
 6f6fafa8142c6f04054b287f8514f28a6e7a292e  ledger/dispositions/part2-links.json
-6044f02e43e92b221a9ed94c2d1e9b8646fe828b  ledger/dispositions/part2-performatives-link-state.json
+4109317fde8f9a7f5c10b7d0b3613468aa0dac66  ledger/dispositions/part2-performatives-link-state.json
 68d4932b8af755747d85b1d6b188bd89f3c2f0b4  ledger/dispositions/part2-performatives-remainder.json
 7b7b6d7b800ca63bad67b68039a873c0d786e46f  ledger/dispositions/part2-performatives-settle-mode.json
 c5f124464a072b0d7d9c21fddb6b19128de98769  ledger/dispositions/part3-addressing.json
