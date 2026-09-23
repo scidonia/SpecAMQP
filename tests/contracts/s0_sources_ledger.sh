@@ -194,6 +194,21 @@ run_case picture-stale 1 "STALE picture disposition"
 python3 "$ledger" check >"$tmp/repo.log" 2>&1 ||
   die "repository ledger check failed: $(tail -5 "$tmp/repo.log")"
 grep -q "check passed" "$tmp/repo.log" || die "unexpected repository ledger output"
+
+# The note check's own *scope*, asserted rather than only reported. Its summary line says how much
+# it read, and a check whose scope shrinks — a note reworded so it no longer names a corpus — passes
+# while reading less, which is the one way it can rot without failing. These are floors and not
+# equalities: growth is fine, and shrinkage is a finding for whoever reads the diff. Raised by the
+# slice that wrote the check, which noticed that its counts were printed and not checked.
+while IFS=: read -r phrase floor; do
+  observed="$(grep -o "[0-9]* ${phrase}" "$tmp/repo.log" | grep -o '^[0-9]*' | head -1)"
+  [ -n "$observed" ] || die "the ledger check printed no count for '${phrase}': $(tail -3 "$tmp/repo.log")"
+  [ "$observed" -ge "$floor" ] || die "the ledger check read ${observed} for '${phrase}', and the floor is ${floor}: its scope shrank"
+done <<'FLOORS'
+ledger string(s) name a corpus:4
+backticked token(s) besides the paths:5
+FLOORS
+note "the ledger's note check read at least the scope it was contracted to read"
 note "repository ledger, audit and reconciliation check clean"
 grep -E '^(clauses|dispositions|undispositioned)' "$tmp/repo.log" | sed 's/^/     /'
 
