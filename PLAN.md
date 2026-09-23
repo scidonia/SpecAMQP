@@ -357,6 +357,24 @@ The bridges landed along the way are reusable and named: `unsignedOf_eq`/`signed
 `boundedField_ok_getObjValAs`, the eight integer round trips `uN_toNat`/`iN_toInt`, `fixedHex_ok_hexPayloadOf`, `mapM_valueOfJson_agrees`,
 and the two JSON accessor lemmas. The wire-level statements will want several of them.
 
+**The hand-over at twenty-four of twenty-five, and what the proof surfaced that nothing else could.** Everything left in this
+hypothesis is either *assembly* or a *JSON-layer lemma*: the AMQP content of the twenty-five clauses is done. `map`, the last clause,
+reduced under *reading* rather than recall — `Array.fromJson? (α := Array β)` is `| .arr a => a.mapM (fromJson? (α := β))` and the element
+instance for `Json` is the identity, so the reference's outer read already *is* the specification's read at the elements and the only
+difference is that the specification parses each element as an array. The bridge is that list-level relation composed with `Json.getArr?`;
+behind it, `map`'s case work is the pair accord with `BodiesAgreePairs` and nothing about JSON. The join's pieces are all present:
+`ValueCarrierAgrees` as the formulation, `valueCarrierAgrees_zero` as the vacuous base, `valueCarrierAgree_of_agrees` as the contract's
+statement at fuel 64, the scalar clauses taking the discriminant as a parameter, and `list`/`array`/`described` taking the induction
+hypothesis — so what remains is to derive the discriminant from the reference's own success, dispatch, and call the clause.
+
+**Three places where the two artefacts' *checks* already meet, which is a fact about how they were written.** The unsigned and signed
+bounds (`unsignedOf`/`signedOf`), the code-point bound, and the timestamp range that supplies the JSON bridge's non-negativity: at each,
+what the coverage needed was exactly what the two implementations already assert, so the proof's work collapsed from reasoning to reading.
+**That is the kind of thing only a proof can surface** — a corpus measures behaviour, and this is a fact about the *shape* of two
+independently written implementations converging where the artifact constrains them. It is also the programme's own claim arriving as a
+measurement rather than an argument: the differential compares verdicts, and the *reason* they agree at these three points is a
+coincidence of authorship that no verdict could show.
+
 **What discharging the hypotheses would take, in order, so the next sitting does not rediscover the shape.** The refutations stand as theorems either way — a refuted hypothesis is a theorem or it is a rumour. Then: **(i)** decide the reading for each divergence, which needs the artifact's own text — for the odd-counted map, whether the count names items or entries and whether the *form* of the count is checked before or after its consistency with the octets. Where the artifact is silent, a register entry decides it, which is what the register is for. **(ii)** Align the two artefacts to that reading, one commit per divergence, since each is symmetric in a different place. **(iii)** Add a vector per divergence, because *reachability* is what decides whether the corpus could ever have seen it: the array-element family is reachable through the corpus vocabulary and the odd-count map is not, and that difference is a fact about the corpus rather than about the defect. **(iv)** Only then are the hypotheses provable and the two conditional instances unconditional. **The order is the point**: a vector written last would be a vector written from the fix rather than from the artifact, which is the rule this repository keeps and exactly why the differential cannot be the thing that finds this class of defect.
 
 **And a second divergence sits underneath the first, found by a sharper witness.** The reported buffer violated two rules at once — an odd count *and* a declared size inconsistent with its items — so it could not say which rule either artefact was answering. A buffer violating only parity, `#[0xC1, 0x03, 0x03, 0x40, 0x40, 0x40]` where the items measure exactly the declared three octets, gives `malformed` from the specification and `sizeMismatch "map" 3 4` from the reference: declared 3, **measured 4**. Four is what a map's content measures if the *count field is inside the size*, three if it is not — so the two artefact seem to differ about what a compound value's size field covers, which would change the class for every map and list rather than only the odd ones. The ledger's index yields the parity clause (`amqp:types/section:primitive-type-definitions/type:map.1`) and nothing on the size field's extent, so that question is open and is being settled from the artifact's prose. **It is the more important of the two**: a parity rule affects one malformed encoding, a size-accounting difference affects the whole corpus.
