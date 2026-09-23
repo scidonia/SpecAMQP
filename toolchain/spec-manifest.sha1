@@ -32,12 +32,14 @@ d488702b9362fdcd2b3e182af1b58627dd5a3f28  vectors/message/messages-negative.ndjs
 ded98608246d60bdf425b26c60206902995a4e30  vectors/message/sections-negative.ndjson
 c876f69bb22065b406c11b423b5ffb93d4d18426  vectors/message/sections.ndjson
 8a0698b69a00e858aefea2249a89ec7c20c1aed5  vectors/messages.ndjson
+0ae3389f5cb1a5360d7b8bcce6d601463b735b2e  vectors/open-bad-field.ndjson
 4edac54f39746f6464d5b2711111720c5b658b5e  vectors/primitives.ndjson
 2f85e410608d4b6f8e220da9a45cd27497227e4a  vectors/slice.ndjson
 5016bfabb395b8ff29564fb6c95208622dd6d652  vectors/txn-negative.ndjson
 ecac919aaaf979c4765bc027729f1934278582cf  vectors/txn.ndjson
 c80948aad7c0afaa70330570dd2624f60982d0b6  ledger/ambiguities/attach-retains-link-flow-state.json
 973e66b7a1143546319dedc4b165a4f508747c78  ledger/ambiguities/channel-zero-layering.json
+3888715999ac8564f2d358f952fbab605a06bc7b  ledger/ambiguities/check-precedence-unspecified.json
 6292292dc07ef18bb452326358be8c2e0a711c77  ledger/ambiguities/compound-size-field.json
 20131c9f40d375af402d2dea11e7fa6efac6acbf  ledger/ambiguities/fail-true-against-an-unknown-id.json
 9cb58a5caf168e43340942811352ca89b5c978cd  ledger/ambiguities/flow-link-field-without-handle.json
@@ -58,7 +60,7 @@ c661a0341ee5572bd716861459bcfbedbae36a7f  ledger/ambiguities/unmapped-begin.json
 9a061ebe7e6cb3faca1264c8e141aaac7e52b2fe  ledger/coverage.json
 18dc26b3c3328b31c9524e7b34ca3e6a23b4e71e  ledger/dispositions/part0-conformance-and-transport-lifecycle.json
 b9adec25fda0261806d98c5ab248e8ea25beb310  ledger/dispositions/part1-types.json
-7bc3f5ef2558a4807162b02463c900c798e3d1ac  ledger/dispositions/part2-connection-establishment.json
+622542fe3d74b1a5fc091e3f6d021cf3fac9f12d  ledger/dispositions/part2-connection-establishment.json
 360149c9ca009a25aa8976b63ecf81e9a6137eca  ledger/dispositions/picture-review.json
 e1c3771304b63d0fe9b99f89296a182fa399781f  ledger/dispositions/unkeyed-normative.json
 fd83990fdb34dca23fc732e566fa109c98af71b5  ledger/lowercase-keywords.json

@@ -1,0 +1,21 @@
+{
+ "adopted": "The artifact does not rank the checks, and the model keeps the order it already has",
+ "consequences": [
+  "No vector exercises a frame that breaks two rules at once, so both orders pass the whole corpus. The register entry is what stops a future change of order from looking like a refactor.",
+  "The lift queued against max-frame-size.1 has been withdrawn: its justification was a defect that measurement showed is no longer reproducible, and its only remaining effect was this precedence change."
+ ],
+ "evidence": "The artifact mandates a code for each rule separately \u2014 capacity exhaustion as amqp:frame-size-too-small and connection:framing-error as the clauses direct, an illegal state as amqp:illegal-state \u2014 and says nothing about a frame that breaks two at once. Measured rather than reasoned: a lift that moved the size comparison ahead of the state, role, channel and mandatory checks changed the name a twice-breaking frame fails with from amqp:illegal-state to amqp:connection:framing-error, in four cells across both paths and both artefacts.",
+ "id": "check-precedence-unspecified",
+ "open": true,
+ "question": "Does the artifact rank the frame checks, or does a frame breaking two of them fail on whichever check the endpoint reaches first?",
+ "readings": [
+  {
+   "name": "The artifact does not rank the checks, and the model keeps the order it already has",
+   "statement": "Adopted. Nothing in the artifact orders the checks, so the order is a reading, and the reading taken is the one already in the model: the state, role, channel and mandatory-field checks run before the size comparison. Changing it is a semantic change that moves a verdict, and it should be made because a bound is argued for rather than as a side effect of moving code."
+  },
+  {
+   "name": "The size comparison runs first, because a frame that cannot fit cannot be processed",
+   "statement": "Rejected as an unargued reading. Defensible in isolation \u2014 a frame whose bytes are not all present cannot be checked for anything else \u2014 but the size rule is about the frame's declared SIZE against the partner's maximum, which is readable before any dispatch, so both orders are available and the artifact chooses neither."
+  }
+ ]
+}
