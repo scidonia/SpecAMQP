@@ -680,6 +680,12 @@ expression whose successor field is definitionally the contract's right-hand sid
 branch rather than by sample. **A contract that states a selection as an equality makes the shape of that selection part of the contract**, and that is a reason to state it deliberately rather than a
 reason to state it some other way.
 
+**And the finding is sharper than "keyed backwards", as the ledger's own review established while confirming it independently against the XML rather than against the note.** Under `snd-settle-mode = unsettled`
+the model demands what `.6` forbids, and under `snd-settle-mode = settled` the flag is false and the guard never fires, so `.4`'s obligation is **unenforced** as well as misapplied. **Three artefacts key it
+the same wrong way** — the specification, the reference, and the corpus generator (`scripts/gen/slices.py`, writing `sender_settle=0` while labelling it `sender-settle-mode`) — so all three agree with each other
+and disagree with the artifact's own choice attributes. That unanimity is exactly why no differential can see it, and why the defect had to be found by reading two clauses whose *rendered* text was identical
+and going back to the source to ask why they could be.
+
 ## 11. Specification test vectors
 
 One shared format for everything the specification is tested against: NDJSON, schema-validated (`tests/contracts/vector.schema.json`), **logical time only** — timestamps are ordering tags, never wall-clock, so replay is deterministic on any machine.
