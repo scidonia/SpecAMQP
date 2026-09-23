@@ -24,6 +24,12 @@
 #   3. generated and harness modules are out of scope by construction — the scan
 #      names the directories it covers, so an omission is visible rather than
 #      implied.
+#   4. the whole package builds. Every other gate here — this one included until
+#      now — builds *named* targets, and a text scan cannot see an unclosed goal,
+#      so a proof module that does not compile is invisible to all of them until
+#      something builds it. This repository has already had one: `Proofs.SaslDialogue`
+#      sat in the tree with its first theorem's goals unsolved while
+#      `Contracts/Sasl.lean`'s header called the same four laws "Proved".
 #
 # Why it matters: a proof that quietly depends on `sorry`, on `native_decide`'s
 # `ofReduceBool`, or on an opaque external model still compiles, and the kernel
@@ -355,3 +361,11 @@ done
 note "every accepted theorem's axiom inventory contains no sorryAx and no ofReduceBool"
 
 printf 's1_proof_integrity: PASS\n'
+
+# The package build, which is the only check here that covers the module set rather
+# than a list of targets. `lake build` with no arguments builds every library and
+# executable the lakefile registers, so a module with unsolved goals fails here even
+# when no contract names it yet and no scan can see it.
+( cd "$root/lean" && LAKE_NO_CACHE=1 lake build ) >"$tmp/packagebuild.log" 2>&1 ||
+  die "the package does not build: $(grep -m2 -E '^(error|✖|some modules)' "$tmp/packagebuild.log" | tr '\n' ' ')"
+note "the whole package builds, proofs included, not only the targets the probes name"

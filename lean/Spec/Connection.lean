@@ -710,6 +710,51 @@ def SaslFrame.ofBody (body : Value) : SaslFrame :=
     | none => .other
   | _ => .other
 
+/-- The declared surface's mandatory-field rule, for the five performatives this layer
+reads itself: a SASL performative that does not carry a field the artifact marks
+mandatory is not the performative its descriptor names, and the refusal is the one the
+AMQP path already raises for `open` and `close` — the artifact's own `invalid-field`,
+with the list read from the generated field table rather than written here.
+
+The rule is enforced in the SASL layer for the same reason it is enforced in the AMQP
+one, and its absence was observable: a `sasl-challenge` with no `challenge` and a
+`sasl-response` with no `response` were taken as the performatives they name, a
+`sasl-outcome` with no `code` silently became a failure, and a `sasl-init` with no
+`mechanism` was refused as an *unoffered mechanism* under the wire-level condition — a
+misattributed failure rather than a weaker check, and one both artefacts agreed on, so
+no differential over them could see it.
+
+Keyed by the performative's declared type name, which each arm knows before it calls
+this: the arm's own moment guard has already refused every frame that is not the one
+the dialogue is waiting for. -/
+def refuseUnlessComplete (typeName : String) (body : Value) : Except Refusal Unit :=
+  let absent := missingMandatory typeName body
+  refuseUnless absent.isEmpty
+    (fieldRefusal "malformed" s!"the {typeName} performative does not carry {absent}, \
+      and the declared surface marks it mandatory")
+
+/-- The refusal a failed SASL dialogue raises, as the peer that received the outcome reports
+it.
+
+Its condition is the **empty string**, and that is the reading rather than an omission: the
+artifact obliges the peer to close the connection and names an "authentication-failure
+close-code" that no value of the generated `connection-error` choice carries, so no protocol
+condition exists for a failed authentication and none is invented. Choosing a declared row
+because the table has one of that shape is how a specification acquires a condition the
+artifact never named.
+
+The reason class is the code's own declared name — `auth`, `sys`, `sys-perm` or `sys-temp`,
+read out of the `sasl-code` choice by `saslCodeName` rather than written here — because the
+four failures are four distinct values for four distinct causes and an outcome that reported
+them all as "not ok" would have read the field and kept only a boolean. The place is END in
+both directions: whichever peer learns of the failure has no dialogue left.
+
+`SaslDialogue`'s contract states this as the law the four corpus vectors pin, and records
+that the class vocabulary grew for this layer by exactly the values the artifact declares for
+`sasl-code` and nothing else. -/
+def saslFailure (reasonClass prose : String) : Refusal :=
+  ⟨"", reasonClass, s!"{reasonClass}: {prose}", some .end, []⟩
+
 /-- The SASL dialogue's position, as the security section orders it: the server
 announces its mechanisms, the partner chooses one and initiates, the challenge and
 response step may occur zero or more times, and the outcome closes the dialogue.
@@ -731,6 +776,20 @@ def SaslPhase.name : SaslPhase → String
   | .mechanismsKnown => "waiting for the sasl-init"
   | .awaitingOutcome => "waiting for the outcome"
 
+/-- The dialogue's order as a number: nothing, then the announcement, then the init, then the
+outcome.
+
+Deliberately a rank *within* a layer rather than a rank of the layer's progress: a successful
+outcome does not leave this endpoint past the dialogue — it resets it to `absent` on the AMQP
+layer, where the peers exchange protocol headers again — so a rank that counted establishment as
+"further along" would report the reset as the dialogue going backwards. `Proofs/SaslDialogue.lean`
+proves the law that uses it: inside the SASL layer the rank never falls. -/
+def SaslPhase.rank : SaslPhase → Nat
+  | .absent => 0
+  | .awaitingMechanisms => 1
+  | .mechanismsKnown => 2
+  | .awaitingOutcome => 3
+
 /-- Which end of the dialogue this peer is: the peer that announced the mechanisms is
 the server, the one that initiates is the client, and the security section requires the
 two to correspond to the TCP roles. -/
@@ -742,6 +801,29 @@ deriving Repr, BEq, DecidableEq
 /-- The code a successful outcome carries, from the `sasl-code` choice table. -/
 def saslOk : Option Nat :=
   (choiceValue? "sasl-code" "ok").bind (fun text => text.toNat?)
+
+/-- The name the `sasl-code` choice declares for an outcome code, or `none` for a value it
+does not declare: the five values are read from the generated choice table rather than
+written here, so a value the artifact added or moved would move this.
+
+The four failure codes are distinct values for distinct causes — the artifact declares
+them separately and labels each — so an outcome that reported them all as "not ok" would
+have read the field and kept only a boolean. The `ok` name is the one the establishment
+test reads, and the four others are what the artifact's own `sasl-code` choice carries. -/
+def saslCodeName (code : Nat) : Option String :=
+  match pathOf "sasl-code" with
+  | none => none
+  | some path =>
+    (choices.find?
+      (fun entry => entry.ownerPath == path && entry.value.toNat? == some code)).map
+      (fun entry => entry.name)
+
+/-- The names the `sasl-code` choice declares, in the table's order, for a diagnostic. -/
+def saslCodeNames : List String :=
+  match pathOf "sasl-code" with
+  | none => []
+  | some path =>
+    (choices.filter (fun entry => entry.ownerPath == path)).map (fun entry => entry.name)
 
 /-! ## The endpoint -/
 
@@ -928,6 +1010,23 @@ def stepHeader (endpoint : Endpoint) (outbound : Bool) (header : ProtocolHeader)
     refuseUnless (endpoint.state.sendClass == .header)
       (stateRefusal "illegalState" s!"{endpoint.state.name}'s legal sends are the table's \
         {endpoint.state.sendClass.name} column, and a protocol header is what HDR names")
+    -- The mirror of the receive-side check below, and the reason it is not decoration: a peer
+    -- that has already received a header has chosen the layer of this exchange, so a header it
+    -- sends must name that layer. Without the check a peer could switch the layer by *sending*
+    -- a header instead of refusing one — received SASL, then answered with an AMQP header — and
+    -- land in the AMQP layer while its partner is in the SASL dialogue. Every exchange vector
+    -- reached this arm from START, where either layer is free, so the asymmetry survived a
+    -- corpus that tests the direction that works.
+    --
+    -- The refusal moves nothing: a refused send writes nothing and moves nothing, and this peer
+    -- can still send the header of the layer the exchange is in. The receive-side refusal ends
+    -- the connection because the unacceptable header has already crossed and there is nothing
+    -- left to say; here nothing has crossed.
+    if endpoint.state != .start then
+      refuseUnless (layer == endpoint.layer)
+        (refusal "unsupported" s!"the header names the {layer.name} layer while this \
+          exchange is the {endpoint.layer.name} one, which is the table's header-mismatch \
+          row: a peer does not send the header it would refuse to receive")
     let state := if endpoint.state == .start then .hdrSent else .hdrExch
     let endpoint := Endpoint.afterHeaderExchange { endpoint with state, layer }
     return ⟨endpoint, [header.octets]⟩
@@ -976,6 +1075,7 @@ def stepSaslFrame (endpoint : Endpoint) (outbound : Bool) (size : Nat) (body : V
     refuseUnless (frame == .mechanisms)
       (stateRefusal "illegalState" "the SASL dialogue is waiting for the partner's \
         sasl-mechanisms frame")
+    refuseUnlessComplete "sasl-mechanisms" body
     let announced :=
       symbolsOf (fieldValue "sasl-mechanisms" "sasl-server-mechanisms" body |>.getD .null)
     refuseUnless (!announced.isEmpty)
@@ -989,6 +1089,11 @@ def stepSaslFrame (endpoint : Endpoint) (outbound : Bool) (size : Nat) (body : V
     refuseUnless (frame == .init)
       (stateRefusal "illegalState" "the SASL dialogue knows the partner's mechanisms and is \
         waiting for the sasl-init that chooses one")
+    -- Before the mechanism is read: an init that carries no `mechanism` at all is not an init
+    -- that names an unoffered mechanism, and the two are different failures. Read as the
+    -- second, it was refused under the wire-level condition and told the peer its mechanism
+    -- was unsupported when in fact it had sent none.
+    refuseUnlessComplete "sasl-init" body
     let mechanism :=
       match fieldValue "sasl-init" "mechanism" body with
       | some (.symbol text) => text
@@ -1012,11 +1117,13 @@ def stepSaslFrame (endpoint : Endpoint) (outbound : Bool) (size : Nat) (body : V
       refuseUnless (outbound == server)
         (stateRefusal "illegalState" "the sasl-challenge is the SASL server's to send, and \
           this peer is not the server")
+      refuseUnlessComplete "sasl-challenge" body
       return reporting endpoint
     if frame == .response then
       refuseUnless (outbound != server)
         (stateRefusal "illegalState" "the sasl-response is the SASL client's to send, and this \
           peer is not the client")
+      refuseUnlessComplete "sasl-response" body
       return reporting endpoint
     refuseUnless (frame == .outcome)
       (stateRefusal "illegalState" "the SASL dialogue is waiting for the outcome of the \
@@ -1024,7 +1131,16 @@ def stepSaslFrame (endpoint : Endpoint) (outbound : Bool) (size : Nat) (body : V
     refuseUnless (outbound == server)
       (stateRefusal "illegalState" "the sasl-outcome is the SASL server's to send, and this \
         peer is not the server")
-    let code := (fieldValue "sasl-outcome" "code" body).bind valueNat
+    refuseUnlessComplete "sasl-outcome" body
+    let code ← intField "sasl-outcome" "code" body
+    -- The code must be one of the values the choice declares. `sasl-code` is an enumerated
+    -- field, so a value outside its declared set is a field-value violation rather than an
+    -- unsuccessful authentication: read as the second, an outcome carrying 9 was accepted and
+    -- closed the connection, which told the peer its frame was well formed when its code was
+    -- not a code the artifact defines.
+    refuseUnless (saslCodeName code).isSome
+      (fieldRefusal "malformed" s!"the sasl-outcome's code is {code}, and the sasl-code \
+        choice declares {saslCodeNames}")
     if code == saslOk then
       -- The layer is established, and the peers MUST exchange protocol headers again:
       -- this time for the AMQP layer, from the beginning.
@@ -1037,10 +1153,30 @@ def stepSaslFrame (endpoint : Endpoint) (outbound : Bool) (size : Nat) (body : V
       -- them would say this one performative puts nothing on the wire where the other four do.
       return reporting established
     else
-      -- Authentication did not succeed. The artifact obliges the peer to close the
-      -- connection and names a close-code for it that the choice table does not define,
-      -- so the close is recorded as the state it leaves and no condition is invented.
-      return reporting { endpoint with state := .end }
+      -- "If the authentication is unsuccessful, this field is not set." The rule is the
+      -- artifact's and it is about this frame's own content, so a failure outcome that carries
+      -- additional-data is refused the way every other field-value violation in this layer is.
+      refuseUnless (!fieldSet "sasl-outcome" "additional-data" body)
+        (fieldRefusal "malformed" s!"the sasl-outcome reports \
+          {(saslCodeName code).getD "an undeclared code"}, which is not a success, and sets \
+          additional-data: the artifact states that the field is not set when the \
+          authentication is unsuccessful")
+      -- Authentication did not succeed. The artifact obliges the peer to close the connection
+      -- and names an "authentication-failure close-code" that no value of the generated
+      -- `connection-error` choice carries, so the refusal's condition is empty: the artifact
+      -- declares no condition for a failed dialogue, and picking a declared row because it
+      -- exists would give this layer a condition the artifact never named.
+      --
+      -- What carries the information is the reason class: the code's own declared name, read
+      -- from the `sasl-code` choice. The four failures are four distinct values for four
+      -- distinct causes — a failed credential, a system error, a permanent one and a transient
+      -- one — and an outcome that reported them all as "not ok" would have read the field and
+      -- kept only a boolean. The place is END in both directions, because this peer has no
+      -- dialogue left either way.
+      Except.error (saslFailure ((saslCodeName code).getD
+        "a code the sasl-code choice does not declare")
+        "the sasl-outcome reports that the SASL dialog did not succeed, and the security \
+          layer is not established")
   | .absent =>
     .error (stateRefusal "illegalState" s!"the SASL layer is not in a place for a SASL \
       performative: the dialogue is {endpoint.phase.name}")
