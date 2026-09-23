@@ -157,9 +157,17 @@ numerically in the other — and a closer that depends on the spelling is a clos
   beyond that is only the pair-level analogue of `mapM_valueOfJson_agrees`, with `BodiesAgreePairs`
   as the obligation — no AMQP content is missing.
 
-  So the last two clauses are *both* blocked on the JSON layer and neither on the standard: of the
-  twenty-five, twenty-three are proved, and the two that remain wait on the layer beneath the corpus
-  vocabulary rather than on anything the corpus is about.
+  The shape of that bridge, since it is the whole of what is left: `Array.fromJson? (α := Array β)`
+  is `| .arr a => a.mapM (fromJson? (α := β))` and the element instance for `Json` is the identity,
+  so the reference's outer read already is the specification's read *at the elements* - what differs
+  is only that the specification parses each element as an array. The bridge is therefore the
+  list-level relation between `a.mapM (fromJson? (α := Array Json))` and
+  `a.mapM (fun e => (fromJson? (α := Json) e).map Json.getArr?)`-style readings, and `map`'s own case
+  work is then the pair accord with `BodiesAgreePairs`, which is AMQP content and no JSON layer at
+  all.
+
+  So of the twenty-five clauses, twenty-four are proved, and the one that remains waits on the layer
+  beneath the corpus vocabulary rather than on anything the corpus is about.
 * **Then the joint development**: prefix determinism and fuel monotonicity, which is what lets
   the clause lemmas be joined into one `valueOfJson` agreement over all buffers rather than
   re-derived per `Json`. `ValueLayersAgree` (`Proofs/ValueLayerLaws`) needs the same treatment on
