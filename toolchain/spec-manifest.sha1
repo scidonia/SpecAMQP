@@ -62,6 +62,7 @@ a78b2bcfe68699fc78794f1bc156a90b6214fdbe  ledger/ambiguities/second-open-refusal
 f1df18bddd8ad6dfa626560dfcf70419598c73dd  ledger/ambiguities/session-state-description-route.json
 0a438b210a37b4ed9558191f9987761a3de518b6  ledger/ambiguities/session-window-violation.json
 154ebe37627ea34810d738a423ca17e9244b83d6  ledger/ambiguities/settlement-is-absorbing.json
+6565db734b7b3fe11c1e75c0175fd1a97295984f  ledger/ambiguities/transport-close-not-an-input.json
 c661a0341ee5572bd716861459bcfbedbae36a7f  ledger/ambiguities/unmapped-begin.json
 59045518f02b945530ce6c86810ea0d79bcf1cae  ledger/ambiguities/unmapped-channel-refusal.json
 2dd54d7eeae541a3df93bd52a17aae4d8cff5a6e  ledger/ambiguities/version-mismatch-condition.json

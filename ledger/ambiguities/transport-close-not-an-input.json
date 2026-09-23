@@ -1,0 +1,30 @@
+{
+ "adopted": "outside the interface alphabet; the core answers none and the shell owns the consequence",
+ "clauses": [
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/type:connection-error/choice:connection-forced.u1"
+ ],
+ "consequences": [
+  "The core's step returns `none` for a transport close: no protocol state moves, so nothing is claimed about it. `Stream.closed` drops the pending inbox, which is buffer state rather than protocol state.",
+  "The endpoint's response to a peer whose byte stream ends is shell behaviour and is therefore unproved, like the socket layer it lives in. `Impl.Core`'s header names it as a non-claim rather than leaving it to be inferred from the absence of a constructor.",
+  "The shape of a slice that could model it is recorded: a constructor carrying the event, the condition the endpoint would report, and a clause or a second register entry grounding that choice. It is not modelled now because the artifact names no such event."
+ ],
+ "evidence": "`Input` at the pinned interface has `frame`, `api` and `tick` and no constructor for the stream ending, and the artifact nowhere says what an endpoint does when its peer's byte stream ends: TCP close is beneath AMQP, and every `close`-related clause concerns the performative or the state table rather than the transport. The nearest declared condition is the one cited above, and it denotes the opposite kind of event \u2014 a local operator intervention, with a client that could retry later \u2014 so adopting it here would move a condition the artifact places elsewhere and make two different observations report the same name. That the alphabet *can* carry environment events is not in dispute: `tick` is one, and its semantics are the specification's. A stream end's semantics would be ours to author, which is the reason to decline the constructor rather than a reason to add one carefully.",
+ "id": "transport-close-not-an-input",
+ "open": false,
+ "question": "What does an endpoint do when its peer's byte stream ends, and is that event an input of the interface alphabet?",
+ "readings": [
+  {
+   "name": "outside the interface alphabet; the core answers none and the shell owns the consequence",
+   "statement": "Adopted. The specification has no answer to give because the artifact names no such event, so the frozen alphabet expresses the situation correctly by not expressing it: the core returns `none`, protocol state is untouched, and the shell decides whether to close a socket, log, or exit. This is the treatment `PLAN.md` \u00a710 rule 6 gives the other environment assumptions the alphabet does not carry."
+  },
+  {
+   "name": "add an input constructor and have the endpoint report `amqp:connection:forced`",
+   "statement": "Rejected: the artifact assigns that condition to operator intervention with a client that may retry later, which is a different event from a peer that has gone away. Reporting it here would give one condition two meanings, and it would put our invented semantics for the event inside the specification rather than outside the relation."
+  },
+  {
+   "name": "encode it as an api call",
+   "statement": "Rejected: no api call expresses a transport event, and the core would then be answering an input where the specification answers `none` \u2014 unsatisfiable in the conformance relation rather than merely unmodelled."
+  }
+ ],
+ "schema_version": 1
+}
