@@ -77,6 +77,16 @@ first** (`4c3c4a0`), and the account below is what designing it showed:
     compound rows are one and four octets wide, so no reader reaches one, but the *statement* has to
     carry that width — or the family has to be stated per category — and any successor that omits it
     will find the clause unprovable rather than false-by-assumption.
+  - Two `split` behaviours decide how the value clause's width case is written, measured rather than
+    guessed. `split at h` on a match whose scrutinee is a variable *substitutes* that variable
+    everywhere, the goal included (and leaves the catch-all's negations), so the compound reader's
+    owner match — a `String`-literal match — costs one `split at h` and nothing else. But `split`
+    *cannot* reach a match under a bind's continuation: the width case's `match decl.category` sits
+    inside `dataDecl code >>= fun decl => …`, and the fix is to destruct the read's own equation first
+    (`dataDecl code = .ok decl`, then `split at h` for the category), then rewrite the goal's copy of
+    the bind with the same two facts. Following that order, the width case needs no width hypothesis of
+    its own; the compound clause's boundary guard is supplied at the branch rather than threaded
+    through the value clause.
   - At the entry fuel the claim is not in doubt: an entry-point differential over **101,585** buffers
     (70,644 up to length 3 over a 41-octet alphabet spanning every category, 30,941 up to length 4
     over a 13-octet alphabet chosen for compounds, arrays and described values) reports **zero**
