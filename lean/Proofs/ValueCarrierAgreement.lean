@@ -149,7 +149,8 @@ numerically in the other — and a closer that depends on the spelling is a clos
   also worth the planner's eye as a *fact about the two artefacts*: the specification accepts a
   code point written as a JSON natural, the reference as a JSON integer, and the corpus writes
   them as naturals, which is why no differential sees the difference.
-* **`map`** — blocked on the JSON layer, for a *different* reason than `char`: the specification
+* **`map`** — its JSON layer is bridged below; it was blocked on it, for a *different* reason than
+  `char`: the specification
   reads the pairs array as `getObjValAs? (Array (Array Json)) "pairs"` while the reference reads it
   as `getObjValAs? (Array Json) "pairs"` and then `getArr?` on each element. The two readings agree
   (the nested instance is the element instance under the array one), but relating them is JSON-layer
@@ -157,17 +158,25 @@ numerically in the other — and a closer that depends on the spelling is a clos
   beyond that is only the pair-level analogue of `mapM_valueOfJson_agrees`, with `BodiesAgreePairs`
   as the obligation — no AMQP content is missing.
 
-  The shape of that bridge, since it is the whole of what is left: `Array.fromJson? (α := Array β)`
-  is `| .arr a => a.mapM (fromJson? (α := β))` and the element instance for `Json` is the identity,
-  so the reference's outer read already is the specification's read *at the elements* - what differs
-  is only that the specification parses each element as an array. The bridge is therefore the
-  list-level relation between `a.mapM (fromJson? (α := Array Json))` and
-  `a.mapM (fun e => (fromJson? (α := Json) e).map Json.getArr?)`-style readings, and `map`'s own case
-  work is then the pair accord with `BodiesAgreePairs`, which is AMQP content and no JSON layer at
-  all.
+  That bridge is now proved, in the section below: `arrayFromJson?_json` and `arrayFromJson?_array`
+  say what each reader does with an array payload, `list_mapM_fromJson?_array` and
+  `mapM_fromJson?_of_mapM_getArr?` relate the two readings element by element, and
+  `mapM_getArr?_collapse` turns the reference's `mapM` over raw elements into a parse of the pairs
+  plus a read of the parsed pairs. What remains for `map` is the pair-level analogue of
+  `mapM_valueOfJson_agrees`, with `BodiesAgreePairs` as the obligation - AMQP content and no JSON
+  layer at all - and then the clause and its case in the step lemma.
 
-  So of the twenty-five clauses, twenty-four are proved, and the one that remains waits on the layer
-  beneath the corpus vocabulary rather than on anything the corpus is about.
+  Two traps are worth recording, because they cost more than the mathematics. `simp` cannot reduce an
+  `Except` bind *at all* - neither `simp at h` nor `simp [Except.bind]` makes progress on
+  `(Except.ok a >>= f) = .ok b` - so anything that has to see inside a `do` block's binds must do it
+  by `rfl`-level reduction or by `Except.bind_ok_iff` below, which peels a successful bind into its
+  steps. And `cases x : t` rewrites the *goal* but not a hypothesis, so a case split whose occurrence
+  lives only in `h` will silently fail to reach it; peel with `Except.bind_ok_iff` instead, or state
+  the split in a lemma whose obligation mentions it.
+
+  So of the twenty-five clauses, twenty-four are proved, and the one that remains has the layer
+  beneath the corpus vocabulary finished: what is left of it is the pair accord, its clause, and its
+  case in the step lemma.
 * **Then the joint development**: prefix determinism and fuel monotonicity, which is what lets
   the clause lemmas be joined into one `valueOfJson` agreement over all buffers rather than
   re-derived per `Json`. `ValueLayersAgree` (`Proofs/ValueLayerLaws`) needs the same treatment on
@@ -814,6 +823,266 @@ theorem valueCarrierAgrees_zero : ValueCarrierAgrees 0 := by
 /-- **The contract's statement is this one at fuel 64**, so the step lemma is what stands between
 the clause family and `ValueCarrierAgree`. -/
 theorem valueCarrierAgree_of_agrees (h : ValueCarrierAgrees 64) : ValueCarrierAgree := h
+
+/-! ## The JSON layer under `map`
+
+`Array.fromJson? (α := Array β)` parses each element of a JSON array as a `β`, and the element
+instance for `Json` is the identity, so the reference's `getObjValAs? (Array Json) "pairs"` and the
+specification's `getObjValAs? (Array (Array Json)) "pairs"` read the *same* payload: they differ only
+in that the specification parses each element as an array, while the reference leaves the element as
+`Json` and calls `getArr?` at the point of use. This section relates the two readings. -/
+
+/-- The `FromJson` instance for `Json` *is* the identity. -/
+theorem fromJson?_json : (Lean.fromJson? (α := Json) : Json → Except String Json) = Except.ok := rfl
+
+/-- Peeling a bind: an `Except` computation that succeeds is its first step succeeding and the rest
+succeeding. Stated in the `bind` form, which is what `do` elaborates to. -/
+theorem Except.bind_ok_iff {α β : Type} (a : Except String α) (f : α → Except String β) (b : β) :
+    (a >>= f) = .ok b ↔ ∃ x, a = .ok x ∧ f x = .ok b := by
+  constructor
+  · intro h
+    cases a with
+    | error e => cases h
+    | ok x => exact ⟨x, rfl, h⟩
+  · rintro ⟨x, rfl, h⟩
+    exact h
+
+/-- A list read at the identity element instance is itself. -/
+theorem list_mapM_ok (l : List Json) :
+    (l.mapM (fun x => Except.ok x) : Except String (List Json)) = .ok l := by
+  induction l with
+  | nil => rfl
+  | cons x xs ih => simp only [List.mapM_cons, Bind.bind, Except.bind, ih]; rfl
+
+/-- The same, in the instance's own spelling. -/
+theorem list_fromJson?_json (l : List Json) :
+    (l.mapM (Lean.fromJson? (α := Json)) : Except String (List Json)) = .ok l := by
+  rw [fromJson?_json]
+  exact list_mapM_ok l
+
+/-- The reference's read of an array at the identity element instance is the array itself. -/
+theorem arrayFromJson?_json (raw : Array Json) :
+    Array.fromJson? (α := Json) (.arr raw) = .ok raw := by
+  simp only [Array.fromJson?, Array.mapM_eq_mapM_toList, list_fromJson?_json]
+  simp
+
+/-- The specification's read of an array parses each element in place. -/
+theorem arrayFromJson?_array (raw : Array Json) :
+    Array.fromJson? (α := Array Json) (.arr raw) =
+      raw.mapM (Array.fromJson? (α := Json)) := rfl
+
+/-- A JSON value that reads as an array *is* the array it reads as: `getArr?` hides nothing. -/
+theorem eq_arr_of_getArr? (e : Json) (a : Array Json) (h : e.getArr? = .ok a) :
+    e = Json.arr a := by
+  cases e with
+  | arr elems =>
+    simp only [Json.getArr?] at h
+    injection h with hb
+    subst hb
+    rfl
+  | null => simp_all [Json.getArr?]
+  | bool b' => simp_all [Json.getArr?]
+  | num n => simp_all [Json.getArr?]
+  | str s => simp_all [Json.getArr?]
+  | obj o => simp_all [Json.getArr?]
+
+/-- The element the nested read accepted is the array it is wrapped in. -/
+theorem eq_arr_of_fromJson?_array (e : Json) (b : Array Json)
+    (h : Array.fromJson? (α := Json) e = .ok b) : e = Json.arr b := by
+  cases e with
+  | arr a =>
+    rw [arrayFromJson?_json a] at h
+    injection h with hb
+    subst hb
+    rfl
+  | null => simp_all [Array.fromJson?]
+  | bool b' => simp_all [Array.fromJson?]
+  | num n => simp_all [Array.fromJson?]
+  | str s => simp_all [Array.fromJson?]
+  | obj o => simp_all [Array.fromJson?]
+
+/-- `getArr?` and the array reader are the same read, so a successful `getArr?` is a successful
+parse. -/
+theorem getArr?_eq_fromJson?_array (e : Json) (a : Array Json) (h : e.getArr? = .ok a) :
+    Array.fromJson? (α := Json) e = .ok a := by
+  rw [eq_arr_of_getArr? e a h]
+  exact arrayFromJson?_json a
+
+/-- An element the nested read parsed as an array *is* an array, and `getArr?` gives it back. -/
+theorem getArr?_of_fromJson?_array (e : Json) (b : Array Json)
+    (h : Array.fromJson? (α := Json) e = .ok b) : e.getArr? = .ok b := by
+  rw [eq_arr_of_fromJson?_array e b h]
+  rfl
+
+/-- A successful read at the identity element instance identifies the payload: it is the array the
+read returned. -/
+theorem eq_arr_of_fromJson?_json (j : Json) (raw : Array Json)
+    (h : Array.fromJson? (α := Json) j = .ok raw) : j = Json.arr raw := by
+  cases j with
+  | arr a =>
+    rw [arrayFromJson?_json a] at h
+    injection h with hb
+    subst hb
+    rfl
+  | null => simp_all [Array.fromJson?]
+  | bool b' => simp_all [Array.fromJson?]
+  | num n => simp_all [Array.fromJson?]
+  | str s => simp_all [Array.fromJson?]
+  | obj o => simp_all [Array.fromJson?]
+
+/-- The list-level bridge: what the specification parses as a list of arrays, the reference parses as
+a list of JSON values that are those arrays — the same payload, parsed one step less far. -/
+theorem list_mapM_fromJson?_array (l : List Json) (a : List (Array Json))
+    (h : (l.mapM (Array.fromJson? (α := Json)) : Except String (List (Array Json))) = .ok a) :
+    l.mapM (fun e => e.getArr?) = .ok a ∧ l = a.map (fun b => Json.arr b) := by
+  induction l generalizing a with
+  | nil =>
+    simp only [List.mapM_nil] at h
+    injection h with hb
+    subst hb
+    exact ⟨rfl, rfl⟩
+  | cons e es ih =>
+    simp only [List.mapM_cons, Bind.bind, Except.bind] at h
+    cases he : Array.fromJson? (α := Json) e with
+    | error err => simp [he] at h
+    | ok b =>
+      simp only [he] at h
+      cases hes : es.mapM (Array.fromJson? (α := Json)) with
+      | error err => simp [hes] at h
+      | ok bs =>
+        simp only [hes] at h
+        injection h with hb
+        subst hb
+        obtain ⟨hget, hmap⟩ := ih bs hes
+        have heq : e = Json.arr b := eq_arr_of_fromJson?_array e b he
+        refine ⟨?_, ?_⟩
+        · simp only [List.mapM_cons, Bind.bind, Except.bind,
+            getArr?_of_fromJson?_array e b he, hget]
+          rfl
+        · simp only [hmap, heq, List.map_cons]
+
+/-- The specification's element parse, recovered from the reference's point-of-use read: whatever
+`getArr?` accepts, the nested reader parses to the same array. -/
+theorem mapM_fromJson?_of_mapM_getArr? (l : List Json) (a : List (Array Json))
+    (h : l.mapM (fun e => e.getArr?) = .ok a) :
+    (l.mapM (Array.fromJson? (α := Json)) : Except String (List (Array Json))) = .ok a := by
+  induction l generalizing a with
+  | nil =>
+    simp only [List.mapM_nil] at h
+    injection h with hb
+    subst hb
+    rfl
+  | cons e es ih =>
+    simp only [List.mapM_cons, Bind.bind, Except.bind] at h
+    cases he : e.getArr? with
+    | error err => simp [he] at h
+    | ok b =>
+      simp only [he] at h
+      cases hes : es.mapM (fun e => e.getArr?) with
+      | error err => simp [hes] at h
+      | ok bs =>
+        simp only [hes] at h
+        injection h with hb
+        subst hb
+        simp only [List.mapM_cons, Bind.bind, Except.bind, getArr?_eq_fromJson?_array e b he,
+          ih bs hes]
+        rfl
+
+/-- A pair read in the reference's map body, decomposed: the pair is the two-element array the
+reference requires, and both values read successfully. The reads are peeled out of the success, so
+nothing here has to split a hypothesis. -/
+theorem pairBody_decomp (fuel : Nat) (b : Array Json) (other : SpecAMQP.Ref.Value × SpecAMQP.Ref.Value)
+    (h : (do
+      match Array.toList b with
+      | [key, value] => do
+        let key' ← SpecAMQP.Ref.Vectors.valueOfJson fuel key
+        let value' ← SpecAMQP.Ref.Vectors.valueOfJson fuel value
+        return (key', value')
+      | _ => .error "a map pair is exactly two values") = .ok other) :
+    ∃ key value key' value', Array.toList b = [key, value] ∧
+      SpecAMQP.Ref.Vectors.valueOfJson fuel key = .ok key' ∧
+      SpecAMQP.Ref.Vectors.valueOfJson fuel value = .ok value' ∧ other = (key', value') := by
+  cases hpl : Array.toList b with
+  | nil => simp [hpl] at h
+  | cons key rest1 =>
+    cases rest1 with
+    | nil => simp [hpl] at h
+    | cons value rest2 =>
+      cases rest2 with
+      | cons w rest3 => simp [hpl] at h
+      | nil =>
+        simp only [hpl] at h
+        rw [Except.bind_ok_iff] at h
+        obtain ⟨key', hkey, hrest⟩ := h
+        rw [Except.bind_ok_iff] at hrest
+        obtain ⟨value', hvalue, hend⟩ := hrest
+        refine ⟨key, value, key', value', rfl, hkey, hvalue, ?_⟩
+        injection hend with hh
+        exact hh.symm
+
+/-- The same decomposition for the raw-`Json` body, which reads the array first. -/
+theorem pairBodyRaw_decomp (fuel : Nat) (e : Json)
+    (other : SpecAMQP.Ref.Value × SpecAMQP.Ref.Value)
+    (h : (do
+      let items ← Json.getArr? e
+      match Array.toList items with
+      | [key, value] => do
+        let key' ← SpecAMQP.Ref.Vectors.valueOfJson fuel key
+        let value' ← SpecAMQP.Ref.Vectors.valueOfJson fuel value
+        return (key', value')
+      | _ => .error "a map pair is exactly two values") = .ok other) :
+    ∃ b key value key' value', e.getArr? = .ok b ∧ Array.toList b = [key, value] ∧
+      SpecAMQP.Ref.Vectors.valueOfJson fuel key = .ok key' ∧
+      SpecAMQP.Ref.Vectors.valueOfJson fuel value = .ok value' ∧ other = (key', value') := by
+  rw [Except.bind_ok_iff] at h
+  obtain ⟨b, he, hpair⟩ := h
+  obtain ⟨key, value, key', value', hpl, hkey, hvalue, hother⟩ := pairBody_decomp fuel b other hpair
+  exact ⟨b, key, value, key', value', he, hpl, hkey, hvalue, hother⟩
+
+/-- The reference's point-of-use read, collapsed into a parse of the pairs and a read of the parsed
+pairs: this is the shape the pair accord is stated against. -/
+theorem mapM_getArr?_collapse (fuel : Nat) (l : List Json)
+    (others : List (SpecAMQP.Ref.Value × SpecAMQP.Ref.Value))
+    (h : l.mapM (fun pair => do
+      let items ← Json.getArr? pair
+      match Array.toList items with
+      | [key, value] => do
+        let key' ← SpecAMQP.Ref.Vectors.valueOfJson fuel key
+        let value' ← SpecAMQP.Ref.Vectors.valueOfJson fuel value
+        return (key', value')
+      | _ => .error "a map pair is exactly two values") = .ok others) :
+    ∃ pairsJson : List (Array Json),
+      l.mapM (fun e => e.getArr?) = .ok pairsJson ∧
+      pairsJson.mapM (fun pair => do
+        match Array.toList pair with
+        | [key, value] => do
+          let key' ← SpecAMQP.Ref.Vectors.valueOfJson fuel key
+          let value' ← SpecAMQP.Ref.Vectors.valueOfJson fuel value
+          return (key', value')
+        | _ => .error "a map pair is exactly two values") = .ok others := by
+  induction l generalizing others with
+  | nil =>
+    simp only [List.mapM_nil] at h
+    injection h with hb
+    subst hb
+    exact ⟨[], rfl, rfl⟩
+  | cons e es ih =>
+    simp only [List.mapM_cons] at h
+    rw [Except.bind_ok_iff] at h
+    obtain ⟨pair, hbody, htail⟩ := h
+    obtain ⟨b, key, value, key', value', he, hpl, hkey, hvalue, hpairEq⟩ :=
+      pairBodyRaw_decomp fuel e pair hbody
+    subst hpairEq
+    rw [Except.bind_ok_iff] at htail
+    obtain ⟨rest, hmap, hend⟩ := htail
+    injection hend with hothers
+    subst hothers
+    obtain ⟨pairsJson, hparse, hread⟩ := ih rest hmap
+    refine ⟨b :: pairsJson, ?_, ?_⟩
+    · simp only [List.mapM_cons, he, hparse]
+      rfl
+    · simp only [List.mapM_cons, hpl, hkey, hvalue, hread]
+      rfl
 
 /-! ## The compound clauses: the recursion at the fuel beneath
 
