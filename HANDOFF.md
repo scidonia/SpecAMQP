@@ -357,6 +357,7 @@ ls tests/contracts/*.sh
 | `s1_proof_integrity.sh` | no `sorry`, `admit`, `native_decide`, `partial def`, `axiom`, `constant`, `unsafe`, `opaque`, `extern` or `implemented_by` in the handwritten and shipped modules; the one permitted `extern` boundary is counted and pinned to `lean/Impl/Transport.lean`; every accepted theorem's axiom inventory printed; and the whole package built |
 | `s1_ref_vectors.sh` | the reference builds natively from Lean and passes both value corpora; both corpora are well formed; the generated one regenerates; the harness is not vacuous |
 | `value_boundaries.sh` | the value layer's rule-boundary sweep: status agreement across both artefacts, class rather than detail, and the one stated-but-unenforced rule — duplicate map keys — pinned as failing by name so the gate goes red the day it starts passing |
+| `value_class_agreement.sh` | the two value readers name the same class for every buffer of a generated family — 114,225 of them — with the family's floor and a non-vacuity clause here rather than in the driver, because how much a check must read for its silence to mean something is a different decision from what it checks |
 | `s1_differential.sh` | specification and reference agree vector by vector, and on the condition each refusal names |
 | `s2_frame_vectors.sh` | the frame corpora: per-vector agreement between both artefacts, declared sizes against octet counts, and a planted mutation |
 | `s3_exchanges.sh` | the exchange corpora: per-step verdicts, including the condition each refused step pins, from both artefacts |
