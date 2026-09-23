@@ -1,5 +1,5 @@
 {
- "adopted": "the restriction is accepted and its consequence recorded: a second delivery's first transfer is absorbed as a continuation and keeps the first delivery's id",
+ "adopted": "absorbed as a continuation of the delivery in progress",
  "clauses": [
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.31"
  ],
