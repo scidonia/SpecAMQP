@@ -8,54 +8,72 @@ import Proofs.FrameSendConformance
 `Proofs.FrameConformance.ValueLayersAgree`, `Proofs.FrameSendConformance.ValueCarrierAgree` and
 `Proofs.FrameSendConformance.ValueWriterAgree` are the three value-layer hypotheses the frame
 layer's two `Conforms` instances rest on. This module asks what is provable about them, and the
-answer is not the one the instances' prose hoped for: **two of the three are false as stated**, at
-witnesses that are in the repository's own vocabulary, and the third is untested here.
+answer is not the one the instances' prose hoped for: **`ValueWriterAgree` is false as stated**, at a
+witness in the repository's own vocabulary; **`ValueLayersAgree` was false as stated and is
+undecided now**, because the divergence it named has been fixed and what remains is a statement with
+no witness and no available proof; and **`ValueCarrierAgree` is untested here**.
 
-## What is refuted, and what is not
+## What the evidence says, statement by statement
 
-* **`ValueLayersAgree` was false**, and the divergence was a check-order difference inside the map
-  path — a difference `Ref.Value.readMap` no longer has, because its parity guard now runs before the
-  items are read, so the two readers agree on every buffer in this module's battery. What remains
-  unprovable is the class comparison itself (see below), not the agreement. The specification reads a compound's `size` and `count` fields and asks whether the count
-  is even *before* it reads the items; the reference reads the items, compares the declared size
-  with what they measured, and asks about parity afterwards. Part 1 forbids an odd count outright
-  ("Map encodings MUST contain an even number of items", `amqp-core-types-v1.0-os.xml`
-  `…/type:map.1`), so a buffer whose `count` field is odd *and* whose declared size disagrees with
-  its items is a legal buffer to hand either reader — and the two answer with different reason
-  classes. `mapWitness` is the smallest such buffer.
+* **`ValueLayersAgree` was false when this module was written, and is undecided now.** Its
+  divergence was a check-order difference inside the map path: the specification reads a compound's
+  `size` and `count` fields and asks whether the count is even *before* it reads the items, while the
+  reference read the items, compared the declared size with what they measured, and asked about
+  parity afterwards. Part 1 forbids an odd count outright ("Map encodings MUST contain an even
+  number of items", `amqp-core-types-v1.0-os.xml` `…/type:map.1`), so `mapWitness` — odd count *and*
+  a declared size that disagrees with its items — was the smallest buffer the two answered
+  differently. `Ref.Value.readMap`'s parity guard has since moved ahead of the items read, so both
+  now refuse it `malformed`; a sweep of 114,225 buffers (every length 1-3 buffer over a 45-octet
+  alphabet, every length-4 buffer over a 12-octet alphabet, and a structured set of arrays,
+  compounds and described values) now finds **no class divergence at all**. So the receive direction
+  has no witness: a refutation is not provable because the divergence is gone, and a proof is not
+  available here because it would need the value layer's own `Conforms` instance, which does not
+  exist. That state is *undecided*, and this module leaves it there rather than writing either
+  direction.
 * **`ValueWriterAgree` is false**, and its first conjunct alone is enough: the reference's writer
   writes a raw payload at whatever width the value carries (`#[0x72] ++ payload`), while the
   specification's writer looks the width up in the declared surface and refuses a payload the type
-  has no encoding for. `floatEmpty` is the smallest witness. The reference's octets for that value
-  are not the specification's answer, and the hypothesis demands they be the same octets.
+  has no encoding for. The reference's octets for that value are not the specification's answer, and
+  the hypothesis demands they be the same octets.
 * **`ValueCarrierAgree` is untouched here**: it is a claim about the two corpus-vocabulary readers
   (`Spec.Codec.valueOfJson` against `Ref.Vectors.valueOfJson`), not about the wire, and this module
   has no evidence against it.
+* **The send *endpoint* is not refutable here, and the reason is a type rather than a missing
+  witness.** Every divergence between the two writers that the corpus vocabulary can express is
+  *class-only* — both refuse, with different classes (`.array 0x00 [null]` and `.array 0xE0 [null]`
+  were `malformed:` against `limit:`) — and the reference's writer answers `Except String Octets`, so
+  its class can only be recovered by `Ref.Frame.classOf`, i.e. by splitting prose. The only *shape*
+  divergence (one writes, the other refuses) is the ill-width family, which `valueOfJson`'s
+  fixed-width payload checks put out of the carrier's reach. So `¬ Conforms specFrameSend
+  refFrameSend` has no witness a kernel proof can carry until the reference's value writer reports
+  its class as a field, the way `Spec.Codec` now does.
 
-## The step this module cannot take, and it is the same step for every class-comparing statement
+## Where the class comparison now stands
 
-`ValueLayersAgree` and `ValueWriterAgree` compare reason classes, and the specification's reason
-class is not a field: it is the token `Spec.Frame.reasonClassOf` recovers from prose by
-`String.splitOn ":"`. `String.splitOn` is not reducible in the kernel — it is
+The vocabulary that blocked the class-comparing statements has been removed on one side. The
+specification's class is a **field** (`Spec.Codec.Refusal.reasonClass`), and the reference's
+*reader* carries its class as a variant (`Ref.DecodeError`), so a comparison between those two is a
+`decide`-able goal — measured, not assumed: `(Spec.Codec.refusal "malformed" "prose").reasonClass =
+"malformed"` closes by `rfl`, and a mismatch between a `Ref.DecodeError` variant's class and a
+`Spec.Codec.Refusal` field's class closes by `decide`.
+
+What is still prose is the reference's *writer*: `Ref.encode` returns `Except String Octets`, so its
+class exists only as the leading token of a message that `Ref.Frame.classOf` recovers with
+`String.splitOn ":"`. That function is not reducible in the kernel — it is
 `if sep == "" then [s] else splitOnAux s sep 0 0 0 []`, and `splitOnAux` is a well-founded scan over
-`String.Pos.Raw`, whose `atEnd`/`get`/`next` do not reduce either:
+`String.Pos.Raw` whose `atEnd`/`get`/`next` do not reduce either, so
 
-  `example : ("a:b".splitOn ":") = ["a", "b"]` is not closed by `decide`, by `simp`, or by
-  `with_unfolding_all decide`; only `native_decide` closes it, which this repository does not use.
+  `example : ("a:b".splitOn ":") == ["a", "b"]` is closed by neither `decide`, `simp`, nor
+  `with_unfolding_all decide`; only `native_decide`, which this repository does not use.
 
-So the class equality is one prose-splitting step beyond what a kernel proof can reach, in both
-directions: it can neither be proved nor refuted from the artefacts' texts. That is not a gap in
-this module; it is the reason `Spec.Frame`'s own documentation gives for carrying the class as a
-*field* ("a class read back out of prose by `String.splitOn` is one no kernel proof can reason
-about"). The frame layer honoured that on its own refusals and did not honour it on this
-hypothesis, and every statement that compares a specification class with a reference class —
-`ValueLayersAgree`, `ValueWriterAgree`, `AnswerMatched`, `ReadersAgree`, and with them the two
-conditional frame instances and the connection instance — is stated in that vocabulary.
+`ValueWriterAgree`'s second conjunct compares exactly that prose, which is why the landed refutation
+is written against the first conjunct, where no class appears at all.
 
-What this module therefore lands is the divergence *at the artefacts' answers*: what each reader
-and each writer actually answers for a witness, in each artefact's own terms, with no class
-recovered from prose. The class-comparing statements follow from these facts by exactly one step,
-and the step is named in each docstring rather than taken.
+What this module lands, then, is the artefacts' answers for a witness, in each artefact's own terms:
+the two readers' answers to `mapWitness`, the two writers' answers for the ill-width and
+array-constructor families, and the reference's size accounting. Where a class-comparing statement
+follows from them it is named in the docstring beside the fact, and where no witness exists it is
+named as undecided rather than written.
 -/
 
 -- The cursor types carry no `DecidableEq`, because no proof has needed to compare cursors yet.
@@ -198,14 +216,15 @@ theorem spec_readCompound_map_odd (fuel : Nat) (decl : SpecAMQP.Generated.Oasis.
   try dsimp only []
   try (first | rfl | (split <;> first | rfl | simp_all))
 
-/-- **The specification's answer to the witness**: the parity refusal, whose message is the class,
-a colon and the prose. The reference's answer to the same buffer is
-`ref_mapWitness_decode`'s — a `sizeMismatch` — so the two readers disagree about the buffer, and
-the disagreement is visible here as the two messages' shapes rather than as a class comparison,
-because the class is this message's first token and only `String.splitOn` can recover it. -/
+/-- **The specification's answer to the witness**: the parity refusal, its class a field of the
+`Spec.Codec.Refusal` this reader answers with (and its message that class, a colon and the prose).
+The reference's answer to the same buffer is `ref_mapWitness_decode`'s, whose class is `.malformed` —
+the same class, since `Ref.Value.readMap`'s parity guard now runs first, so the two answers agree
+where they once disagreed. -/
 theorem spec_mapWitness_decodeValue :
     SpecAMQP.Spec.Codec.decodeValue mapWitness =
-      .error "malformed: a map declares 1 item(s): keys and values come in pairs, so an odd count is not a map" := by
+      .error (SpecAMQP.Spec.Codec.refusal "malformed"
+        "a map declares 1 item(s): keys and values come in pairs, so an odd count is not a map") := by
   have hrow : (SpecAMQP.Spec.Codec.dataDecl 0xC1).map
       (fun d => (d.owner, d.category, d.width)) =
       .ok ("map", SpecAMQP.Generated.Oasis.Category.compound, 1) := by decide
@@ -230,8 +249,9 @@ theorem spec_mapWitness_decodeValue :
     unfold SpecAMQP.Spec.Codec.decodeValue
     rw [mapWitness_size, hstep, hmap]
     try dsimp only []
-    simp only [Except.error.injEq, SpecAMQP.Spec.Codec.refusal]
-    decide
+    try simp only [Except.error.injEq, SpecAMQP.Spec.Codec.refusal,
+      SpecAMQP.Spec.Codec.refusalMessage]
+    try decide
 
 /-! ## The writer's witness
 
@@ -240,7 +260,10 @@ specification's writer looks the payload's width up in the declared surface
 (`rowOf "float" bits.size`) and refuses a width the surface does not declare. Values reach a writer
 from a reader, so this witness is outside the corpus vocabulary — `valueOfJson` and `hexPayloadOf`
 fix a `float`'s payload at four octets — and `ValueWriterAgree` quantifies over every pair of
-values `BodiesAgree` relates, not only over the reachable ones. Another divergence in the same
+values `BodiesAgree` relates, not only over the reachable ones. The specification's refusal for
+this value leads with `limit` — it spelled the bare prose until the classless refusals in
+`Spec/Codec.lean` were given their class, and that change moved this theorem's message and
+nothing else in this module. Another divergence in the same
 hypothesis is reachable through the vocabulary (an array whose element does not fit its declared
 element constructor), and it is reported with its two messages below. -/
 
@@ -256,7 +279,8 @@ theorem ref_encode_floatEmpty : SpecAMQP.Ref.encode (.float #[]) = .ok #[0x72] :
 
 theorem spec_encodeValue_floatEmpty :
     SpecAMQP.Spec.Codec.encodeValue (.float #[]) =
-      .error "the declared surface has no float encoding of width 0" := by
+      .error (SpecAMQP.Spec.Codec.refusal "limit"
+        "the declared surface has no float encoding of width 0") := by
   unfold SpecAMQP.Spec.Codec.encodeValue SpecAMQP.Spec.Codec.writeValue
     SpecAMQP.Spec.Codec.emitScalar SpecAMQP.Spec.Codec.rowOf
   try dsimp only []
@@ -277,23 +301,27 @@ theorem not_valueWriterAgree : ¬ ValueWriterAgree := by
 
 Both writers are asked for an array whose declared element constructor is `%x57` — an octet inside
 the fixed-width range that the declared surface assigns no encoding — carrying one `null`. The
-corpus vocabulary can produce that pair (`"constructor": "57"`), so this divergence is reachable
-through the send instance's carrier, and it is the one that matters there. Both refuse; what
-differs is the class, and the specification's is `unassigned` while the reference's is a catch-all
-`limit` — and the specification's two *classless* refusals in this family (`.array %x00 [x]` and
-`.array %xE0 [x]`) are a separate defect recorded in this module's report. -/
+corpus vocabulary can produce that pair (`"constructor": "57"`), so this is a *reachable* pair, and
+it is the one that mattered: the specification refused it `unassigned` while the reference's catch-all
+said `limit`. `Ref.arrayElement`'s catch-all has since been split — `unassigned` where the surface
+assigns the constructor no encoding, `malformed` where the value does not fit the constructor it does
+assign — so the two now agree, and these two theorems are the pair that goes red if either side's
+class is weakened rather than aligned. The specification's two *classless* refusals in this family
+(`.array %x00 [x]` and `.array %xE0 [x]`) were given `malformed` in the same pass. -/
 
 theorem ref_encode_arrayUnassigned :
     SpecAMQP.Ref.encode (.array 0x57 [.null]) =
-      .error "limit: an array whose element constructor is 87 cannot carry a null" := by
+      .error "unassigned: octet 87 is not an encoding the constructor grammar assigns" := by
   unfold SpecAMQP.Ref.encode SpecAMQP.Ref.arrayElementItems SpecAMQP.Ref.arrayElement
   try dsimp only []
+  try simp only [SpecAMQP.Ref.assignedConstructor]
   try (first | rfl | (split <;> first | rfl | simp_all))
   try decide
 
 theorem spec_encodeValue_arrayUnassigned :
     SpecAMQP.Spec.Codec.encodeValue (.array 0x57 [.null]) =
-      .error "unassigned: octet 0x57 lies in the fixed range of width 1 but the declared surface assigns it no encoding" := by
+      .error (SpecAMQP.Spec.Codec.refusal "unassigned"
+        "octet 0x57 lies in the fixed range of width 1 but the declared surface assigns it no encoding") := by
   unfold SpecAMQP.Spec.Codec.encodeValue SpecAMQP.Spec.Codec.writeValue
     SpecAMQP.Spec.Codec.elementDecl?
   try dsimp only []
@@ -368,6 +396,5 @@ theorem ref_listWitness_decode :
   unfold SpecAMQP.Ref.decode
   rw [listWitness_size, hstep, hlist]
   try dsimp only []
-  try (first | rfl | (split <;> first | rfl | simp_all))
 
 end SpecAMQP.Proofs

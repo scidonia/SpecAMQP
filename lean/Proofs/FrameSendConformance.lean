@@ -205,10 +205,9 @@ def ValueWriterAgree : Prop :=
     (∀ octets : Octets, SpecAMQP.Ref.encode other = .ok octets →
       SpecAMQP.Spec.Codec.encodeValue body = .ok octets) ∧
     (∀ message : String, SpecAMQP.Ref.encode other = .error message →
-      ∃ specMessage : String,
-        SpecAMQP.Spec.Codec.encodeValue body = .error specMessage ∧
-        SpecAMQP.Spec.Frame.reasonClassOf specMessage =
-          SpecAMQP.Ref.Frame.classOf message)
+      ∃ refusal : SpecAMQP.Spec.Codec.Refusal,
+        SpecAMQP.Spec.Codec.encodeValue body = .error refusal ∧
+        refusal.reasonClass = SpecAMQP.Ref.Frame.classOf message)
 
 /-! ## The layer's answer, and the two endpoints -/
 

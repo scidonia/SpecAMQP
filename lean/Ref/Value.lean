@@ -827,8 +827,19 @@ def arrayElement : UInt8 → Value → Except String Octets
       let count := items.length
       return u32be (5 + body.size) ++ u32be count ++ #[constructor] ++ body
   | constructor, value =>
-    .error s!"limit: an array whose element constructor is {constructor.toNat} cannot \
-      carry a {typeName value}"
+    -- Two different defects, refused with the two classes the specification names for them: an
+    -- element constructor the declared surface assigns no encoding is `unassigned` — the same
+    -- refusal this reader's own `readElement` makes for such an octet, and the class the
+    -- specification's `elementDecl?` gives it — while a value the declared constructor cannot
+    -- carry is a shape refusal, `malformed`. Reporting both as `limit` was a class a conforming
+    -- peer could not agree with, and it made an array element the one place where the two
+    -- artefacts' writers differed in class on a body the corpus vocabulary can express.
+    if !assignedConstructor constructor then
+      .error s!"unassigned: octet {constructor.toNat} is not an encoding the constructor \
+        grammar assigns"
+    else
+      .error s!"malformed: an array whose element constructor is {constructor.toNat} cannot \
+        carry a {typeName value}"
 termination_by _ value => sizeOf value
 
 end

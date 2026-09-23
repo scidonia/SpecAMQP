@@ -114,7 +114,8 @@ theorem accepted_frames_carry_performatives :
   intro bytes frame consumed h
   rw [decodeFrame_eq_ok_iff] at h
   unfold readFrame at h
-  simp only [] at h
+  simp only [SpecAMQP.Spec.Frame.declaredSize, SpecAMQP.Spec.Frame.declaredDoff,
+    SpecAMQP.Spec.Frame.doffOctets] at h
   repeat' split at h
   all_goals grind [carriesPerformative_eq]
 
@@ -130,7 +131,8 @@ theorem consumed_is_the_declared_size :
   intro bytes frame consumed h
   rw [decodeFrame_eq_ok_iff] at h
   unfold readFrame at h
-  simp only [] at h
+  simp only [SpecAMQP.Spec.Frame.declaredSize, SpecAMQP.Spec.Frame.declaredDoff,
+    SpecAMQP.Spec.Frame.doffOctets] at h
   repeat' split at h
   all_goals grind
 
@@ -459,7 +461,8 @@ theorem decodeFrame_eq_ok_of (bytes : Octets) (frame : Frame) (consumed : Nat)
   have g5 : ¬ (bodyStart frame.doff + consumed > bytes.size) := by omega
   rw [decodeFrame_eq_ok_iff]
   unfold readFrame
-  dsimp only []
+  dsimp only [SpecAMQP.Spec.Frame.declaredSize, SpecAMQP.Spec.Frame.declaredDoff,
+    SpecAMQP.Spec.Frame.doffOctets]
   rw [hSize, hDoff, hType, hChannel]
   rw [if_neg g1, if_neg g1, if_neg g2, if_neg g3, if_neg g4]
   try dsimp only []
