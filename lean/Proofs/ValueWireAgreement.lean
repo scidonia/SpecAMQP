@@ -6790,4 +6790,79 @@ theorem elementsDecideAt_of_upTo {g : Nat} (hup : WireAgreesUpTo g) (hdec : Elem
       (hb := hb) (ed := ed) (hed := hed)
 
 
+/-- **The `array8` value row (`0xE0`).** The specification's `readValue` resolves the octet to the
+table's one-octet array row and hands its cursor to `readArrayData`; the reference matches the octet
+and reads at width one. Both are the array body at the fuel the octet handed down, which is what
+`readArray_body` relates — and the body is where the elements' one-fuel offset lives, so it takes the
+element decision *below* that fuel as the hypothesis the induction discharges. -/
+theorem arm_0xE0 (fuel : Nat) (hdec : ElementsDecideBelow fuel) (c : SpecAMQP.Spec.Codec.Cursor)
+    (c' : SpecAMQP.Ref.Cursor) (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor)
+    (hd : CursorAgrees d d') (hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0xE0, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0xE0, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hdata : d.data = c.data := spec_takeU8_data hs
+  have hclass : SpecAMQP.Spec.Value.classify (0xE0 : UInt8).toNat = .array 1 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0xE0 : UInt8) =
+      .ok ⟨224, some "array8", Generated.Oasis.Category.array, 1, "array",
+        "up to 2^8 - 1 array elements with total size less than 2^8 octets"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.readArrayData fuel ⟨224, some "array8",
+        Generated.Oasis.Category.array, 1, "array",
+        "up to 2^8 - 1 array elements with total size less than 2^8 octets"⟩ d := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' = SpecAMQP.Ref.readArray fuel 1 d' := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  obtain ⟨hok, herr⟩ := readArray_body fuel hdec ⟨224, some "array8",
+    Generated.Oasis.Category.array, 1, "array",
+    "up to 2^8 - 1 array elements with total size less than 2^8 octets"⟩ (by decide) hd hb
+  constructor
+  · intro other c₂' h
+    rw [hR] at h
+    obtain ⟨body, c₂, hf, hba, hcd, hdat⟩ := hok other c₂' h
+    exact ⟨body, c₂, by rw [hS]; exact hf, hcd, by rw [hdat, hdata], hba⟩
+  · intro failure h
+    rw [hR] at h
+    obtain ⟨refusal, hf, hcl⟩ := herr failure h
+    exact ⟨refusal, by rw [hS]; exact hf, hcl⟩
+
+/-- **The `array32` value row (`0xF0`).** The same body behind a four-octet array row. -/
+theorem arm_0xF0 (fuel : Nat) (hdec : ElementsDecideBelow fuel) (c : SpecAMQP.Spec.Codec.Cursor)
+    (c' : SpecAMQP.Ref.Cursor) (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor)
+    (hd : CursorAgrees d d') (hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0xF0, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0xF0, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hdata : d.data = c.data := spec_takeU8_data hs
+  have hclass : SpecAMQP.Spec.Value.classify (0xF0 : UInt8).toNat = .array 4 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0xF0 : UInt8) =
+      .ok ⟨240, some "array32", Generated.Oasis.Category.array, 4, "array",
+        "up to 2^32 - 1 array elements with total size less than 2^32 octets"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.readArrayData fuel ⟨240, some "array32",
+        Generated.Oasis.Category.array, 4, "array",
+        "up to 2^32 - 1 array elements with total size less than 2^32 octets"⟩ d := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' = SpecAMQP.Ref.readArray fuel 4 d' := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  obtain ⟨hok, herr⟩ := readArray_body fuel hdec ⟨240, some "array32",
+    Generated.Oasis.Category.array, 4, "array",
+    "up to 2^32 - 1 array elements with total size less than 2^32 octets"⟩ (by decide) hd hb
+  constructor
+  · intro other c₂' h
+    rw [hR] at h
+    obtain ⟨body, c₂, hf, hba, hcd, hdat⟩ := hok other c₂' h
+    exact ⟨body, c₂, by rw [hS]; exact hf, hcd, by rw [hdat, hdata], hba⟩
+  · intro failure h
+    rw [hR] at h
+    obtain ⟨refusal, hf, hcl⟩ := herr failure h
+    exact ⟨refusal, by rw [hS]; exact hf, hcl⟩
+
+
 end SpecAMQP.Proofs
