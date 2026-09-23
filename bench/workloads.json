@@ -1,0 +1,89 @@
+{
+  "run_set": "corpus-instruments",
+  "note": "Off-gate timing evidence for the two corpus executables. Not a gate: no threshold, no assertion, nothing here is a contract. See bench/run.py for what a number here does and does not mean.",
+  "warmup": 1,
+  "repetitions": 7,
+  "floor": "startup-floor",
+  "executables": [
+    {
+      "name": "amqp-ref",
+      "path": "lean/.lake/build/bin/amqp-ref",
+      "root": "Ref.Main"
+    },
+    {
+      "name": "amqp-spec",
+      "path": "lean/.lake/build/bin/amqp-spec",
+      "root": "Spec.Main"
+    }
+  ],
+  "workloads": [
+    {
+      "id": "startup-floor",
+      "corpus": "vectors/generated.ndjson",
+      "prefix": 0.0,
+      "repeat": 1,
+      "note": "Zero vectors: process start, runtime init, reading an empty file and exiting, with no corpus work at all. The floor every marginal cost below is measured against, and the reason a raw time ratio sits below the work ratio."
+    },
+    {
+      "id": "worked",
+      "corpus": "vectors/primitives.ndjson",
+      "prefix": 1.0,
+      "repeat": 1,
+      "note": "The 20-vector worked corpus the contracts replay. Carries no prefix series: 5, 10 and 20 vectors all sit inside the startup floor, so ratios across it would measure noise and process startup rather than the corpus."
+    },
+    {
+      "id": "generated-quarter",
+      "corpus": "vectors/generated.ndjson",
+      "prefix": 0.25,
+      "repeat": 1,
+      "note": "The first 17,598 of the corpus's 70,390 vectors."
+    },
+    {
+      "id": "generated-half",
+      "corpus": "vectors/generated.ndjson",
+      "prefix": 0.5,
+      "repeat": 1,
+      "note": "The first 35,195 vectors."
+    },
+    {
+      "id": "generated-full",
+      "corpus": "vectors/generated.ndjson",
+      "prefix": 1.0,
+      "repeat": 1,
+      "note": "The whole corpus, handed to the binary in place rather than copied."
+    },
+    {
+      "id": "growth-1x",
+      "corpus": "vectors/generated.ndjson",
+      "prefix": 0.25,
+      "repeat": 1,
+      "note": "The growth series' base: the same 17,598 vectors as generated-quarter, under its own label. The two are byte-identical on purpose, so the pair also reads as a repeatability check taken at two points in the same run."
+    },
+    {
+      "id": "growth-2x",
+      "corpus": "vectors/generated.ndjson",
+      "prefix": 0.25,
+      "repeat": 2,
+      "note": "The base vectors twice: 35,196 vectors of exactly the base's mixture, so the work ratio is exactly 2.0 and no part of the time ratio comes from the corpus changing shape."
+    },
+    {
+      "id": "growth-4x",
+      "corpus": "vectors/generated.ndjson",
+      "prefix": 0.25,
+      "repeat": 4,
+      "note": "The base vectors four times: 70,392 vectors, within 0.01% of the whole corpus's vector count and made of one quarter only."
+    }
+  ],
+  "series": [
+    {
+      "name": "prefix",
+      "workloads": ["generated-quarter", "generated-half", "generated-full"],
+      "note": "Prefixes of the corpus, read as a size series; the mixture is not constant across them, because the corpus's first quarter holds 8.2 MB of its 15.8 MB."
+    },
+    {
+      "name": "growth",
+      "workloads": ["growth-1x", "growth-2x", "growth-4x"],
+      "note": "One fixed set of vectors repeated 1x, 2x, 4x: volume doubles with the mixture held exactly constant, so this is the series the complexity question is read from."
+    }
+  ]
+}

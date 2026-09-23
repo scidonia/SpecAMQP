@@ -1,0 +1,1235 @@
+{
+  "binaries": {
+    "amqp-ref": {
+      "mtime_utc": "2026-09-23T20:40:39Z",
+      "path": "lean/.lake/build/bin/amqp-ref",
+      "root": "Ref.Main",
+      "sha256": "8d88ac2aa8a8d2bdcb67dcdef1e4f43f4bac26b6e9aa6ad85b0539a70d4e4930",
+      "size_bytes": 228232696
+    },
+    "amqp-spec": {
+      "mtime_utc": "2026-09-23T20:33:39Z",
+      "path": "lean/.lake/build/bin/amqp-spec",
+      "root": "Spec.Main",
+      "sha256": "4c3a356830960d6e9ab7e22ffc9834cb84e1fad44dbf627094cf806136cc1a22",
+      "size_bytes": 227763720
+    }
+  },
+  "environment": {
+    "cpu_model": "Intel(R) Core(TM) Ultra 7 268V",
+    "git": {
+      "branch": "main",
+      "commit": "d6e2959106e4698cb32f8992703344c80cc82cb2",
+      "dirty": true,
+      "dirty_outside_bench": true,
+      "dirty_paths": [
+        "bench/",
+        "lean/Proofs/FrameSendConformance.lean",
+        "lean/Proofs/ValueLayerLaws.lean",
+        "vectors/generated-exchanges.ndjson"
+      ]
+    },
+    "host": "pleiades",
+    "kernel": "6.17.0-1032-oem",
+    "lean_toolchain": "leanprover/lean4:v4.31.0",
+    "load_average": [
+      8.17,
+      6.12,
+      6.38
+    ],
+    "manifest": {
+      "path": "bench/workloads.json",
+      "sha256": "c5b06eb68e3d5b7f6ce08dcc7b9ea933fe0a0bc3f3e9710baeb5a44ec715afda"
+    },
+    "memory_total_kb": 32332864,
+    "python": "3.12.3",
+    "reported_cores": 8,
+    "runner": {
+      "path": "bench/run.py",
+      "sha256": "e49fbcd53c301e04194cfe72785dffef19041fc48b9f462cfba1a3fd27010627"
+    },
+    "taken_utc": "2026-09-23T20:59:48Z",
+    "usable_cores": 8
+  },
+  "measurements": {
+    "amqp-ref/generated-full": {
+      "bytes": 15803940,
+      "executable": "amqp-ref",
+      "exit_status": 0,
+      "fork_parent_rss_kb": 21260,
+      "id": "generated-full",
+      "load_average_after": [
+        6.62,
+        5.97,
+        6.31
+      ],
+      "load_average_before": [
+        7.68,
+        6.05,
+        6.35
+      ],
+      "peak_rss_kb": {
+        "max": 142552,
+        "median": 141968,
+        "min": 141520,
+        "runs": [
+          141660,
+          142368,
+          141908,
+          142552,
+          141968,
+          141520,
+          142312
+        ]
+      },
+      "vectors": 70390,
+      "wall_seconds": {
+        "max": 0.772131,
+        "median": 0.72632,
+        "min": 0.641345,
+        "runs": [
+          0.729925,
+          0.72632,
+          0.772131,
+          0.75752,
+          0.678016,
+          0.641345,
+          0.649956
+        ]
+      }
+    },
+    "amqp-ref/generated-half": {
+      "bytes": 10735860,
+      "executable": "amqp-ref",
+      "exit_status": 0,
+      "fork_parent_rss_kb": 21260,
+      "id": "generated-half",
+      "load_average_after": [
+        6.62,
+        5.97,
+        6.31
+      ],
+      "load_average_before": [
+        7.68,
+        6.05,
+        6.35
+      ],
+      "peak_rss_kb": {
+        "max": 120712,
+        "median": 120444,
+        "min": 119260,
+        "runs": [
+          119468,
+          120712,
+          120560,
+          119272,
+          120444,
+          119260,
+          120556
+        ]
+      },
+      "vectors": 35195,
+      "wall_seconds": {
+        "max": 0.596142,
+        "median": 0.534235,
+        "min": 0.473721,
+        "runs": [
+          0.549952,
+          0.534235,
+          0.596142,
+          0.539508,
+          0.52559,
+          0.473721,
+          0.50757
+        ]
+      }
+    },
+    "amqp-ref/generated-quarter": {
+      "bytes": 8201892,
+      "executable": "amqp-ref",
+      "exit_status": 0,
+      "fork_parent_rss_kb": 21260,
+      "id": "generated-quarter",
+      "load_average_after": [
+        6.85,
+        6.0,
+        6.33
+      ],
+      "load_average_before": [
+        7.68,
+        6.05,
+        6.35
+      ],
+      "peak_rss_kb": {
+        "max": 119068,
+        "median": 119016,
+        "min": 117788,
+        "runs": [
+          119028,
+          119020,
+          119016,
+          118404,
+          119068,
+          119008,
+          117788
+        ]
+      },
+      "vectors": 17598,
+      "wall_seconds": {
+        "max": 0.491112,
+        "median": 0.437995,
+        "min": 0.378052,
+        "runs": [
+          0.469009,
+          0.466371,
+          0.491112,
+          0.437995,
+          0.409803,
+          0.378052,
+          0.380967
+        ]
+      }
+    },
+    "amqp-ref/growth-1x": {
+      "bytes": 8201892,
+      "executable": "amqp-ref",
+      "exit_status": 0,
+      "fork_parent_rss_kb": 21260,
+      "id": "growth-1x",
+      "load_average_after": [
+        6.62,
+        5.97,
+        6.31
+      ],
+      "load_average_before": [
+        7.68,
+        6.05,
+        6.35
+      ],
+      "peak_rss_kb": {
+        "max": 119384,
+        "median": 118852,
+        "min": 117812,
+        "runs": [
+          119384,
+          119024,
+          117940,
+          118736,
+          119092,
+          117812,
+          118852
+        ]
+      },
+      "vectors": 17598,
+      "wall_seconds": {
+        "max": 0.489553,
+        "median": 0.436787,
+        "min": 0.39887,
+        "runs": [
+          0.436787,
+          0.439314,
+          0.489553,
+          0.461534,
+          0.39887,
+          0.407893,
+          0.402798
+        ]
+      }
+    },
+    "amqp-ref/growth-2x": {
+      "bytes": 16403784,
+      "executable": "amqp-ref",
+      "exit_status": 0,
+      "fork_parent_rss_kb": 21260,
+      "id": "growth-2x",
+      "load_average_after": [
+        6.62,
+        5.97,
+        6.31
+      ],
+      "load_average_before": [
+        7.68,
+        6.05,
+        6.35
+      ],
+      "peak_rss_kb": {
+        "max": 139080,
+        "median": 138724,
+        "min": 137900,
+        "runs": [
+          138724,
+          138136,
+          137900,
+          139080,
+          138588,
+          138760,
+          138960
+        ]
+      },
+      "vectors": 35196,
+      "wall_seconds": {
+        "max": 0.873669,
+        "median": 0.81153,
+        "min": 0.71266,
+        "runs": [
+          0.838478,
+          0.822732,
+          0.873669,
+          0.81153,
+          0.747592,
+          0.71266,
+          0.736875
+        ]
+      }
+    },
+    "amqp-ref/growth-4x": {
+      "bytes": 32807568,
+      "executable": "amqp-ref",
+      "exit_status": 0,
+      "fork_parent_rss_kb": 21260,
+      "id": "growth-4x",
+      "load_average_after": [
+        6.62,
+        5.97,
+        6.31
+      ],
+      "load_average_before": [
+        7.54,
+        6.05,
+        6.35
+      ],
+      "peak_rss_kb": {
+        "max": 184076,
+        "median": 183484,
+        "min": 182420,
+        "runs": [
+          183832,
+          184060,
+          182420,
+          183256,
+          183484,
+          184076,
+          183204
+        ]
+      },
+      "vectors": 70392,
+      "wall_seconds": {
+        "max": 1.659421,
+        "median": 1.512503,
+        "min": 1.420361,
+        "runs": [
+          1.584069,
+          1.659421,
+          1.569862,
+          1.426036,
+          1.493402,
+          1.420361,
+          1.512503
+        ]
+      }
+    },
+    "amqp-ref/startup-floor": {
+      "bytes": 0,
+      "executable": "amqp-ref",
+      "exit_status": 0,
+      "fork_parent_rss_kb": 21260,
+      "id": "startup-floor",
+      "load_average_after": [
+        6.85,
+        6.0,
+        6.33
+      ],
+      "load_average_before": [
+        7.68,
+        6.05,
+        6.35
+      ],
+      "peak_rss_kb": {
+        "max": 84404,
+        "median": 83468,
+        "min": 82916,
+        "runs": [
+          83056,
+          84188,
+          82916,
+          84404,
+          83340,
+          83468,
+          83576
+        ]
+      },
+      "vectors": 0,
+      "wall_seconds": {
+        "max": 0.059327,
+        "median": 0.049174,
+        "min": 0.040012,
+        "runs": [
+          0.049174,
+          0.049534,
+          0.059327,
+          0.052987,
+          0.040012,
+          0.046439,
+          0.046558
+        ]
+      }
+    },
+    "amqp-ref/worked": {
+      "bytes": 12659,
+      "executable": "amqp-ref",
+      "exit_status": 0,
+      "fork_parent_rss_kb": 21260,
+      "id": "worked",
+      "load_average_after": [
+        6.85,
+        6.0,
+        6.33
+      ],
+      "load_average_before": [
+        7.68,
+        6.05,
+        6.35
+      ],
+      "peak_rss_kb": {
+        "max": 84880,
+        "median": 83392,
+        "min": 83288,
+        "runs": [
+          84520,
+          84880,
+          83392,
+          83300,
+          84052,
+          83340,
+          83288
+        ]
+      },
+      "vectors": 20,
+      "wall_seconds": {
+        "max": 0.058301,
+        "median": 0.048778,
+        "min": 0.041438,
+        "runs": [
+          0.048778,
+          0.049267,
+          0.058301,
+          0.049456,
+          0.041438,
+          0.044618,
+          0.044925
+        ]
+      }
+    },
+    "amqp-spec/generated-full": {
+      "bytes": 15803940,
+      "executable": "amqp-spec",
+      "exit_status": 0,
+      "fork_parent_rss_kb": 21288,
+      "id": "generated-full",
+      "load_average_after": [
+        7.29,
+        6.2,
+        6.38
+      ],
+      "load_average_before": [
+        7.45,
+        6.15,
+        6.37
+      ],
+      "peak_rss_kb": {
+        "max": 142464,
+        "median": 141724,
+        "min": 141328,
+        "runs": [
+          141720,
+          141328,
+          141724,
+          141956,
+          142396,
+          142464,
+          141516
+        ]
+      },
+      "vectors": 70390,
+      "wall_seconds": {
+        "max": 0.700431,
+        "median": 0.68816,
+        "min": 0.626512,
+        "runs": [
+          0.695197,
+          0.691796,
+          0.626512,
+          0.643005,
+          0.68816,
+          0.700431,
+          0.682238
+        ]
+      }
+    },
+    "amqp-spec/generated-half": {
+      "bytes": 10735860,
+      "executable": "amqp-spec",
+      "exit_status": 0,
+      "fork_parent_rss_kb": 21288,
+      "id": "generated-half",
+      "load_average_after": [
+        7.29,
+        6.2,
+        6.38
+      ],
+      "load_average_before": [
+        7.45,
+        6.15,
+        6.37
+      ],
+      "peak_rss_kb": {
+        "max": 120648,
+        "median": 120136,
+        "min": 119420,
+        "runs": [
+          119976,
+          119440,
+          120648,
+          120576,
+          120416,
+          120136,
+          119420
+        ]
+      },
+      "vectors": 35195,
+      "wall_seconds": {
+        "max": 0.519388,
+        "median": 0.49149,
+        "min": 0.419082,
+        "runs": [
+          0.519388,
+          0.49149,
+          0.419082,
+          0.471079,
+          0.499426,
+          0.499793,
+          0.475966
+        ]
+      }
+    },
+    "amqp-spec/generated-quarter": {
+      "bytes": 8201892,
+      "executable": "amqp-spec",
+      "exit_status": 0,
+      "fork_parent_rss_kb": 21288,
+      "id": "generated-quarter",
+      "load_average_after": [
+        7.29,
+        6.2,
+        6.38
+      ],
+      "load_average_before": [
+        7.45,
+        6.15,
+        6.37
+      ],
+      "peak_rss_kb": {
+        "max": 119312,
+        "median": 119236,
+        "min": 117608,
+        "runs": [
+          119292,
+          119116,
+          119272,
+          119312,
+          118756,
+          117608,
+          119236
+        ]
+      },
+      "vectors": 17598,
+      "wall_seconds": {
+        "max": 0.422496,
+        "median": 0.375923,
+        "min": 0.339028,
+        "runs": [
+          0.422103,
+          0.375923,
+          0.339028,
+          0.345828,
+          0.377793,
+          0.422496,
+          0.372078
+        ]
+      }
+    },
+    "amqp-spec/growth-1x": {
+      "bytes": 8201892,
+      "executable": "amqp-spec",
+      "exit_status": 0,
+      "fork_parent_rss_kb": 21288,
+      "id": "growth-1x",
+      "load_average_after": [
+        7.29,
+        6.2,
+        6.38
+      ],
+      "load_average_before": [
+        7.45,
+        6.15,
+        6.37
+      ],
+      "peak_rss_kb": {
+        "max": 119248,
+        "median": 119068,
+        "min": 117952,
+        "runs": [
+          119068,
+          117952,
+          119176,
+          119172,
+          119036,
+          118468,
+          119248
+        ]
+      },
+      "vectors": 17598,
+      "wall_seconds": {
+        "max": 0.415926,
+        "median": 0.388932,
+        "min": 0.325293,
+        "runs": [
+          0.386875,
+          0.392736,
+          0.325293,
+          0.384329,
+          0.405434,
+          0.415926,
+          0.388932
+        ]
+      }
+    },
+    "amqp-spec/growth-2x": {
+      "bytes": 16403784,
+      "executable": "amqp-spec",
+      "exit_status": 0,
+      "fork_parent_rss_kb": 21288,
+      "id": "growth-2x",
+      "load_average_after": [
+        7.29,
+        6.2,
+        6.38
+      ],
+      "load_average_before": [
+        7.45,
+        6.15,
+        6.37
+      ],
+      "peak_rss_kb": {
+        "max": 138180,
+        "median": 137264,
+        "min": 136844,
+        "runs": [
+          137080,
+          136844,
+          138132,
+          138180,
+          138108,
+          136932,
+          137264
+        ]
+      },
+      "vectors": 35196,
+      "wall_seconds": {
+        "max": 0.790918,
+        "median": 0.730456,
+        "min": 0.579521,
+        "runs": [
+          0.687628,
+          0.730456,
+          0.579521,
+          0.681202,
+          0.762401,
+          0.790918,
+          0.737734
+        ]
+      }
+    },
+    "amqp-spec/growth-4x": {
+      "bytes": 32807568,
+      "executable": "amqp-spec",
+      "exit_status": 0,
+      "fork_parent_rss_kb": 21288,
+      "id": "growth-4x",
+      "load_average_after": [
+        6.95,
+        6.15,
+        6.36
+      ],
+      "load_average_before": [
+        7.18,
+        6.11,
+        6.36
+      ],
+      "peak_rss_kb": {
+        "max": 184120,
+        "median": 183496,
+        "min": 182184,
+        "runs": [
+          183496,
+          183512,
+          183468,
+          183572,
+          182184,
+          183324,
+          184120
+        ]
+      },
+      "vectors": 70392,
+      "wall_seconds": {
+        "max": 1.393785,
+        "median": 1.337909,
+        "min": 1.163742,
+        "runs": [
+          1.326259,
+          1.272583,
+          1.163742,
+          1.337909,
+          1.393785,
+          1.392651,
+          1.338373
+        ]
+      }
+    },
+    "amqp-spec/startup-floor": {
+      "bytes": 0,
+      "executable": "amqp-spec",
+      "exit_status": 0,
+      "fork_parent_rss_kb": 21288,
+      "id": "startup-floor",
+      "load_average_after": [
+        7.29,
+        6.2,
+        6.38
+      ],
+      "load_average_before": [
+        7.45,
+        6.15,
+        6.37
+      ],
+      "peak_rss_kb": {
+        "max": 84212,
+        "median": 83504,
+        "min": 82764,
+        "runs": [
+          83764,
+          83504,
+          82764,
+          83152,
+          83704,
+          83160,
+          84212
+        ]
+      },
+      "vectors": 0,
+      "wall_seconds": {
+        "max": 0.059855,
+        "median": 0.049129,
+        "min": 0.04197,
+        "runs": [
+          0.057981,
+          0.04817,
+          0.04197,
+          0.045903,
+          0.049129,
+          0.050769,
+          0.059855
+        ]
+      }
+    },
+    "amqp-spec/worked": {
+      "bytes": 12659,
+      "executable": "amqp-spec",
+      "exit_status": 0,
+      "fork_parent_rss_kb": 21288,
+      "id": "worked",
+      "load_average_after": [
+        7.29,
+        6.2,
+        6.38
+      ],
+      "load_average_before": [
+        7.45,
+        6.15,
+        6.37
+      ],
+      "peak_rss_kb": {
+        "max": 84688,
+        "median": 83584,
+        "min": 83164,
+        "runs": [
+          83676,
+          84132,
+          84688,
+          83548,
+          83548,
+          83584,
+          83164
+        ]
+      },
+      "vectors": 20,
+      "wall_seconds": {
+        "max": 0.055377,
+        "median": 0.04836,
+        "min": 0.044321,
+        "runs": [
+          0.055377,
+          0.047101,
+          0.046131,
+          0.044321,
+          0.048758,
+          0.052985,
+          0.04836
+        ]
+      }
+    }
+  },
+  "note": "Off-gate timing evidence for the two corpus executables. Not a gate: no threshold, no assertion, nothing here is a contract. See bench/run.py for what a number here does and does not mean.",
+  "record": {
+    "path": "bench/results/corpus-instruments-2026-09-23.json"
+  },
+  "repetitions": 7,
+  "run_set": "corpus-instruments",
+  "scaling": {
+    "amqp-ref": {
+      "growth": {
+        "median": {
+          "floor": "startup-floor",
+          "points": [
+            {
+              "bytes": 8201892,
+              "id": "growth-1x",
+              "marginal_us_per_vector": 22.026,
+              "seconds": 0.436787,
+              "vectors": 17598
+            },
+            {
+              "bytes": 16403784,
+              "id": "growth-2x",
+              "marginal_us_per_vector": 21.66,
+              "seconds": 0.81153,
+              "vectors": 35196
+            },
+            {
+              "bytes": 32807568,
+              "id": "growth-4x",
+              "marginal_us_per_vector": 20.788,
+              "seconds": 1.512503,
+              "vectors": 70392
+            }
+          ],
+          "statistic": "median",
+          "steps": [
+            {
+              "from": "growth-1x",
+              "marginal_ratio": 0.9834,
+              "time_ratio": 1.858,
+              "to": "growth-2x",
+              "work_ratio": 2.0
+            },
+            {
+              "from": "growth-2x",
+              "marginal_ratio": 0.9597,
+              "time_ratio": 1.8638,
+              "to": "growth-4x",
+              "work_ratio": 2.0
+            }
+          ]
+        },
+        "min": {
+          "floor": "startup-floor",
+          "points": [
+            {
+              "bytes": 8201892,
+              "id": "growth-1x",
+              "marginal_us_per_vector": 20.392,
+              "seconds": 0.39887,
+              "vectors": 17598
+            },
+            {
+              "bytes": 16403784,
+              "id": "growth-2x",
+              "marginal_us_per_vector": 19.111,
+              "seconds": 0.71266,
+              "vectors": 35196
+            },
+            {
+              "bytes": 32807568,
+              "id": "growth-4x",
+              "marginal_us_per_vector": 19.609,
+              "seconds": 1.420361,
+              "vectors": 70392
+            }
+          ],
+          "statistic": "min",
+          "steps": [
+            {
+              "from": "growth-1x",
+              "marginal_ratio": 0.9372,
+              "time_ratio": 1.7867,
+              "to": "growth-2x",
+              "work_ratio": 2.0
+            },
+            {
+              "from": "growth-2x",
+              "marginal_ratio": 1.0261,
+              "time_ratio": 1.993,
+              "to": "growth-4x",
+              "work_ratio": 2.0
+            }
+          ]
+        },
+        "note": "One fixed set of vectors repeated 1x, 2x, 4x: volume doubles with the mixture held exactly constant, so this is the series the complexity question is read from."
+      },
+      "prefix": {
+        "median": {
+          "floor": "startup-floor",
+          "points": [
+            {
+              "bytes": 8201892,
+              "id": "generated-quarter",
+              "marginal_us_per_vector": 22.095,
+              "seconds": 0.437995,
+              "vectors": 17598
+            },
+            {
+              "bytes": 10735860,
+              "id": "generated-half",
+              "marginal_us_per_vector": 13.782,
+              "seconds": 0.534235,
+              "vectors": 35195
+            },
+            {
+              "bytes": 15803940,
+              "id": "generated-full",
+              "marginal_us_per_vector": 9.62,
+              "seconds": 0.72632,
+              "vectors": 70390
+            }
+          ],
+          "statistic": "median",
+          "steps": [
+            {
+              "from": "generated-quarter",
+              "marginal_ratio": 0.6238,
+              "time_ratio": 1.2197,
+              "to": "generated-half",
+              "work_ratio": 1.9999
+            },
+            {
+              "from": "generated-half",
+              "marginal_ratio": 0.698,
+              "time_ratio": 1.3596,
+              "to": "generated-full",
+              "work_ratio": 2.0
+            }
+          ]
+        },
+        "min": {
+          "floor": "startup-floor",
+          "points": [
+            {
+              "bytes": 8201892,
+              "id": "generated-quarter",
+              "marginal_us_per_vector": 19.209,
+              "seconds": 0.378052,
+              "vectors": 17598
+            },
+            {
+              "bytes": 10735860,
+              "id": "generated-half",
+              "marginal_us_per_vector": 12.323,
+              "seconds": 0.473721,
+              "vectors": 35195
+            },
+            {
+              "bytes": 15803940,
+              "id": "generated-full",
+              "marginal_us_per_vector": 8.543,
+              "seconds": 0.641345,
+              "vectors": 70390
+            }
+          ],
+          "statistic": "min",
+          "steps": [
+            {
+              "from": "generated-quarter",
+              "marginal_ratio": 0.6415,
+              "time_ratio": 1.2531,
+              "to": "generated-half",
+              "work_ratio": 1.9999
+            },
+            {
+              "from": "generated-half",
+              "marginal_ratio": 0.6933,
+              "time_ratio": 1.3538,
+              "to": "generated-full",
+              "work_ratio": 2.0
+            }
+          ]
+        },
+        "note": "Prefixes of the corpus, read as a size series; the mixture is not constant across them, because the corpus's first quarter holds 8.2 MB of its 15.8 MB."
+      }
+    },
+    "amqp-spec": {
+      "growth": {
+        "median": {
+          "floor": "startup-floor",
+          "points": [
+            {
+              "bytes": 8201892,
+              "id": "growth-1x",
+              "marginal_us_per_vector": 19.309,
+              "seconds": 0.388932,
+              "vectors": 17598
+            },
+            {
+              "bytes": 16403784,
+              "id": "growth-2x",
+              "marginal_us_per_vector": 19.358,
+              "seconds": 0.730456,
+              "vectors": 35196
+            },
+            {
+              "bytes": 32807568,
+              "id": "growth-4x",
+              "marginal_us_per_vector": 18.309,
+              "seconds": 1.337909,
+              "vectors": 70392
+            }
+          ],
+          "statistic": "median",
+          "steps": [
+            {
+              "from": "growth-1x",
+              "marginal_ratio": 1.0025,
+              "time_ratio": 1.8781,
+              "to": "growth-2x",
+              "work_ratio": 2.0
+            },
+            {
+              "from": "growth-2x",
+              "marginal_ratio": 0.9458,
+              "time_ratio": 1.8316,
+              "to": "growth-4x",
+              "work_ratio": 2.0
+            }
+          ]
+        },
+        "min": {
+          "floor": "startup-floor",
+          "points": [
+            {
+              "bytes": 8201892,
+              "id": "growth-1x",
+              "marginal_us_per_vector": 16.1,
+              "seconds": 0.325293,
+              "vectors": 17598
+            },
+            {
+              "bytes": 16403784,
+              "id": "growth-2x",
+              "marginal_us_per_vector": 15.273,
+              "seconds": 0.579521,
+              "vectors": 35196
+            },
+            {
+              "bytes": 32807568,
+              "id": "growth-4x",
+              "marginal_us_per_vector": 15.936,
+              "seconds": 1.163742,
+              "vectors": 70392
+            }
+          ],
+          "statistic": "min",
+          "steps": [
+            {
+              "from": "growth-1x",
+              "marginal_ratio": 0.9486,
+              "time_ratio": 1.7815,
+              "to": "growth-2x",
+              "work_ratio": 2.0
+            },
+            {
+              "from": "growth-2x",
+              "marginal_ratio": 1.0434,
+              "time_ratio": 2.0081,
+              "to": "growth-4x",
+              "work_ratio": 2.0
+            }
+          ]
+        },
+        "note": "One fixed set of vectors repeated 1x, 2x, 4x: volume doubles with the mixture held exactly constant, so this is the series the complexity question is read from."
+      },
+      "prefix": {
+        "median": {
+          "floor": "startup-floor",
+          "points": [
+            {
+              "bytes": 8201892,
+              "id": "generated-quarter",
+              "marginal_us_per_vector": 18.57,
+              "seconds": 0.375923,
+              "vectors": 17598
+            },
+            {
+              "bytes": 10735860,
+              "id": "generated-half",
+              "marginal_us_per_vector": 12.569,
+              "seconds": 0.49149,
+              "vectors": 35195
+            },
+            {
+              "bytes": 15803940,
+              "id": "generated-full",
+              "marginal_us_per_vector": 9.078,
+              "seconds": 0.68816,
+              "vectors": 70390
+            }
+          ],
+          "statistic": "median",
+          "steps": [
+            {
+              "from": "generated-quarter",
+              "marginal_ratio": 0.6768,
+              "time_ratio": 1.3074,
+              "to": "generated-half",
+              "work_ratio": 1.9999
+            },
+            {
+              "from": "generated-half",
+              "marginal_ratio": 0.7223,
+              "time_ratio": 1.4002,
+              "to": "generated-full",
+              "work_ratio": 2.0
+            }
+          ]
+        },
+        "min": {
+          "floor": "startup-floor",
+          "points": [
+            {
+              "bytes": 8201892,
+              "id": "generated-quarter",
+              "marginal_us_per_vector": 16.88,
+              "seconds": 0.339028,
+              "vectors": 17598
+            },
+            {
+              "bytes": 10735860,
+              "id": "generated-half",
+              "marginal_us_per_vector": 10.715,
+              "seconds": 0.419082,
+              "vectors": 35195
+            },
+            {
+              "bytes": 15803940,
+              "id": "generated-full",
+              "marginal_us_per_vector": 8.304,
+              "seconds": 0.626512,
+              "vectors": 70390
+            }
+          ],
+          "statistic": "min",
+          "steps": [
+            {
+              "from": "generated-quarter",
+              "marginal_ratio": 0.6348,
+              "time_ratio": 1.2361,
+              "to": "generated-half",
+              "work_ratio": 1.9999
+            },
+            {
+              "from": "generated-half",
+              "marginal_ratio": 0.775,
+              "time_ratio": 1.495,
+              "to": "generated-full",
+              "work_ratio": 2.0
+            }
+          ]
+        },
+        "note": "Prefixes of the corpus, read as a size series; the mixture is not constant across them, because the corpus's first quarter holds 8.2 MB of its 15.8 MB."
+      }
+    }
+  },
+  "warmup": 1,
+  "workloads": {
+    "generated-full": {
+      "bytes": 15803940,
+      "corpus": "vectors/generated.ndjson",
+      "corpus_sha256": "822da15729d0642819e568bd7f790539e7df3f9ce29fb3a1d53a7539b0ffa355",
+      "note": "The whole corpus, handed to the binary in place rather than copied.",
+      "prefix": 1.0,
+      "repeat": 1,
+      "vectors": 70390
+    },
+    "generated-half": {
+      "bytes": 10735860,
+      "corpus": "vectors/generated.ndjson",
+      "corpus_sha256": null,
+      "note": "The first 35,195 vectors.",
+      "prefix": 0.5,
+      "repeat": 1,
+      "vectors": 35195
+    },
+    "generated-quarter": {
+      "bytes": 8201892,
+      "corpus": "vectors/generated.ndjson",
+      "corpus_sha256": null,
+      "note": "The first 17,598 of the corpus's 70,390 vectors.",
+      "prefix": 0.25,
+      "repeat": 1,
+      "vectors": 17598
+    },
+    "growth-1x": {
+      "bytes": 8201892,
+      "corpus": "vectors/generated.ndjson",
+      "corpus_sha256": null,
+      "note": "The growth series' base: the same 17,598 vectors as generated-quarter, under its own label. The two are byte-identical on purpose, so the pair also reads as a repeatability check taken at two points in the same run.",
+      "prefix": 0.25,
+      "repeat": 1,
+      "vectors": 17598
+    },
+    "growth-2x": {
+      "bytes": 16403784,
+      "corpus": "vectors/generated.ndjson",
+      "corpus_sha256": null,
+      "note": "The base vectors twice: 35,196 vectors of exactly the base's mixture, so the work ratio is exactly 2.0 and no part of the time ratio comes from the corpus changing shape.",
+      "prefix": 0.25,
+      "repeat": 2,
+      "vectors": 35196
+    },
+    "growth-4x": {
+      "bytes": 32807568,
+      "corpus": "vectors/generated.ndjson",
+      "corpus_sha256": null,
+      "note": "The base vectors four times: 70,392 vectors, within 0.01% of the whole corpus's vector count and made of one quarter only.",
+      "prefix": 0.25,
+      "repeat": 4,
+      "vectors": 70392
+    },
+    "startup-floor": {
+      "bytes": 0,
+      "corpus": "vectors/generated.ndjson",
+      "corpus_sha256": null,
+      "note": "Zero vectors: process start, runtime init, reading an empty file and exiting, with no corpus work at all. The floor every marginal cost below is measured against, and the reason a raw time ratio sits below the work ratio.",
+      "prefix": 0.0,
+      "repeat": 1,
+      "vectors": 0
+    },
+    "worked": {
+      "bytes": 12659,
+      "corpus": "vectors/primitives.ndjson",
+      "corpus_sha256": "cb53d2d0155fe56c718b797398c3018a93d895d48c13a50977d7ce1347e23814",
+      "note": "The 20-vector worked corpus the contracts replay. Carries no prefix series: 5, 10 and 20 vectors all sit inside the startup floor, so ratios across it would measure noise and process startup rather than the corpus.",
+      "prefix": 1.0,
+      "repeat": 1,
+      "vectors": 20
+    }
+  }
+}
