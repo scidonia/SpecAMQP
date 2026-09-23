@@ -299,16 +299,22 @@ def announceHeader : Option Octets := announceHeaderFor .amqp
 /-! ## The endpoint, as the interface sees it -/
 
 /--
-The core as an `Endpoint` of §10's interface. `choose` is empty for the same reason the reference's
-instance leaves it empty: `ConformsVia` never consults an implementation's `choose`, and a second set
-that could drift from the specification's is a liability rather than a claim.
+**The implementation's side of §10's interface.** The core's own step as an `Endpoint`, which is what a
+conformance instance pairs with the specification's: `Proofs.ConnectionConformance.specConn` is the
+specification's own `Endpoint` for the same alphabet, and the relation between them is the plumbing —
+`fun s i => i.conn = s`, over `State.conn` below, which is why that field is public and why this wrapper
+carries no state of its own beyond the endpoint's.
+
+`choose` is empty for the same reason the reference's instance leaves it empty: `ConformsVia` never
+consults an implementation's `choose`, and a second set that could drift from the specification's is a
+liability rather than a claim.
 
 The instance says nothing about the byte stream — `Input` has no fragment to quantify over — and
 `PLAN.md` §10's `Conforms` is therefore discharged against the *unit* reading of `.frame` documented
 above. That the stream front end is a permitted sequence of these steps is `Impl.Stream`'s laws
 composed with this instance, and it is R3's corollary to state.
 -/
-def specCore : Endpoint State where
+def implCore : Endpoint State where
   init := initial
   step := step
   choose := fun _ _ => ∅
