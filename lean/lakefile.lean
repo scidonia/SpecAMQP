@@ -194,6 +194,28 @@ lean_exe «amqp-endpoint» where
   root := `Shell.Main
   moreLinkObjs := #[«transport-shim»]
 
+/--
+The shell's harness peer: `scripts/endpoint/EndpointProbe/Client.lean`, the same shell with an application
+that asks it to send a frame larger than one `send` will accept. It lives outside `lean/Shell/` so that no
+test-only policy is shipped, and outside the package directory for the same reason R1's loopback binaries
+do — it is the harness, not the endpoint.
+
+Its sources sit under `scripts/endpoint/EndpointProbe/`, one level down, so that `srcDir` can point the
+library at them and the module is `EndpointProbe.Client` rather than a name claiming the top level.
+-/
+@[default_target]
+lean_lib EndpointProbe where
+  srcDir := "../scripts/endpoint"
+  globs := #[.submodules `EndpointProbe]
+
+/-- `lake exe amqp-endpoint-probe <port> [read-octets]` — the shell's short-write case, linked against
+`scripts/loopback/mutants/shim_controls.c` so that a write is offered to the kernel in 1024-octet pieces
+whatever the kernel would take, which is the only way the shipped write loop is forced to iterate. -/
+lean_exe «amqp-endpoint-probe» where
+  srcDir := "../scripts/endpoint"
+  root := `EndpointProbe.Client
+  moreLinkObjs := #[«transport-shim-controls»]
+
 /-- The reference implementation as a native executable: `lake exe amqp-ref
 <vector-file.ndjson>`. -/
 lean_exe «amqp-ref» where

@@ -21,23 +21,28 @@ and it is the whole of the core's own protocol-facing decision.
 * **How far to advance.** This is the core's decision, and it is unavoidable: `Spec.Connection.step`'s
   `.arriving` arm reads a frame with `readFrame`, which *does* report the octets it consumed, but the
   layer passes that count to `stepAmqpFrame` as a size and the `Outcome` it returns does not carry it.
-  The loop therefore cannot learn how far to advance from the layer, and computes it from the layout
-  instead — from `Spec.Frame`'s own octets: the header's width, the `SIZE` field, and the `DOFF`
-  arithmetic — never from a guess and never from `readFrame`'s message text.
+  The loop therefore cannot learn how far to advance from the layer, and **asks the layout instead**:
+  `Spec.Frame.frameExtent`, in the module that owns the layout, where the arithmetic is stated once
+  (`declaredSize`, `declaredDoff`, `declarationConsistent`) and `declarationConsistent_eq_true_iff` and
+  `readFrame_ok_declarationConsistent` tie it to the reader's own checks. Nothing here re-spells it; the
+  one comparison this module adds is the waiting rule, which is a question about the buffer.
 
-`nextUnitLength`'s rules, and why each one is the layer's own arithmetic rather than ours:
+`nextUnitLength`'s rules: the first column is the connection layer's question, the last is the
+specification's arithmetic, and the only thing this module decides is whether the buffer yet holds what
+the arithmetic asks for.
 
 | when | the unit | why |
 |---|---|---|
 | a header is due (`State.receiveClass`) | `headerOctets` (8), or wait | a protocol header *is* eight octets, and `decodeHeader` reads nothing beyond them |
 | a frame is due and fewer than 8 octets have arrived | wait | nothing can be named from less than a frame header, and the layer's answer there (`truncated`) is a statement about the buffer's length rather than a decision about a frame |
 | a frame is due and the buffer begins with the header magic | `headerOctets` | the layer refuses this shape *before* reading any frame — "a protocol header is not a frame of this layer" — so a frame window must not be computed from octets that are not a frame |
-| `SIZE` below the header, `DOFF` below its minimum, or the body start past `SIZE` | `headerOctets` | all three are the layout's own arithmetic contradictions and all three are decided by the header alone — `readFrame`'s first three checks, in its order — so the frame's declared extent cannot be trusted and the octets that carried the declaration are what the unit is |
-| otherwise | `SIZE`, or wait until `SIZE` octets have arrived | this is the frame's extent as the layout states it ("SIZE ... MUST contain the total frame size of the frame header, extended header, and frame body"), and on exactly those octets the layer reads the frame or names a defect inside it |
+| `SIZE` below the header, `DOFF` below its minimum, or the body start past `SIZE` | `Spec.Frame.frameExtent` = `headerOctets` | the declaration contradicts itself, and all three contradictions are decided by the header alone (`declarationConsistent`) — so its declared extent cannot be trusted and the octets that carried the declaration are what the unit is |
+| otherwise | `Spec.Frame.frameExtent` = `SIZE`, or wait until `SIZE` octets have arrived | this is the frame's extent as the layout states it ("SIZE ... MUST contain the total frame size of the frame header, extended header, and frame body"), and on exactly those octets the layer reads the frame or names a defect inside it |
 
 `nextUnitLength_ge_header` below is what makes the middle rows safe and the loop terminate: a unit is
 never shorter than a header, so the loop never advances by zero and never re-decides octets it has
-already decided about.
+already decided about. In the frame branch that law is `Spec.Frame.headerOctets_le_frameExtent` — the
+specification's fact, not this module's.
 
 ## What this module proves, and what it leaves
 
@@ -113,45 +118,56 @@ theorem headerShaped_append (inbox extra : Octets) (h : magicOctets ≤ inbox.si
   rw [Array.size_append, hprefix]
   simp [hm, hge]
 
-/-! ## The frame branch's extent -/
+/-! ## The unit: the layer's questions, and the specification's arithmetic
 
-/--
-The extent of the frame at the front of a buffer, by the layout's own arithmetic, or `none` where the
-buffer does not yet hold one.
+A unit is the buffer the connection layer is handed next. Two things decide it, and they belong to
+different owners:
 
-This is the frame-due half of `nextUnitLength`: the short-buffer check first, then the layer's own
-discriminator (`headerShaped`, which the connection layer tests before it reads any frame), then the
-declaration's own consistency, then the frame's declared size.
+* **whether a header or a frame is due** — `State.receiveClass`, the layer's own read of picture 24's
+  "Legal Receives" column — and whether a buffer that is *not* a frame has arrived where a frame belongs,
+  which is the layer's own discriminator again (`Spec.Connection.headerShaped`, tested before it reads any
+  frame). Both are asked here, not re-decided.
+* **how far a frame extends** — the layout's arithmetic, which is `Spec.Frame.frameExtent`: the declared
+  `SIZE` where the declaration is self-consistent and the header where it is not. Nothing here re-spells
+  it. The one comparison this module adds is the *waiting* rule — does the buffer hold that many octets
+  yet — which is a question about the buffer rather than about the frame, and is therefore the caller's.
 -/
-def frameExtent (inbox : Octets) : Option Nat :=
-  if inbox.size < SpecAMQP.Spec.Frame.headerOctets then none
-  else if SpecAMQP.Spec.Connection.headerShaped inbox then some SpecAMQP.Spec.Frame.headerOctets
-  else
-    let size := SpecAMQP.Spec.Frame.beAt inbox 0 SpecAMQP.Spec.Frame.sizeOctets
-    let doff := SpecAMQP.Spec.Frame.beAt inbox 4 SpecAMQP.Spec.Frame.doffOctets
-    if size < SpecAMQP.Spec.Frame.headerOctets then some SpecAMQP.Spec.Frame.headerOctets
-    else if doff < SpecAMQP.Spec.Frame.minDoff then some SpecAMQP.Spec.Frame.headerOctets
-    else if SpecAMQP.Spec.Frame.bodyStart doff > size then some SpecAMQP.Spec.Frame.headerOctets
-    else if inbox.size < size then none
-    else some size
 
 /--
 **The extent of the next wire unit**, or `none` where the buffer does not yet hold one.
 
 `none` is "wait for more octets" and never "nothing is here": every caller in this module treats it as
 "the buffer is incomplete", which is why the loop below stops rather than discarding.
-
-The rules are the table in the header, and they are the connection layer's own: which of a header and a
-frame is due is `State.receiveClass`'s question, and the frame branch is `frameExtent`'s.
 -/
 def nextUnitLength (state : LayerState) (inbox : Octets) : Option Nat :=
   if state.receiveClass = .header then
     if inbox.size < headerOctets then none else some headerOctets
+  else if inbox.size < headerOctets then none
+  else if SpecAMQP.Spec.Connection.headerShaped inbox then some headerOctets
   else
-    frameExtent inbox
+    let extent := SpecAMQP.Spec.Frame.frameExtent inbox
+    if inbox.size < extent then none else some extent
 
--- The bounds below are what the loop's termination and its conservation law rest on, and they are
--- proved for the two branches separately: one shape each, no unfolding of a six-deep `if` chain.
+/-- **A frame's extent does not move when the octets after the header do.** `Spec.Frame.frameExtent` reads
+the declaration's two fields and nothing else, and both live inside the header, so a buffer that has a
+header has the frame's extent whatever follows it. This is the framer's half of stream safety; the layer's
+half — that its *answer* is prefix-determined too — is unproved in this tree and is named in R2's report. -/
+theorem frameExtent_append {inbox extra : Octets} (h : headerOctets ≤ inbox.size) :
+    SpecAMQP.Spec.Frame.frameExtent (inbox ++ extra) = SpecAMQP.Spec.Frame.frameExtent inbox := by
+  have hsize4 : (0 + SpecAMQP.Spec.Frame.sizeOctets) ≤ inbox.size := by
+    simp only [SpecAMQP.Spec.Frame.sizeOctets, headerOctets, SpecAMQP.Spec.Frame.headerOctets] at h ⊢
+    omega
+  have hdoff5 : (4 + SpecAMQP.Spec.Frame.doffOctets) ≤ inbox.size := by
+    simp only [SpecAMQP.Spec.Frame.doffOctets, headerOctets, SpecAMQP.Spec.Frame.headerOctets] at h ⊢
+    omega
+  have h0 := beAt_append inbox extra 0 SpecAMQP.Spec.Frame.sizeOctets hsize4
+  have h4 := beAt_append inbox extra 4 SpecAMQP.Spec.Frame.doffOctets hdoff5
+  simp only [SpecAMQP.Spec.Frame.frameExtent, SpecAMQP.Spec.Frame.declarationConsistent,
+    SpecAMQP.Spec.Frame.declaredSize, SpecAMQP.Spec.Frame.declaredDoff, h0, h4]
+  rfl
+
+-- The bounds below are what the loop's termination and its conservation law rest on. Both branches are
+-- proved for their own shape, and the frame branch's lower bound is the specification's own law.
 
 /-- The header branch's extent: eight octets of a buffer that has eight, and nothing otherwise. -/
 theorem headerBranch_ge {inbox : Octets} {n : Nat}
@@ -165,150 +181,65 @@ theorem headerBranch_le {inbox : Octets} {n : Nat}
     n ≤ inbox.size := by
   split at h <;> simp_all
 
-/-- **A frame unit is at least a frame header**: the frame branch is either the header's own width (a
-declaration that contradicts itself or a buffer that is not a frame) or a `SIZE` at or above it. -/
-theorem frameExtent_ge_header {inbox : Octets} {n : Nat} (h : frameExtent inbox = some n) :
-    SpecAMQP.Spec.Frame.headerOctets ≤ n := by
-  unfold frameExtent at h
-  by_cases hshort : inbox.size < SpecAMQP.Spec.Frame.headerOctets
-  · rw [if_pos hshort] at h; simp at h
-  · rw [if_neg hshort] at h
-    by_cases hshape : SpecAMQP.Spec.Connection.headerShaped inbox
-    · rw [if_pos hshape] at h
-      simp only [Option.some.injEq] at h
-      omega
-    · rw [if_neg hshape] at h
-      by_cases h1 : SpecAMQP.Spec.Frame.beAt inbox 0 SpecAMQP.Spec.Frame.sizeOctets <
-          SpecAMQP.Spec.Frame.headerOctets
-      · rw [if_pos h1] at h; simp only [Option.some.injEq] at h; omega
-      · rw [if_neg h1] at h
-        by_cases h2 : SpecAMQP.Spec.Frame.beAt inbox 4 SpecAMQP.Spec.Frame.doffOctets <
-            SpecAMQP.Spec.Frame.minDoff
-        · rw [if_pos h2] at h; simp only [Option.some.injEq] at h; omega
-        · rw [if_neg h2] at h
-          by_cases h3 : SpecAMQP.Spec.Frame.bodyStart
-                (SpecAMQP.Spec.Frame.beAt inbox 4 SpecAMQP.Spec.Frame.doffOctets) >
-              SpecAMQP.Spec.Frame.beAt inbox 0 SpecAMQP.Spec.Frame.sizeOctets
-          · rw [if_pos h3] at h; simp only [Option.some.injEq] at h; omega
-          · rw [if_neg h3] at h
-            by_cases h4 : inbox.size < SpecAMQP.Spec.Frame.beAt inbox 0 SpecAMQP.Spec.Frame.sizeOctets
-            · rw [if_pos h4] at h; simp at h
-            · rw [if_neg h4] at h
-              simp only [Option.some.injEq] at h
-              omega
-
-/-- **A frame unit is at most the buffer**: the advance never claims octets that have not arrived. -/
-theorem frameExtent_le_size {inbox : Octets} {n : Nat} (h : frameExtent inbox = some n) :
-    n ≤ inbox.size := by
-  unfold frameExtent at h
-  by_cases hshort : inbox.size < SpecAMQP.Spec.Frame.headerOctets
-  · rw [if_pos hshort] at h; simp at h
-  · rw [if_neg hshort] at h
-    by_cases hshape : SpecAMQP.Spec.Connection.headerShaped inbox
-    · rw [if_pos hshape] at h; simp only [Option.some.injEq] at h; omega
-    · rw [if_neg hshape] at h
-      by_cases h1 : SpecAMQP.Spec.Frame.beAt inbox 0 SpecAMQP.Spec.Frame.sizeOctets <
-          SpecAMQP.Spec.Frame.headerOctets
-      · rw [if_pos h1] at h; simp only [Option.some.injEq] at h; omega
-      · rw [if_neg h1] at h
-        by_cases h2 : SpecAMQP.Spec.Frame.beAt inbox 4 SpecAMQP.Spec.Frame.doffOctets <
-            SpecAMQP.Spec.Frame.minDoff
-        · rw [if_pos h2] at h; simp only [Option.some.injEq] at h; omega
-        · rw [if_neg h2] at h
-          by_cases h3 : SpecAMQP.Spec.Frame.bodyStart
-                (SpecAMQP.Spec.Frame.beAt inbox 4 SpecAMQP.Spec.Frame.doffOctets) >
-              SpecAMQP.Spec.Frame.beAt inbox 0 SpecAMQP.Spec.Frame.sizeOctets
-          · rw [if_pos h3] at h; simp only [Option.some.injEq] at h; omega
-          · rw [if_neg h3] at h
-            by_cases h4 : inbox.size < SpecAMQP.Spec.Frame.beAt inbox 0 SpecAMQP.Spec.Frame.sizeOctets
-            · rw [if_pos h4] at h; simp at h
-            · rw [if_neg h4] at h
-              simp only [Option.some.injEq] at h
-              omega
-
-/-- **A unit is at least a frame header.** The law the loop's termination rests on: an advance is never
+/-- **A unit is at least a frame header.** The law the loop's termination rests on — an advance is never
 zero, so the buffer it recurses on is genuinely smaller — and the law that makes the loop well-founded in
-the other sense too, that octets already decided about are never re-decided. -/
+the other sense too: octets already decided about are never re-decided. In the frame branch it is
+`Spec.Frame.headerOctets_le_frameExtent`, so a frame's extent being non-empty is the specification's fact
+rather than this module's. -/
 theorem nextUnitLength_ge_header {state : LayerState} {inbox : Octets} {n : Nat}
     (h : nextUnitLength state inbox = some n) : headerOctets ≤ n := by
   unfold nextUnitLength at h
-  split at h
-  · exact headerBranch_ge h
-  · exact frameExtent_ge_header h
+  by_cases hh : state.receiveClass = .header
+  · rw [if_pos hh] at h
+    exact headerBranch_ge h
+  · rw [if_neg hh] at h
+    by_cases h8 : inbox.size < headerOctets
+    · rw [if_pos h8] at h; simp at h
+    · rw [if_neg h8] at h
+      by_cases hs : SpecAMQP.Spec.Connection.headerShaped inbox
+      · rw [if_pos hs] at h
+        simp only [Option.some.injEq] at h
+        omega
+      · rw [if_neg hs] at h
+        by_cases hw : inbox.size < SpecAMQP.Spec.Frame.frameExtent inbox
+        · rw [if_pos hw] at h; simp at h
+        · rw [if_neg hw] at h
+          simp only [Option.some.injEq] at h
+          rw [← h]
+          exact SpecAMQP.Spec.Frame.headerOctets_le_frameExtent inbox
 
-/-- **A unit is at most the buffer.** A unit is never invented beyond the octets that have arrived. -/
+/-- **A unit is at most the buffer.** A unit is never invented beyond the octets that have arrived: the
+advance is a slice of what is in the buffer, never more. -/
 theorem nextUnitLength_le_size {state : LayerState} {inbox : Octets} {n : Nat}
     (h : nextUnitLength state inbox = some n) : n ≤ inbox.size := by
   unfold nextUnitLength at h
-  split at h
-  · exact headerBranch_le h
-  · exact frameExtent_le_size h
+  by_cases hh : state.receiveClass = .header
+  · rw [if_pos hh] at h
+    exact headerBranch_le h
+  · rw [if_neg hh] at h
+    by_cases h8 : inbox.size < headerOctets
+    · rw [if_pos h8] at h; simp at h
+    · rw [if_neg h8] at h
+      by_cases hs : SpecAMQP.Spec.Connection.headerShaped inbox
+      · rw [if_pos hs] at h
+        simp only [Option.some.injEq] at h
+        rw [← h]
+        exact Nat.le_of_not_lt h8
+      · rw [if_neg hs] at h
+        by_cases hw : inbox.size < SpecAMQP.Spec.Frame.frameExtent inbox
+        · rw [if_pos hw] at h; simp at h
+        · rw [if_neg hw] at h
+          simp only [Option.some.injEq] at h
+          rw [← h]
+          exact Nat.le_of_not_lt hw
 
 /--
 **The framer's own half of stream safety**: a unit that is complete in a prefix of a buffer is complete
-in the longer buffer, with the same extent.
-
-Reading the octets that arrived must not depend on octets that have not arrived yet, and this is that
-property for the decision this module owns. The layer's half — that its *answer* is the same, which is
-what makes a fragmenting read invisible — is not proved anywhere yet; see the header.
+in the longer buffer, with the same extent. Reading the octets that arrived must not depend on octets that
+have not arrived yet, and this is that property for the decision this module owns — the layer's
+header-or-frame question and the specification's extent. The layer's half of the same property (that its
+*answer* is prefix-determined) is named in R2's report as an obligation with its exact statement.
 -/
-theorem frameExtent_prefix {inbox : Octets} {n : Nat} (h : frameExtent inbox = some n) :
-    ∀ extra : Octets, frameExtent (inbox ++ extra) = some n := by
-  intro extra
-  -- every branch below reads only the first eight octets, and they are in the prefix
-  have hsize : SpecAMQP.Spec.Frame.headerOctets ≤ inbox.size :=
-    le_trans (frameExtent_ge_header h) (frameExtent_le_size h)
-  have hbig : ¬ (inbox ++ extra).size < SpecAMQP.Spec.Frame.headerOctets := by
-    rw [Array.size_append]
-    omega
-  have hshape := headerShaped_append inbox extra (by
-    simp only [magicOctets, SpecAMQP.Spec.Frame.headerOctets] at hsize ⊢
-    omega)
-  have hsize4 : (0 + SpecAMQP.Spec.Frame.sizeOctets) ≤ inbox.size := by
-    simp only [SpecAMQP.Spec.Frame.sizeOctets, SpecAMQP.Spec.Frame.headerOctets] at hsize ⊢
-    omega
-  have hdoff4 : (4 + SpecAMQP.Spec.Frame.doffOctets) ≤ inbox.size := by
-    simp only [SpecAMQP.Spec.Frame.doffOctets, SpecAMQP.Spec.Frame.headerOctets] at hsize ⊢
-    omega
-  have h0 := beAt_append inbox extra 0 SpecAMQP.Spec.Frame.sizeOctets hsize4
-  have h4 := beAt_append inbox extra 4 SpecAMQP.Spec.Frame.doffOctets hdoff4
-  unfold frameExtent at h
-  rw [if_neg (by omega : ¬ inbox.size < SpecAMQP.Spec.Frame.headerOctets)] at h
-  unfold frameExtent
-  rw [if_neg hbig, hshape, h0, h4]
-  by_cases hshaped : SpecAMQP.Spec.Connection.headerShaped inbox
-  · rw [if_pos hshaped] at h ⊢
-    exact h
-  · rw [if_neg hshaped] at h ⊢
-    by_cases h1 : SpecAMQP.Spec.Frame.beAt inbox 0 SpecAMQP.Spec.Frame.sizeOctets <
-        SpecAMQP.Spec.Frame.headerOctets
-    · rw [if_pos h1] at h ⊢
-      exact h
-    · rw [if_neg h1] at h ⊢
-      by_cases h2 : SpecAMQP.Spec.Frame.beAt inbox 4 SpecAMQP.Spec.Frame.doffOctets <
-          SpecAMQP.Spec.Frame.minDoff
-      · rw [if_pos h2] at h ⊢
-        exact h
-      · rw [if_neg h2] at h ⊢
-        by_cases h3 : SpecAMQP.Spec.Frame.bodyStart
-              (SpecAMQP.Spec.Frame.beAt inbox 4 SpecAMQP.Spec.Frame.doffOctets) >
-            SpecAMQP.Spec.Frame.beAt inbox 0 SpecAMQP.Spec.Frame.sizeOctets
-        · rw [if_pos h3] at h ⊢
-          exact h
-        · rw [if_neg h3] at h ⊢
-          by_cases h4 : inbox.size < SpecAMQP.Spec.Frame.beAt inbox 0 SpecAMQP.Spec.Frame.sizeOctets
-          · rw [if_pos h4] at h
-            simp at h
-          · rw [if_neg h4] at h
-            have hwait : ¬ (inbox ++ extra).size <
-                SpecAMQP.Spec.Frame.beAt inbox 0 SpecAMQP.Spec.Frame.sizeOctets := by
-              rw [Array.size_append]
-              omega
-            rw [if_neg hwait]
-            exact h
-
-/-- A unit that is complete in a prefix of a buffer is complete in the longer buffer, with the same
-extent — stated over the unit the loop actually takes, whichever branch produced it. -/
 theorem nextUnitLength_prefix {state : LayerState} {inbox : Octets} {n : Nat}
     (h : nextUnitLength state inbox = some n) :
     ∀ extra : Octets, nextUnitLength state (inbox ++ extra) = some n := by
@@ -322,7 +253,28 @@ theorem nextUnitLength_prefix {state : LayerState} {inbox : Octets} {n : Nat}
       rw [if_neg this]
       exact h
   · rw [if_neg hh] at h ⊢
-    exact frameExtent_prefix h extra
+    by_cases h8 : inbox.size < headerOctets
+    · rw [if_pos h8] at h; simp at h
+    · rw [if_neg h8] at h
+      have hge : headerOctets ≤ inbox.size := Nat.le_of_not_lt h8
+      have hbig : ¬ (inbox ++ extra).size < headerOctets := by rw [Array.size_append]; omega
+      rw [if_neg hbig]
+      have hshape := headerShaped_append inbox extra (by
+        simp only [magicOctets, headerOctets, SpecAMQP.Spec.Frame.headerOctets] at hge ⊢
+        omega)
+      by_cases hs : SpecAMQP.Spec.Connection.headerShaped inbox
+      · rw [if_pos hs] at h
+        rw [if_pos (by rw [hshape]; exact hs)]
+        exact h
+      · rw [if_neg hs] at h
+        rw [if_neg (by rw [hshape]; exact hs)]
+        have hext := frameExtent_append (inbox := inbox) (extra := extra) hge
+        by_cases hw : inbox.size < SpecAMQP.Spec.Frame.frameExtent inbox
+        · rw [if_pos hw] at h; simp at h
+        · rw [if_neg hw] at h
+          simp only [hext]
+          rw [if_neg (by rw [Array.size_append]; omega)]
+          exact h
 
 /-! ## The loop -/
 

@@ -220,11 +220,6 @@ hold it. -/
 def beAt (bytes : Octets) (start width : Nat) : Nat :=
   (bytes.extract start (start + width)).foldl (fun acc byte => acc * 256 + byte.toNat) 0
 
-/-- The reason class a message leads with, so that a refusal raised by the value layer
-can be recognised without parsing its prose. -/
-def reasonClassOf (message : String) : String :=
-  (message.splitOn ":").head?.getD ""
-
 /-- A refusal: the reason class this layer names, and the message a caller sees.
 
 The class is a field rather than a token a reader recovers from the message, because the
@@ -243,7 +238,93 @@ deriving Repr, DecidableEq
 /-- A refusal whose class this layer named itself. The message is spelled exactly as a
 message has always been spelled here: the class, a colon, a space, and the prose. -/
 def refusal (reasonClass prose : String) : Refusal :=
-  ⟨reasonClass, SpecAMQP.Spec.Codec.refusal reasonClass prose⟩
+  ⟨reasonClass, SpecAMQP.Spec.Codec.refusalMessage reasonClass prose⟩
+
+/-! ## The layout's arithmetic, in one place, and the frame's extent
+
+`readFrame` below reports the octets it consumed — but only where it *accepted* a frame. A caller that has
+to advance a stream is in the other position: it reads whatever sizes the transport returns and must know
+when it holds a whole frame and when it must wait, which is a question about the frame's *extent* and not
+about the reader's answer, and one the reader cannot answer at all before the frame is complete. What that
+caller needs is the layout's own arithmetic, so it is stated here once — the two fields the declaration is
+made of, whether the declaration is self-consistent, and the extent the frame therefore occupies.
+
+`readFrame` stays the authority on what a buffer *means*: its checks, their order and the refusal each
+raises are its own, because a caller has to be told which defect it read. What holds the two together is
+not convention but a theorem: `declarationConsistent_eq_true_iff` identifies the predicate with the
+reader's three consistency checks, and `Proofs.CoreLaws` proves the reader's answer and the frame's extent
+agree wherever the reader accepts.
+-/
+
+/-- The frame's declared size: the `SIZE` field, "an unsigned 32-bit integer that MUST contain the total
+frame size of the frame header, extended header, and frame body", read big-endian where the layout puts
+it. The reader reads its fields through this definition and `declaredDoff`, so the offsets and widths
+exist once. -/
+def declaredSize (bytes : Octets) : Nat := beAt bytes 0 sizeOctets
+
+/-- The frame's declared body offset: the `DOFF` field, "an unsigned, 8-bit integer specifying a count of
+4-byte words", so the body begins at four times its value. -/
+def declaredDoff (bytes : Octets) : Nat := beAt bytes 4 doffOctets
+
+/-- Whether the frame's declaration is self-consistent: a `SIZE` that can carry the eight-octet header, a
+`DOFF` that puts the body after it, and a body that starts inside the frame.
+
+Those three are exactly the reader's consistency checks — `SIZE` below the header, `DOFF` below its
+minimum, a body start past `SIZE` — and `declarationConsistent_eq_true_iff` proves the identification
+rather than asserting it, so a caller that decides when to wait and the reader that decides what a buffer
+means cannot drift apart without a failing theorem. -/
+def declarationConsistent (bytes : Octets) : Bool :=
+  !(declaredSize bytes < headerOctets) && !(declaredDoff bytes < minDoff) &&
+    !(bodyStart (declaredDoff bytes) > declaredSize bytes)
+
+/-- **How many octets the next frame occupies.**
+
+Where the declaration is self-consistent a frame occupies exactly the `SIZE` it declares, which is the
+arithmetic the layout itself states; where it is not, the declaration contradicts itself and the octets
+that carried the contradiction — the header — are all that can be attributed to the frame. Octets of a
+*following* frame are never attributed to this one.
+
+The buffer's length deliberately does not enter. This is the frame's extent, not the reader's progress: a
+stream caller compares the buffer it holds against this number to decide whether the whole frame is in
+hand, and that comparison — the waiting rule — is the caller's own
+(`Impl.Stream.nextUnitLength` is where it lives, together with the connection layer's question of whether
+a header or a frame is due). -/
+def frameExtent (bytes : Octets) : Nat :=
+  if declarationConsistent bytes then declaredSize bytes else headerOctets
+
+/-- **The three checks, as one predicate.** A caller that wants the reader's consistency checks can ask
+for them here rather than spelling them again: the predicate is true exactly where none of the three
+holds. -/
+theorem declarationConsistent_eq_true_iff (bytes : Octets) :
+    declarationConsistent bytes = true ↔
+      ¬ declaredSize bytes < headerOctets ∧ ¬ declaredDoff bytes < minDoff ∧
+        ¬ bodyStart (declaredDoff bytes) > declaredSize bytes := by
+  unfold declarationConsistent
+  simp [and_assoc]
+
+/-- **A frame's extent is never shorter than a frame header.** This is the law a stream loop's
+termination rests on: advancing by the extent always consumes octets, so a caller that loops on extents
+makes progress. -/
+theorem headerOctets_le_frameExtent (bytes : Octets) : headerOctets ≤ frameExtent bytes := by
+  unfold frameExtent
+  by_cases h : declarationConsistent bytes
+  · rw [if_pos h]
+    exact Nat.le_of_not_lt ((declarationConsistent_eq_true_iff bytes).mp h).1
+  · rw [if_neg h]
+    exact Nat.le_refl _
+
+/-- Where the declaration is self-consistent, the extent is the declared `SIZE` — the layout's own
+reading, and the count the reader reports when it accepts. -/
+theorem frameExtent_eq_declaredSize {bytes : Octets} (h : declarationConsistent bytes = true) :
+    frameExtent bytes = declaredSize bytes := by
+  unfold frameExtent
+  rw [if_pos h]
+
+/-- Where it is not, the extent is the header: the octets that carried the contradiction. -/
+theorem frameExtent_eq_headerOctets {bytes : Octets} (h : declarationConsistent bytes = false) :
+    frameExtent bytes = headerOctets := by
+  unfold frameExtent
+  rw [if_neg (by rw [h]; simp)]
 
 /-- Read one frame from the front of a buffer, reporting the octets it consumed as the
 SIZE it declares, so a buffer may hold a following frame.
@@ -267,8 +348,8 @@ def readFrame (bytes : Octets) : Except Refusal (Frame × Nat) := do
     .error (refusal "truncated" s!"a frame header is {headerOctets} octets and the \
       buffer holds {bytes.size}")
   else
-    let size := beAt bytes 0 sizeOctets
-    let doff := beAt bytes 4 1
+    let size := declaredSize bytes
+    let doff := declaredDoff bytes
     let typeCode := beAt bytes 5 1
     let channel := beAt bytes 6 channelOctets
     if size < headerOctets then
@@ -301,11 +382,13 @@ def readFrame (bytes : Octets) : Except Refusal (Frame × Nat) := do
         else
           let region := bytes.extract start bytes.size
           match decodeValue region with
-          | .error e =>
-            if reasonClassOf e == "truncated" then
+          | .error failure =>
+            -- the class is a field of the value layer's refusal: the frame layer reads it, and never
+            -- recovers it by splitting the rendered message
+            if failure.reasonClass == "truncated" then
               .error (refusal "sizeMismatch" s!"the performative at octet {start} does \
-                not complete within the {size} octets SIZE declares: {e}")
-            else .error ⟨reasonClassOf e, e⟩
+                not complete within the {size} octets SIZE declares: {failure.message}")
+            else .error ⟨failure.reasonClass, failure.message⟩
           | .ok (body, consumed) =>
             if start + consumed > size then
               .error (refusal "sizeMismatch" s!"the performative at octet {start} ends \
@@ -329,6 +412,24 @@ def readFrame (bytes : Octets) : Except Refusal (Frame × Nat) := do
                 .error (refusal "malformed" s!"the frame body starts with \
                   {typeName other}, and a frame's performative is encoded as a described \
                   type")
+
+/-- **Acceptance implies a self-consistent declaration.** A reader that reads a frame has passed all
+three consistency checks, which is exactly the predicate above — so the frame branch of a stream caller,
+which asks the predicate, is asking a question the reader agrees with on the branch where the reader
+succeeds.
+
+The converse is deliberately *not* claimed, and the difference is the reader's business rather than the
+window's: a self-consistent declaration can still be refused for what the frame carries (a type the
+artifact does not assign, a body that is not a described value, a performative that runs past its own
+`SIZE`), and none of that changes how far the frame extends. -/
+theorem readFrame_ok_declarationConsistent {bytes : Octets} {frame : Frame} {consumed : Nat}
+    (h : readFrame bytes = .ok (frame, consumed)) : declarationConsistent bytes = true := by
+  unfold readFrame at h
+  simp only [] at h
+  all_goals (repeat' split at h)
+  all_goals first
+    | (rw [declarationConsistent_eq_true_iff]; exact ⟨by assumption, by assumption, by assumption⟩)
+    | (exact absurd h (by intro he; cases he))
 
 /-- The reader as a caller sees it: `readFrame`'s refusal rendered as its message. The
 class it names is the field `readFrame` carries, so a reader of this form and a proof about
@@ -398,7 +499,7 @@ def writeFrame (frame : Frame) : Except Refusal Octets := do
           let octets ←
             match encodeValue body with
             | .ok octets => .ok octets
-            | .error e => .error ⟨reasonClassOf e, e⟩
+            | .error failure => .error ⟨failure.reasonClass, failure.message⟩
           let size := headerOctets + frame.extended.size + octets.size + frame.payload.size
           if size ≤ maxSize then
             return (beOctets sizeOctets size ++ beOctets 1 frame.doff ++

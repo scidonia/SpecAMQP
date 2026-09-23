@@ -29,24 +29,6 @@ import Shell.Driver
 open SpecAMQP.Shell
 open SpecAMQP.Harness (Octets)
 
-/-- A decimal argument in `[low, high]`: a typo is refused by name rather than truncated to a port
-number that means something else. -/
-def boundedArg (name text : String) (low high : Nat) : Except String Nat :=
-  match text.toNat? with
-  | none => .error s!"{name} must be a decimal number, not '{text}'"
-  | some n =>
-    if n < low || n > high then .error s!"{name} must be between {low} and {high}, not {n}"
-    else .ok n
-
-/-- A port: in the range a `UInt16` can carry, and not below the reserved range. -/
-def portOf (text : String) : Except String UInt16 :=
-  (boundedArg "port" text 1024 65535).map (fun n => n.toUInt16)
-
-/-- A read size: at least one octet, so that a zero-octet request — which the boundary refuses rather
-than confusing it with an orderly close — cannot be asked for from here. -/
-def readOctetsOf (text : String) : Except String USize :=
-  (boundedArg "read-octets" text 1 (1024 * 1024)).map (fun n => n.toUSize)
-
 /-- The application a **client** runs: announce nothing of its own (the shell announces the header on
 every connection, because it is the one frame §23.1 calls fixed) and finish once both protocol headers
 have been exchanged, so a client that has nothing to say closes the connection rather than blocking. -/

@@ -102,15 +102,22 @@ offered fails loudly too. (`scripts/loopback/Loopback/Wire.lean`'s `sendAll` is 
 same discipline; it is R1's harness and this is the shipped path, so the two are separate by design.) -/
 def sendAll (conn : Conn) (octets : ByteArray) : IO Unit := do
   let mut sent := 0
+  let mut calls := 0
   while sent < octets.size do
     let accepted ← send conn (octets.extract sent octets.size)
     let taken := accepted.toNat
+    calls := calls + 1
     if taken = 0 then
       throw (IO.userError s!"the transport accepted no octets at {sent} of {octets.size}")
     if sent + taken > octets.size then
       throw (IO.userError
         s!"the transport accepted {taken} octets at {sent} of {octets.size}, which is more than it was offered")
     sent := sent + taken
+  -- a write the kernel took in one call is the ordinary case and says nothing; one it took in pieces is
+  -- the case this loop exists for, and the count is what makes it observable rather than inferred
+  if calls > 1 then
+    IO.println s!"endpoint: wrote {octets.size} octets in {calls} send call(s)"
+    (← IO.getStdout).flush
 
 /-- Where the endpoint's owner is told what happened. The shell writes one line per answer to standard
 output, which is the socket-level twin of the corpus's verdict line ("the state name on a step taken,
@@ -148,11 +155,11 @@ def serveApp (conn : Conn) (core : State) (outs : List Output) (app : App) : IO 
 /-- **Read once.** One `recv` request, fed to the core whatever its size: `none` is the peer's orderly
 close and ends the connection, and the octets that arrived incomplete are dropped with it
 (`Impl.Stream.closed`). -/
-def readOnce (conn : Conn) (core : State) (readOctets : USize) : IO (Option State) := do
+def readOnce (conn : Conn) (core : State) (readOctets : USize) : IO (Option (State × List Output)) := do
   let some bytes ← recv conn readOctets | return none
   let (core', outs) := SpecAMQP.Impl.Stream.feed core bytes
   writeOutputs conn outs
-  return some core'
+  return some (core', outs)
 
 /-- **The loop**: read, feed, write, ask the application, and repeat until the peer closes the stream or
 the application is finished.
@@ -173,8 +180,8 @@ def pump (conn : Conn) (core : State) (app : App)
       IO.println "endpoint: the peer closed the stream (orderly)"
       core := SpecAMQP.Impl.Stream.closed core
       live := false
-    | some core' =>
-      let (core'', keepGoing) ← serveApp conn core' ([] : List Output) app
+    | some (core', outs) =>
+      let (core'', keepGoing) ← serveApp conn core' outs app
       core := core''
       live := keepGoing
   return core
@@ -234,5 +241,29 @@ def announcedHeader : IO Octets :=
   | none =>
     throw (IO.userError
       "the artifact states no version for the AMQP layer, so this peer has no header to announce")
+
+/-! ## Reading a command line
+
+Three small parsers, shared by the endpoint process and the harness probe below the socket: a typo in a
+port is refused by name rather than truncated to a port number that means something else, and a read size
+is never zero — the boundary refuses a zero-octet *request* precisely so it cannot be confused with an
+orderly close, and nothing in this tree should be able to ask for one.
+-/
+
+/-- A decimal argument in `[low, high]`. -/
+def boundedArg (name text : String) (low high : Nat) : Except String Nat :=
+  match text.toNat? with
+  | none => .error s!"{name} must be a decimal number, not '{text}'"
+  | some n =>
+    if n < low || n > high then .error s!"{name} must be between {low} and {high}, not {n}"
+    else .ok n
+
+/-- A port: in the range a `UInt16` can carry, and not below the reserved range. -/
+def portOf (text : String) : Except String UInt16 :=
+  (boundedArg "port" text 1024 65535).map (fun n => n.toUInt16)
+
+/-- A read size: at least one octet. -/
+def readOctetsOf (text : String) : Except String USize :=
+  (boundedArg "read-octets" text 1 (1024 * 1024)).map (fun n => n.toUSize)
 
 end SpecAMQP.Shell
