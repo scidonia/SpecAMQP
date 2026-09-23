@@ -6,14 +6,16 @@
 # as the peer's orderly close. `scripts/run-endpoint-shell.sh` is the tier that forces them; this file is
 # the contract that says what a passing run has to have shown.
 #
-# Why the four descriptions below are pinned by wording, when this repository prefers not to pin log text:
-# they are not incidental output, they are the *forcing conditions*. The read sizes are 3 and 5, so a shell
-# that assumed one read is one frame cannot produce a reassembly line, and a run that stopped asserting
-# reassembly would pass while testing that assumption's absence. The write loop's own report is the same
-# thing on the write side: the shim caps `send` at 1024 octets, so a shell that wrote only the first chunk
-# leaves the server waiting and the case times out rather than passing. Asserting that these four lines
-# exist is asserting the run was non-vacuous, which is the one property the driver cannot assert about
-# itself.
+# The forcing is asserted *structurally*, and the first version of this file got that wrong: it pinned four
+# sentences the driver printed, on the reasoning that they name forcing conditions rather than incidental
+# output. A refactor in the driver reworded one of them — "the header" for "the peer's header" — and this
+# gate failed while the forcing was intact, which is the failure mode the repository's own rule warns about.
+# Verdicts, named conditions and exit statuses are contract; sentences are not. So what is asserted here is
+# the *shape of the run*: the read sizes each case forced, the send cap the short-write case requires, how
+# many sends the kernel took the frame in, and a floor on the number of assertions that passed. Each of those
+# catches a driver that stopped forcing without caring how it words an assertion. The read sizes are asserted
+# from the *invocations* the driver echoes, because only the server announces its size on startup — the client's
+# appears nowhere else, which the first attempt at this got wrong and this gate then said so precisely.
 #
 # The driver reports a case whose listener could not bind as INVALID and exits non-zero for it, so the
 # "the port was busy" failure can never satisfy this gate. It does collide, though, and systematically rather
@@ -47,15 +49,21 @@ fi
 grep -q '^endpoint-shell: PASS' "$log" ||
   die "the driver exited zero without reporting PASS: $(tail -3 "$log")"
 
-while IFS= read -r forcing; do
-  grep -qF "$forcing" "$log" ||
-    die "the run never asserted '$forcing' — the case passed without forcing what it claims"
-done <<'FORCING'
-server reassembled the peer's header across 3-octet reads
-client reassembled the peer's header across 5-octet reads
-the write loop reported a write the kernel took in pieces
-server read the looped write whole and accepted it
-FORCING
+grep -qF 'read-octets=3' "$log" ||
+  die "no server ran with 3-octet reads: the header could arrive whole and the case would force nothing"
+grep -qE 'amqp-endpoint client [0-9]+ 5' "$log" ||
+  die "the client was not started with 5-octet reads: the forcing is absent on that side"
+grep -qE 'amqp-endpoint server [0-9]+ 3' "$log" ||
+  die "the server was not started with 3-octet reads"
+grep -qF 'SPECAMQP_SHIM_CONTROL=short-send' "$log" ||
+  die "the short-write case did not run through the send cap, so the write loop was never forced"
+sends="$(grep -oE 'in [0-9]+ send' "$log" | grep -oE '[0-9]+' | sort -n | tail -1)"
+[ -n "$sends" ] || die "no case reported how many sends the kernel took: the write forcing is unobserved"
+[ "$sends" -ge 2 ] ||
+  die "the largest write took $sends send(s): the loop never iterated, so the cap did not bite"
+assertions="$(grep -c '^ok ' "$log" || true)"
+[ "$assertions" -ge 13 ] ||
+  die "only $assertions assertion(s) passed: the driver has stopped checking what it used to"
 
 printf 'r2_endpoint_shell: PASS\n'
-printf '     both cases forced: the header reassembled across 3- and 5-octet reads, a 3 kB frame written in 1024-octet sends\n'
+printf '     %s assertions passed; the write loop iterated %s send(s); reads forced at 3 and 5 octets\n' "$assertions" "$sends"
