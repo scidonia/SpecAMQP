@@ -1892,6 +1892,29 @@ def session_corpus(tables: Corpus) -> list[dict]:
              "are the conforming case"))
 
     vectors.append(exchange(
+        "exchange-flow-properties-without-handle", start=s("MAPPED"),
+        clauses=[LINK_HANDLES, *FLOW_FIELDS_REQUIRE_HANDLE],
+        steps=link_up() + [
+            t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                      state=s("DISCARDING"),
+                      body=t.body("flow", **windows(),
+                                  **{"next-incoming-id": {"type": "uint", "value": 0},
+                                     "properties": t.unsettled_map(
+                                         [({"type": "symbol", "text": "x"},
+                                           {"type": "uint", "value": 1})])}),
+                      channel=1,
+                      note="`flow/field:properties.1` is one of the five sentences "
+                           "that read \"When the handle field is not set, this field "
+                           "MUST NOT be set\", and the register's "
+                           "`flow-link-field-without-handle` reading names all "
+                           "five")],
+        note="the coupling's fifth field, which the vector above does not reach: this "
+             "flow names no handle and sets `properties`, so the rule refuses it with "
+             "`amqp:invalid-field` and leaves the session in `session:DISCARDING`. The "
+             "reference admitted the same frame until `5ad7b6b`; both artefacts have "
+             "refused it since"))
+
+    vectors.append(exchange(
         "exchange-link-credit-echoed", start=s("MAPPED"),
         clauses=[FLOW_SENDER_MATCHES_DELIVERY_LIMIT],
         steps=link_up() + [
@@ -2158,6 +2181,25 @@ def session_corpus(tables: Corpus) -> list[dict]:
              "readable as gaps rather than as a rule nobody implements"))
 
     vectors.append(exchange(
+        "exchange-flow-sender-count-null", start=s("MAPPED"),
+        clauses=[FLOW_DELIVERY_COUNT_SET_BY_SENDER, SESSION_END_ON_ERROR,
+                 SESSION_ERRORS],
+        steps=link_up(role_sender=False) + [
+            t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                      state=s("DISCARDING"),
+                      body=t.body("flow", **windows(),
+                                  **{"next-incoming-id": {"type": "uint", "value": 0},
+                                     "handle": {"type": "uint", "value": 0},
+                                     "link-credit": {"type": "uint", "value": 0}}),
+                      channel=1)],
+        note="the null form of the field the vector above pins a value for: this flow "
+             "names the link and carries `delivery-count` as null, which the type system's "
+             "trailing-null rule makes the field unset, so the rule refuses the frame with "
+             "`amqp:invalid-field` and the session lands in `session:DISCARDING`. The "
+             "reference admitted the same frame until `5ad7b6b`; both artefacts have "
+             "refused it since"))
+
+    vectors.append(exchange(
         "exchange-flow-receiver-count-echoed", start=s("MAPPED"),
         clauses=[FLOW_DELIVERY_COUNT_ECHO, FLOW_SENDER_SETS_CREDIT,
                  FLOW_SENDER_MATCHES_DELIVERY_LIMIT],
@@ -2380,10 +2422,8 @@ def staged_corpus(tables: Corpus) -> list[dict]:
 
     Three of them are settled-mode or delivery-count readings the register is silent on
     (`Transfer/field:settled.6`, `transfer/field:rcv-settle-mode.u1`,
-    `flow/field:delivery-count.2`'s presence half and `.3`), one is a frame with no body
-    in a state whose table column is `-`, and one is the `properties` field of the
-    handle-less flow rule — the only clause in the whole sweep whose five field sentences
-    are enforced by one artefact and not the other.
+    `flow/field:delivery-count.2`'s presence half and `.3`), and one is a frame with no
+    body in a state whose table column is `-`.
     """
     t = tables
     message = b"a message whose split points are the vector's business"
@@ -2416,36 +2456,6 @@ def staged_corpus(tables: Corpus) -> list[dict]:
 
     return [
         # -- a frame the two artefacts answer differently ---------------------- #
-
-        exchange(
-            "staged-flow-properties-without-handle", start=s("MAPPED"),
-            clauses=[LINK_HANDLES, *FLOW_FIELDS_REQUIRE_HANDLE],
-            steps=link_up() + [
-                t.refused("receive", reason="malformed", condition=INVALID_FIELD,
-                          state=s("DISCARDING"),
-                          body=t.body("flow", **windows(),
-                                      **{"next-incoming-id": {"type": "uint", "value": 0},
-                                         "properties": t.unsettled_map(
-                                             [({"type": "symbol", "text": "x"},
-                                               {"type": "uint", "value": 1})])}),
-                          channel=1,
-                          note="`flow/field:properties.1` is one of the five sentences "
-                               "that read \"When the handle field is not set, this field "
-                               "MUST NOT be set\", and the register's "
-                               "`flow-link-field-without-handle` reading names all "
-                               "five")],
-            note="**Divergence.** The register's reading is `amqp:invalid-field` for a "
-                 "handle-less flow carrying any of the five link fields, and the "
-                 "specification implements the reading: it refuses this frame with "
-                 "`amqp:invalid-field` and class `malformed`, leaving the session in "
-                 "`session:DISCARDING`. The reference's list of the five "
-                 "(`Ref/Session.lean:591`) omits `properties`, so the same frame is "
-                 "**admitted** and the peer stays in `session:MAPPED`. The existing "
-                 "corpus vector for this clause uses `available`, which both list, so "
-                 "nothing in the corpus can see the difference — and a five-sentence rule "
-                 "enforced in four places is the shape this sweep exists to find. Neither "
-                 "reading is chosen here: the vector pins the register's, and the fix "
-                 "belongs to whichever artefact the planner finds wrong"),
 
         exchange(
             "staged-link-aborted-false-spends-no-credit", start=s("MAPPED"),
@@ -2490,30 +2500,6 @@ def staged_corpus(tables: Corpus) -> list[dict]:
                  "`aborted.1` requires the *recipient* to discard the message rather than "
                  "the sender to un-send it. The register is silent, which is why this is "
                  "staged rather than decided"),
-
-        exchange(
-            "staged-flow-sender-count-null", start=s("MAPPED"),
-            clauses=[FLOW_DELIVERY_COUNT_SET_BY_SENDER, SESSION_END_ON_ERROR,
-                     SESSION_ERRORS],
-            steps=link_up(role_sender=False) + [
-                t.refused("receive", reason="malformed", condition=INVALID_FIELD,
-                          state=s("DISCARDING"),
-                          body=t.body("flow", **windows(),
-                                      **{"next-incoming-id": {"type": "uint", "value": 0},
-                                         "handle": {"type": "uint", "value": 0},
-                                         "link-credit": {"type": "uint", "value": 0}}),
-                          channel=1)],
-            note="**Divergence, on a field that is present and null.** `delivery-count` "
-                 "is a field of a flow that names a link and comes from the sender, and "
-                 "`flow/field:delivery-count.2` requires it to be the sender's current "
-                 "count — so a null where a count belongs is the field *unset*, which is "
-                 "what the type system's trailing-null rule makes of a null anywhere in "
-                 "the list. The specification refuses it with `amqp:invalid-field` and "
-                 "class `malformed` (\"the flow's delivery-count is not an integer\"), "
-                 "leaving `session:DISCARDING`; the reference **admits** it, because its "
-                 "reader maps a null to `none` and its check is a match on a present "
-                 "value. The same frame with the field left off the list entirely is the "
-                 "vector below, where both artefacts admit"),
 
         # -- frames both artefacts admit against the clause --------------------- #
 
