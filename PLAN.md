@@ -221,6 +221,30 @@ The proof's shape is fixed by `lean/Contracts/Conformance.lean` and is the same 
 
 **So the acceptance paragraph above is amended rather than withdrawn.** Each instance is *proved* — the proofs are real, the relation is load-bearing under both mutations, and the composition is honest — and each is **conditional on a premise now known to be false**, which makes the theorem true and empty. That is precisely what a corpus cannot tell us: the divergent buffers are not in it, and the theorem quantifies over the whole domain. **The defect the corpus could not find, the proof found**, and that is the argument for having a relation rather than a corpus, arriving as a defect instead of a confirmation.
 
+**The value layer's three claims, stated, with the writer's domain decided.** These are the target for the slice that
+proves them; the Lean statements live in `Proofs/FrameConformance.lean` and `Proofs/FrameSendConformance.lean`, and this
+paragraph records the shape and the decisions rather than restating them, because a statement copied into prose drifts
+and the module is what a proof is checked against.
+
+* `ValueLayersAgree`, the receive direction: on a reference success, the same region decodes to a body the specification's
+  reader also produces with the same octet count, and what the two bodies *are* is compared separately by the layer's own
+  relation; on a reference refusal, a specification refusal whose reason class is the same. Both comparisons are between
+  data the two artefacts carry — a count, an equality of declared types, and two `String` **fields**, the reference's from a
+  `DecodeError` variant and the specification's from `Refusal.reasonClass` — so no `splitOn` survives in it. That matters
+  because it was the whole of the obstruction: the statement could not be quantified over classes while it quantified over
+  sentences. It is falsifiable by history rather than by argument: `#[0xC1,0x03,0x01,0x40]` refuted it before
+  `Ref.Value.readMap`'s parity guard moved, and each conjunct's premise sits on the reference's answer, so no combination of
+  specification and reference outcomes escapes it — the defect `AnswersMatch` once had. A search that finds no divergence
+  over 114,225 buffers is evidence, not a shape that no witness could refute.
+* `ValueCarrierAgree`, the corpus vocabulary: a JSON value the reference's carrier accepts is one the specification's accepts,
+  with the layer's relation between the bodies. No classes, no wire, one claim, and it is the one hypothesis in the layer with
+  no evidence against it. It is also the most tractable, so it is first.
+* `ValueWriterAgree`, the send direction: **restated over the reader-reachable domain.** The body of an endpoint can only come
+  from a reader — the wire is the only source of values — so a body no reader can produce cannot be sent by a conforming peer
+  nor arise in the implementation answering one, and the ill-width family that refuted the unrestricted statement is a
+  property of a permissive writer over values no protocol path constructs. The narrowing is stated at the statement and in the
+  caveat with its witness, because a narrowed hypothesis with an unexplained narrowing is a defect wearing a domain.
+
 **What discharging the hypotheses would take, in order, so the next sitting does not rediscover the shape.** The refutations stand as theorems either way — a refuted hypothesis is a theorem or it is a rumour. Then: **(i)** decide the reading for each divergence, which needs the artifact's own text — for the odd-counted map, whether the count names items or entries and whether the *form* of the count is checked before or after its consistency with the octets. Where the artifact is silent, a register entry decides it, which is what the register is for. **(ii)** Align the two artefacts to that reading, one commit per divergence, since each is symmetric in a different place. **(iii)** Add a vector per divergence, because *reachability* is what decides whether the corpus could ever have seen it: the array-element family is reachable through the corpus vocabulary and the odd-count map is not, and that difference is a fact about the corpus rather than about the defect. **(iv)** Only then are the hypotheses provable and the two conditional instances unconditional. **The order is the point**: a vector written last would be a vector written from the fix rather than from the artifact, which is the rule this repository keeps and exactly why the differential cannot be the thing that finds this class of defect.
 
 **And a second divergence sits underneath the first, found by a sharper witness.** The reported buffer violated two rules at once — an odd count *and* a declared size inconsistent with its items — so it could not say which rule either artefact was answering. A buffer violating only parity, `#[0xC1, 0x03, 0x03, 0x40, 0x40, 0x40]` where the items measure exactly the declared three octets, gives `malformed` from the specification and `sizeMismatch "map" 3 4` from the reference: declared 3, **measured 4**. Four is what a map's content measures if the *count field is inside the size*, three if it is not — so the two artefact seem to differ about what a compound value's size field covers, which would change the class for every map and list rather than only the odd ones. The ledger's index yields the parity clause (`amqp:types/section:primitive-type-definitions/type:map.1`) and nothing on the size field's extent, so that question is open and is being settled from the artifact's prose. **It is the more important of the two**: a parity rule affects one malformed encoding, a size-accounting difference affects the whole corpus.
