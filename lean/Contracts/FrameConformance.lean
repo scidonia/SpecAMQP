@@ -81,13 +81,18 @@ therefore:
 **What follows was a fix in one of the two readings, and the receive half is done.** Both artefacts
 refused those buffers and differed only about the class, so either one misread the artifact or the
 artifact was silent and the register decided; the reading was decided, both artefacts were aligned to
-it (`fd9bdc5`), and the witness above now draws the same class from both. The **send** half is still
-open and is patch 3's `arrayElement` split — the reference's catch-all names `limit` where the
-specification names the shape error — and until it lands the send instance is false rather than
-merely conditional. `PLAN.md` §10 records the order of discharge — decide the reading,
-align the artefacts, then add a vector, because a vector written before the fix is authored from the
-artifact and one written after it is authored from the fix. `Proofs/` carries the refutations as
-theorems, since a refuted hypothesis is a theorem or it is a rumour.
+it (`fd9bdc5`), and the witness above now draws the same class from both. The **send** half
+is closed as far as alignment goes and *not* closed as a theorem: patch 3 split the reference's
+`arrayElement` catch-all, and three shape refusals on the specification's side were reclassified with it
+(`writeFixedData`, `writeVariableData`, `writeCompoundData`), so the two writers now name the same class
+for every array body either can reach. **No refutation is provable**, and the reason is a type rather than
+a missing witness: the reference's writer returns `Except String Octets`, so its class can only be
+recovered by splitting a sentence — the same unreducible step that blocked the value-layer refutations
+before the specification's class became a field. `Conforms specFrameSend refFrameSend` is therefore
+*believed false before patch 3 and undecided after it, and unprovable in both cases* until the reference's
+writer carries a class. `PLAN.md` §10 records the order of discharge — decide the reading, align the
+artefacts, then add a vector, because a vector written before the fix is authored from the artifact and one
+written after it is authored from the fix.
 -/
 
 namespace SpecAMQP.Contracts
