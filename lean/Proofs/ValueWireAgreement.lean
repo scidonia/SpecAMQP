@@ -30,14 +30,34 @@ of its smallest fuels closed by the octet bound). The tool that made the offset 
 readers' *position* invariance (`readRows_le_size` with `readScalarData_le` and
 `specElementData_le`): a zero-width element row reads nothing through `takeBytes 0`, which succeeds
 exactly when the cursor is inside the buffer, and an array of zero-width values is read at exactly
-that cursor. Still owed: the **element decision** (`ElementDataAgrees`), the forty constructor rows
-that `elementsLoop_agrees` and `readArray_body` take as the named hypothesis `ElementsDecideAt` /
-`ElementsDecideBelow`; the two array arms (`0xE0`, `0xF0`) that consume the loop; the dispatch that
-turns the arms into the induction step; and the fuel induction itself. The entry point is therefore
-**not** reached in this module yet, and `ValueLayersAgree` is undischarged.
+that cursor. The **element decision** (`ElementDataAgrees`) has landed in turn: all **forty
+constructor rows** are proved — one theorem per octet, `element_0x00` through `element_0xF0`, over the
+three stems `elementData_ok` / `elementData_step` / `elementData_var` — and the dispatcher
+`elementsDecideAt_of_upTo` turns them into the named hypothesis `ElementsDecideAt` that
+`elementsLoop_agrees` and `readArray_body` take. Still owed: the two array arms (`0xE0`, `0xF0`) that
+consume the loop; the dispatch that turns the value-level arms into the induction step; and the fuel
+induction itself. The entry point is therefore **not** reached in this module yet, and
+`ValueLayersAgree` is undischarged.
 What each owes and how it is
 proved is stated where it belongs rather than in a list here: see the octet step's arithmetic, and
 `arm_0x00`'s docstring for the pattern the branches follow.
+
+## The element decision is not independent of the value law
+
+The plan's ordering — the element decision first, then the arms, then the induction — is not the
+dependency order, and a successor should not start from it. Four of the forty element rows are
+*container* rows, and an element that is a compound, an array or a described value is read by the
+same body a value-level row is: `element_0xC0` and its three neighbours call
+`readCompound_list_body` / `readCompound_map_body`, which take `WireAgreesUpTo (g - 2)`, and
+`element_0x00` calls `WireAgrees g` twice. So `ElementsDecideAt g` rests on the value law at the
+fuels *beneath* `g` — and `element_0xE0` / `element_0xF0` rest on `ElementsDecideBelow g`, which is
+the same decision family one fuel down. The two families therefore have to be proved together, as the
+joint invariant `WireAgreesUpTo n ∧ ElementsDecideBelow n` that the induction below carries: the
+element decision at every fuel below `n` supplies the array rows, the value law at every fuel up to
+`n` supplies the compound and described rows, and the value law at `n + 1` is then read off the same
+two. `elementsDecideAt_of_upTo` is the dispatch with exactly those two hypotheses; it is not a
+conditional in the sense the acceptance refuses, because both are discharged by the same induction
+that produces the value law itself.
 
 ## What the compound and array rows owe, and the fuel asymmetry that shapes them
 
@@ -5965,6 +5985,809 @@ theorem element_0x98 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : Cur
   · intro x'
     simp only [SpecAMQP.Ref.readElement]
     rfl
+
+
+/-! ## The variable element rows' stem -/
+
+/-- **A variable element row: a length field, then the payload it announced.** -/
+theorem elementData_var {α β : Type} {R : α → β → Prop}
+    {StepS : Cursor → Except Refusal (α × Cursor)}
+    {StepR : SpecAMQP.Ref.Cursor → Except SpecAMQP.Ref.DecodeError (β × SpecAMQP.Ref.Cursor)}
+    {g : Nat} {ctor : UInt8} {ed : Option EncodingDecl}
+    {c : Cursor} {c' : SpecAMQP.Ref.Cursor}
+    (Step2S : α → Cursor → Except Refusal (Value × Cursor))
+    (Step2R : β → SpecAMQP.Ref.Cursor → Except SpecAMQP.Ref.DecodeError
+      (SpecAMQP.Ref.Value × SpecAMQP.Ref.Cursor))
+    (hstep : StepAgreesAt R StepS StepR c c')
+    (h2 : ∀ (a : α) (b : β), R a b → ReadersAgree (Step2S a) (Step2R b))
+    (hspec : ∀ x : Cursor, specElementData g ed x = StepS x >>= fun p => Step2S p.1 p.2)
+    (href : ∀ x' : SpecAMQP.Ref.Cursor,
+      SpecAMQP.Ref.readElement (g + 1) ctor x' = StepR x' >>= fun p => Step2R p.1 p.2) :
+    ElementDataAgrees g ctor ed c c' := by
+  constructor
+  · intro other d' h
+    rw [href c'] at h
+    obtain ⟨⟨b, d₁'⟩, hb, h⟩ := exists_of_bind_ok h
+    try dsimp only at h
+    obtain ⟨a, d₁, hf, hrel, hcd, hdat⟩ := hstep.1 b d₁' hb
+    obtain ⟨body, d₂, hk, hcd2, hdat2, hba⟩ := (h2 a b hrel d₁ d₁' hcd).1 other d' h
+    refine ⟨body, d₂, ?_, hba, hcd2, ?_⟩
+    · rw [hspec c, hf, except_bind_ok]
+      exact hk
+    · rw [hdat2, hdat]
+  · intro failure h
+    rw [href c'] at h
+    cases hb : StepR c' with
+    | error e =>
+      rw [hb, except_bind_error] at h
+      simp only [Except.error.injEq] at h
+      subst h
+      obtain ⟨refusal, hspec', hcl⟩ := hstep.2 e hb
+      exact ⟨refusal, by rw [hspec c, hspec', except_bind_error], hcl⟩
+    | ok p =>
+      obtain ⟨b, d₁'⟩ := p
+      rw [hb, except_bind_ok] at h
+      try dsimp only at h
+      obtain ⟨a, d₁, hf, hrel, hcd, -⟩ := hstep.1 b d₁' hb
+      cases hb2 : Step2R b d₁' with
+      | error e =>
+        rw [hb2] at h
+        simp only [Except.error.injEq] at h
+        subst h
+        obtain ⟨refusal, hspec2, hcl⟩ := (h2 a b hrel d₁ d₁' hcd).2 e hb2
+        exact ⟨refusal, by rw [hspec c, hf, except_bind_ok]; exact hspec2, hcl⟩
+      | ok q =>
+        rw [hb2] at h
+        exact absurd h (by simp)
+
+/-! ## The signed and variable rows -/
+
+/-- **The `byte` element row (`0x51`).** -/
+theorem element_0x51 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0x51 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x51 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x51 : UInt8) =
+      .ok (some ⟨81, none, Generated.Oasis.Category.fixed, 1, "byte",
+        "8-bit two's-complement integer"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_step (hstep := (stepAgreesAll_takeU8Nat c c' hc))
+    (Sv := fun a => Value.byte (signedOfOctets 1 (payloadNat a)))
+    (Rv := fun b => SpecAMQP.Ref.Value.byte (Int8.ofBitVec (BitVec.ofNat 8 b.toNat)))
+    (hval := fun a b hrel _ _ => by
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact signedOfOctets_8 b.toNat b.toNat_lt) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨81, none, Generated.Oasis.Category.fixed, 1, "byte",
+        "8-bit two's-complement integer"⟩) x =
+        SpecAMQP.Spec.Codec.takeBytes 1 x >>= fun p =>
+          .ok (Value.byte (signedOfOctets 1 (payloadNat p.1)), p.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+/-- **The `smallint` element row (`0x54`).** -/
+theorem element_0x54 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0x54 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x54 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x54 : UInt8) =
+      .ok (some ⟨84, some "smallint", Generated.Oasis.Category.fixed, 1, "int",
+        "8-bit two's-complement integer"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_step (hstep := (stepAgreesAll_takeU8Nat c c' hc))
+    (Sv := fun a => Value.int (signedOfOctets 1 (payloadNat a)))
+    (Rv := fun b => SpecAMQP.Ref.Value.int (Int32.ofBitVec (BitVec.ofNat 32
+      (SpecAMQP.Ref.signedOctet b % 4294967296).toNat)))
+    (hval := fun a b hrel _ _ => by
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact (signedOctet_int32 b).symm) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨84, some "smallint", Generated.Oasis.Category.fixed, 1,
+        "int", "8-bit two's-complement integer"⟩) x =
+        SpecAMQP.Spec.Codec.takeBytes 1 x >>= fun p =>
+          .ok (Value.int (signedOfOctets 1 (payloadNat p.1)), p.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+/-- **The `smalllong` element row (`0x55`).** -/
+theorem element_0x55 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0x55 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x55 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x55 : UInt8) =
+      .ok (some ⟨85, some "smalllong", Generated.Oasis.Category.fixed, 1, "long",
+        "8-bit two's-complement integer"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_step (hstep := (stepAgreesAll_takeU8Nat c c' hc))
+    (Sv := fun a => Value.long (signedOfOctets 1 (payloadNat a)))
+    (Rv := fun b => SpecAMQP.Ref.Value.long (Int64.ofBitVec (BitVec.ofNat 64
+      (SpecAMQP.Ref.signedOctet b % 18446744073709551616).toNat)))
+    (hval := fun a b hrel _ _ => by
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact (signedOctet_int64 b).symm) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨85, some "smalllong", Generated.Oasis.Category.fixed, 1,
+        "long", "8-bit two's-complement integer"⟩) x =
+        SpecAMQP.Spec.Codec.takeBytes 1 x >>= fun p =>
+          .ok (Value.long (signedOfOctets 1 (payloadNat p.1)), p.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+/-- **The `short` element row (`0x61`).** -/
+theorem element_0x61 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0x61 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x61 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x61 : UInt8) =
+      .ok (some ⟨97, none, Generated.Oasis.Category.fixed, 2, "short",
+        "16-bit two's-complement integer in network byte order"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_step (hstep := (stepAgreesAll_takeBeNat 2 c c' hc))
+    (Sv := fun a => Value.short (signedOfOctets 2 (payloadNat a)))
+    (Rv := fun n => SpecAMQP.Ref.Value.short (Int16.ofBitVec (BitVec.ofNat 16 n)))
+    (hval := fun a b hrel f hf => by
+      have hlt : b < 2 ^ 16 := by
+        have h1 := payloadNat_lt_of_takeBytes hf
+        rw [hrel] at h1
+        have h2 : (256 : Nat) ^ 2 = 2 ^ 16 := by decide
+        rw [h2] at h1
+        exact h1
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact signedOfOctets_16 b hlt) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨97, none, Generated.Oasis.Category.fixed, 2, "short",
+        "16-bit two's-complement integer in network byte order"⟩) x =
+        SpecAMQP.Spec.Codec.takeBytes 2 x >>= fun p =>
+          .ok (Value.short (signedOfOctets 2 (payloadNat p.1)), p.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+/-- **The `int` element row (`0x71`).** -/
+theorem element_0x71 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0x71 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x71 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x71 : UInt8) =
+      .ok (some ⟨113, none, Generated.Oasis.Category.fixed, 4, "int",
+        "32-bit two's-complement integer in network byte order"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_step (hstep := (stepAgreesAll_takeBeNat 4 c c' hc))
+    (Sv := fun a => Value.int (signedOfOctets 4 (payloadNat a)))
+    (Rv := fun n => SpecAMQP.Ref.Value.int (Int32.ofBitVec (BitVec.ofNat 32 n)))
+    (hval := fun a b hrel f hf => by
+      have hlt : b < 2 ^ 32 := by
+        have h1 := payloadNat_lt_of_takeBytes hf
+        rw [hrel] at h1
+        have h2 : (256 : Nat) ^ 4 = 2 ^ 32 := by decide
+        rw [h2] at h1
+        exact h1
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact signedOfOctets_32 b hlt) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨113, none, Generated.Oasis.Category.fixed, 4, "int",
+        "32-bit two's-complement integer in network byte order"⟩) x =
+        SpecAMQP.Spec.Codec.takeBytes 4 x >>= fun p =>
+          .ok (Value.int (signedOfOctets 4 (payloadNat p.1)), p.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+/-- **The `long` element row (`0x81`).** -/
+theorem element_0x81 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0x81 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x81 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x81 : UInt8) =
+      .ok (some ⟨129, none, Generated.Oasis.Category.fixed, 8, "long",
+        "64-bit two's-complement integer in network byte order"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_step (hstep := (stepAgreesAll_takeBeNat 8 c c' hc))
+    (Sv := fun a => Value.long (signedOfOctets 8 (payloadNat a)))
+    (Rv := fun n => SpecAMQP.Ref.Value.long (Int64.ofBitVec (BitVec.ofNat 64 n)))
+    (hval := fun a b hrel f hf => by
+      have hlt : b < 2 ^ 64 := by
+        have h1 := payloadNat_lt_of_takeBytes hf
+        rw [hrel] at h1
+        have h2 : (256 : Nat) ^ 8 = 2 ^ 64 := by decide
+        rw [h2] at h1
+        exact h1
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact signedOfOctets_64 b hlt) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨129, none, Generated.Oasis.Category.fixed, 8, "long",
+        "64-bit two's-complement integer in network byte order"⟩) x =
+        SpecAMQP.Spec.Codec.takeBytes 8 x >>= fun p =>
+          .ok (Value.long (signedOfOctets 8 (payloadNat p.1)), p.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+/-- **The `timestamp` element row (`0x83`).** -/
+theorem element_0x83 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0x83 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x83 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x83 : UInt8) =
+      .ok (some ⟨131, some "ms64", Generated.Oasis.Category.fixed, 8, "timestamp",
+        "64-bit two's-complement integer representing milliseconds since the unix epoch"⟩) := by
+    decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_step (hstep := (stepAgreesAll_takeBeNat 8 c c' hc))
+    (Sv := fun a => Value.timestamp (signedOfOctets 8 (payloadNat a)))
+    (Rv := fun n => SpecAMQP.Ref.Value.timestamp (Int64.ofBitVec (BitVec.ofNat 64 n)))
+    (hval := fun a b hrel f hf => by
+      have hlt : b < 2 ^ 64 := by
+        have h1 := payloadNat_lt_of_takeBytes hf
+        rw [hrel] at h1
+        have h2 : (256 : Nat) ^ 8 = 2 ^ 64 := by decide
+        rw [h2] at h1
+        exact h1
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact signedOfOctets_64 b hlt) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨131, some "ms64", Generated.Oasis.Category.fixed, 8,
+        "timestamp",
+        "64-bit two's-complement integer representing milliseconds since the unix epoch"⟩) x =
+        SpecAMQP.Spec.Codec.takeBytes 8 x >>= fun p =>
+          .ok (Value.timestamp (signedOfOctets 8 (payloadNat p.1)), p.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+/-! ## The variable rows -/
+
+/-- **The `vbin8` element row (`0xA0`).** -/
+theorem element_0xA0 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0xA0 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0xA0 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0xA0 : UInt8) =
+      .ok (some ⟨160, some "vbin8", Generated.Oasis.Category.variable, 1, "binary",
+        "up to 2^8 - 1 octets of binary data"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_var
+    (Step2S := fun n f => SpecAMQP.Spec.Codec.takeBytes n f >>= fun q => .ok (.binary q.1, q.2))
+    (Step2R := fun b f' => SpecAMQP.Ref.takeBytes b.toNat f' >>= fun q =>
+      .ok (.binary q.1.toList, q.2))
+    (hstep := (stepAgreesAll_takeBeOne c c' hc))
+    (h2 := fun a b hab => by
+      rw [← hab]
+      exact readersAgree_bind (stepAgreesAll_takeBytes a)
+        (fun bytes bytes' hb => by
+          subst hb
+          exact readersAgree_ok (.binary bytes) (.binary bytes.toList)
+            (by simp only [BodiesAgree]))) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨160, some "vbin8", Generated.Oasis.Category.variable, 1,
+        "binary", "up to 2^8 - 1 octets of binary data"⟩) x =
+        SpecAMQP.Spec.Codec.takeBe 1 x >>= fun p =>
+          SpecAMQP.Spec.Codec.takeBytes p.1 p.2 >>= fun q => .ok (.binary q.1, q.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+/-- **The `str8-utf8` element row (`0xA1`).** -/
+theorem element_0xA1 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0xA1 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0xA1 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0xA1 : UInt8) =
+      .ok (some ⟨161, some "str8-utf8", Generated.Oasis.Category.variable, 1, "string",
+        "up to 2^8 - 1 octets worth of UTF-8 Unicode (with no byte order mark)"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_var
+    (Step2S := fun n f => SpecAMQP.Spec.Codec.takeBytes n f >>= fun q =>
+      SpecAMQP.Spec.Codec.utf8Of q.1 "string" >>= fun s => .ok (.string s, q.2))
+    (Step2R := fun b f' => SpecAMQP.Ref.takeBytes b.toNat f' >>= fun q =>
+      SpecAMQP.Ref.decodeStringAt q.1 "string" q.2 >>= fun r => .ok (.string r.1, r.2))
+    (hstep := (stepAgreesAll_takeBeOne c c' hc))
+    (h2 := fun a b hab => by
+      rw [← hab]
+      exact readersAgree_bind (stepAgreesAll_takeBytes a)
+        (fun bytes bytes' hb => by
+          subst hb
+          exact readersAgree_utf8 "string" bytes (fun s => .string s) (fun s => .string s)
+            (fun s => by simp only [BodiesAgree]))) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨161, some "str8-utf8",
+        Generated.Oasis.Category.variable, 1, "string",
+        "up to 2^8 - 1 octets worth of UTF-8 Unicode (with no byte order mark)"⟩) x =
+        SpecAMQP.Spec.Codec.takeBe 1 x >>= fun p =>
+          SpecAMQP.Spec.Codec.takeBytes p.1 p.2 >>= fun q =>
+            SpecAMQP.Spec.Codec.utf8Of q.1 "string" >>= fun s => .ok (.string s, q.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+/-- **The `sym8` element row (`0xA3`).** -/
+theorem element_0xA3 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0xA3 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0xA3 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0xA3 : UInt8) =
+      .ok (some ⟨163, some "sym8", Generated.Oasis.Category.variable, 1, "symbol",
+        "up to 2^8 - 1 seven bit ASCII characters representing a symbolic value"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_var
+    (Step2S := fun n f => SpecAMQP.Spec.Codec.takeBytes n f >>= fun q =>
+      SpecAMQP.Spec.Codec.utf8Of q.1 "symbol" >>= fun s => .ok (.symbol s, q.2))
+    (Step2R := fun b f' => SpecAMQP.Ref.takeBytes b.toNat f' >>= fun q =>
+      SpecAMQP.Ref.decodeStringAt q.1 "symbol" q.2 >>= fun r => .ok (.symbol r.1, r.2))
+    (hstep := (stepAgreesAll_takeBeOne c c' hc))
+    (h2 := fun a b hab => by
+      rw [← hab]
+      exact readersAgree_bind (stepAgreesAll_takeBytes a)
+        (fun bytes bytes' hb => by
+          subst hb
+          exact readersAgree_utf8 "symbol" bytes (fun s => .symbol s) (fun s => .symbol s)
+            (fun s => by simp only [BodiesAgree]))) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨163, some "sym8", Generated.Oasis.Category.variable, 1,
+        "symbol", "up to 2^8 - 1 seven bit ASCII characters representing a symbolic value"⟩) x =
+        SpecAMQP.Spec.Codec.takeBe 1 x >>= fun p =>
+          SpecAMQP.Spec.Codec.takeBytes p.1 p.2 >>= fun q =>
+            SpecAMQP.Spec.Codec.utf8Of q.1 "symbol" >>= fun s => .ok (.symbol s, q.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+/-- **The `vbin32` element row (`0xB0`).** -/
+theorem element_0xB0 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0xB0 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0xB0 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0xB0 : UInt8) =
+      .ok (some ⟨176, some "vbin32", Generated.Oasis.Category.variable, 4, "binary",
+        "up to 2^32 - 1 octets of binary data"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_var
+    (Step2S := fun n f => SpecAMQP.Spec.Codec.takeBytes n f >>= fun q => .ok (.binary q.1, q.2))
+    (Step2R := fun b f' => SpecAMQP.Ref.takeBytes b f' >>= fun q => .ok (.binary q.1.toList, q.2))
+    (hstep := (stepAgreesAll_takeBeEq 4 c c' hc))
+    (h2 := fun a b hab => by
+      rw [← hab]
+      exact readersAgree_bind (stepAgreesAll_takeBytes a)
+        (fun bytes bytes' hb => by
+          subst hb
+          exact readersAgree_ok (.binary bytes) (.binary bytes.toList)
+            (by simp only [BodiesAgree]))) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨176, some "vbin32", Generated.Oasis.Category.variable, 4,
+        "binary", "up to 2^32 - 1 octets of binary data"⟩) x =
+        SpecAMQP.Spec.Codec.takeBe 4 x >>= fun p =>
+          SpecAMQP.Spec.Codec.takeBytes p.1 p.2 >>= fun q => .ok (.binary q.1, q.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+/-- **The `str32-utf8` element row (`0xB1`).** -/
+theorem element_0xB1 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0xB1 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0xB1 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0xB1 : UInt8) =
+      .ok (some ⟨177, some "str32-utf8", Generated.Oasis.Category.variable, 4, "string",
+        "up to 2^32 - 1 octets worth of UTF-8 Unicode (with no byte order mark)"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_var
+    (Step2S := fun n f => SpecAMQP.Spec.Codec.takeBytes n f >>= fun q =>
+      SpecAMQP.Spec.Codec.utf8Of q.1 "string" >>= fun s => .ok (.string s, q.2))
+    (Step2R := fun b f' => SpecAMQP.Ref.takeBytes b f' >>= fun q =>
+      SpecAMQP.Ref.decodeStringAt q.1 "string" q.2 >>= fun r => .ok (.string r.1, r.2))
+    (hstep := (stepAgreesAll_takeBeEq 4 c c' hc))
+    (h2 := fun a b hab => by
+      rw [← hab]
+      exact readersAgree_bind (stepAgreesAll_takeBytes a)
+        (fun bytes bytes' hb => by
+          subst hb
+          exact readersAgree_utf8 "string" bytes (fun s => .string s) (fun s => .string s)
+            (fun s => by simp only [BodiesAgree]))) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨177, some "str32-utf8",
+        Generated.Oasis.Category.variable, 4, "string",
+        "up to 2^32 - 1 octets worth of UTF-8 Unicode (with no byte order mark)"⟩) x =
+        SpecAMQP.Spec.Codec.takeBe 4 x >>= fun p =>
+          SpecAMQP.Spec.Codec.takeBytes p.1 p.2 >>= fun q =>
+            SpecAMQP.Spec.Codec.utf8Of q.1 "string" >>= fun s => .ok (.string s, q.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+/-- **The `sym32` element row (`0xB3`).** -/
+theorem element_0xB3 {g : Nat} {c : Cursor} {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c')
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0xB3 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0xB3 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0xB3 : UInt8) =
+      .ok (some ⟨179, some "sym32", Generated.Oasis.Category.variable, 4, "symbol",
+        "up to 2^32 - 1 seven bit ASCII characters representing a symbolic value"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  refine elementData_var
+    (Step2S := fun n f => SpecAMQP.Spec.Codec.takeBytes n f >>= fun q =>
+      SpecAMQP.Spec.Codec.utf8Of q.1 "symbol" >>= fun s => .ok (.symbol s, q.2))
+    (Step2R := fun b f' => SpecAMQP.Ref.takeBytes b f' >>= fun q =>
+      SpecAMQP.Ref.decodeStringAt q.1 "symbol" q.2 >>= fun r => .ok (.symbol r.1, r.2))
+    (hstep := (stepAgreesAll_takeBeEq 4 c c' hc))
+    (h2 := fun a b hab => by
+      rw [← hab]
+      exact readersAgree_bind (stepAgreesAll_takeBytes a)
+        (fun bytes bytes' hb => by
+          subst hb
+          exact readersAgree_utf8 "symbol" bytes (fun s => .symbol s) (fun s => .symbol s)
+            (fun s => by simp only [BodiesAgree]))) ?_ ?_
+  · intro x
+    rw [(show specElementData g (some ⟨179, some "sym32", Generated.Oasis.Category.variable, 4,
+        "symbol", "up to 2^32 - 1 seven bit ASCII characters representing a symbolic value"⟩) x =
+        SpecAMQP.Spec.Codec.takeBe 4 x >>= fun p =>
+          SpecAMQP.Spec.Codec.takeBytes p.1 p.2 >>= fun q =>
+            SpecAMQP.Spec.Codec.utf8Of q.1 "symbol" >>= fun s => .ok (.symbol s, q.2) from rfl)]
+  · intro x'
+    simp only [SpecAMQP.Ref.readElement]
+    rfl
+
+
+/-- **The `list8` element row (`0xC0`).** -/
+theorem element_0xC0 {g : Nat} (hup : WireAgreesUpTo g) {c : Cursor} {c' : SpecAMQP.Ref.Cursor}
+    (hc : CursorAgrees c c') (hb : c.data.size - c.pos ≤ g) {ed : Option EncodingDecl}
+    (hed : SpecAMQP.Spec.Codec.elementDecl? (0xC0 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0xC0 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0xC0 : UInt8) =
+      .ok (some ⟨192, some "list8", Generated.Oasis.Category.compound, 1, "list",
+        "up to 2^8 - 1 list elements with total size less than 2^8 octets"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  unfold ElementDataAgrees
+  rw [show specElementData g (some ⟨192, some "list8", Generated.Oasis.Category.compound, 1,
+        "list", "up to 2^8 - 1 list elements with total size less than 2^8 octets"⟩) =
+        SpecAMQP.Spec.Codec.readCompound g ⟨192, some "list8",
+          Generated.Oasis.Category.compound, 1, "list",
+          "up to 2^8 - 1 list elements with total size less than 2^8 octets"⟩ from rfl,
+      show SpecAMQP.Ref.readElement (g + 1) (0xC0 : UInt8) = SpecAMQP.Ref.readCompound g 1 from
+        funext (fun x' => by simp only [SpecAMQP.Ref.readElement])]
+  exact readCompound_list_body g (wireAgreesUpTo_mono hup (by omega)) ⟨192, some "list8",
+    Generated.Oasis.Category.compound, 1, "list",
+    "up to 2^8 - 1 list elements with total size less than 2^8 octets"⟩ (by decide) rfl hc hb
+
+/-- **The `map8` element row (`0xC1`).** -/
+theorem element_0xC1 {g : Nat} (hup : WireAgreesUpTo g) {c : Cursor} {c' : SpecAMQP.Ref.Cursor}
+    (hc : CursorAgrees c c') (hb : c.data.size - c.pos ≤ g) {ed : Option EncodingDecl}
+    (hed : SpecAMQP.Spec.Codec.elementDecl? (0xC1 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0xC1 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0xC1 : UInt8) =
+      .ok (some ⟨193, some "map8", Generated.Oasis.Category.compound, 1, "map",
+        "up to 2^8 - 1 octets of encoded map data"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  unfold ElementDataAgrees
+  rw [show specElementData g (some ⟨193, some "map8", Generated.Oasis.Category.compound, 1,
+        "map", "up to 2^8 - 1 octets of encoded map data"⟩) =
+        SpecAMQP.Spec.Codec.readCompound g ⟨193, some "map8",
+          Generated.Oasis.Category.compound, 1, "map",
+          "up to 2^8 - 1 octets of encoded map data"⟩ from rfl,
+      show SpecAMQP.Ref.readElement (g + 1) (0xC1 : UInt8) = SpecAMQP.Ref.readMap g 1 from
+        funext (fun x' => by simp only [SpecAMQP.Ref.readElement])]
+  exact readCompound_map_body g (wireAgreesUpTo_mono hup (by omega)) ⟨193, some "map8",
+    Generated.Oasis.Category.compound, 1, "map",
+    "up to 2^8 - 1 octets of encoded map data"⟩ (by decide) rfl hc hb
+
+/-- **The `list32` element row (`0xD0`).** -/
+theorem element_0xD0 {g : Nat} (hup : WireAgreesUpTo g) {c : Cursor} {c' : SpecAMQP.Ref.Cursor}
+    (hc : CursorAgrees c c') (hb : c.data.size - c.pos ≤ g) {ed : Option EncodingDecl}
+    (hed : SpecAMQP.Spec.Codec.elementDecl? (0xD0 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0xD0 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0xD0 : UInt8) =
+      .ok (some ⟨208, some "list32", Generated.Oasis.Category.compound, 4, "list",
+        "up to 2^32 - 1 list elements with total size less than 2^32 octets"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  unfold ElementDataAgrees
+  rw [show specElementData g (some ⟨208, some "list32", Generated.Oasis.Category.compound, 4,
+        "list", "up to 2^32 - 1 list elements with total size less than 2^32 octets"⟩) =
+        SpecAMQP.Spec.Codec.readCompound g ⟨208, some "list32",
+          Generated.Oasis.Category.compound, 4, "list",
+          "up to 2^32 - 1 list elements with total size less than 2^32 octets"⟩ from rfl,
+      show SpecAMQP.Ref.readElement (g + 1) (0xD0 : UInt8) = SpecAMQP.Ref.readCompound g 4 from
+        funext (fun x' => by simp only [SpecAMQP.Ref.readElement])]
+  exact readCompound_list_body g (wireAgreesUpTo_mono hup (by omega)) ⟨208, some "list32",
+    Generated.Oasis.Category.compound, 4, "list",
+    "up to 2^32 - 1 list elements with total size less than 2^32 octets"⟩ (by decide) rfl hc hb
+
+/-- **The `map32` element row (`0xD1`).** -/
+theorem element_0xD1 {g : Nat} (hup : WireAgreesUpTo g) {c : Cursor} {c' : SpecAMQP.Ref.Cursor}
+    (hc : CursorAgrees c c') (hb : c.data.size - c.pos ≤ g) {ed : Option EncodingDecl}
+    (hed : SpecAMQP.Spec.Codec.elementDecl? (0xD1 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0xD1 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0xD1 : UInt8) =
+      .ok (some ⟨209, some "map32", Generated.Oasis.Category.compound, 4, "map",
+        "up to 2^32 - 1 octets of encoded map data"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  unfold ElementDataAgrees
+  rw [show specElementData g (some ⟨209, some "map32", Generated.Oasis.Category.compound, 4,
+        "map", "up to 2^32 - 1 octets of encoded map data"⟩) =
+        SpecAMQP.Spec.Codec.readCompound g ⟨209, some "map32",
+          Generated.Oasis.Category.compound, 4, "map",
+          "up to 2^32 - 1 octets of encoded map data"⟩ from rfl,
+      show SpecAMQP.Ref.readElement (g + 1) (0xD1 : UInt8) = SpecAMQP.Ref.readMap g 4 from
+        funext (fun x' => by simp only [SpecAMQP.Ref.readElement])]
+  exact readCompound_map_body g (wireAgreesUpTo_mono hup (by omega)) ⟨209, some "map32",
+    Generated.Oasis.Category.compound, 4, "map",
+    "up to 2^32 - 1 octets of encoded map data"⟩ (by decide) rfl hc hb
+
+/-- **The `array8` element row (`0xE0`).** -/
+theorem element_0xE0 {g : Nat} (hdec : ElementsDecideBelow g) {c : Cursor}
+    {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c') (hb : c.data.size - c.pos ≤ g)
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0xE0 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0xE0 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0xE0 : UInt8) =
+      .ok (some ⟨224, some "array8", Generated.Oasis.Category.array, 1, "array",
+        "up to 2^8 - 1 array elements with total size less than 2^8 octets"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  unfold ElementDataAgrees
+  rw [show specElementData g (some ⟨224, some "array8", Generated.Oasis.Category.array, 1,
+        "array", "up to 2^8 - 1 array elements with total size less than 2^8 octets"⟩) =
+        SpecAMQP.Spec.Codec.readArrayData g ⟨224, some "array8",
+          Generated.Oasis.Category.array, 1, "array",
+          "up to 2^8 - 1 array elements with total size less than 2^8 octets"⟩ from rfl,
+      show SpecAMQP.Ref.readElement (g + 1) (0xE0 : UInt8) = SpecAMQP.Ref.readArray g 1 from
+        funext (fun x' => by simp only [SpecAMQP.Ref.readElement])]
+  exact readArray_body g hdec ⟨224, some "array8", Generated.Oasis.Category.array, 1, "array",
+    "up to 2^8 - 1 array elements with total size less than 2^8 octets"⟩ (by decide) hc hb
+
+/-- **The `array32` element row (`0xF0`).** -/
+theorem element_0xF0 {g : Nat} (hdec : ElementsDecideBelow g) {c : Cursor}
+    {c' : SpecAMQP.Ref.Cursor} (hc : CursorAgrees c c') (hb : c.data.size - c.pos ≤ g)
+    {ed : Option EncodingDecl} (hed : SpecAMQP.Spec.Codec.elementDecl? (0xF0 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0xF0 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0xF0 : UInt8) =
+      .ok (some ⟨240, some "array32", Generated.Oasis.Category.array, 4, "array",
+        "up to 2^32 - 1 array elements with total size less than 2^32 octets"⟩) := by decide
+  rw [hd] at hed
+  cases hed
+  unfold ElementDataAgrees
+  rw [show specElementData g (some ⟨240, some "array32", Generated.Oasis.Category.array, 4,
+        "array", "up to 2^32 - 1 array elements with total size less than 2^32 octets"⟩) =
+        SpecAMQP.Spec.Codec.readArrayData g ⟨240, some "array32",
+          Generated.Oasis.Category.array, 4, "array",
+          "up to 2^32 - 1 array elements with total size less than 2^32 octets"⟩ from rfl,
+      show SpecAMQP.Ref.readElement (g + 1) (0xF0 : UInt8) = SpecAMQP.Ref.readArray g 4 from
+        funext (fun x' => by simp only [SpecAMQP.Ref.readElement])]
+  exact readArray_body g hdec ⟨240, some "array32", Generated.Oasis.Category.array, 4, "array",
+    "up to 2^32 - 1 array elements with total size less than 2^32 octets"⟩ (by decide) hc hb
+
+/-! ## The descriptor prefix -/
+
+/-- **The descriptor prefix (`0x00`).** An element under the prefix states its own descriptor and
+value, so the decision is the value law twice: the descriptor first, then the value at the cursor the
+first read left, exactly as `arm_0x00` reads the same two values behind the octet. -/
+theorem element_0x00 {g : Nat} (ih : WireAgrees g) {c : Cursor} {c' : SpecAMQP.Ref.Cursor}
+    (hc : CursorAgrees c c') (hb : c.data.size - c.pos ≤ g) {ed : Option EncodingDecl}
+    (hed : SpecAMQP.Spec.Codec.elementDecl? (0x00 : UInt8) = .ok ed) :
+    ElementDataAgrees g (0x00 : UInt8) ed c c' := by
+  have hd : SpecAMQP.Spec.Codec.elementDecl? (0x00 : UInt8) = .ok (none : Option EncodingDecl) := by
+    decide
+  rw [hd] at hed
+  cases hed
+  have hS : specElementData g (none : Option EncodingDecl) c =
+      (SpecAMQP.Spec.Codec.readValue g c >>= fun p =>
+        (SpecAMQP.Spec.Codec.readValue g p.2) >>= fun q =>
+          .ok (.described p.1 q.1, q.2)) := by
+    simp only [specElementData, except_pure_ok]
+  have hR : SpecAMQP.Ref.readElement (g + 1) (0x00 : UInt8) c' =
+      (SpecAMQP.Ref.readValue g c' >>= fun p =>
+        (SpecAMQP.Ref.readValue g p.2) >>= fun q =>
+          .ok (.described p.1 q.1, q.2)) := by
+    simp only [SpecAMQP.Ref.readElement, except_pure_ok]
+  constructor
+  · intro other c₂' h
+    rw [hR] at h
+    obtain ⟨⟨desc, d₂'⟩, h1, h⟩ := exists_of_bind_ok h
+    try dsimp only at h
+    obtain ⟨⟨val, d₃'⟩, h2, h⟩ := exists_of_bind_ok h
+    try dsimp only at h
+    obtain ⟨hother, hcur⟩ : .described desc val = other ∧ d₃' = c₂' := by
+      have hp := Except.ok.inj h
+      simpa only [Prod.mk.injEq] using hp
+    subst hother
+    subst hcur
+    obtain ⟨sdesc, d₂, hs1, hc1, hdat1, hb1⟩ := (ih c c' hc hb).1 desc d₂' h1
+    obtain ⟨sval, d₃, hs2, hc2, hdat2, hb2⟩ :=
+      (ih d₂ d₂' hc1 (bound_of_read hs1 hdat1 hb)).1 val d₃' h2
+    refine ⟨.described sdesc sval, d₃, ?_, ?_, hc2, ?_⟩
+    · rw [hS, hs1, except_bind_ok, hs2, except_bind_ok]
+    · unfold BodiesAgree
+      exact ⟨hb1, hb2⟩
+    · rw [hdat2, hdat1]
+  · intro failure h
+    rw [hR] at h
+    cases h1 : SpecAMQP.Ref.readValue g c' with
+    | error e =>
+      rw [h1] at h
+      rw [except_bind_error] at h
+      simp only [Except.error.injEq] at h
+      subst h
+      obtain ⟨refusal, hspec, hcl⟩ := (ih c c' hc hb).2 e h1
+      refine ⟨refusal, ?_, hcl⟩
+      rw [hS, hspec, except_bind_error]
+    | ok p =>
+      obtain ⟨desc, d₂'⟩ := p
+      rw [h1] at h
+      rw [except_bind_ok] at h
+      cases h2 : SpecAMQP.Ref.readValue g d₂' with
+      | error e =>
+        rw [h2] at h
+        rw [except_bind_error] at h
+        simp only [Except.error.injEq] at h
+        subst h
+        obtain ⟨sdesc, d₂, hs1, hc1, hdat1, -⟩ := (ih c c' hc hb).1 desc d₂' h1
+        obtain ⟨refusal, hspec, hcl⟩ :=
+          (ih d₂ d₂' hc1 (bound_of_read hs1 hdat1 hb)).2 e h2
+        refine ⟨refusal, ?_, hcl⟩
+        rw [hS, hs1, except_bind_ok, hspec, except_bind_error]
+      | ok q =>
+        rw [h2] at h
+        rw [except_bind_ok] at h
+        exact absurd h (by simp)
+
+
+/-! ## The element decision, dispatched over the constructor octets -/
+
+/-- The constructor octets an array's element can name: the descriptor prefix, and every octet the
+declared surface assigns. A successor who adds a row to the table must add it here as well, which the
+sweep below makes fail rather than pass silently. -/
+def elementCtors : List UInt8 :=
+  [0x00, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x60, 0x61, 0x70, 0x71, 0x72, 0x73, 0x74, 0x80, 0x81, 0x82, 0x83, 0x84, 0x94, 0x98, 0xA0, 0xA1, 0xA3, 0xB0, 0xB1, 0xB3, 0xC0, 0xC1, 0xD0, 0xD1, 0xE0, 0xF0]
+
+set_option maxRecDepth 10000 in
+/-- **Every octet the element lookup refuses is outside the list, and the descriptor prefix is
+inside.** One finite evaluation of the lookup over all 256 octets. -/
+theorem elementCtors_sweep :
+    (List.range 256).all (fun n =>
+      !(SpecAMQP.Spec.Codec.elementDecl? (UInt8.ofNat n)).isOk
+        || elementCtors.contains (UInt8.ofNat n)) = true := by
+  decide
+
+/-- The sweep as a membership: an octet the element lookup accepts is one of the list's. -/
+theorem elementDecl?_ctor_mem {ctor : UInt8}
+    (h : (SpecAMQP.Spec.Codec.elementDecl? ctor).isOk = true) : ctor ∈ elementCtors := by
+  have hall := List.all_eq_true.mp elementCtors_sweep ctor.toNat (List.mem_range.mpr ctor.toNat_lt)
+  have hof : UInt8.ofNat ctor.toNat = ctor := by
+    apply UInt8.toNat_inj.mp
+    simp
+  rw [hof] at hall
+  simpa only [h, Bool.not_true, Bool.false_or, List.contains_iff_mem] using hall
+
+/-- **The element decision, at every fuel the value law reaches.** The decision's rows are the value
+law's own material: the four container rows are the compound and array bodies at the fuel the octet
+handed down, the descriptor prefix is the value law twice, and the rest read a declared row's data
+against the reference's own literal arm. The fuel family is an argument rather than something read off
+the value law because the array's own row needs it, and nothing else in the dispatch does. -/
+theorem elementsDecideAt_of_upTo {g : Nat} (hup : WireAgreesUpTo g) (hdec : ElementsDecideBelow g) :
+    ElementsDecideAt g := by
+  intro ctor ed hed c c' hc hpos hb
+  have hmem : ctor ∈ elementCtors :=
+    elementDecl?_ctor_mem (by rw [hed]; rfl)
+  simp only [elementCtors, List.mem_cons, List.not_mem_nil, or_false] at hmem
+  rcases hmem with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+  ·
+    exact element_0x00 (g := g) (ih := wireAgreesUpTo_self hup) (c := c) (c' := c')
+      (hc := hc) (hb := hb) (ed := ed) (hed := hed)
+  ·
+    exact element_0x40 (g := g) (c := c) (c' := c') (hc := hc) (hpos := hpos)
+      (ed := ed) (hed := hed)
+  ·
+    exact element_0x41 (g := g) (c := c) (c' := c') (hc := hc) (hpos := hpos)
+      (ed := ed) (hed := hed)
+  ·
+    exact element_0x42 (g := g) (c := c) (c' := c') (hc := hc) (hpos := hpos)
+      (ed := ed) (hed := hed)
+  ·
+    exact element_0x43 (g := g) (c := c) (c' := c') (hc := hc) (hpos := hpos)
+      (ed := ed) (hed := hed)
+  ·
+    exact element_0x44 (g := g) (c := c) (c' := c') (hc := hc) (hpos := hpos)
+      (ed := ed) (hed := hed)
+  ·
+    exact element_0x45 (g := g) (c := c) (c' := c') (hc := hc) (hpos := hpos)
+      (ed := ed) (hed := hed)
+  ·
+    exact element_0x50 (g := g) (c := c) (c' := c') (hc := hc)
+      (ed := ed) (hed := hed)
+  ·
+    exact element_0x51 (g := g) (c := c) (c' := c') (hc := hc) (ed := ed) (hed := hed)
+  ·
+    exact element_0x52 (g := g) (c := c) (c' := c') (hc := hc)
+      (ed := ed) (hed := hed)
+  ·
+    exact element_0x53 (g := g) (c := c) (c' := c') (hc := hc)
+      (ed := ed) (hed := hed)
+  ·
+    exact element_0x54 (g := g) (c := c) (c' := c') (hc := hc) (ed := ed) (hed := hed)
+  ·
+    exact element_0x55 (g := g) (c := c) (c' := c') (hc := hc) (ed := ed) (hed := hed)
+  ·
+    exact element_0x56 (g := g) (c := c) (c' := c') (hc := hc)
+      (ed := ed) (hed := hed)
+  ·
+    exact element_0x60 (g := g) (c := c) (c' := c') (hc := hc)
+      (ed := ed) (hed := hed)
+  ·
+    exact element_0x61 (g := g) (c := c) (c' := c') (hc := hc) (ed := ed) (hed := hed)
+  ·
+    exact element_0x70 (g := g) (c := c) (c' := c') (hc := hc)
+      (ed := ed) (hed := hed)
+  ·
+    exact element_0x71 (g := g) (c := c) (c' := c') (hc := hc) (ed := ed) (hed := hed)
+  ·
+    exact element_0x72 (g := g) (c := c) (c' := c') (hc := hc)
+      (ed := ed) (hed := hed)
+  ·
+    exact element_0x73 (g := g) (c := c) (c' := c') (hc := hc)
+      (ed := ed) (hed := hed)
+  ·
+    exact element_0x74 (g := g) (c := c) (c' := c') (hc := hc)
+      (ed := ed) (hed := hed)
+  ·
+    exact element_0x80 (g := g) (c := c) (c' := c') (hc := hc)
+      (ed := ed) (hed := hed)
+  ·
+    exact element_0x81 (g := g) (c := c) (c' := c') (hc := hc) (ed := ed) (hed := hed)
+  ·
+    exact element_0x82 (g := g) (c := c) (c' := c') (hc := hc)
+      (ed := ed) (hed := hed)
+  ·
+    exact element_0x83 (g := g) (c := c) (c' := c') (hc := hc) (ed := ed) (hed := hed)
+  ·
+    exact element_0x84 (g := g) (c := c) (c' := c') (hc := hc)
+      (ed := ed) (hed := hed)
+  ·
+    exact element_0x94 (g := g) (c := c) (c' := c') (hc := hc)
+      (ed := ed) (hed := hed)
+  ·
+    exact element_0x98 (g := g) (c := c) (c' := c') (hc := hc)
+      (ed := ed) (hed := hed)
+  ·
+    exact element_0xA0 (g := g) (c := c) (c' := c') (hc := hc) (ed := ed) (hed := hed)
+  ·
+    exact element_0xA1 (g := g) (c := c) (c' := c') (hc := hc) (ed := ed) (hed := hed)
+  ·
+    exact element_0xA3 (g := g) (c := c) (c' := c') (hc := hc) (ed := ed) (hed := hed)
+  ·
+    exact element_0xB0 (g := g) (c := c) (c' := c') (hc := hc) (ed := ed) (hed := hed)
+  ·
+    exact element_0xB1 (g := g) (c := c) (c' := c') (hc := hc) (ed := ed) (hed := hed)
+  ·
+    exact element_0xB3 (g := g) (c := c) (c' := c') (hc := hc) (ed := ed) (hed := hed)
+  ·
+    exact element_0xC0 (g := g) (hup := hup) (c := c) (c' := c') (hc := hc)
+      (hb := hb) (ed := ed) (hed := hed)
+  ·
+    exact element_0xC1 (g := g) (hup := hup) (c := c) (c' := c') (hc := hc)
+      (hb := hb) (ed := ed) (hed := hed)
+  ·
+    exact element_0xD0 (g := g) (hup := hup) (c := c) (c' := c') (hc := hc)
+      (hb := hb) (ed := ed) (hed := hed)
+  ·
+    exact element_0xD1 (g := g) (hup := hup) (c := c) (c' := c') (hc := hc)
+      (hb := hb) (ed := ed) (hed := hed)
+  ·
+    exact element_0xE0 (g := g) (hdec := hdec) (c := c) (c' := c') (hc := hc)
+      (hb := hb) (ed := ed) (hed := hed)
+  ·
+    exact element_0xF0 (g := g) (hdec := hdec) (c := c) (c' := c') (hc := hc)
+      (hb := hb) (ed := ed) (hed := hed)
 
 
 end SpecAMQP.Proofs
