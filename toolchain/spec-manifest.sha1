@@ -15,7 +15,7 @@ cd0b5ac08a97c9ff4c4074a2cade872b32c78da4  lean/Contracts/Settlement.lean
 7a52a63a35cda512b63a483e43af4799ae81beea  lean/Contracts/Transaction.lean
 c5ee92929caed5a244bae9a85cea9d0af5e7749a  lean/Contracts/TypeSystem.lean
 f8940df7bf0bffcaf8b2f68d914de108b92f1659  lean/Spec/Codec.lean
-e53591db4b916e797445d227165fb7fd42b98af6  lean/Spec/Connection.lean
+2ca24c7481f75673b678fb26c48e17deec817629  lean/Spec/Connection.lean
 2a205f752ad6833b88e2064a498eba8b86193fba  lean/Spec/ConnectionCodec.lean
 c92c679a91d5a504610bbd47f27ffe33f7776971  lean/Spec/Frame.lean
 31e43aed7900e071a7a1615d739be50f716b5b74  lean/Spec/FrameCodec.lean
@@ -53,13 +53,13 @@ c661a0341ee5572bd716861459bcfbedbae36a7f  ledger/ambiguities/unmapped-begin.json
 7280ec69526349247e0dabbe081cbbcd3c2193e2  ledger/clauses.json
 12e201d799e20229b8c0f95e7da3cc7e4fca1143  ledger/coverage.json
 18dc26b3c3328b31c9524e7b34ca3e6a23b4e71e  ledger/dispositions/part0-conformance-and-transport-lifecycle.json
-b9adec25fda0261806d98c5ab248e8ea25beb310  ledger/dispositions/part1-types.json
+8e670f5180142c4b95c9d847b67dddbb79e04048  ledger/dispositions/part1-types.json
 622542fe3d74b1a5fc091e3f6d021cf3fac9f12d  ledger/dispositions/part2-connection-establishment.json
 d81267f3bb9410b6e6bc8ca0aa4f9b6e1160b88b  ledger/dispositions/part2-links.json
 132689ebf2e4fe35751559536cbcaa1971b7ec5b  ledger/dispositions/part2-performatives-link-state.json
 f573411597e689159173d0bf6184b92501675f43  ledger/dispositions/part4-transactions.json
-12ed3c4953b9440814f576475dbc168a51ffebcd  ledger/dispositions/picture-review.json
-0e242a9a3ad286d7e9ce70707b0fc9b640e9f074  ledger/dispositions/unkeyed-normative.json
+c1a4c6572075b06b6ff063eef0aa5308ea85f8d7  ledger/dispositions/picture-review.json
+2a088bfdb884a286ac367359889f249e8f142576  ledger/dispositions/unkeyed-normative.json
 fd83990fdb34dca23fc732e566fa109c98af71b5  ledger/lowercase-keywords.json
 bade00376950e4a224326e89498494519b4c5452  ledger/pictures.json
 745a82ff70e5e9eaa0a4f0a944d56ac4acb99119  ledger/reconciliation.json
