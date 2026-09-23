@@ -534,13 +534,15 @@ grep -n "second transcription" PLAN.md               # when the front end's fix 
 ```
 
 ```sh
-git status --porcelain lean/Impl      # ?? lean/Impl/Core.lean
+git log --oneline -1 -- lean/Impl     # R2's core, committed
 ls lean/Impl
 ```
 
-**R3 — the conformance theorem: not started, and narrower than it sounds.** Its content is the
-plumbing (§1); the value layer's hypotheses (§2) and the layer proofs it reuses are its
-prerequisites.
+**R3 — the conformance theorem: not started, and its declaration is not written either.** That is the
+planner's next pen: the repository's order is statement, then proof, then acceptance, and R3 has no
+`Contracts/` module and no relation stated beyond §1's plumbing. Its content is narrower than its name —
+it is the plumbing — and its prerequisites are the value layer's hypotheses (§2) and the layer proofs it
+reuses, which is why the value layer's agreement is the rung everything above it waits on.
 
 **R4 — the wire differential: not started.** The corpus replayed against the endpoint over a
 socket, compared per vector against `amqp-spec` with the same verdict-and-reason comparison
@@ -583,9 +585,12 @@ socket, compared per vector against `amqp-spec` with the same verdict-and-reason
 **Two records that disagree about this section, stated so neither is trusted blindly.** `PLAN.md`
 §23's opening sentence describes the endpoint as one "whose protocol core is proved to conform to
 the frozen interface, with its socket layer as the one named unproved dependency". The second
-half of that is true and R1 landed it; the first is not yet — R2's core is uncommitted and R3
-has not started, so what `lean/Impl/` holds today is the transport boundary plus a core being
-written (`grep -n "whose protocol core is proved" PLAN.md`; `git status --porcelain lean/Impl`).
+half of that is true and R1 landed it; the first is not yet — R2's core is committed but its review
+is not closed: the second transcription is gone and the shipped shell now has a gate, while the
+fragmentation property remains unproved and has moved inside the value layer's carrier development,
+since the two lemmas it needs are the two that development needs. R3 has not started and has no
+declaration, so what `lean/Impl/` holds today is the transport boundary plus a landed core whose
+conformance is owed (`grep -n "whose protocol core is proved" PLAN.md`; `git status --porcelain lean/Impl`).
 `README.md`'s "What is here" table carries the same reading — "the shipped endpoint: a pure
 protocol core proved to conform" — with the same qualification
 (`grep -n "shipped endpoint" README.md`). Everything else in §23's and §23.1's account of what
