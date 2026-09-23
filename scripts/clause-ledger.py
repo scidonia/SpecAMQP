@@ -1321,6 +1321,12 @@ def check_note_names(root: Path, vectors_dir: Path, report: dict) -> list[str]:
     for where, text in corpus_named_strings(root):
         named = set(CORPUS_REFERENCE_PATTERN.findall(text))
         for token in BACKTICKED_TOKEN_PATTERN.findall(text):
+            # A citation is a single word: no vector id and no name this ledger defines contains
+            # whitespace. A multi-word span is prose or code being *quoted* — `set == session.peerBegun`,
+            # `delivery.settled || settled` — and reading those as failed citations is a false positive,
+            # which is worse than no check: the failure is real and it points at the wrong thing.
+            if any(c.isspace() for c in token):
+                continue
             if CORPUS_REFERENCE_PATTERN.fullmatch(token):
                 continue  # a corpus named in backticks is a file, not a vector
             if token in known or token in LEDGER_VOCABULARY:
