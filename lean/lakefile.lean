@@ -70,6 +70,73 @@ lean_lib Ref where
 lean_lib Proofs where
   globs := #[.submodules `Proofs]
 
+/--
+## The transport shell (R1, `PLAN.md` §23.1)
+
+`Impl` holds the shipped endpoint's Lean side. Today that is one module,
+`Transport.lean`, which declares the six `@[extern]` operations that are the whole
+of this implementation's unproved trust; the pure protocol core joins it at R2.
+`tests/contracts/s1_proof_integrity.sh` pins the boundary to that one path and
+reports the count, so the size of the trust is a number in a gate's output rather
+than a claim in prose.
+-/
+@[default_target]
+lean_lib Impl where
+  globs := #[.submodules `Impl]
+
+/--
+The shim those declarations call, compiled by the shell's C compiler.
+
+A custom `target` rather than `extern_lib`, which Lake's README deprecates in favour
+of exactly this pair: the object file is a target, and the executables that need the
+symbols name it in `moreLinkObjs`. The include path is a *weak* argument because it
+is system-dependent — changing it must not invalidate a correct object file — while
+the flags that decide the object's contents are traced, so a flag change rebuilds it.
+
+The compiler is `cc`, the pinned shell's `gcc` wrapper, and *not* the Lean
+toolchain's own C compiler, which `buildLeanO` would use. That clang is invoked with
+a store-path sysroot and `-nostdinc`; measured, it cannot find even `stddef.h`, let
+alone `arpa/inet.h`, because the Lean build ships no libc headers. A shim that talks
+to the kernel needs POSIX headers, so it is compiled by the shell's compiler against
+Lean's headers, which is what `-I $(lean --print-prefix)/include` gives it.
+-/
+target «transport-shim» pkg : System.FilePath := do
+  let srcJob ← inputTextFile <| (pkg.dir.parent.getD pkg.dir) / "scripts" / "transport_shim.c"
+  buildO (pkg.buildDir / "c" / "transport_shim.o") srcJob
+    #["-I", (← getLeanIncludeDir).toString]
+    #["-O2", "-fPIC", "-std=c11", "-Wall", "-Wextra"]
+
+/--
+R1's loopback evidence: a server that echoes one connection and a client that
+compares what it receives octet for octet. They live outside `lean/Impl/` so that
+"nothing but `Transport.lean` inside the shipped tree is unproved" is a
+directory-level fact rather than a reading of two files, and outside the package
+directory because they are R1's harness rather than the shipped endpoint.
+
+Their sources are under `scripts/loopback/Loopback/` — the module tree sits one
+level down so that `srcDir` can point the library at it and the module names stay
+`Loopback.*` rather than claiming top-level names.
+-/
+@[default_target]
+lean_lib Loopback where
+  srcDir := "../scripts/loopback"
+  globs := #[.submodules `Loopback]
+
+/-- `lake exe amqp-loopback-server <port> <chunk-octets>` — R1's server: accepts one
+connection, echoes the announced payload, reports its call counts, exits. -/
+lean_exe «amqp-loopback-server» where
+  srcDir := "../scripts/loopback"
+  root := `Loopback.Server
+  moreLinkObjs := #[«transport-shim»]
+
+/-- `lake exe amqp-loopback-client <port> <octets> <chunk-octets>` — R1's client:
+sends a known byte string, compares what comes back octet for octet, exits non-zero
+on a mismatch. -/
+lean_exe «amqp-loopback-client» where
+  srcDir := "../scripts/loopback"
+  root := `Loopback.Client
+  moreLinkObjs := #[«transport-shim»]
+
 /-- The reference implementation as a native executable: `lake exe amqp-ref
 <vector-file.ndjson>`. -/
 lean_exe «amqp-ref» where

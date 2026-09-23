@@ -2,14 +2,21 @@
 
 ## Scope
 
-SpecAMQP holds a **specification**, not an implementation. The deliverable is a
-complete, correct, executable formal specification of AMQP 1.0 core (OASIS
-Standard, Parts 0–5) in Lean 4, with a clause-level ledger that makes completeness
-and fidelity measurable. Read `PLAN.md`; it is the programme of record.
+SpecAMQP holds a **specification and a reference implementation of it**. The
+deliverable is a complete, correct, executable formal specification of AMQP 1.0
+core (OASIS Standard, Parts 0–5) in Lean 4, with a clause-level ledger that makes
+completeness and fidelity measurable; and, from the implementation track in `PLAN.md`
+§23.1, an AMQP 1.0 endpoint written in Lean, compiled natively, whose protocol core
+is proved to conform to that specification. Read `PLAN.md`; it is the programme of
+record.
 
-There is no Rust, no extraction, no Charon/Aeneas and no performance work here.
-Those belong to TemperMint and are scheduled there; `PLAN.md` §23 records what
-downstream work needs from this repository.
+There is no Rust here, no Charon/Aeneas extraction of a Rust implementation, and no
+performance claim: those belong to TemperMint and are scheduled there, and `PLAN.md`
+§23 records what downstream work needs from this repository. The endpoint is compiled
+by Lean's own C backend, which is **trusted rather than verified**, and its socket
+layer is the one named unproved dependency. Saying "a specification, not an
+implementation" would now be false, and saying which parts of the implementation are
+proved is the point of that track's record.
 
 ## Layers
 
@@ -23,9 +30,25 @@ downstream work needs from this repository.
   `scripts/gen-oasis-lean.py`. **Generated; never hand-edited.**
 - `lean/Spec/` — the handwritten semantics (executable, total, independent of
   every consumer).
+- `lean/Ref/` — an independently written second reading of the same artifacts, and the
+  differential's other side. It shares no definition with `lean/Spec/`, because the two
+  disagreeing *is* the evidence: this is a check on the specification, not on an implementation.
+- `lean/Harness/` — the runner and its interfaces: corpus replay, per-step verdicts, and the
+  comparison the differential and the corpus gates share. **Contract-bearing**, because the
+  reason-class vocabulary it emits is mirrored as an enum in
+  `tests/contracts/exchange-vector.schema.json` — which is why it is planner-owned below.
 - `lean/Contracts/` — acceptance declarations for every specification claim.
 - `lean/Proofs/` — proofs.
-- `scripts/` — generators, the ledger, and the fetch/verify script.
+- `lean/Impl/` — the shipped endpoint's Lean side. One module so far:
+  `Transport.lean`, the six `@[extern]` operations that are the implementation's
+  entire unproved trust, alongside its C shim `scripts/transport_shim.c`. The pure
+  protocol core joins it at R2. Nothing else in this directory may be `unsafe` or
+  import `Transport`, so "only the boundary module here is not proved" stays a
+  property of the directory rather than a reading of two files — which is why R1's
+  loopback binaries live outside it in `scripts/loopback/`, under a `lean_lib` whose
+  `srcDir` points there.
+- `scripts/` — generators, the ledger, and the fetch/verify script; `loopback/`
+  holds R1's two-process transport evidence and the shim it exercises.
 - `tests/contracts/` — the observable contracts; `fixtures/` holds planted
   controls, never evidence.
 - `vectors/` — specification test vectors (positive, negative, recorded
@@ -41,10 +64,16 @@ requires an explicit planner update plus a regenerated SHA-1 manifest:
   content is the reviewed record)
 - `tests/contracts/**` including fixtures
 - `lean/Spec/**`, `lean/Contracts/**`
+- `lean/Harness/**` — for the vocabulary reason in the Layers table: a reason class is part of
+  what a verdict *means*, not how one is printed
 - `vectors/**` once a vector is committed as contract
 
-Coder-owned: `flake.nix`, `flake.lock`, `scripts/**`, `lean/Proofs/**`,
-`lean/Generated/**` (regenerated only), `AGENTS.md` under planner review.
+Coder-owned: `flake.nix`, `flake.lock`, `scripts/**` (including `scripts/loopback/**`),
+`lean/Proofs/**`, `lean/Ref/**`, `lean/Impl/**`, `lean/Generated/**` (regenerated only),
+`AGENTS.md` under planner review. `lean/Impl/Transport.lean` is the one coder-owned file whose
+*content* is a declared trust claim, and it is deliberately asymmetric: the trust gate pins
+`@[extern]` to that path and prints how many there are, so a change to it shows up in a gate's
+output rather than only in a diff. Right now that count is six.
 ## Commits
 
 - **Accepting a slice and committing it are one movement.** An accepted slice left
@@ -120,6 +149,16 @@ Coder-owned: `flake.nix`, `flake.lock`, `scripts/**`, `lean/Proofs/**`,
   rather than counted, which is what happened once in this repository — the
   conclusion drawn from it was re-derived from an offline build before being
   relied on.
+- **The module set, not a list of targets.** `lake build <target>` builds what you named;
+  `lake build` builds every module the lakefile's globs reach, including ones no contract names
+  yet. Every gate here named targets, so two modules that did not compile sat in the tree
+  unremarked — `Proofs.SaslDialogue` while a contract's header called its four laws proved, and
+  `Loopback.Wire` while the slice that wrote it reported a green build from a targeted run that
+  predated the file. `s1_proof_integrity.sh` now builds the package as one of its clauses.
+- **A gate's prose is not its check.** `s1_proof_integrity.sh` bans `extern` in its pattern list
+  and its summary line did not name it; two agents read the banned set off the summary, agreed on
+  a ruling from it, and were both wrong in the same direction. A document describing a check must
+  be derived from the check. Where they disagree, the check is the fact and the prose is the bug.
 
 ## Commands
 
@@ -133,16 +172,20 @@ shell bash tests/contracts/s0_sources_ledger.sh      # vendored identity, ledger
 shell bash tests/contracts/s0_tables_fidelity.sh     # generated tables current and load-bearing
 shell bash tests/contracts/s0_lean_environment.sh    # pinned toolchain, mathlib, offline resolution
 shell bash tests/contracts/s0_spec_manifest.sh       # planner-owned files as the manifest records them
-shell bash tests/contracts/s0_vector_citations.sh    # every citation in the corpus resolves
+shell bash tests/contracts/s0_vector_citations.sh    # every citation resolves: the corpora and the handwritten modules
 shell bash tests/contracts/s0_generator_fidelity.sh  # each corpus is what its generator produces
 
 # the artefacts, their proofs, and their corpora
 shell bash tests/contracts/s1_proof_integrity.sh     # no sorry, no native_decide; axiom inventories per theorem
+shell bash tests/contracts/s1_ref_vectors.sh         # the reference builds native from Lean; both its corpora pass
 shell bash tests/contracts/s1_differential.sh        # specification and reference agree on the wire
 shell bash tests/contracts/s2_frame_vectors.sh       # the frame layer's corpus
 shell bash tests/contracts/s3_exchanges.sh           # the exchange corpora, both artefacts, per-step refusals
 shell bash tests/contracts/s5_messages.sh            # the message layer's differential
 shell bash tests/contracts/s6_transactions.sh        # the transaction layer's differential
+
+# the implementation track: R1's transport shell (PLAN.md §23.1)
+shell bash scripts/run-transport-loopback.sh         # two Lean processes over loopback; shim evidence
 
 shell python3 scripts/clause-ledger.py check         # ledger + audit + reconciliation
 shell python3 scripts/gen-oasis-lean.py --check      # generated tables current
