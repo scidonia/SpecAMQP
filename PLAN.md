@@ -763,6 +763,11 @@ lemmas. The item loop then landed at one fuel on both sides (`ItemsAgree`, `read
 reduced to their octet step, their classify/table resolution and a call to that body. **The entry point is still not reached**, and the sitting recorded the two relations still outstanding — the map rows
 and the array element loop's one-fuel offset — rather than reporting progress as proximity.
 
+**And the whole suite is green with these proofs in it** — **19 of 19 contracts** on a tree carrying the R4 shell and comparator changes, the fuel-irrelevance family, the readers'
+position invariance and 38 of the 40 arms. That matters for a reason beyond the number: every earlier sitting's work passed its own module build, and this is the first run that puts the wire module's proofs
+through the *corpus* gates, the trust gate and the shell tiers together. **A proof that disturbs a gate is a proof about the wrong thing**, and the differential gates agreeing while the module's own claims
+are still partial is the shape the section's evidence argument needs: the proofs are being built on a verified base rather than beside one.
+
 **And a fourth constraint the plan did not anticipate, found by a statement that was false rather than unproved.** An element whose declared row is width zero reads nothing through
 `takeBytes 0`, which succeeds exactly when the cursor is inside the buffer, and an array of zero-width values is read at exactly that cursor (`pos = size`) — so the element decision's statement is
 **false** without `c.pos ≤ c.data.size`, and the loop has to carry the condition on. It is landed as the readers' position invariance (`readRows_le_size`, `specElementData_le`), and it is the fourth
