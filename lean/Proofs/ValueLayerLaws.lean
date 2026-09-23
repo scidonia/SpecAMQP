@@ -531,6 +531,128 @@ theorem ref_encode_nestedUnassignedEmpty :
     SpecAMQP.Ref.requireAssignedConstructor
   rfl
 
+/-! ## The zero-width element forms, and the value they were dropping
+
+The array-constructor hole above had a twin inside the element writer, and it was worse: not a class
+the two artefacts could disagree about, but octets that read back as a *different value*.
+
+`Ref.arrayElement` writes the zero-width forms — the constructors whose encoding is the constructor
+octet and nothing else — and three of them matched **any** item:
+
+    0x40, _ => .ok #[]      0x41, _ => .ok #[]      0x42, _ => .ok #[]
+
+`null0`, `true` and `false` therefore wrote no element data for whatever item they were handed, and an
+array's element data carries no second constructor: `Ref.encode (.array 0x40 [.ubyte 7])` emitted
+`#[0xE0,0x02,0x01,0x40]`, and that reader returns `.array 0x40 [.null]` — `ref_readElement_null` is why,
+under `%x40` the reader yields `null` whatever follows. The reference wrote a different value than the
+one it was given, where the specification refused the same item `malformed`. The zero-*value* arms
+beside them never had this defect (`0x43` matches `.uint 0` and nothing else), so the wildcard was the
+whole of it; the three arms now check the item's kind, inside the arm rather than in the pattern,
+because refining these three patterns makes Lean's match compiler build the 40-by-25 product tree and
+exhaust its heartbeat budget.
+
+After the fix `zeroWidthMismatch_class_agrees` is the law's error conjunct at the witness, in the law's
+own form, and `ref_arrayElement_null_refuses_mismatch` closes the whole `%x40` family rather than the
+witness alone: every item that is not `null` is refused. The matching cases still write, and
+`ref_encode_zeroWidthMatch` is their octets — which is the other half of the measurement, since the same
+four octets used to come from a mismatched value.
+
+**One interaction, named because it is a divergence this fix makes *visible* rather than makes.**
+`0x41` carries `true` and `0x42` carries `false`, so `Ref.arrayElement 0x41 (.boolean false)` is now
+refused — correctly, because writing nothing under `%x41` reads back as `true`. The specification still
+*writes* it: its `writeFixedData` boolean arm answers `.ok []` whenever the row's width is zero,
+regardless of `b`, so it drops the value rather than refusing it. That is a defect on the
+specification's side (`lean/Spec/**`, planner-owned) and it is reported rather than touched; until it is
+fixed the differential sees `0x41` with `false`, and `0x42` with `true`, as a shape divergence, and the
+reference's answer is the one both should give. -/
+
+/-- **The reader's side of the data loss**: under `%x40` this reader produces `null` whatever data
+follows, so an element written with no data at all under `%x40` reads back as a `null` — which is why a
+writer that emitted nothing for a `ubyte` under that constructor had written a different value. -/
+theorem ref_readElement_null (fuel : Nat) (c : SpecAMQP.Ref.Cursor) :
+    SpecAMQP.Ref.readElement fuel 0x40 c = .ok (.null, c) := by
+  unfold SpecAMQP.Ref.readElement
+  rfl
+
+/-- **A zero-width form carries exactly one value, and the reference refuses any other.** General over
+*every* item rather than at one witness: whatever is handed to `%x40` that is not `null` is refused,
+with the class the specification names for the same item. The residual goals of this proof are equalities
+of rendered strings — the two `s!` spellings of the same message — which is what the trailing `decide`
+closes and why the repo's `rfl`-only recipe does not. -/
+theorem ref_arrayElement_null_refuses_mismatch {item : SpecAMQP.Ref.Value} (h : item ≠ .null) :
+    SpecAMQP.Ref.arrayElement 0x40 item =
+      .error (SpecAMQP.Ref.encodeRefusal "malformed"
+        s!"an array whose element constructor is 64 cannot carry a {SpecAMQP.Ref.typeName item}") := by
+  cases item <;>
+    simp_all [SpecAMQP.Ref.arrayElement, SpecAMQP.Ref.elementShapeRefusal,
+      SpecAMQP.Ref.assignedConstructor, SpecAMQP.Ref.typeName] <;>
+    decide
+
+/-- The two boolean forms are subject to the same rule, and this is the case the specification does not
+yet refuse — `%x41` names `true`, so a `false` under it is a value that form cannot carry. -/
+theorem ref_arrayElement_true_refuses_false :
+    SpecAMQP.Ref.arrayElement 0x41 (.boolean false) =
+      .error (SpecAMQP.Ref.encodeRefusal "malformed"
+        "an array whose element constructor is 65 cannot carry a boolean") := by
+  unfold SpecAMQP.Ref.arrayElement SpecAMQP.Ref.elementShapeRefusal
+  simp only [SpecAMQP.Ref.assignedConstructor]
+  decide
+
+/-- No array elements write no data, which is the base case the array writer's own `do` block needs
+before its element-list guard can be reduced — the module's reader-side proofs need the same shape
+(`ref_readItems_nil`), for the same reason: the iterator is a member of a `mutual` block, so it has no
+equation `unfold` can reach on its own. -/
+theorem ref_arrayElementItems_nil (constructor : UInt8) :
+    SpecAMQP.Ref.arrayElementItems constructor [] = .ok #[] := by
+  unfold SpecAMQP.Ref.arrayElementItems
+  rfl
+
+/-- **The fix, at the witness**: the reference refuses the mismatch, `malformed`, where before the fix it
+wrote `#[0xE0,0x02,0x01,0x40]` — octets that read back as `.array 0x40 [.null]`. -/
+theorem ref_encode_zeroWidthMismatch :
+    SpecAMQP.Ref.encode (.array 0x40 [.ubyte 7]) =
+      .error (SpecAMQP.Ref.encodeRefusal "malformed"
+        "an array whose element constructor is 64 cannot carry a ubyte") := by
+  unfold SpecAMQP.Ref.encode SpecAMQP.Ref.arrayElementItems SpecAMQP.Ref.arrayElement
+    SpecAMQP.Ref.requireAssignedConstructor SpecAMQP.Ref.elementShapeRefusal
+  simp only [SpecAMQP.Ref.arrayElementLimit, SpecAMQP.Ref.assignedConstructor]
+  try dsimp only []
+  try (first | rfl | (split <;> first | rfl | simp_all))
+  try decide
+
+/-- And the matching case still writes those same four octets, which is the measurement's other half. -/
+theorem ref_encode_zeroWidthMatch :
+    SpecAMQP.Ref.encode (.array 0x40 [.null]) = .ok #[0xE0, 0x02, 0x01, 0x40] := by
+  unfold SpecAMQP.Ref.encode SpecAMQP.Ref.arrayElementItems SpecAMQP.Ref.arrayElement
+    SpecAMQP.Ref.requireAssignedConstructor
+  rw [show SpecAMQP.Ref.arrayElementItems 0x40 [] = .ok #[] from ref_arrayElementItems_nil 0x40]
+  simp only [SpecAMQP.Ref.arrayElementLimit, SpecAMQP.Ref.assignedConstructor]
+  decide
+
+/-- The specification's answer for the same item, and the class the reference now agrees with. -/
+theorem spec_encodeValue_zeroWidthMismatch :
+    SpecAMQP.Spec.Codec.encodeValue (.array 0x40 [.ubyte 7]) =
+      .error (SpecAMQP.Spec.Codec.refusal "malformed"
+        "the declared surface calls octet 0x40 a null encoding, which cannot carry ubyte") := by
+  unfold SpecAMQP.Spec.Codec.encodeValue SpecAMQP.Spec.Codec.writeValue
+    SpecAMQP.Spec.Codec.writeElements SpecAMQP.Spec.Codec.writeDeclared
+    SpecAMQP.Spec.Codec.writeFixedData SpecAMQP.Spec.Codec.elementDecl?
+  try dsimp only []
+  try (first | rfl | (split <;> first | rfl | simp_all))
+  try decide
+
+/-- **The class agreement at the zero-width witness**, the law's error conjunct in the law's own form. -/
+theorem zeroWidthMismatch_class_agrees :
+    ∀ failure : SpecAMQP.Ref.EncodeRefusal,
+      SpecAMQP.Ref.encode (.array 0x40 [.ubyte 7]) = .error failure →
+      ∃ refusal : SpecAMQP.Spec.Codec.Refusal,
+        SpecAMQP.Spec.Codec.encodeValue (.array 0x40 [.ubyte 7]) = .error refusal ∧
+        refusal.reasonClass = failure.reasonClass := by
+  intro failure h
+  rw [ref_encode_zeroWidthMismatch] at h
+  have hcl : failure.reasonClass = "malformed" := by rw [← Except.error.inj h]; rfl
+  exact ⟨_, spec_encodeValue_zeroWidthMismatch, by rw [hcl]; rfl⟩
+
 /-! ## The size accounting, settled by the artefacts
 
 The divergence above is an *order* difference, not an *accounting* difference, and this section is
