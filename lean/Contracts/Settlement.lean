@@ -172,9 +172,8 @@ def SenderSettleModeDeliveriesAreSettledOnATransfer : Prop :=
       transferLink session true body = .error reason ∧
         reason.condition = invalidField
 
-**Proved by** `Proofs.Settlement.senderSettleModeIsTheChoiceTheClauseSelects`.
-
 /-- **The negotiated settle mode is the *choice* the artifact selects, not the *element's* name.**
+**Proved by** `Proofs.Settlement.senderSettleModeIsTheChoiceTheClauseSelects`.
 `attach`'s `snd-settle-mode` field has the declared type `sender-settle-mode`
 (`spec/oasis/amqp-core-transport-v1.0-os.xml:3138`), and that element's *choices* are `settled` and
 `unsettled`. The two sentences that constrain `transfer`'s `settled` field select one choice each:
