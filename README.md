@@ -41,7 +41,11 @@ second instance of the relation, and the corpus is what the two are compared ove
 **How far the endpoint's evidence reaches.** Its protocol core is proved to conform, under the same gates as
 every other proof in this repository. Its compiled form is a *trusted* step rather than a proved one — Lean's
 compiler and runtime are not verified — and its socket layer is a small, separately named unproved
-dependency, because the pinned stdlib provides addresses and UDP and no TCP. The corpus runs against the
+dependency: **a choice rather than a necessity**, because the pinned stdlib does have TCP (`Std.Async/TCP`,
+over libuv compiled into `libleanshared.so`) and a POSIX wrapper of about two hundred readable lines was
+taken instead, so that the endpoint's frame loop stays synchronous and the unnamed part of the trust base
+stays small. `PLAN.md` §23.1 records the measurement, the decision and the rejected alternative, which was
+built and passed before it was rejected. The corpus runs against the
 endpoint over a socket as a third runner beside `amqp-spec` and `amqp-ref`, so what the endpoint claims and
 what it does are compared by the same vectors as everything else.
 
