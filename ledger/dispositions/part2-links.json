@@ -1,0 +1,64 @@
+{
+ "conventions": {
+  "deferred:": "A real obligation this plan carries; the suffix names the milestone whose scope in PLAN.md the clause falls in \u2014 S4 for sessions, links and flow control, whose scope line names handle allocation, link resumption, link errors and forced detach. The note names the gap that keeps the clause out of the carrier set. An entry with this value says that nothing under lean/ or vectors/ carries the clause's requirement: a missing carrier is recorded rather than covered by naming a declaration that does not hold the rule.",
+  "kind": "The clause's own keyword, read from the ledger's clause rather than inferred from the coverage class: the class is MUST for both forms, so kind and class diverge for MUST NOT. Every clause in this file is a MUST, and the note says MUST NOT where the clause does.",
+  "uncarried": "No declaration and no vector carries the clause's requirement. A declaration that only recognises the vocabulary a clause is written in \u2014 reading a field without acting on it \u2014 is not a carrier; where one of those exists the note names it as the near-miss so a reader can see why it was not counted, and a finding is stated where the model admits what the clause forbids."
+ },
+ "design_consequences": [
+  "The seven must-class clauses of the links section that were still undispositioned are all about the link as a named, resumable thing, and the model has neither: Spec.Session holds one link per session with a handle registry (lean/Spec/Session.lean:446-448) and no link name, no terminus properties, no unsettled map and no link-error family. The link's flow state is modelled and its flow clauses are dispositioned elsewhere; what is uncarried here is the link's identity and its termini.",
+  "The nearest neighbour of links.2 is implemented and is a different clause: attachLink refuses an attach whose handle is already claimed (lean/Spec/Session.lean:686-689) under attach/field:handle.2, where this sentence says a second attach for a non-suspended link may succeed and the first attach be closed with link-error. A register entry would be the record if the model ever expresses stealing; today the model cannot ask the question.",
+  "links.10 is uncarried for the reason connections.5 is: the model builds no frame, so an obligation to send one has nowhere to live, even though the unmapping that frame announces is modelled in detachLink's outbound branch.",
+  "links.1 is the vacuity the register records for sessions.1 in a second place. That entry's clause list names sessions.1 alone, so this file cites none; widening it to cover link names is the planner's decision to make."
+ ],
+ "dispositions": {
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.1": {
+   "clause_text": "Link names MUST uniquely identify the link amongst all links of the same direction between the two participating containers.",
+   "disposition": "deferred:S4",
+   "kind": "MUST",
+   "note": "deferred: S4 \u2014 uncarried: the model stores no link name and holds one link per session, so the uniqueness this sentence requires has no subject. `attachLink` (lean/Spec/Session.lean:656-736) reads an attach's role, handle, initial-delivery-count, snd-settle-mode and target and never its `name`, and the session keeps one handle registry for its one link (lean/Spec/Session.lean:446-448). This is the shape the register calls vacuous for `sessions.1` (`link-uniqueness-vacuous`), but that entry's text and clause list name `sessions.1` alone, so it is not cited here; widening it, or registering a name-uniqueness reading, is the planner's pen.",
+   "text_sha256": "13cc11d74778e2dfd2caf315599aae0ef534a4f7261f2fbbb532271f67c8275e"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.10": {
+   "clause_text": "In this case, the endpoint MUST send a \u00abdetach\u00bb frame to inform the remote peer that the handle is no longer attached to the link endpoint.",
+   "disposition": "deferred:S4",
+   "kind": "MUST",
+   "note": "deferred: S4 \u2014 uncarried: the sentence obliges the endpoint to send a frame, and no declaration builds one \u2014 the corpus supplies every frame and the model transitions on the frames it is given, which is the gap `connections.5`'s entry records for the close frame. Near-miss: `detachLink`'s outbound branch releases this endpoint's output handle (lean/Spec/Session.lean:944-957), so the unmapping the sentence announces is modelled; what is absent is any policy that decides to unmap, and the vector that exercises a release, `exchange-link-detach-releases-handle`, is a *received* detach.",
+   "text_sha256": "3107b2e9e14381d8af865bd2e10c3affb89c6e49157d037f2379c6b45c12a257"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.2": {
+   "clause_text": "If an attempt is made to attach the link subsequently when it is not suspended, then the link can be 'stolen', i.e., the second attach succeeds and the first attach MUST then be closed with a link error of \u00ablink-error\u00bb.",
+   "disposition": "deferred:S4",
+   "kind": "MUST",
+   "note": "deferred: S4 \u2014 uncarried: nothing carries the stealing rule. The nearest behaviour is the opposite clause's: `attachLink` refuses an attach whose handle is already claimed with an immediate close carrying `handle-in-use` (lean/Spec/Session.lean:686-689), which is `attach/field:handle.2`, while this sentence says a second attach for a non-suspended link succeeds and the first attach is closed with `link-error`. The model has no link-error family, no link-name identity to steal under and no second-attach path, so which of the two applies is not a question it can ask.",
+   "text_sha256": "39b86a096396de45b474c0f912912baa70d5c08e429e45ff1aa6da0d909f2082"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.4": {
+   "clause_text": "In this case, the session endpoint MUST immediately detach the newly created link endpoint.",
+   "disposition": "deferred:S4",
+   "kind": "MUST",
+   "note": "deferred: S4 \u2014 uncarried: no declaration reads an attach's local terminus (source or target), so a peer that declined to create one is indistinguishable from a peer that supplied one. `attachLink` (lean/Spec/Session.lean:656-736) creates the link endpoint for any attach it admits, and its only read of `target` is the coordinator recognition at `Session.withControlLink` (lean/Spec/Session.lean:573-580). Finding: an inbound attach whose terminus is null \u2014 how the artifact says a peer declines, and also what the recovery case of `links.u5` leaves in the field \u2014 is admitted and keeps its link, where this sentence requires the newly created endpoint to be detached.",
+   "text_sha256": "6cb94cd066651facc7647c6fbca4860c15bc9b8a55cee66533543f83220b1a89"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.5": {
+   "clause_text": "If either end of the link is already associated with a terminus, the \u00abattach\u00bb frame MUST include its unsettled delivery state.",
+   "disposition": "deferred:S4",
+   "kind": "MUST",
+   "note": "deferred: S4 \u2014 uncarried: the attach's `unsettled` field is read nowhere, and the model holds no unsettled delivery state to put in it. The fields `attachLink` reads are those listed under `.1`; the session's one delivery (lean/Spec/Session.lean:464) is a delivery in progress rather than a map of unsettled deliveries, which `Contracts/Settlement.lean`'s closing section records. The subject of the sentence does not exist in the model, so it is uncarried rather than unimplemented, and it is the resumption family's \u2014 `links.17`'s non-null `unsettled` for a resuming attach has the same gap.",
+   "text_sha256": "d18d8ad10bdab5db49bf291b674a8a74e938714bcc576f2e9265dec791e873cd"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.7": {
+   "clause_text": "In this case the endpoint MUST report the actual properties of the terminus as created.",
+   "disposition": "deferred:S4",
+   "kind": "MUST",
+   "note": "deferred: S4 \u2014 uncarried: the model holds no terminus properties, so there is nothing whose actual properties could differ from the expected ones this sentence contrasts with. `attachLink` (lean/Spec/Session.lean:656-736) validates the handle, the role and the delivery-count a sender announces and installs no source or target: the attach's `source` field is never read, and `target` is read only to recognise a coordinator (lean/Spec/Session.lean:573-580).",
+   "text_sha256": "63bfb9d273a1aa86d0886c193b891af0b4e3a0497bf4990e6bcdef0d18edd6ea"
+  },
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.8": {
+   "clause_text": "Note that a peer MUST take responsibility for verifying that the remote terminus meets its requirements.",
+   "disposition": "deferred:S4",
+   "kind": "MUST",
+   "note": "deferred: S4 \u2014 uncarried: the obligation is over a remote terminus's requirements and the model holds no terminus to have them. The nearest behaviour is the artifact's own instance of the same idea rather than a carrier for this sentence: `declare`'s `global-id` rule refuses a declare whose coordinator announced no `distributed-transactions` capability (lean/Spec/Transactions.lean:292-296), which is a field rule dispositioned with the `global-id` clauses. The general responsibility \u2014 that a peer verifies rather than assumes \u2014 is stated nowhere.",
+   "text_sha256": "ef75b0df4bb80924b872b34624e8770ffd3ee808a8b414b9e9627610b62176e1"
+  }
+ }
+}
