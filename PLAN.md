@@ -750,7 +750,15 @@ three loop relations cannot be stated at a single fuel. **This is not a behaviou
 structural rather than lucky: the specification's dispatch is on `classify` and its four width cases are uniform in the row through `specElementData`, so there is no per-octet work for a fuel increment to
 buy, while the reference spends its unit on a header the specification does not have. The route taken is therefore to prove **the specification's fuel irrelevant above the octet bound** — a theorem rather
 than a hypothesis — which aligns the loops without re-proving the 34 landed arms at shifted pairs. It is the *third* instance of the shape this section has now recorded twice: a statement quantified wider
-than its contract needs is not stronger but false, and the repair is a restriction to the domain the contract actually reaches.
+than its contract needs is not stronger but false, and the repair is a restriction to the domain the contract actually reaches. The route was implemented as far as its design and its tooling: the loop tooling landed green
+(`a018180` — the unassigned-octet family, the element-constructor bridge, the reference's advances, `pairUp_agrees`, `specElementData` with its loop equation, the exhausted-cursor refusals), and the design
+established four statement-level facts that are conditions on the *statement* rather than objections to the fact: the item loop's irrelevance is false from fuel zero to one at a zero count, the compound
+reader's is false at fuel zero for a width-zero declaration the declared surface has no row for, every clause must carry the *buffer invariance* of its read because a loop's tail is read at a cursor the
+item read advanced, and the specification's readers are one `mutual` block, so their unfoldings are the compiler's equations rather than iota — `unfold` or `cases` reduces them, not `rfl`.
+
+**And one finding refuted a second claim, in a docstring rather than a law.** `WireAgrees`'s own rationale said the two readers "spend the same fuel per value, per compound item and per array element", which
+the compound rows refute; the docstring now carries the witness beside the bound it explains. **A rationale is a claim like any other and decays the same way** — this is the same lesson as the plan text
+that described landed work as owed and the note that said the model was keyed wrongly, arriving this time inside a proof module, where the temptation is to read prose as commentary rather than assertion.
 
 ## 11. Specification test vectors
 
