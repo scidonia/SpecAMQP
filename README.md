@@ -46,9 +46,11 @@ dependency: **a choice rather than a necessity**, because the pinned stdlib does
 over libuv compiled into `libleanshared.so`) and a POSIX wrapper — a couple of hundred lines, measured in
 `PLAN.md` §23.1 — was taken instead, so that the endpoint's frame loop stays synchronous and the unnamed part of the trust base
 stays small. `PLAN.md` §23.1 records the measurement, the decision and the rejected alternative, which was
-built and passed before it was rejected. The corpus runs against the
-endpoint over a socket as a third runner beside `amqp-spec` and `amqp-ref`, so what the endpoint claims and
-what it does are compared by the same vectors as everything else.
+built and passed before it was rejected. **The corpus will run against the
+endpoint over a socket as a third runner beside `amqp-spec` and `amqp-ref`** — that runner is R4 and does not
+exist yet, so what the endpoint claims and what it does are not compared by the vectors today. The protocol
+core's `Conforms` instance is likewise R3 and undischarged: what is proved *about the endpoint* at this point
+is nothing, and what is proved *about its parts* is the framing laws in `lean/Proofs/CoreLaws.lean`.
 
 **`lean/Ref/` is not that proof, and it is not an implementation-acceptance mechanism.** It is a second
 *independent reading* of the same standard, because the dominant residual risk here is prose ambiguity: two

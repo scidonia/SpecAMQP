@@ -966,9 +966,9 @@ This repository holds the specification **and**, from the implementation track r
 
 The chain is therefore three links, and only the middle one is trusted:
 
-1. **The protocol core conforms to the specification — proved.** `lean/Impl/` holds a pure endpoint: octets and events in, octets and events out, no `IO`. Its conformance to `Spec` is a `Conforms` instance of §10, discharged in `lean/Proofs/` under the same gates as every other proof here.
+1. **The protocol core conforms to the specification — R3's obligation, not yet discharged.** `lean/Impl/` holds a pure endpoint: octets and events in, octets and events out, no `IO`. Its conformance to `Spec` is to be a `Conforms` instance of §10 with the relation `i.conn = s`, discharged in `lean/Proofs/`; `Core.specCore` exists with an empty `choose` and **no `Conforms` theorem about it does**. This link was written in the present tense before R2 landed and a review caught it, which is why it now names the rung instead of the fact — the chain is what the track *establishes*, and two of its three links are still owed.
 2. **The compiled binary refines the source — trusted, and disclosed.** Lean's compiler and runtime are not verified. This link is named in `HANDOFF.md` and in the trust gate's inventory the way `native_decide` is named, because a claim that a proof about Lean source is a claim about a binary is exactly the kind of assumption this repository discloses rather than implies.
-3. **The binary behaves as the corpus says — tested.** The vectors already run against `amqp-spec` and `amqp-ref` through a runner interface that was frozen to be implementation-agnostic; the endpoint becomes the third runner over the same corpus, at the wire rather than in process.
+3. **The binary behaves as the corpus says — R4's obligation, not yet discharged.** The vectors already run against `amqp-spec` and `amqp-ref` through a runner interface that was frozen to be implementation-agnostic; the endpoint *will* be the third runner over the same corpus, at the wire rather than in process. No runner drives `amqp-endpoint` today, and a review found no test or script invoking it at all, so the shell's three unproved obligations currently rest on analogous evidence from R1's harness rather than on execution of the shipped loops.
 
 **Rungs**, each landable and each verified on its own:
 
