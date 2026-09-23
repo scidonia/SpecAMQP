@@ -512,7 +512,20 @@ than a function of it; `readFrame`'s suffix-independence — the property that m
 invisible — is **unproved**, so no present-tense claim about arbitrary fragmentation is available;
 **no committed test executes the shipped shell's loops** (R1's contract exercises a different
 implementation); and two documents claimed the core's `Conforms` instance and the corpus's endpoint
-runner as existing, which they are not — that one was mine and is corrected. **Updated as the fixes landed:**
+runner as existing, which they are not — that one was mine and is corrected. **ACCEPTED.** The verdict came after four rounds, and each round found a different kind of defect rather than a
+further instance of the last: the document correction it asked for was incomplete in five places, and grepping for
+the claim rather than for the finding turned up three more; the contract it was asked to verify pinned four
+sentences the driver *printed* rather than the forcing conditions those sentences described, so it failed on a
+reworded assertion while the forcing was intact; two of the remaining claims no phrase-search could find — a table
+row calling the shell a loop "over the proved core" four lines above the row saying that core is unproved, and a
+command block saying a contract did not exist long after it landed; and finally that my own search had truncated
+its results, so I had reported the family closed three hits early. Its substantive rulings: finding 1's second
+transcription is gone (`Spec.Frame.frameExtent`), finding 3's shell is tested by
+`tests/contracts/r2_endpoint_shell.sh` with the forcing asserted structurally, and finding 2's unproved
+fragmentation property is **sufficient as a stated no-axiom residual** rather than a blocker — the acceptance-bar
+judgement I deliberately put to it rather than making myself, and the thing R3's stream corollary now rests on.
+
+**Updated as the fixes landed:**
 
 the second transcription is gone — `0f75923` made the front end's extent computation a call to
 `Spec.Frame.frameExtent` rather than a second copy of the reader's progress decision, and `Spec` rebuilt
