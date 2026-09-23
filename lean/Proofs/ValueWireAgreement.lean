@@ -12,7 +12,12 @@ import Ref.Value
 `Proofs.FrameConformance.ValueLayersAgree` is the value layer's claim in the *wire* vocabulary: what
 the reference's reader reads off a buffer, the specification's reader reads too - the same octets
 consumed and bodies the frame layer views the same way - or a refusal of the same class. This module
-is that claim's development, and it is **in progress**. Landed: the formulation (with the fuel bound
+is that claim's development, and the claim is **proved**: `valueLayersAgree` below is a theorem of
+`Proofs.FrameConformance.ValueLayersAgree` with no hypotheses, so the frame layer's
+`frame_conformance_public` now applies to `specFrame`/`refFrame` without one. Nothing in it is
+conditional on `ElementsDecideAt` or `ElementsDecideBelow` or on any other named hypothesis about the
+readers: both are discharged by `elementsDecideBelow_all` / `elementsDecideAt_all`, which are read off
+the same induction that produces the value law. Landed: the formulation (with the fuel bound
 its truth needs), the base case, the octet step and its payload bridges, the branch *pattern*, and
 **38 of the 40 arms** — the described branch and every row that reads no recursive value: the five
 other zero-width rows, the one-octet payloads, the wide unsigned and `char` widths, the seven *signed*
@@ -34,15 +39,20 @@ that cursor. The **element decision** (`ElementDataAgrees`) has landed in turn: 
 constructor rows** are proved — one theorem per octet, `element_0x00` through `element_0xF0`, over the
 three stems `elementData_ok` / `elementData_step` / `elementData_var` — and the dispatcher
 `elementsDecideAt_of_upTo` turns them into the named hypothesis `ElementsDecideAt` that
-`elementsLoop_agrees` and `readArray_body` take. Still owed: the two array arms (`0xE0`, `0xF0`) that
-consume the loop; the dispatch that turns the value-level arms into the induction step; and the fuel
-induction itself. The entry point is therefore **not** reached in this module yet, and
-`ValueLayersAgree` is undischarged.
+`elementsLoop_agrees` and `readArray_body` take. The two array arms (`0xE0`, `0xF0`) have followed —
+they are the array body at the fuel the octet hands down — and so has the **value law's dispatch**:
+`wireAgrees_succ` takes the octet on both sides and applies the octet's own arm, over the forty octets
+the reference's reader assigns (`wireCtors`), with the unassigned family for the rest. The **fuel
+induction** is `wireInvariant`, `WireAgreesUpTo n ∧ ElementsDecideBelow n` by `Nat.rec`, from which
+`wireAgrees_all`, `elementsDecideBelow_all` and `elementsDecideAt_all` are read off; the **entry
+point** is `valueLayersAgree` at `fuel = region.size` with both initial cursors, where the bound is
+`region.size - 0 ≤ region.size` and the consumed cursor is the two readers' own entry point. The
+claim is therefore reached and `ValueLayersAgree` is discharged.
 What each owes and how it is
 proved is stated where it belongs rather than in a list here: see the octet step's arithmetic, and
 `arm_0x00`'s docstring for the pattern the branches follow.
 
-## The element decision is not independent of the value law
+## The element decision is not independent of the value law, and neither is the induction
 
 The plan's ordering — the element decision first, then the arms, then the induction — is not the
 dependency order, and a successor should not start from it. Four of the forty element rows are
@@ -52,12 +62,12 @@ same body a value-level row is: `element_0xC0` and its three neighbours call
 `element_0x00` calls `WireAgrees g` twice. So `ElementsDecideAt g` rests on the value law at the
 fuels *beneath* `g` — and `element_0xE0` / `element_0xF0` rest on `ElementsDecideBelow g`, which is
 the same decision family one fuel down. The two families therefore have to be proved together, as the
-joint invariant `WireAgreesUpTo n ∧ ElementsDecideBelow n` that the induction below carries: the
+joint invariant `WireAgreesUpTo n ∧ ElementsDecideBelow n` that `wireInvariant` inducts over: the
 element decision at every fuel below `n` supplies the array rows, the value law at every fuel up to
 `n` supplies the compound and described rows, and the value law at `n + 1` is then read off the same
-two. `elementsDecideAt_of_upTo` is the dispatch with exactly those two hypotheses; it is not a
-conditional in the sense the acceptance refuses, because both are discharged by the same induction
-that produces the value law itself.
+two. `elementsDecideAt_of_upTo` is the dispatch with exactly those two hypotheses, and both are
+supplied at the one place the induction uses it — so it is not a conditional left standing, it is a
+step of the induction that produces the value law itself.
 
 ## What the compound and array rows owe, and the fuel asymmetry that shapes them
 
@@ -67,9 +77,9 @@ element read, named as a reader so the element count can be inducted on), the re
 advances, the element-constructor bridge (`elementDecl?_isSome`, `elementDecl?_of_assigned`,
 `elementDecl?_refusal`), and the refusal families for an octet the declared surface does not assign
 (`encodingOf_none_of_not_assigned`, `ref_readValue_unassigned`, `spec_readValue_unassigned`,
-`dataDecl_of_unassigned`). The loop relations themselves are **not** landed, and the reason is a
-finding that shapes them rather than a missing lemma — the plan owner's response to it is the
-irrelevance family now landed at the end of this module:
+`dataDecl_of_unassigned`). The loop relations followed, by the route below rather than at one fuel,
+because of a finding that shapes them rather than a missing lemma — the plan owner's response to it is
+the irrelevance family landed at the end of this module:
 
 **The two artefacts spend fuel differently on a compound's header.** The reference's `readCompound`
 matches on `fuel + 1`, so it spends one unit on its own header and reads its items at `readItems
@@ -6993,6 +7003,95 @@ theorem wireAgrees_succ (K : Nat) (hup : WireAgreesUpTo K) (hdec : ElementsDecid
         obtain ⟨r, hspec, hcl⟩ :=
           spec_readValue_unassigned K c code d hs (encodingOf_none_of_not_assigned hass) hne
         exact ⟨r, hspec, by rw [hcl]; rfl⟩
+
+
+/-! ## The joint induction, and the entry point -/
+
+/-- **The invariant of one induction.** The value law at every fuel up to `n`, together with the
+element decision at every fuel below `n`.
+
+The two are *not* provable separately, which is the thing a successor needs to know before trying: the
+four container element rows are the compound and array bodies, so `ElementsDecideAt k` needs the value
+law at the fuels beneath `k`, and the two array arms of the value law need `ElementsDecideBelow k`,
+which is the same decision family one fuel down. One induction over the pair closes both, and the
+reading of each half off the pair is what `wireAgrees_all` and `elementsDecideBelow_all` below do. -/
+theorem wireInvariant : ∀ n : Nat, WireAgreesUpTo n ∧ ElementsDecideBelow n := by
+  intro n
+  induction n with
+  | zero =>
+    refine ⟨?_, ?_⟩
+    · intro k hk
+      have hk0 : k = 0 := by omega
+      subst hk0
+      exact wireAgrees_zero
+    · intro k hk
+      exact absurd hk (by omega)
+  | succ m ih =>
+    have hdec : ElementsDecideBelow (m + 1) := by
+      intro k hk
+      exact elementsDecideAt_of_upTo (wireAgreesUpTo_mono ih.1 (by omega))
+        (fun j hj => ih.2 j (by omega))
+    have hw : WireAgrees (m + 1) := wireAgrees_succ m ih.1 ih.2
+    refine ⟨?_, hdec⟩
+    intro k hk
+    by_cases hkm : k ≤ m
+    · exact ih.1 k hkm
+    · have hk1 : k = m + 1 := by omega
+      subst hk1
+      exact hw
+
+/-- **The value law at every fuel.** Read off the joint invariant at its own top. -/
+theorem wireAgrees_all (n : Nat) : WireAgrees n := (wireInvariant n).1 n le_rfl
+
+/-- **The element decision at every fuel below `n`**, the hypothesis `elementsLoop_agrees` and
+`readArray_body` take. -/
+theorem elementsDecideBelow_all (n : Nat) : ElementsDecideBelow n := (wireInvariant n).2
+
+/-- **The element decision at one fuel**, the named hypothesis discharged. -/
+theorem elementsDecideAt_all (g : Nat) : ElementsDecideAt g :=
+  elementsDecideBelow_all (g + 1) g (by omega)
+
+/-- **The value layer's reader agreement, in the contract's own vocabulary.** The wire law at
+`fuel = region.size` and the initial cursors — `region.size - 0 ≤ region.size` is the octet bound's
+base case, and the two initial cursors are the same buffer at the same position — with the
+`BodiesAgree` the law carries turned into the *view* equality the contract states by
+`bodyView_of_BodiesAgree`, and the consumed cursor read off the two readers' own entry points. -/
+theorem valueLayersAgree : ValueLayersAgree := by
+  intro region
+  have h := wireAgrees_all region.size ⟨region, 0⟩ ⟨region, 0⟩ ⟨rfl, rfl⟩ (by simp)
+  constructor
+  · intro other used hd
+    unfold SpecAMQP.Ref.decode at hd
+    cases hrv : SpecAMQP.Ref.readValue region.size ⟨region, 0⟩ with
+    | error e =>
+      rw [hrv] at hd
+      exact absurd hd (by simp)
+    | ok p =>
+      obtain ⟨v, cx⟩ := p
+      rw [hrv] at hd
+      simp only [Except.ok.injEq, Prod.mk.injEq] at hd
+      obtain ⟨hother, hused⟩ := hd
+      subst hother
+      subst hused
+      obtain ⟨body, c₂, hspec, hcd, -, hba⟩ := h.1 v cx hrv
+      refine ⟨body, ?_, bodyView_of_BodiesAgree hba⟩
+      unfold SpecAMQP.Spec.Codec.decodeValue
+      rw [hspec]
+      simp only [hcd.2]
+  · intro failure hd
+    unfold SpecAMQP.Ref.decode at hd
+    cases hrv : SpecAMQP.Ref.readValue region.size ⟨region, 0⟩ with
+    | error e =>
+      rw [hrv] at hd
+      simp only [Except.error.injEq] at hd
+      subst hd
+      obtain ⟨refusal, hspec, hcl⟩ := h.2 e hrv
+      refine ⟨refusal, ?_, hcl⟩
+      unfold SpecAMQP.Spec.Codec.decodeValue
+      rw [hspec]
+    | ok p =>
+      rw [hrv] at hd
+      exact absurd hd (by simp)
 
 
 end SpecAMQP.Proofs
