@@ -153,6 +153,14 @@ output rather than only in a diff. Right now that count is six.
   rather than counted, which is what happened once in this repository — the
   conclusion drawn from it was re-derived from an offline build before being
   relied on.
+- **Say which tree a gate ran against.** With several slices editing at once, a green gate is
+  evidence about the *working tree* at the moment it ran — not about a commit, and not about
+  anyone else's slice, which may have moved under it. Name the commit id when the run followed
+  one and say "working tree" when it did not. The distinction is small and real: a run against a
+  working tree whose contents were later committed is evidence about that commit, and one whose
+  contents changed before the commit is evidence about a state that no longer exists. Raised by a
+  slice that noticed its own numbers predated a commit and said so rather than leaving them to be
+  read as the commit's.
 - **The module set, not a list of targets.** `lake build <target>` builds what you named;
   `lake build` builds every module the lakefile's globs reach, including ones no contract names
   yet. Every gate here named targets, so two modules that did not compile sat in the tree
