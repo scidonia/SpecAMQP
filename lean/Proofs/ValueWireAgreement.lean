@@ -46,6 +46,29 @@ A later reader may wonder why the statement below says the view rather than `Bod
 contract's spelling, kept so the claim is the contract's own, and the strengthening is the route to
 proving it.
 
+`bodyView_of_BodiesAgree`'s state, so a successor starts where this stopped rather than re-deriving
+it: `typeOfDescriptor_agrees` **closes 623 of its 625 goals** with a case-driven closer —
+
+```lean
+cases d <;> cases d' <;>
+  simp only [BodiesAgree, SpecAMQP.Spec.Frame.typeOfDescriptor,
+    SpecAMQP.Ref.Frame.typeOfDescriptor] at h ⊢ <;>
+  try rfl <;> simp_all
+```
+
+— and the two that remain are `.ulong/.ulong` and `.symbol/.symbol`, where `h` is the payload
+equality and the goal is
+`types.find? (fun entry => … == n) = types.find? (fun entry => … == n.toNat)`: equal once the
+equality is rewritten *under the predicate's binder*, which is why a top-level `rw [h]` does not
+reach it — enter the binder first (`congr 1`, then `funext entry`, then `rw [h]`).
+
+Two shapes to avoid, both measured. A `match d, d' with` prologue before the `cases` abstracts the
+two values, so the wildcard's `cases` acts on names the goal no longer mentions and fails with the
+values still symbolic — the case-driven form above is the one that works even though the prologue
+reads better. And one `simp` call over the 25×25 product exceeds the heartbeat budget while 625 goals
+with the targeted `simp only` chain above close in about ten seconds: the budget is per-invocation,
+so a fixed term per goal is cheap at any count and a search is expensive at one.
+
 ## What the view weakens to
 
 `specBodyView`/`refBodyView` look at a body only to ask *which described type it announces*
