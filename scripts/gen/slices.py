@@ -34,13 +34,44 @@ What the corpus covers:
     `open`, and the mechanism comparison the symbol type forces (exact, not
     case-folded);
   * the connection error conditions, all of them the one the artifact uses for
-    wire-level refusals, with the specific cause in the reason class.
+    wire-level refusals, with the specific cause in the reason class;
+  * the framing boundaries the connection owns: a frame at exactly the maximum frame
+    size this peer announced and at one octet more, a frame whose header is longer than
+    the minimum, a frame with no body on a channel a session would have to map, a frame
+    above the channel maximum this peer declared, the SASL layer's own 512-octet bound,
+    and the two frame-layer failure classes (`sizeMismatch`, `truncated`) that reach the
+    connection as a pass-through, under the one condition it uses for a wire-level
+    failure;
+  * the settlement negotiation in both directions: the `settled` choice obliging a
+    delivery to be settled in at least one of its transfers and the `mixed` choice
+    obliging neither, the `unsettled` choice's exemption for an aborted delivery, and
+    the transfer's `rcv-settle-mode` admitted only where the attach negotiated it;
+  * the flow's counts against the quantities each end holds: the delivery-count a
+    sender's flow must carry as its own current count, and the echo a receiver's flow
+    must return;
+  * the delivery a transfer ends or discards: `more` carrying one across transfers,
+    `aborted` discarding one with the data its earlier transfers carried, and the
+    precedence the artifact gives `aborted` when both flags are set;
+  * the fields an attach's and a begin's own clauses make them carry or omit — a
+    sender's missing `initial-delivery-count`, a receiver's (which is ignored), the
+    `remote-channel` in both of its directions — and the resume flag a resumed delivery
+    is named by;
+  * the dispatch table's channel rule, which the interface fixes and the register
+    records: a session performative on channel zero is a frame the connection cannot
+    relay and no session can answer.
 
 `--mutations` writes the control family to a separate path: a vector that asserts a
 mutated state-table row (END permits a send) and which the peer must therefore refuse,
 and a vector whose own expected state is wrong so that the harness's failure path is
 exercised. Those are controls, not corpus: they are meant to fail, so they are written
 where the operator asks for them rather than into the passing corpus.
+
+`--staged` writes the third family to a path of the caller's choosing: vectors authored
+from the artifact that at least one artefact does not meet. Each is a *divergence* (the
+two artefacts answer the same step differently, and neither side is chosen) or a *shared
+gap* (both admit what a clause forbids, so no differential can see it); `staged_corpus`
+names which, with the clause and both observed answers, because the file is a fix
+slice's opening evidence rather than a corpus a gate runs.
 
 Runs offline; the only input is the vendored artifacts under `spec/oasis/`.
 """
@@ -105,6 +136,43 @@ WINDOW_INCOMING = f"{TRANSPORT}#amqp:transport/section:sessions/doc:session-flow
 WINDOW_AFTER_SENDING = f"{TRANSPORT}#amqp:transport/section:sessions/doc:session-flow-control.5"
 WINDOW_AFTER_FLOW = f"{TRANSPORT}#amqp:transport/section:sessions/doc:session-flow-control.7"
 WINDOW_AFTER_RECEIVING = f"{TRANSPORT}#amqp:transport/section:sessions/doc:session-flow-control.6"
+
+# The settle-mode pair. `settled.4`/`.5` and `.6` are one sentence's two choices: the
+# artifact distinguishes them only by the `choice` attribute of their cross-references
+# (`<xref name="sender-settle-mode" choice="settled"/>` against `choice="unsettled"`),
+# so a vector names the clause whose choice it negotiates rather than the family.
+TRANSFER_SETTLED_NEVER = f"{TRANSPORT}#amqp:transport/section:performatives/type:transfer/field:settled.6"
+TRANSFER_RCV_SETTLE_ILLEGAL = f"{TRANSPORT}#amqp:transport/section:performatives/type:transfer/field:rcv-settle-mode.u1"
+# The resumption clauses, none of which has a carrier: `resume.2` is the sender's MUST NOT
+# and `.3` the first-transfer rule, and both are statements about a delivery's presence in
+# an unsettled map the layer does not hold.
+TRANSFER_RESUME_SENDER_MUST_NOT = f"{TRANSPORT}#amqp:transport/section:performatives/type:transfer/field:resume.2"
+TRANSFER_RESUME_FIRST_TRANSFER = f"{TRANSPORT}#amqp:transport/section:performatives/type:transfer/field:resume.3"
+# The `more`/`aborted` pair: `.u1` is the precedence note ("the aborted flag takes
+# precedence") and `.2` the sender's SHOULD NOT, which a receiver cannot enforce and which
+# is why the vector that carries both states the precedence rather than the SHOULD NOT.
+TRANSFER_MORE_ABORTED_PRECEDENCE = f"{TRANSPORT}#amqp:transport/section:performatives/type:transfer/field:more.u1"
+TRANSFER_ABORT_PRIOR_DATA = f"{TRANSPORT}#amqp:transport/section:links.33"
+ATTACH_INITIAL_COUNT = f"{TRANSPORT}#amqp:transport/section:performatives/type:attach/field:initial-delivery-count.1"
+ATTACH_UNSETTLED_NULL_KEY = f"{TRANSPORT}#amqp:transport/section:performatives/type:attach/field:unsettled.5"
+FLOW_DELIVERY_COUNT_ECHO = f"{TRANSPORT}#amqp:transport/section:performatives/type:flow/field:delivery-count.3"
+BEGIN_LOCAL_REMOTE_CHANNEL = f"{TRANSPORT}#amqp:transport/section:performatives/type:begin/field:remote-channel.1"
+# The connection-level framing boundaries: the SIZE field counts the extended header
+# (`framing.1`), and `framing.4` is the empty frame the idle-timeout doc licenses.
+SIZE_COUNTS_EXTENDED = f"{TRANSPORT}#amqp:transport/section:framing.1"
+EMPTY_FRAME = f"{TRANSPORT}#amqp:transport/section:framing.4"
+EMPTY_FRAME_ANY_CHANNEL = f"{TRANSPORT}#amqp:transport/section:connections/doc:doc-idle-time-out.7"
+# The section's answer to input a session cannot process (`.5`), and the discard phase it
+# obliges (`.6`) — the two clauses every session refusal is placed by.
+SESSION_END_ON_ERROR = f"{TRANSPORT}#amqp:transport/section:sessions.5"
+# `links.29` is where the artifact says what `more` means — "additional data MAY be
+# transferred in additional «transfer» frames by setting the more flag on all but the last
+# «transfer» frame" — which is what makes an unset flag a completed message rather than an
+# absent one.
+TRANSFER_MORE_LAST_FRAME = f"{TRANSPORT}#amqp:transport/section:links.29"
+# "Both peers MUST accept frames of up to 512 octets", which is the floor an `open`'s own
+# declared maximum has to leave in place.
+MIN_ACCEPTED_FRAME = f"{TRANSPORT}#amqp:transport/section:performatives/type:open/field:max-frame-size.3"
 
 CHANNEL_MAP = f"{TRANSPORT}#amqp:transport/section:connections.1"
 STATE_DIAGRAM = f"{TRANSPORT}#picture.23"
@@ -269,6 +337,21 @@ def encode(value: dict) -> bytes:
         if size < 256 and len(value["items"]) < 256:
             return b"\xC0" + bytes([size]) + bytes([len(value["items"])]) + items
         return b"\xC1" + be(size + 3, 4) + be(len(value["items"]), 4) + items
+    if kind == "map":
+        entries = b"".join(encode(entry["key"]) + encode(entry["value"])
+                           for entry in value["entries"])
+        if not value["entries"]:
+            # map8 with a count of zero: the size field counts the count field and the
+            # items that follow it, so an empty map's size is one
+            return b"\xC1\x01\x00"
+        # the count field counts *items* rather than pairs — a map's keys and values are
+        # its items, so a one-pair map declares two — which is why a pair count written
+        # here is refused by both readers as an odd item count
+        count = len(value["entries"]) * 2
+        size = len(entries) + 1
+        if size < 256 and count < 256:
+            return b"\xC1" + bytes([size]) + bytes([count]) + entries
+        return b"\xD1" + be(size + 3, 4) + be(count, 4) + entries
     if kind == "described":
         return b"\x00" + encode(value["descriptor"]) + encode(value["value"])
     raise SystemExit(f"gen-exchange-vectors: cannot encode a {kind!r}")
@@ -319,6 +402,13 @@ def frame_value(frame_type: int, body: dict, channel: int = 0, payload: bytes = 
 
 def protocol_header(protocol_id: int, major: int, minor: int, revision: int) -> bytes:
     return MAGIC + bytes([protocol_id, major, minor, revision])
+
+
+def empty_frame(frame_type: int = AMQP_FRAME, channel: int = 0) -> bytes:
+    """A frame consisting solely of a frame header, which `framing.4` licenses ("a frame
+    consisting solely of a frame header, with no frame body") and which the idle-timeout
+    doc requires a peer to handle on any valid channel. SIZE counts the header alone."""
+    return be(FRAME_HEADER, 4) + bytes([FRAME_MIN_DOFF, frame_type]) + be(channel, 2)
 
 
 # --------------------------------------------------------------------------- #
@@ -440,17 +530,35 @@ class Corpus:
             "outgoing-window": {"type": "uint", "value": outgoing}})
 
     def transfer_body(self, handle: int = 0, delivery_id: int = 0,
-                      delivery_tag: bytes = b"tag") -> dict:
+                      delivery_tag: bytes = b"tag", *, identity: bool = True,
+                      settled: bool | None = None, more: bool | None = None,
+                      aborted: bool | None = None, resume: bool | None = None,
+                      rcv_settle_mode: int | None = None) -> dict:
         """A `transfer` of one unfragmented delivery: the handle it is mandatory, and
-        `more` is left unset, which is the default and means the message is not split."""
-        return self.body("transfer", handle={"type": "uint", "value": handle},
-                         **{"delivery-id": {"type": "uint", "value": delivery_id},
-                            "delivery-tag": {"type": "binary", "hex": delivery_tag.hex()},
-                            "message-format": {"type": "uint", "value": 0}})
+        `more` is left unset, which is the default and means the message is not split.
+
+        `identity=False` leaves `delivery-id`, `delivery-tag` and `message-format` off the
+        frame, which is what a continuation transfer writes. The flags each field is named
+        for are written only where the vector sets them, so an unset flag is the absent
+        field the artifact's own default applies to rather than an explicit false."""
+        fields: dict[str, dict] = {"handle": {"type": "uint", "value": handle}}
+        if identity:
+            fields["delivery-id"] = {"type": "uint", "value": delivery_id}
+            fields["delivery-tag"] = {"type": "binary", "hex": delivery_tag.hex()}
+            fields["message-format"] = {"type": "uint", "value": 0}
+        for name, flag in (("settled", settled), ("more", more), ("aborted", aborted),
+                           ("resume", resume)):
+            if flag is not None:
+                fields[name] = {"type": "boolean", "value": flag}
+        if rcv_settle_mode is not None:
+            fields["rcv-settle-mode"] = {"type": "ubyte", "value": rcv_settle_mode}
+        return self.body("transfer", **fields)
 
     def attach_body(self, role: bool = False, handle: int = 0, name: str = "link",
                     initial_delivery_count: int = 0,
-                    snd_settle_mode: int | None = None) -> dict:
+                    snd_settle_mode: int | None = None,
+                    rcv_settle_mode: int | None = None,
+                    unsettled: dict | None = None) -> dict:
         """An `attach`. The `role` field's declared type is a restricted `boolean` whose
         `sender` value is false and whose `receiver` value is true, and
         `initial-delivery-count` "MUST NOT be null if role is sender", so this carries it
@@ -461,7 +569,9 @@ class Corpus:
         element itself. The element names the field's type and the sentences that constrain
         `transfer`'s `settled` field each select one of those choices, so a value written
         here is a negotiation, and reading the element's *name* where a sentence selects a
-        *choice* inverts which obligation is in force."""
+        *choice* inverts which obligation is in force. `rcv_settle_mode` is the same shape
+        for the receiver's half of the negotiation, whose choices are `first` and `second`.
+        """
         fields: dict[str, dict] = {"name": {"type": "string", "text": name},
                                    "handle": {"type": "uint", "value": handle},
                                    "role": {"type": "boolean", "value": role}}
@@ -470,7 +580,25 @@ class Corpus:
                                                 "value": initial_delivery_count}
         if snd_settle_mode is not None:
             fields["snd-settle-mode"] = {"type": "ubyte", "value": snd_settle_mode}
+        if rcv_settle_mode is not None:
+            fields["rcv-settle-mode"] = {"type": "ubyte", "value": rcv_settle_mode}
+        if unsettled is not None:
+            fields["unsettled"] = unsettled
         return self.body("attach", **fields)
+
+    def unsettled_map(self, entries: list[tuple[dict, dict]]) -> dict:
+        """An `unsettled` field's value: a map of delivery-tag to delivery state. Part 3
+        gives the states meanings and this layer does not read them, so a vector that
+        exercises the map's own key rule carries values that are whatever the rule under
+        test does not look at."""
+        return {"type": "map",
+                "entries": [{"key": key, "value": value} for key, value in entries]}
+
+    def settle_mode(self, owner: str, name: str) -> int:
+        """A settle-mode choice's number, from the artifact's own choice table: the
+        `sender-settle-mode` and `receiver-settle-mode` elements are where the two
+        negotiations' values live, and a vector that writes one cites the choice."""
+        return choice_value(TRANSPORT, owner, name)
 
     def detach_body(self, handle: int = 0, closed: bool = True) -> dict:
         """A `detach`, whose handle is mandatory and whose `closed` flag says whether the
@@ -1066,6 +1194,145 @@ def corpus(tables: Corpus) -> list[dict]:
              "discarded until the partner's close arrives, and that close is what ends "
              "the connection, after which nothing is written"))
 
+    # -- the frame-size bound at the value it was declared with -------------------- #
+
+    # The two frames below are the same flow — the session's windows, which is a body
+    # every layer reads and no link rule constrains — padded to a total the vector states.
+    def window_flow() -> dict:
+        return t.body("flow", **{
+            "next-incoming-id": {"type": "uint", "value": 0},
+            "incoming-window": {"type": "uint", "value": 1000},
+            "next-outgoing-id": {"type": "uint", "value": 0},
+            "outgoing-window": {"type": "uint", "value": 1000}})
+
+    def sized_receive(body: dict, total: int, *, state: str, channel: int = 1) -> dict:
+        return {"direction": "receive",
+                "bytes": frame_octets(AMQP_FRAME, body, channel=channel,
+                                      payload=payload_to_total(AMQP_FRAME, body, total)).hex(),
+                "expect": {"status": "admitted", "state": state}}
+
+    vectors.append(exchange(
+        "exchange-frame-size-at-the-declared-maximum", start=c("START"),
+        clauses=[STATE_TABLE, PRE_NEGOTIATION_LIMITS, MAX_FRAME_SIZE, OVERSIZED_FRAME,
+                 SESSION_STATES, BEGIN_ESTABLISHES],
+        steps=[t.send_header("amqp"),
+               t.send_frame(AMQP_FRAME,
+                            t.open_body(max_frame_size=t.min_max_frame_size),
+                            state=c("OPEN_PIPE")),
+               t.receive_header("amqp", state=c("OPEN_SENT")),
+               t.receive_frame(AMQP_FRAME, open_wide, state=c("OPENED")),
+               t.send_frame(AMQP_FRAME, t.begin_body(), state=s("BEGIN_SENT"), channel=1),
+               t.receive_frame(AMQP_FRAME, t.begin_body(remote_channel=1),
+                               state=s("MAPPED"), channel=1),
+               sized_receive(window_flow(), t.min_max_frame_size, state=s("MAPPED")),
+               t.refused("receive", reason="limit", state=c("DISCARDING"),
+                         body=window_flow(), channel=1,
+                         payload=payload_to_total(AMQP_FRAME, window_flow(),
+                                                  t.min_max_frame_size + 1),
+                         note="one octet more than the maximum frame size this peer "
+                              "announced in its own open, which the clause makes the "
+                              "bound: \"A peer that receives an oversized frame MUST "
+                              "close the connection with the framing-error "
+                              "error-code\"")],
+        note="the boundary the other oversized vector approaches from one side only: "
+             "`exchange-oversized-frame-received` refuses a frame one octet over the "
+             "limit, and this vector admits a frame of exactly MIN-MAX-FRAME-SIZE on the "
+             "same terms and then refuses the next octet — so the bound is the "
+             "comparison's rather than the frame's, and the two halves are one vector "
+             "because a boundary is only pinned by both sides of it"))
+
+    vectors.append(exchange(
+        "exchange-frame-size-below-the-header", start=c("OPENED"),
+        clauses=[STATE_TABLE, SIZE_COUNTS_EXTENDED, HEADER_LAYOUT, OVERSIZED_FRAME],
+        steps=[t.refused("receive", reason="sizeMismatch", state=c("DISCARDING"),
+                         octets=be(4, 4) + bytes([FRAME_MIN_DOFF, AMQP_FRAME]) + be(0, 2),
+                         note="SIZE declares four octets where the header alone is eight: "
+                              "`framing.1` makes the field the total the header, the "
+                              "extended header and the body occupy together, so a frame "
+                              "that cannot hold its own header is not a frame"),
+               t.refused("receive", reason="truncated",
+                         state=c("DISCARDING"), octets=empty_frame()[:6],
+                         note="the same field against the octets available: "
+                              "`doc-idle-time-out.7` requires a peer to *handle* empty "
+                              "frames, and six octets are not a frame header at all")],
+        note="the frame layer's own two classes, which no exchange vector pins: the "
+             "corpus's frame vectors refuse these octets at the frame boundary, and this "
+             "vector is the other half — that the connection reports the frame layer's "
+             "class rather than one of its own, under the one condition both artefacts "
+             "use for a wire-level failure. The register's `check-precedence-unspecified` "
+             "entry is why no order between the two checks is claimed here: the artifact "
+             "ranks no checks, and each step offers one failure only"))
+
+    vectors.append(exchange(
+        "exchange-empty-frame-any-channel", start=c("OPENED"),
+        clauses=[STATE_TABLE, EMPTY_FRAME, EMPTY_FRAME_ANY_CHANNEL, DISPATCH_TABLE],
+        steps=[{"direction": "receive", "bytes": empty_frame(channel=0).hex(),
+                "expect": {"status": "admitted", "state": c("OPENED")}},
+               {"direction": "receive", "bytes": empty_frame(channel=1).hex(),
+                "expect": {"status": "admitted", "state": c("OPENED")}}],
+        note="a frame with no body on two channels: the artifact licenses the shape "
+             "(`framing.4`) and requires a peer to handle it \"on any valid channel\", so "
+             "the second step is the one that matters — a channel the session layer would "
+             "have to map is not a channel the idle-timeout frame needs mapped"))
+
+    vectors.append(exchange(
+        "exchange-extended-header-relayed", start=c("OPENED"),
+        clauses=[STATE_TABLE, SIZE_COUNTS_EXTENDED, HEADER_LAYOUT, CLOSE_ANY_CHANNEL],
+        steps=[{"direction": "receive",
+                "bytes": frame_octets(AMQP_FRAME, t.close_body(), doff=3,
+                                      extended=b"\x00\x00\x00\x00").hex(),
+                "expect": {"status": "admitted", "state": c("CLOSE_RCVD")}},
+               t.send_frame(AMQP_FRAME, t.close_body(), state=c("END"))],
+        note="a frame whose header is longer than the minimum: `picture.11` draws the "
+             "extended header as part of the frame header and `framing.1` counts it inside "
+             "SIZE, so a peer that reads the octets after DOFF and before the body carries "
+             "the frame — the treatment of those octets is the frame type's business "
+             "(`framing.2`), which is why this vector's body is the `close` the connection "
+             "answers for rather than a session's. The second step is the close this side "
+             "owes the peer, so the vector also shows the longer header left the state "
+             "machine where a shorter header would have"))
+
+    vectors.append(exchange(
+        "exchange-frame-above-our-declared-channel-max", start=c("START"),
+        clauses=[STATE_TABLE, PRE_NEGOTIATION_LIMITS, CHANNEL_MAX, CHANNEL_RANGE],
+        steps=[t.send_header("amqp"),
+               t.send_frame(AMQP_FRAME,
+                            t.open_body(max_frame_size=t.min_max_frame_size, channel_max=2),
+                            state=c("OPEN_PIPE")),
+               t.receive_header("amqp", state=c("OPEN_SENT")),
+               t.receive_frame(AMQP_FRAME, open_wide, state=c("OPENED")),
+               t.refused("receive", reason="limit", state=c("DISCARDING"),
+                         body=t.transfer_body(), channel=3,
+                         note="this peer announced a maximum channel number of two in its "
+                              "own open, and the frame carries channel three: "
+                              "`open/field:channel-max.2` mandates the framing-error for a "
+                              "channel outside the supported range, and the range is the "
+                              "one this peer declared")],
+        note="the receive-side channel bound, which no vector pins — the corpus's channel "
+             "vectors are send-side, or observe the a priori maximum of zero before any "
+             "negotiation. Here the bound is this peer's own announcement, so the refusal "
+             "is about the range it declared rather than about the peer's"))
+
+    vectors.append(exchange(
+        "exchange-oversized-sasl-frame", start=c("START"),
+        clauses=[STATE_TABLE, PRE_NEGOTIATION_LIMITS, SASL_HEADER, SASL_FRAMES,
+                 SASL_SERVER_ANNOUNCES, MIN_ACCEPTED_FRAME],
+        steps=[t.send_header("sasl"),
+               t.receive_header("sasl", state=c("HDR_EXCH")),
+               t.refused("receive", reason="limit", state=c("END"), frame_type=SASL_FRAME,
+                         body=t.mechanisms_body(["ANONYMOUS"]),
+                         payload=payload_to_total(SASL_FRAME,
+                                                  t.mechanisms_body(["ANONYMOUS"]),
+                                                  t.min_max_frame_size + 1),
+                         note="no `open` has been exchanged, so the maximum frame size is "
+                              "still the 512 octets every peer must accept "
+                              "(`connections.1`), and the SASL layer's bound is that "
+                              "constant rather than the negotiated one — \"Both peers "
+                              "MUST accept frames of up to 512 octets\"")],
+        note="the pre-negotiation size bound in the layer that never negotiates one: the "
+             "SASL dialogue runs before any `open`, so 512 is the only bound in force and "
+             "the answer to exceeding it is the connection's own framing-error"))
+
     return vectors
 
 
@@ -1097,15 +1364,24 @@ def session_corpus(tables: Corpus) -> list[dict]:
         return t.transfer_body(**kwargs)
 
     def link_up(role_sender: bool = False, handle: int = 0, peer_handle: int = 0,
-                credit: int = 1000) -> list:
+                credit: int = 1000, peer_settle: int | None = None,
+                own_settle: int | None = None, own_rcv_settle: int | None = None) -> list:
         """The three steps that attach a link on a MAPPED session: our attach, the
         peer's attach, and the peer's flow, which is what grants a sender its credit. Every
         state is pinned, because a setup whose steps were unpinned could drift under a rule
-        the vector is not about."""
+        the vector is not about.
+
+        `own_settle`/`own_rcv_settle` are written into *our* attach and `peer_settle` into
+        the peer's: the two sides negotiate the settlement modes separately and each one's
+        value governs what that side sends, so a vector that means to constrain the peer's
+        transfers writes the peer's attach and not ours."""
         return [
-            t.send_frame(AMQP_FRAME, t.attach_body(role=not role_sender, handle=handle),
+            t.send_frame(AMQP_FRAME, t.attach_body(role=not role_sender, handle=handle,
+                                                   snd_settle_mode=own_settle,
+                                                   rcv_settle_mode=own_rcv_settle),
                          state=s("MAPPED"), channel=1),
-            t.receive_frame(AMQP_FRAME, t.attach_body(role=role_sender, handle=peer_handle),
+            t.receive_frame(AMQP_FRAME, t.attach_body(role=role_sender, handle=peer_handle,
+                                                      snd_settle_mode=peer_settle),
                             state=s("MAPPED"), channel=1),
             t.receive_frame(AMQP_FRAME, t.flow_body(
                 handle=peer_handle, delivery_count=0,
@@ -1776,7 +2052,687 @@ def session_corpus(tables: Corpus) -> list[dict]:
              "channel map would answer first if the frame were on the wrong channel, "
              "which is why the handle rule is used here"))
 
+    # -- the settlement negotiation: the flag against the mode it was negotiated under --
+    #
+    # `snd-settle-mode` is negotiated per link and per direction: an attach's value governs
+    # what the side that wrote it sends. `settled.4`/`.5` and `.6` are that negotiation's
+    # two obligations, each selected by the `choice` attribute of its xref rather than by
+    # the field's declared type, and the corpus already carries the `settled` choice in the
+    # receive direction (`exchange-link-sender-settle-mode-unmet`). The vectors below are
+    # the rest of the matrix: the `unsettled` choice's MUST NOT and its abort exemption,
+    # the `mixed` choice's absence of obligation, and the delivery boundary each one is
+    # stated at — "at least one transfer frame for a delivery" against "every transfer".
+    settle_choices = {
+        "unsettled": t.settle_mode("sender-settle-mode", "unsettled"),
+        "settled": t.settle_mode("sender-settle-mode", "settled"),
+        "mixed": t.settle_mode("sender-settle-mode", "mixed"),
+        "second": t.settle_mode("receiver-settle-mode", "second"),
+    }
+
+    vectors.append(exchange(
+        "exchange-link-settled-over-unsettled-negotiation-aborted", start=s("MAPPED"),
+        clauses=[TRANSFER_SETTLED_NEVER, ABORTED_MESSAGES_DISCARDED, DATA_SECTION],
+        steps=link_up(role_sender=False, peer_settle=settle_choices["unsettled"]) + [
+            t.receive_frame(AMQP_FRAME,
+                            t.transfer_body(settled=True, aborted=True),
+                            state=s("MAPPED"), channel=1, payload=message)],
+        note="`settled.6`'s exemption read as the conforming half of a sentence whose "
+             "refusal half is staged: the artifact forbids the flag on every transfer of "
+             "a delivery \"unless the delivery is aborted\", so a settled, aborted "
+             "transfer under the `unsettled` choice is admitted — and the delimitation is "
+             "the point, since neither artefact enforces the refusal at all "
+             "(`scripts/staged-exchange-divergences.ndjson`), and this vector would fail "
+             "if one of them refused the flag outright"))
+
+    vectors.append(exchange(
+        "exchange-link-settled-on-a-continuation-suffices", start=s("MAPPED"),
+        clauses=[TRANSFER_SETTLED, TRANSFER_FIRST_FIELDS, TRANSFER_ONE_SECTION],
+        steps=link_up(role_sender=False, peer_settle=settle_choices["settled"]) + [
+            t.receive_frame(AMQP_FRAME, t.transfer_body(more=True),
+                            state=s("MAPPED"), channel=1, payload=message[:10]),
+            t.receive_frame(AMQP_FRAME, t.transfer_body(identity=False, settled=True),
+                            state=s("MAPPED"), channel=1, payload=message[10:]),
+            t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                      state=s("DISCARDING"),
+                      body=t.transfer_body(delivery_id=1), channel=1, payload=message,
+                      note="the negotiation is `settled`, so this second delivery MUST be "
+                           "settled in at least one of its transfers and this transfer "
+                           "carries no flag: `settled.4` is per *delivery*, and the "
+                           "delivery before this one was settled by its continuation")],
+        note="`settled.4`'s boundary is a delivery rather than a transfer: the flag must be "
+             "true on at least one transfer *for a delivery*, so a delivery whose first "
+             "transfer leaves it unset and whose second sets it is complete and settled, "
+             "and the next delivery — which settles nowhere — is the violation"))
+
+    vectors.append(exchange(
+        "exchange-link-mixed-negotiation-neither-obligation", start=s("MAPPED"),
+        clauses=[TRANSFER_SETTLED, TRANSFER_SETTLED_NEVER, TRANSFER_ONE_SECTION],
+        steps=link_up(role_sender=False, peer_settle=settle_choices["mixed"]) + [
+            t.receive_frame(AMQP_FRAME, t.transfer_body(settled=True),
+                            state=s("MAPPED"), channel=1, payload=message),
+            t.receive_frame(AMQP_FRAME, t.transfer_body(delivery_id=1),
+                            state=s("MAPPED"), channel=1, payload=message)],
+        note="the third choice is the one both sentences exclude: with `mixed` negotiated, "
+             "`settled.4` — which selects the `settled` choice — obliges nothing and "
+             "`settled.6` — which selects `unsettled` — forbids nothing, so a settled "
+             "delivery and an unsettled one are both admitted on the same link. This is "
+             "the control that shows the two obligations do not leak onto a negotiation "
+             "neither of them names"))
+
+    # -- the receiver's settlement mode, and what a transfer may say about it -------- #
+
+    vectors.append(exchange(
+        "exchange-link-rcv-settle-second-over-second", start=s("MAPPED"),
+        clauses=[TRANSFER_RCV_SETTLE_ILLEGAL, ATTACH_SETTLE_DEFAULT, TRANSFER_ONE_SECTION],
+        steps=link_up(role_sender=False, own_rcv_settle=settle_choices["second"]) + [
+            t.receive_frame(
+                AMQP_FRAME,
+                t.transfer_body(rcv_settle_mode=settle_choices["second"]),
+                state=s("MAPPED"), channel=1, payload=message)],
+        note="the complement of the refusal beside it: `rcv-settle-mode.u1` forbids the "
+             "field only against a link negotiated to `first`, so a link negotiated to "
+             "`second` carries the same field value admitted — which is what makes the "
+             "refusal about the negotiation rather than about the field's presence"))
+
+    # -- the flow's counts against the quantities the two ends actually hold --------- #
+
+    vectors.append(exchange(
+        "exchange-flow-sender-count-not-its-current", start=s("MAPPED"),
+        clauses=[FLOW_DELIVERY_COUNT_SET_BY_SENDER, SESSION_END_ON_ERROR, SESSION_ERRORS],
+        steps=link_up(role_sender=False) + [
+            t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                      state=s("DISCARDING"),
+                      body=t.flow_body(handle=0, delivery_count=5, link_credit=0),
+                      channel=1,
+                      note="`flow/field:delivery-count.2`: a flow sent from the sender "
+                           "endpoint to the receiver MUST carry the sender's *current* "
+                           "delivery-count, and this link's sender has sent nothing, so "
+                           "the count this receiver holds is zero and the frame claims "
+                           "five")],
+        note="the sender's half of the delivery-count rule, which the existing credit "
+             "vector does not reach: the receiver's count is what the peer's deliveries "
+             "have advanced, and a flow claiming a count of its own is the sender "
+             "inventing the number the receiver checks. Both artefacts refuse this one "
+             "frame for this one reason, which is what makes the two staged halves of the "
+             "same clause — the field absent, and the receiver's own count restated — "
+             "readable as gaps rather than as a rule nobody implements"))
+
+    vectors.append(exchange(
+        "exchange-flow-receiver-count-echoed", start=s("MAPPED"),
+        clauses=[FLOW_DELIVERY_COUNT_ECHO, FLOW_SENDER_SETS_CREDIT,
+                 FLOW_SENDER_MATCHES_DELIVERY_LIMIT],
+        steps=link_up(role_sender=True, credit=1) + [
+            t.send_frame(AMQP_FRAME, t.transfer_body(), state=s("MAPPED"), channel=1,
+                         payload=message),
+            t.receive_frame(AMQP_FRAME, t.flow_body(handle=0, delivery_count=1,
+                                                    link_credit=1),
+                            state=s("MAPPED"), channel=1)],
+        note="`flow/field:delivery-count.3` in its conforming form: a flow sent from the "
+             "receiver to the sender MUST carry \"the last known value of the "
+             "corresponding sending endpoint\", and this endpoint — the link's sender — "
+             "has sent one delivery, so the receiver's flow carries one and the grant it "
+             "carries is applied. It is the delimitation for a staged vector that asks "
+             "the same flow to carry a value that is not the sender's: a rule nobody "
+             "enforces would admit both, so the admitted half is what gives the refused "
+             "half its meaning"))
+
+    # -- `more` and `aborted`: the delivery a transfer ends, and the one it discards --- #
+
+    vectors.append(exchange(
+        "exchange-link-aborted-continuation-discards-prior", start=s("MAPPED"),
+        clauses=[TRANSFER_MORE_ABORTED_PRECEDENCE, TRANSFER_ABORT_PRIOR_DATA,
+                 ABORTED_MESSAGES_DISCARDED, DATA_SECTION],
+        steps=link_up(role_sender=False) + [
+            t.receive_frame(AMQP_FRAME, t.transfer_body(more=True),
+                            state=s("MAPPED"), channel=1, payload=message[:10]),
+            t.receive_frame(AMQP_FRAME, t.transfer_body(identity=False, aborted=True,
+                                                        more=True),
+                            state=s("MAPPED"), channel=1, payload=message[10:]),
+            t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                      state=s("DISCARDING"),
+                      body=t.transfer_body(identity=False), channel=1, payload=message,
+                      note="the delivery the abort discarded is gone, so a transfer that "
+                           "omits the three identity fields has nothing to continue")],
+        note="`more.u1`'s precedence over a delivery that was already in progress: the "
+             "aborted transfer carries `more` as well, and the value is ignored — the "
+             "delivery it aborts is discarded *with* the data its earlier transfer "
+             "carried, which is `links.33`'s \"the receiver MUST discard the message data "
+             "that was transferred prior to the abort\". The third step is how that is "
+             "observable: a continuation with no delivery to continue is refused"))
+
+    vectors.append(exchange(
+        "exchange-link-aborted-then-next-delivery", start=s("MAPPED"),
+        clauses=[TRANSFER_MORE_ABORTED_PRECEDENCE, ABORTED_MESSAGES_DISCARDED,
+                 TRANSFER_FIRST_FIELDS],
+        steps=link_up(role_sender=False) + [
+            t.receive_frame(AMQP_FRAME, t.transfer_body(aborted=True, more=True),
+                            state=s("MAPPED"), channel=1, payload=message),
+            t.receive_frame(AMQP_FRAME, t.transfer_body(delivery_id=1),
+                            state=s("MAPPED"), channel=1, payload=message)],
+        note="the complement of the abort vector: an aborted delivery leaves the link "
+             "usable, so the next transfer is a first transfer of a new delivery and is "
+             "admitted. `aborted.2` discards the delivery and its payload, not the link"))
+
+    # -- resumption: the flag a resumed delivery is named by ------------------------- #
+
+    vectors.append(exchange(
+        "exchange-link-resume-on-first-transfer", start=s("MAPPED"),
+        clauses=[TRANSFER_RESUME_FIRST_TRANSFER, TRANSFER_FIRST_FIELDS,
+                 TRANSFER_ONE_SECTION],
+        steps=link_up(role_sender=False) + [
+            t.receive_frame(AMQP_FRAME, t.transfer_body(resume=True, more=True),
+                            state=s("MAPPED"), channel=1, payload=message[:10]),
+            t.receive_frame(AMQP_FRAME, t.transfer_body(identity=False),
+                            state=s("MAPPED"), channel=1, payload=message[10:])],
+        note="`resume.3` and `.4` read together: the flag MUST be set on the *first* "
+             "transfer of a resumed delivery, and on a subsequent transfer it MAY be set "
+             "or omitted — so a resumed delivery named on its first transfer and left "
+             "unnamed on its continuation is the conforming case, and admission is the "
+             "observable"))
+
+    # -- the fields an attach's own clauses make it carry or omit -------------------- #
+
+    vectors.append(exchange(
+        "exchange-link-attach-sender-without-initial-count", start=s("MAPPED"),
+        clauses=[ATTACH_INITIAL_COUNT, ATTACH_DEFAULTS, SESSION_END_ON_ERROR,
+                 SESSION_ERRORS],
+        steps=[t.send_frame(AMQP_FRAME, t.attach_body(role=True), state=s("MAPPED"),
+                            channel=1),
+               t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                         state=s("DISCARDING"),
+                         body=t.body("attach", name={"type": "string", "text": "link"},
+                                     handle={"type": "uint", "value": 0},
+                                     role={"type": "boolean", "value": False}),
+                         channel=1,
+                         note="the peer's attach declares the sender role and carries no "
+                              "`initial-delivery-count`, which "
+                              "`attach/field:initial-delivery-count.1` forbids: \"This "
+                              "MUST NOT be null if role is sender\"")],
+        note="a mandatory-by-condition field rather than a mandatory one: the declared "
+             "surface marks neither, so the rule is the role's — the same attach with the "
+             "receiver role is the vector beside this one, where the omission is the "
+             "default the clause says is ignored"))
+
+    vectors.append(exchange(
+        "exchange-link-attach-receiver-without-initial-count", start=s("MAPPED"),
+        clauses=[ATTACH_INITIAL_COUNT, ATTACH_DEFAULTS],
+        steps=[t.send_frame(AMQP_FRAME, t.attach_body(role=True), state=s("MAPPED"),
+                            channel=1),
+               t.receive_frame(AMQP_FRAME, t.attach_body(role=True),
+                               state=s("MAPPED"), channel=1)],
+        note="the ignored half of the same sentence: \"This MUST NOT be null if role is "
+             "sender, and it is ignored if the role is receiver\" — so the attach whose "
+             "role is the receiver and which omits the field is admitted, and the refusal "
+             "beside it is about the role rather than about the field"))
+
+    # -- the begin's remote-channel in both directions ------------------------------- #
+
+    vectors.append(exchange(
+        "exchange-session-begin-with-remote-channel", start=s("UNMAPPED"),
+        clauses=[BEGIN_LOCAL_REMOTE_CHANNEL, BEGIN_ESTABLISHES, SESSION_STATES,
+                 SESSION_TRANSITIONS],
+        steps=[t.refused("send", reason="malformed", condition=INVALID_FIELD,
+                         state=s("UNMAPPED"),
+                         body=t.body("begin", **windows(),
+                                     **{"remote-channel": {"type": "ushort", "value": 1}}),
+                         channel=1,
+                         note="a locally initiated session's begin MUST NOT set "
+                              "`remote-channel`: this endpoint has not received a remote "
+                              "begin, so there is no channel for the field to name"),
+               t.send_frame(AMQP_FRAME, t.body("begin", **windows()),
+                            state=s("BEGIN_SENT"), channel=1)],
+        note="the refusal half of `begin/field:remote-channel.1`, which no vector pins: "
+             "the corpus's two begin vectors carry the field only where it is required, "
+             "and this one offers it where it is forbidden — the second step shows the "
+             "refusal is about the field, since the same begin without it is admitted"))
+
+    vectors.append(exchange(
+        "exchange-session-begin-answer-without-remote-channel", start=s("BEGIN_RCVD"),
+        clauses=[BEGIN_ESTABLISHES, BEGIN_REMOTE_CHANNEL, SESSION_STATES,
+                 SESSION_TRANSITIONS],
+        steps=[t.refused("send", reason="malformed", condition=INVALID_FIELD,
+                         state=s("BEGIN_RCVD"),
+                         body=t.body("begin", **windows()), channel=1,
+                         note="the peer's begin arrived on channel one and this begin "
+                              "answers it, so `remote-channel` MUST be set to that "
+                              "channel — `.1`'s MUST NOT and `.2`'s MUST are one "
+                              "sentence, and this is the second half"),
+               t.send_frame(AMQP_FRAME, t.body("begin", **windows(),
+                                               **{"remote-channel": {"type": "ushort",
+                                                                     "value": 1}}),
+                            state=s("MAPPED"), channel=1)],
+        note="the answering begin's field, refused for being absent: the corpus pins the "
+             "conforming value in `exchange-session-begin-remotely-initiated`, and this "
+             "vector pins what the section says about a begin that leaves it out"))
+
+    # -- a flow's next-incoming-id before the peer's begin -------------------------- #
+
+    vectors.append(exchange(
+        "exchange-session-flow-next-incoming-id-before-begin", start=s("BEGIN_SENT"),
+        clauses=[FLOW_NEXT_INCOMING_ID, SESSION_STATES, SESSION_TRANSITIONS],
+        steps=[t.refused("send", reason="malformed", condition=INVALID_FIELD,
+                         state=s("BEGIN_SENT"),
+                         body=t.body("flow", **windows(),
+                                     **{"next-incoming-id": {"type": "uint", "value": 0}}),
+                         channel=1,
+                         note="`flow/field:next-incoming-id.1`: the field \"MUST be set if "
+                              "the peer has received the begin frame for the session, and "
+                              "MUST NOT be set if it has not\" — this endpoint has sent "
+                              "its own begin and the peer has not answered, so the "
+                              "partner's begin has not arrived and the field is forbidden"),
+               t.send_frame(AMQP_FRAME, t.body("flow", **windows()),
+                            state=s("BEGIN_SENT"), channel=1)],
+        note="the MUST NOT half of the rule whose MUST half the corpus pins twice: a flow "
+             "may be sent from BEGIN_SENT — the state's description says it may send — and "
+             "the only rule that refuses this one is the field's own, which the second "
+             "step shows by carrying the same frame without it"))
+
+    # -- the dispatch: a session performative on the connection's channel ----------- #
+
+    vectors.append(exchange(
+        "exchange-session-frame-on-channel-zero", start=s("MAPPED"),
+        clauses=[DISPATCH_TABLE, CHANNEL_MAP, OPEN_ON_CHANNEL_ZERO],
+        steps=[t.refused("send", reason="illegalState", condition=FRAMING_ERROR,
+                         state=c("OPENED"), body=t.transfer_body(), channel=0,
+                         note="channel zero is the connection's, and a session "
+                              "performative on it belongs to no session: the register's "
+                              "`channel-zero-layering` reading is that the artifact does "
+                              "not say so and the dispatch table's two connection frames "
+                              "are all it gives the connection, so the refusal is the "
+                              "codec's reading rather than a clause's"),
+               t.send_frame(AMQP_FRAME,
+                            t.body("flow", **{
+                                "next-incoming-id": {"type": "uint", "value": 0},
+                                "incoming-window": {"type": "uint", "value": 1000},
+                                "next-outgoing-id": {"type": "uint", "value": 0},
+                                "outgoing-window": {"type": "uint", "value": 1000}}),
+                            state=s("MAPPED"), channel=1)],
+        note="the dispatch table's channel rule, which the interface fixes and no vector "
+             "has exercised: `open` and `close` are the connection's whatever channel "
+             "they carry, and every other performative belongs to the session on *its* "
+             "channel — so a transfer on channel zero is a frame the connection cannot "
+             "relay and no session can answer, and the second step is its admitted "
+             "sibling on the session's own channel"))
+
     return vectors
+
+
+def staged_corpus(tables: Corpus) -> list[dict]:
+    """Vectors whose expectations the artefacts do not both meet, staged rather than
+    carried.
+
+    An exchange corpus is a contract, and every vector in `vectors/` has to pass in both
+    artefacts or the gate that runs it is red. These vectors are the ones authored from
+    the artifact whose expectation at least one artefact refuses to meet: each note names
+    the clause the expectation comes from, which of the two classes it is, and what each
+    artefact actually did — the buffer it was given, the answer it gave, and the class it
+    named. They are written to a path the caller names, outside `vectors/`, so the corpus
+    a gate reads stays green while the finding stays in a file a fix slice can lift.
+
+    The two classes are worth distinguishing, because they need different work:
+
+    * a **divergence** is a frame the two artefacts answer differently. Neither side is
+      chosen here: the vector states what the clause requires and records both answers,
+      and the reading that decides between them belongs to the register.
+    * a **shared gap** is a frame both artefacts admit (or refuse) against the clause, so
+      no differential can see it. These are the shapes the corpus has never reached, and
+      each one is a rule with no carrier in either layer.
+
+    Three of them are settled-mode or delivery-count readings the register is silent on
+    (`Transfer/field:settled.6`, `transfer/field:rcv-settle-mode.u1`,
+    `flow/field:delivery-count.2`'s presence half and `.3`), one is a frame with no body
+    in a state whose table column is `-`, and one is the `properties` field of the
+    handle-less flow rule — the only clause in the whole sweep whose five field sentences
+    are enforced by one artefact and not the other.
+    """
+    t = tables
+    message = b"a message whose split points are the vector's business"
+
+    def windows() -> dict:
+        return {"next-outgoing-id": {"type": "uint", "value": 0},
+                "incoming-window": {"type": "uint", "value": 1000},
+                "outgoing-window": {"type": "uint", "value": 1000}}
+
+    def link_up(role_sender: bool = False, handle: int = 0, peer_handle: int = 0,
+                credit: int = 1000, peer_settle: int | None = None,
+                own_settle: int | None = None, own_rcv_settle: int | None = None) -> list:
+        return [
+            t.send_frame(AMQP_FRAME, t.attach_body(role=not role_sender, handle=handle,
+                                                   snd_settle_mode=own_settle,
+                                                   rcv_settle_mode=own_rcv_settle),
+                         state=s("MAPPED"), channel=1),
+            t.receive_frame(AMQP_FRAME, t.attach_body(role=role_sender,
+                                                      handle=peer_handle,
+                                                      snd_settle_mode=peer_settle),
+                            state=s("MAPPED"), channel=1),
+            t.receive_frame(AMQP_FRAME, t.flow_body(
+                handle=peer_handle, delivery_count=0,
+                link_credit=(credit if role_sender else 0)),
+                state=s("MAPPED"), channel=1)]
+
+    unsettled = t.settle_mode("sender-settle-mode", "unsettled")
+    settled = t.settle_mode("sender-settle-mode", "settled")
+    second = t.settle_mode("receiver-settle-mode", "second")
+
+    return [
+        # -- a frame the two artefacts answer differently ---------------------- #
+
+        exchange(
+            "staged-flow-properties-without-handle", start=s("MAPPED"),
+            clauses=[LINK_HANDLES, *FLOW_FIELDS_REQUIRE_HANDLE],
+            steps=link_up() + [
+                t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                          state=s("DISCARDING"),
+                          body=t.body("flow", **windows(),
+                                      **{"next-incoming-id": {"type": "uint", "value": 0},
+                                         "properties": t.unsettled_map(
+                                             [({"type": "symbol", "text": "x"},
+                                               {"type": "uint", "value": 1})])}),
+                          channel=1,
+                          note="`flow/field:properties.1` is one of the five sentences "
+                               "that read \"When the handle field is not set, this field "
+                               "MUST NOT be set\", and the register's "
+                               "`flow-link-field-without-handle` reading names all "
+                               "five")],
+            note="**Divergence.** The register's reading is `amqp:invalid-field` for a "
+                 "handle-less flow carrying any of the five link fields, and the "
+                 "specification implements the reading: it refuses this frame with "
+                 "`amqp:invalid-field` and class `malformed`, leaving the session in "
+                 "`session:DISCARDING`. The reference's list of the five "
+                 "(`Ref/Session.lean:591`) omits `properties`, so the same frame is "
+                 "**admitted** and the peer stays in `session:MAPPED`. The existing "
+                 "corpus vector for this clause uses `available`, which both list, so "
+                 "nothing in the corpus can see the difference — and a five-sentence rule "
+                 "enforced in four places is the shape this sweep exists to find. Neither "
+                 "reading is chosen here: the vector pins the register's, and the fix "
+                 "belongs to whichever artefact the planner finds wrong"),
+
+        exchange(
+            "staged-link-aborted-false-spends-no-credit", start=s("MAPPED"),
+            clauses=[ABORTED_MESSAGES_DISCARDED, FLOW_SENDER_STOPS_AT_ZERO_CREDIT,
+                     TRANSFER_MORE_ABORTED_PRECEDENCE],
+            steps=link_up(role_sender=True, credit=1) + [
+                t.send_frame(AMQP_FRAME, t.transfer_body(aborted=False),
+                             state=s("MAPPED"), channel=1, payload=message),
+                t.refused("send", reason="limit", condition=FRAMING_ERROR,
+                          state=s("MAPPED"), body=t.transfer_body(delivery_id=1),
+                          channel=1, payload=message)],
+            note="**Divergence, on the credit an aborted delivery spends.** The receiver "
+                 "granted one delivery of credit. `aborted` is a boolean whose value here "
+                 "is *false*, so the delivery is not an aborted one and it consumes the "
+                 "credit the receiver granted — which makes the second delivery exceed "
+                 "the delivery-limit and be refused. The specification refuses it with "
+                 "`amqp:connection:framing-error` and class `limit`, leaving the peer in "
+                 "`session:MAPPED`; the reference **admits** it, because its `aborted` "
+                 "check is a presence test that reads an explicit false as an abort and "
+                 "returns before the credit block. So the divergence has two causes at "
+                 "once — the flag's value read as its presence, and the credit an aborted "
+                 "delivery does or does not spend — and the vector's second step is what "
+                 "separates them from the outside"),
+
+        exchange(
+            "staged-link-aborted-spends-the-credit", start=s("MAPPED"),
+            clauses=[ABORTED_MESSAGES_DISCARDED, FLOW_SENDER_STOPS_AT_ZERO_CREDIT,
+                     TRANSFER_ABORT_PRIOR_DATA],
+            steps=link_up(role_sender=True, credit=1) + [
+                t.send_frame(AMQP_FRAME, t.transfer_body(aborted=True),
+                             state=s("MAPPED"), channel=1, payload=message),
+                t.refused("send", reason="limit", condition=FRAMING_ERROR,
+                          state=s("MAPPED"), body=t.transfer_body(delivery_id=1),
+                          channel=1, payload=message)],
+            note="**Divergence, with the flag the clauses do agree about.** Here the "
+                 "delivery really is aborted, so both artefacts discard it — and they "
+                 "still disagree about the credit it spent. The specification refuses the "
+                 "next delivery with `amqp:connection:framing-error` and class `limit`; "
+                 "the reference **admits** it. Which reading the artifact gives is not "
+                 "stated: `flow-control.5` ties `link-credit` to `delivery-count`, an "
+                 "aborted delivery advances the sender's sequence number, and "
+                 "`aborted.1` requires the *recipient* to discard the message rather than "
+                 "the sender to un-send it. The register is silent, which is why this is "
+                 "staged rather than decided"),
+
+        exchange(
+            "staged-flow-sender-count-null", start=s("MAPPED"),
+            clauses=[FLOW_DELIVERY_COUNT_SET_BY_SENDER, SESSION_END_ON_ERROR,
+                     SESSION_ERRORS],
+            steps=link_up(role_sender=False) + [
+                t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                          state=s("DISCARDING"),
+                          body=t.body("flow", **windows(),
+                                      **{"next-incoming-id": {"type": "uint", "value": 0},
+                                         "handle": {"type": "uint", "value": 0},
+                                         "link-credit": {"type": "uint", "value": 0}}),
+                          channel=1)],
+            note="**Divergence, on a field that is present and null.** `delivery-count` "
+                 "is a field of a flow that names a link and comes from the sender, and "
+                 "`flow/field:delivery-count.2` requires it to be the sender's current "
+                 "count — so a null where a count belongs is the field *unset*, which is "
+                 "what the type system's trailing-null rule makes of a null anywhere in "
+                 "the list. The specification refuses it with `amqp:invalid-field` and "
+                 "class `malformed` (\"the flow's delivery-count is not an integer\"), "
+                 "leaving `session:DISCARDING`; the reference **admits** it, because its "
+                 "reader maps a null to `none` and its check is a match on a present "
+                 "value. The same frame with the field left off the list entirely is the "
+                 "vector below, where both artefacts admit"),
+
+        # -- frames both artefacts admit against the clause --------------------- #
+
+        exchange(
+            "staged-link-settled-over-unsettled-negotiation", start=s("MAPPED"),
+            clauses=[TRANSFER_SETTLED_NEVER, SESSION_END_ON_ERROR, SESSION_ERRORS],
+            steps=link_up(role_sender=False, peer_settle=unsettled) + [
+                t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                          state=s("DISCARDING"), body=t.transfer_body(settled=True),
+                          channel=1, payload=message)],
+            note="**Shared gap.** The peer's attach negotiated the `unsettled` choice of "
+                 "`sender-settle-mode`, and `settled.6` says the flag \"MUST be false (or "
+                 "unset) on every transfer frame for a delivery\" under that choice. "
+                 "**Both artefacts admit** this frame and leave the peer in "
+                 "`session:MAPPED`: neither reads the `unsettled` choice anywhere. The "
+                 "clause is disposed `deferred:S4`, and `Contracts/Settlement.lean`'s "
+                 "own closing section states that only the sender's `settled` obligation "
+                 "has a proposition — but the two artefacts enforcing the `settled` "
+                 "choice's MUST while ignoring the `unsettled` choice's MUST NOT is "
+                 "exactly the declared-against-negotiated shape the sweep was pointed at"),
+
+        exchange(
+            "staged-link-settled-over-unsettled-negotiation-sent", start=s("MAPPED"),
+            clauses=[TRANSFER_SETTLED_NEVER, TRANSFER_ONE_SECTION],
+            steps=link_up(role_sender=True, credit=1, own_settle=unsettled) + [
+                t.refused("send", reason="malformed", condition=INVALID_FIELD,
+                          state=s("MAPPED"), body=t.transfer_body(settled=True),
+                          channel=1, payload=message)],
+            note="**Shared gap, in the direction the sender owns.** Our own attach "
+                 "negotiated `unsettled`, so `settled.6` forbids the flag on the "
+                 "transfers *we* write — the obligation is the sending end's, and a "
+                 "conformant endpoint withholds the frame rather than being told about "
+                 "it. **Both artefacts write it**: each admits the step and leaves the "
+                 "peer in `session:MAPPED`. The receive-direction vector above says the "
+                 "same about the peer's frames; this one says it about ours, which is "
+                 "where an enforcement would have to live to stop the frame"),
+
+        exchange(
+            "staged-link-settled-false-under-settled-negotiation", start=s("MAPPED"),
+            clauses=[TRANSFER_SETTLED, SESSION_END_ON_ERROR, SESSION_ERRORS],
+            steps=link_up(role_sender=False, peer_settle=settled) + [
+                t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                          state=s("DISCARDING"), body=t.transfer_body(settled=False),
+                          channel=1, payload=message)],
+            note="**Shared gap: the flag's content against its presence.** `settled.4` "
+                 "requires the field to be **true** on at least one transfer of a "
+                 "delivery when the negotiated mode is the `settled` choice. This "
+                 "transfer carries the field with the value *false*, so no transfer of "
+                 "the delivery is settled and the delivery breaks the negotiation — while "
+                 "both artefacts **admit** it, because both read the flag by presence "
+                 "(`fieldSet`/`present` are true for any non-null value). The corpus "
+                 "already carries the vector where the flag is absent, which both refuse "
+                 "correctly; this is the neighbouring input that shows the check is on "
+                 "the field's shape rather than on its content"),
+
+        exchange(
+            "staged-link-more-false-completes-the-delivery", start=s("MAPPED"),
+            clauses=[TRANSFER_MORE_LAST_FRAME, TRANSFER_FIRST_FIELDS],
+            steps=link_up() + [
+                t.receive_frame(AMQP_FRAME, t.transfer_body(more=False),
+                                state=s("MAPPED"), channel=1, payload=message),
+                t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                          state=s("DISCARDING"), body=t.transfer_body(identity=False),
+                          channel=1, payload=message)],
+            note="**Shared gap, the same shape as the settled flag.** `links.29` says how "
+                 "a split message is carried — \"by setting the more flag on all but the "
+                 "last «transfer» frame\" — so a transfer whose `more` is *false* is the "
+                 "last one and the delivery it carries is complete. Both artefacts "
+                 "**admit** both steps here: they read `more` by presence, so an explicit "
+                 "false continues the delivery and the following continuation, which has "
+                 "nothing to continue, is admitted too. The second step is what makes the "
+                 "reading observable rather than a matter of taste: whichever way the "
+                 "flag is read, the two steps cannot both be right"),
+
+        exchange(
+            "staged-link-rcv-settle-second-over-first", start=s("MAPPED"),
+            clauses=[TRANSFER_RCV_SETTLE_ILLEGAL, ATTACH_SETTLE_DEFAULT,
+                     SESSION_END_ON_ERROR, SESSION_ERRORS],
+            steps=link_up(role_sender=False, own_rcv_settle=t.settle_mode(
+                "receiver-settle-mode", "first")) + [
+                t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                          state=s("DISCARDING"),
+                          body=t.transfer_body(rcv_settle_mode=second), channel=1,
+                          payload=message)],
+            note="**Shared gap.** `rcv-settle-mode.u1` says that \"If the negotiated link "
+                 "value is «first», then it is illegal to set this field to «second»\" — "
+                 "the attach fixed the link at `first`, and this transfer names `second`. "
+                 "**Both artefacts admit** it: neither reads the transfer's "
+                 "`rcv-settle-mode` at all, and neither reads the attach's. The corpus's "
+                 "conforming vector for the negotiation "
+                 "(`exchange-session-attach-defaults-admitted`) cites the attach field, so "
+                 "the transfer-side rule has been cited and never exercised"),
+
+        exchange(
+            "staged-flow-receiver-count-not-echoed", start=s("MAPPED"),
+            clauses=[FLOW_DELIVERY_COUNT_ECHO, FLOW_SENDER_SETS_CREDIT],
+            steps=link_up(role_sender=True, credit=1) + [
+                t.send_frame(AMQP_FRAME, t.transfer_body(), state=s("MAPPED"), channel=1,
+                             payload=message),
+                t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                          state=s("DISCARDING"),
+                          body=t.flow_body(handle=0, delivery_count=0, link_credit=1),
+                          channel=1)],
+            note="**Shared gap.** `flow/field:delivery-count.3` requires a flow sent from "
+                 "the receiver to the sender to carry \"the last known value of the "
+                 "corresponding sending endpoint\". This endpoint is the link's sender and "
+                 "has sent one delivery, so the receiver's flow reporting zero is naming "
+                 "a value the sending endpoint never had. **Both artefacts admit** it, and "
+                 "the specification's own disposition says so in terms: `.3` \"is not "
+                 "carried at all\", because its selector asks which end *issued* the "
+                 "frame and returns `none` for the receiver's flows. The corpus's admitted "
+                 "half (`exchange-flow-receiver-count-echoed`) is the delimitation"),
+
+        exchange(
+            "staged-flow-sender-count-absent", start=s("MAPPED"),
+            clauses=[FLOW_DELIVERY_COUNT_SET_BY_SENDER, SESSION_END_ON_ERROR,
+                     SESSION_ERRORS],
+            steps=link_up(role_sender=False) + [
+                t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                          state=s("DISCARDING"),
+                          body=t.body("flow", **windows(),
+                                      **{"next-incoming-id": {"type": "uint", "value": 0},
+                                         "handle": {"type": "uint", "value": 0}}),
+                          channel=1)],
+            note="**Shared gap: the presence half of a sentence whose value half is "
+                 "enforced.** `flow/field:delivery-count.2` requires the field to be set, "
+                 "not only to be right, and this flow names the link and omits it "
+                 "entirely. **Both artefacts admit** it: the specification's guard is a "
+                 "match on a present field and falls through when it is absent, which the "
+                 "disposition for `.2` records as the half its carrier misses, and the "
+                 "reference returns early on an absent count. `exchange-flow-sender-count-"
+                 "not-its-current` pins the half both do enforce, so the two together "
+                 "give the clause both readings"),
+
+        exchange(
+            "staged-link-resume-sent-not-in-map", start=s("MAPPED"),
+            clauses=[TRANSFER_RESUME_SENDER_MUST_NOT, TRANSFER_ONE_SECTION],
+            steps=link_up(role_sender=True, credit=1) + [
+                t.refused("send", reason="malformed", condition=INVALID_FIELD,
+                          state=s("MAPPED"), body=t.transfer_body(resume=True), channel=1,
+                          payload=message)],
+            note="**Shared gap.** `transfer/field:resume.2`: \"The sender MUST NOT send "
+                 "resumed transfers for deliveries not in its local unsettled map.\" Our "
+                 "endpoint is the link's sender and has sent nothing, so a resumed "
+                 "transfer for delivery zero is a resume of a delivery that does not "
+                 "exist. **Both artefacts write it**: neither reads the `resume` field, "
+                 "which the specification's disposition records as uncarried "
+                 "(`deferred:S4`) and the reference's layer never mentions. The clause is "
+                 "stated for the sending end, so this is one a conformance check could "
+                 "hold without an unsettled map — the map's absence is what makes the "
+                 "delivery's absence easy to state and impossible to check"),
+
+        exchange(
+            "staged-link-resume-only-on-continuation", start=s("MAPPED"),
+            clauses=[TRANSFER_RESUME_FIRST_TRANSFER, TRANSFER_FIRST_FIELDS],
+            steps=link_up() + [
+                t.receive_frame(AMQP_FRAME, t.transfer_body(more=True),
+                                state=s("MAPPED"), channel=1, payload=message[:10]),
+                t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                          state=s("DISCARDING"),
+                          body=t.transfer_body(identity=False, resume=True), channel=1,
+                          payload=message[10:])],
+            note="**Shared gap.** `resume.3`: \"If a resumed delivery spans more than one "
+                 "transfer performative, then the resume flag MUST be set to true on the "
+                 "*first* transfer of the resumed delivery.\" The delivery here is "
+                 "resumed — its continuation says so — while the first transfer that "
+                 "began it did not. **Both artefacts admit** both steps. The corpus's "
+                 "admitted half (`exchange-link-resume-on-first-transfer`) has the flag "
+                 "where the clause requires it, and the pair is what separates \"the flag "
+                 "is read\" from \"the flag is required in a place\""),
+
+        exchange(
+            "staged-link-attach-unsettled-null-key", start=s("MAPPED"),
+            clauses=[ATTACH_UNSETTLED_NULL_KEY, ATTACH_DEFAULTS],
+            steps=[t.send_frame(AMQP_FRAME, t.attach_body(role=True), state=s("MAPPED"),
+                                channel=1),
+                   t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                             state=s("DISCARDING"),
+                             body=t.body("attach",
+                                         name={"type": "string", "text": "link"},
+                                         handle={"type": "uint", "value": 0},
+                                         role={"type": "boolean", "value": False},
+                                         **{"initial-delivery-count":
+                                                {"type": "uint", "value": 0},
+                                            "unsettled": t.unsettled_map(
+                                                [({"type": "null"},
+                                                  {"type": "binary", "hex": "00"})])}),
+                             channel=1)],
+            note="**Shared gap.** `attach/field:unsettled.5`: \"The unsettled map MUST NOT "
+                 "contain null valued keys.\" A null key is a legal map key in the type "
+                 "system — which is why the clause has to forbid it *here* — and the "
+                 "reference decodes this frame happily. **Both artefacts admit** it: "
+                 "neither reads the `unsettled` field at all, and the specification's "
+                 "disposition records the generated table row as the field's only trace. "
+                 "The map itself is well formed (an even item count, a null key, an "
+                 "octet-string value), so the only rule this frame breaks is the one the "
+                 "vector names"),
+
+        exchange(
+            "staged-bodyless-frame-in-end", start=c("END"),
+            clauses=[STATE_TABLE, EMPTY_FRAME, EMPTY_FRAME_ANY_CHANNEL],
+            steps=[t.refused("receive", reason="illegalState", condition=ILLEGAL_STATE,
+                             state=c("END"), octets=empty_frame(channel=0),
+                             note="END's legal receives are `-`, so a frame arrives where "
+                                  "the table admits none"),
+                   t.refused("receive", reason="illegalState", condition=ILLEGAL_STATE,
+                             state=c("END"), octets=empty_frame(channel=1))],
+            note="**Shared gap: a frame with no body defeats the table's `-` column.** "
+                 "`picture.24` gives END `-` in both columns, and the corpus already pins "
+                 "that a `close` and a protocol header arriving there are refused with "
+                 "`amqp:illegal-state` and class `illegalState`. A frame whose header is "
+                 "all there is — which `framing.4` licenses, and which "
+                 "`doc-idle-time-out.10` forbids *sending* after a close — is **admitted "
+                 "by both artefacts in END**, with no state change, because both "
+                 "short-circuit on a bodyless frame before the state column is consulted. "
+                 "The idle-timeout clause requires a peer to handle empty frames \"on any "
+                 "valid channel\"; it does not license one on a connection that is over, "
+                 "and the table's `-` is what says so")
+    ]
 
 
 def mutation_corpus(tables: Corpus) -> list[dict]:
