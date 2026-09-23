@@ -1315,7 +1315,7 @@
    "clause_text": "A map in which there exist two identical key values is invalid.",
    "disposition": "deferred:map-duplicate-keys",
    "kind": "UNKEYED",
-   "note": "Both artefacts decode a map whose keys repeat and admit it, so the rule is not enforced; `vectors/value-boundary-negatives.ndjson` carries two vectors for it (`boundary-negative-map-duplicate-keys-string` and `-null`) with a differing-keys control beside them, so the gap is recorded by vectors rather than by this note alone. Left deferred rather than dispositioned by test: a `test:` names a vector that pins the behaviour, and these pin a rejection neither artefact gives.",
+   "note": "Both artefacts decode a map whose keys repeat and admit it, so the rule is not enforced; `vectors/value-boundary-negatives.ndjson` carries two vectors for it (`boundary-negative-map-duplicate-string-keys` and `boundary-negative-map-duplicate-null-keys`) with a differing-keys control beside them, so the gap is recorded by vectors rather than by this note alone. Left deferred rather than dispositioned by test: a `test:` names a vector that pins the behaviour, and these pin a rejection neither artefact gives.",
    "text_sha256": "9b2b112f06fbceb126af8f873361d7e623832a136d936d5814d7c502544132d6",
    "unkeyed_phrases": [
     "is invalid"
