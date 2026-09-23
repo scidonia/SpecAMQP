@@ -340,6 +340,23 @@ on wording, on order, and on a JSON number's type.** A downstream implementation
 and the proof is where the boundary becomes visible — which is the argument for a proof existing beside a test suite rather than instead of
 one.
 
+**Twenty-four of twenty-five, and the join is *assembly* rather than construction.** `char`'s bridge was plumbing as predicted: both
+accessors reduce to the same structural form — a mantissa and a zero exponent — so the lemma is a case analysis on the number, and the
+negative-mantissa branch dies on the very hypothesis the reference's own range check carries. What is left is `map`, the same species with
+a different subject: the specification reads the pairs array as `Array (Array Json)` where the reference reads `Array Json` and then a
+`getArr?` per element, so it needs that bridge plus the pair-level analogue of `mapM_valueOfJson_agrees` with `BodiesAgreePairs` as its
+obligation. Still nothing about AMQP itself is missing, which is now a fair summary of the whole remaining development: the difficulty was
+never the protocol.
+
+**And the fuel-64 join is smaller than the estimate that put it here**, for a reason worth stating: the compound clauses are already
+stated with the induction hypothesis as a *parameter*, so they **are** the step lemma's own compound cases, and what remains is assembly —
+derive the discriminant from the reference's own success, dispatch on it, and call the clause. That is the second time in this development
+that re-reading a *statement* shortened the work rather than the proof of it, the fuel-64 observation being the first.
+
+The bridges landed along the way are reusable and named: `unsignedOf_eq`/`signedOf_eq`, `unsignedOf_le`/`signedOf_range`/`boundedField_range`/
+`boundedField_ok_getObjValAs`, the eight integer round trips `uN_toNat`/`iN_toInt`, `fixedHex_ok_hexPayloadOf`, `mapM_valueOfJson_agrees`,
+and the two JSON accessor lemmas. The wire-level statements will want several of them.
+
 **What discharging the hypotheses would take, in order, so the next sitting does not rediscover the shape.** The refutations stand as theorems either way — a refuted hypothesis is a theorem or it is a rumour. Then: **(i)** decide the reading for each divergence, which needs the artifact's own text — for the odd-counted map, whether the count names items or entries and whether the *form* of the count is checked before or after its consistency with the octets. Where the artifact is silent, a register entry decides it, which is what the register is for. **(ii)** Align the two artefacts to that reading, one commit per divergence, since each is symmetric in a different place. **(iii)** Add a vector per divergence, because *reachability* is what decides whether the corpus could ever have seen it: the array-element family is reachable through the corpus vocabulary and the odd-count map is not, and that difference is a fact about the corpus rather than about the defect. **(iv)** Only then are the hypotheses provable and the two conditional instances unconditional. **The order is the point**: a vector written last would be a vector written from the fix rather than from the artifact, which is the rule this repository keeps and exactly why the differential cannot be the thing that finds this class of defect.
 
 **And a second divergence sits underneath the first, found by a sharper witness.** The reported buffer violated two rules at once — an odd count *and* a declared size inconsistent with its items — so it could not say which rule either artefact was answering. A buffer violating only parity, `#[0xC1, 0x03, 0x03, 0x40, 0x40, 0x40]` where the items measure exactly the declared three octets, gives `malformed` from the specification and `sizeMismatch "map" 3 4` from the reference: declared 3, **measured 4**. Four is what a map's content measures if the *count field is inside the size*, three if it is not — so the two artefact seem to differ about what a compound value's size field covers, which would change the class for every map and list rather than only the odd ones. The ledger's index yields the parity clause (`amqp:types/section:primitive-type-definitions/type:map.1`) and nothing on the size field's extent, so that question is open and is being settled from the artifact's prose. **It is the more important of the two**: a parity rule affects one malformed encoding, a size-accounting difference affects the whole corpus.
