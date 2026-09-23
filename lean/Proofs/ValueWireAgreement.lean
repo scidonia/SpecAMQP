@@ -19,8 +19,11 @@ other zero-width rows, the one-octet payloads, the wide unsigned and `char` widt
 widths, the six opaque widths, and the six variable rows. Also landed: the fuel-irrelevance family
 (`fuelIrrelevant_all`, with its six reader clauses), which is the fact the loop relations need — the
 specification's reader answers the same at every fuel above the octet bound, so its item loop can be
-put on the reference's footing one fuel lower. Still owed: the six compound and array rows,
-with the three loop relations they share; the dispatch that turns the arms into the induction step;
+put on the reference's footing one fuel lower. The *item* loop relation is landed too (`ItemsAgree`,
+`readItems_loop`), at one fuel on both sides. Still owed: the six compound and array rows, with the
+two remaining loop relations they share — the compound body's (`readCompound`/`readMap` against
+`readCompound`, which the item loop relation now feeds) and the array element loop's one-fuel offset;
+the dispatch that turns the arms into the induction step;
 and the fuel induction itself, whose entry point is free. What each owes and how it is
 proved is stated where it belongs rather than in a list here: see the octet step's arithmetic, and
 `arm_0x00`'s docstring for the pattern the branches follow.
@@ -3960,5 +3963,117 @@ theorem readElementsLoop_irrel {f f' : Nat} (hle : f ≤ f') {ed : Option Encodi
     {count : Nat} {c : Cursor} (hw : WideOption ed) (hb : c.data.size - c.pos ≤ f) :
     AnswerAgrees (readElementsLoop f ed count c) (readElementsLoop f' ed count c) :=
   (fuelIrrelevant_all f).elementLoop f' hle ed count c hw hb
+
+/-! ## The item loop, at one fuel on both sides
+
+The irrelevance above aligns the loops; this is the relation itself, and the first of the three the
+compound and array rows share. The reference refuses at fuel zero and reads its items at its
+predecessor, while the specification reads its items at the fuel it was handed — so at one value-level
+fuel the two item loops are one apart, and the *statement* puts them back together at one fuel: the
+value law at the item's fuel relates the two item reads, the loop relation at the fuel below relates
+the tails, and the irrelevance converts the specification's loop down where a caller has only
+`Spec.readItems F` and `Ref.readItems (F - 1)`. -/
+
+/-- **The two artefacts' item loops at one fuel.** The reference refuses at fuel zero and reads its
+items at its predecessor; the specification reads its items at the fuel it was handed, so a compound's
+items sit one fuel apart between the artefacts and *this* is the statement that puts them back
+together: the value law at the item's fuel relates the two item reads, and the loop relation at the
+fuel below relates the tails. -/
+def ItemsAgree (j : Nat) (count : Nat) (c : Cursor) (c' : SpecAMQP.Ref.Cursor) : Prop :=
+  (∀ (others : List SpecAMQP.Ref.Value) (d' : SpecAMQP.Ref.Cursor),
+      SpecAMQP.Ref.readItems j count c' = .ok (others, d') →
+      ∃ (bodies : List Value) (d : Cursor),
+        SpecAMQP.Spec.Codec.readItems j count c = .ok (bodies, d) ∧
+        CursorAgrees d d' ∧ BodiesAgreeList bodies others) ∧
+  (∀ failure : SpecAMQP.Ref.DecodeError,
+      SpecAMQP.Ref.readItems j count c' = .error failure →
+      ∃ refusal : SpecAMQP.Spec.Codec.Refusal,
+        SpecAMQP.Spec.Codec.readItems j count c = .error refusal ∧
+        (SpecAMQP.Ref.Frame.valueFailure failure).reasonClass = refusal.reasonClass)
+
+/-- **The item loop agrees at one fuel**, given the value law at every fuel beneath it: the item read
+is at the fuel below the loop's, and the loop's tail at the fuel below that. -/
+theorem readItems_loop : ∀ (j : Nat), WireAgreesUpTo (j - 1) → 1 ≤ j →
+    ∀ (count : Nat) (c : Cursor) (c' : SpecAMQP.Ref.Cursor), CursorAgrees c c' →
+      c.data.size - c.pos ≤ j - 1 → ItemsAgree j count c c' := by
+  intro j
+  induction j with
+  | zero => intro _ h1; exact absurd h1 (by omega)
+  | succ s ih =>
+    intro hup _ count c c' hc hb
+    have hup' : WireAgreesUpTo s := hup
+    have hval : WireAgrees s := wireAgreesUpTo_self hup'
+    constructor
+    · intro others d' hr
+      cases count with
+      | zero =>
+        simp only [SpecAMQP.Ref.readItems] at hr
+        obtain ⟨ho, hd⟩ : [] = others ∧ c' = d' := by
+          simpa only [Except.ok.injEq, Prod.mk.injEq] using hr
+        subst ho
+        subst hd
+        exact ⟨[], c, by simp only [SpecAMQP.Spec.Codec.readItems], hc,
+          by simp only [BodiesAgreeList]⟩
+      | succ k =>
+        unfold SpecAMQP.Ref.readItems at hr
+        obtain ⟨⟨other, d₁'⟩, hr1, hr⟩ := exists_of_bind_ok hr
+        try dsimp only at hr
+        obtain ⟨⟨rest, d₂'⟩, hr2, hr⟩ := exists_of_bind_ok hr
+        try dsimp only at hr
+        obtain ⟨ho, hd⟩ : other :: rest = others ∧ d₂' = d' := by
+          simpa only [except_pure_ok, Except.ok.injEq, Prod.mk.injEq] using hr
+        subst ho
+        subst hd
+        obtain ⟨body, d₁, hs1, hc1, -, hbody⟩ := (hval c c' hc hb).1 other d₁' hr1
+        have hs_ge : 1 ≤ s := by
+          cases s with
+          | zero => simp only [SpecAMQP.Ref.readItems] at hr2; exact absurd hr2 (by simp)
+          | succ t => omega
+        obtain ⟨bodies, d₂, hs2, hc2, hbodies⟩ :=
+          (ih (wireAgreesUpTo_mono hup' (by omega)) hs_ge k d₁ d₁' hc1 (bound_tail_lt hs1 hb)).1
+            rest d₂' hr2
+        refine ⟨body :: bodies, d₂, ?_, hc2, ?_⟩
+        · simp only [SpecAMQP.Spec.Codec.readItems]
+          rw [hs1, except_bind_ok, hs2, except_bind_ok, except_pure_ok]
+        · simp only [BodiesAgreeList]; exact ⟨hbody, hbodies⟩
+    · intro failure hr
+      cases count with
+      | zero => simp only [SpecAMQP.Ref.readItems] at hr; exact absurd hr (by simp)
+      | succ k =>
+        unfold SpecAMQP.Ref.readItems at hr
+        cases h1 : SpecAMQP.Ref.readValue s c' with
+        | error e =>
+          rw [h1, except_bind_error] at hr
+          simp only [Except.error.injEq] at hr
+          subst hr
+          obtain ⟨refusal, hs1, hcl⟩ := (hval c c' hc hb).2 e h1
+          refine ⟨refusal, ?_, hcl⟩
+          simp only [SpecAMQP.Spec.Codec.readItems]
+          rw [hs1, except_bind_error]
+        | ok p =>
+          obtain ⟨other, d₁'⟩ := p
+          rw [h1, except_bind_ok] at hr
+          try dsimp only at hr
+          cases h2 : SpecAMQP.Ref.readItems s k d₁' with
+          | error e =>
+            rw [h2, except_bind_error] at hr
+            simp only [Except.error.injEq] at hr
+            subst hr
+            obtain ⟨body, d₁, hs1, hc1, -, -⟩ := (hval c c' hc hb).1 other d₁' h1
+            -- the item read accepted, so the loop's fuel is not zero
+            have hs_ge : 1 ≤ s := by
+              cases s with
+              | zero => simp only [SpecAMQP.Ref.readValue] at h1; exact absurd h1 (by simp)
+              | succ t => omega
+            obtain ⟨refusal, hs2, hcl⟩ :=
+              (ih (wireAgreesUpTo_mono hup' (by omega)) hs_ge k d₁ d₁' hc1
+                (bound_tail_lt hs1 hb)).2 e h2
+            refine ⟨refusal, ?_, hcl⟩
+            simp only [SpecAMQP.Spec.Codec.readItems]
+            rw [hs1, except_bind_ok, hs2, except_bind_error]
+          | ok q =>
+            rw [h2, except_bind_ok] at hr
+            try dsimp only at hr
+            exact absurd hr (by simp)
 
 end SpecAMQP.Proofs
