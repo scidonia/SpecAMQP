@@ -6865,4 +6865,134 @@ theorem arm_0xF0 (fuel : Nat) (hdec : ElementsDecideBelow fuel) (c : SpecAMQP.Sp
     exact ⟨refusal, by rw [hS]; exact hf, hcl⟩
 
 
+/-! ## The value law's dispatch
+
+The forty value-level arms are one per constructor octet, so the step of the fuel induction is a
+dispatch over the octets the reference's reader assigns: an assigned octet is one of forty literals and
+is the arm's own hypothesis, and an octet the declared surface does not assign is refused on both
+sides in the same class. The list below is the same forty octets the element dispatch uses; the sweep
+reads the *reference's* own test, which is what the refusal family is stated against. -/
+
+/-- The constructor octets the reference's value reader assigns: the descriptor prefix and every
+octet the declared surface holds a row for. -/
+def wireCtors : List UInt8 :=
+  [0x00, 0x40, 0x41, 0x42, 0x43, 0x44, 0x45, 0x50, 0x51, 0x52, 0x53, 0x54, 0x55, 0x56, 0x60, 0x61, 0x70, 0x71, 0x72, 0x73, 0x74, 0x80, 0x81, 0x82, 0x83, 0x84, 0x94, 0x98, 0xA0, 0xA1, 0xA3, 0xB0, 0xB1, 0xB3, 0xC0, 0xC1, 0xD0, 0xD1, 0xE0, 0xF0]
+
+set_option maxRecDepth 10000 in
+/-- **Every octet the reference does not accept as a constructor is outside the list.** One finite
+evaluation of the reference's own test over all 256 octets. -/
+theorem wireCtors_sweep :
+    (List.range 256).all (fun n =>
+      wireCtors.contains (UInt8.ofNat n)
+        || !(SpecAMQP.Ref.assignedConstructor (UInt8.ofNat n))) = true := by
+  decide
+
+/-- The sweep as a fact about one octet: outside the list, the reference's test is false. -/
+theorem assignedConstructor_false_of_not_mem {code : UInt8} (h : code ∉ wireCtors) :
+    SpecAMQP.Ref.assignedConstructor code = false := by
+  have hall := List.all_eq_true.mp wireCtors_sweep code.toNat (List.mem_range.mpr code.toNat_lt)
+  have hof : UInt8.ofNat code.toNat = code := by
+    apply UInt8.toNat_inj.mp
+    simp
+  rw [hof] at hall
+  have hc : wireCtors.contains code = false := by
+    cases hcon : wireCtors.contains code with
+    | false => rfl
+    | true => exact absurd (List.contains_iff_mem.mp hcon) h
+  rw [hc, Bool.false_or] at hall
+  simpa using hall
+
+/-- **The step of the fuel induction.** At one fuel more than the invariant reaches, the readers agree:
+the octet is taken on both sides (`takeU8_agrees`, or `takeU8_fails` when one side runs out), and then
+the octet's own arm — one of the forty landed arms — is the whole of the value, with the element
+decision below the fuel for the two array rows and the value law below for the four container rows and
+the descriptor prefix. -/
+theorem wireAgrees_succ (K : Nat) (hup : WireAgreesUpTo K) (hdec : ElementsDecideBelow K) :
+    WireAgrees (K + 1) := by
+  intro c c' hc hb
+  cases hr : SpecAMQP.Ref.takeU8 c' with
+  | error e =>
+    constructor
+    · intro other c₂' h
+      simp only [SpecAMQP.Ref.readValue] at h
+      rw [hr, except_bind_error] at h
+      exact absurd h (by simp)
+    · intro failure h
+      simp only [SpecAMQP.Ref.readValue] at h
+      rw [hr, except_bind_error] at h
+      simp only [Except.error.injEq] at h
+      subst h
+      obtain ⟨refusal, hsU8, hcl⟩ := takeU8_fails hc e hr
+      refine ⟨refusal, ?_, hcl⟩
+      simp only [SpecAMQP.Spec.Codec.readValue]
+      rw [hsU8, except_bind_error]
+  | ok p =>
+    obtain ⟨code, d'⟩ := p
+    obtain ⟨d, hs, hcd⟩ := takeU8_agrees hc code d' hr
+    have hb' : d.data.size - d.pos ≤ K := by
+      rw [spec_takeU8_data hs, spec_takeU8_pos hs]
+      omega
+    by_cases hmem : code ∈ wireCtors
+    · simp only [wireCtors, List.mem_cons, List.not_mem_nil, or_false] at hmem
+      rcases hmem with rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+        | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+        | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl | rfl
+      · exact arm_0x00 K (wireAgreesUpTo_self hup) c c' d d' hcd hb' hs hr
+      · exact arm_0x40 K c c' d d' hcd hb' hs hr
+      · exact arm_0x41 K c c' d d' hcd hb' hs hr
+      · exact arm_0x42 K c c' d d' hcd hb' hs hr
+      · exact arm_0x43 K c c' d d' hcd hb' hs hr
+      · exact arm_0x44 K c c' d d' hcd hb' hs hr
+      · exact arm_0x45 K c c' d d' hcd hb' hs hr
+      · exact arm_0x50 K c c' d d' hcd hb' hs hr
+      · exact arm_0x51 K c c' d d' hcd hb' hs hr
+      · exact arm_0x52 K c c' d d' hcd hb' hs hr
+      · exact arm_0x53 K c c' d d' hcd hb' hs hr
+      · exact arm_0x54 K c c' d d' hcd hb' hs hr
+      · exact arm_0x55 K c c' d d' hcd hb' hs hr
+      · exact arm_0x56 K c c' d d' hcd hb' hs hr
+      · exact arm_0x60 K c c' d d' hcd hb' hs hr
+      · exact arm_0x61 K c c' d d' hcd hb' hs hr
+      · exact arm_0x70 K c c' d d' hcd hb' hs hr
+      · exact arm_0x71 K c c' d d' hcd hb' hs hr
+      · exact arm_0x72 K c c' d d' hcd hb' hs hr
+      · exact arm_0x73 K c c' d d' hcd hb' hs hr
+      · exact arm_0x74 K c c' d d' hcd hb' hs hr
+      · exact arm_0x80 K c c' d d' hcd hb' hs hr
+      · exact arm_0x81 K c c' d d' hcd hb' hs hr
+      · exact arm_0x82 K c c' d d' hcd hb' hs hr
+      · exact arm_0x83 K c c' d d' hcd hb' hs hr
+      · exact arm_0x84 K c c' d d' hcd hb' hs hr
+      · exact arm_0x94 K c c' d d' hcd hb' hs hr
+      · exact arm_0x98 K c c' d d' hcd hb' hs hr
+      · exact arm_0xA0 K c c' d d' hcd hb' hs hr
+      · exact arm_0xA1 K c c' d d' hcd hb' hs hr
+      · exact arm_0xA3 K c c' d d' hcd hb' hs hr
+      · exact arm_0xB0 K c c' d d' hcd hb' hs hr
+      · exact arm_0xB1 K c c' d d' hcd hb' hs hr
+      · exact arm_0xB3 K c c' d d' hcd hb' hs hr
+      · exact arm_0xC0 K (wireAgreesUpTo_mono hup (by omega)) c c' d d' hcd hb' hs hr
+      · exact arm_0xC1 K (wireAgreesUpTo_mono hup (by omega)) c c' d d' hcd hb' hs hr
+      · exact arm_0xD0 K (wireAgreesUpTo_mono hup (by omega)) c c' d d' hcd hb' hs hr
+      · exact arm_0xD1 K (wireAgreesUpTo_mono hup (by omega)) c c' d d' hcd hb' hs hr
+      · exact arm_0xE0 K hdec c c' d d' hcd hb' hs hr
+      · exact arm_0xF0 K hdec c c' d d' hcd hb' hs hr
+    · have hass : SpecAMQP.Ref.assignedConstructor code = false :=
+        assignedConstructor_false_of_not_mem hmem
+      have hne : code ≠ 0x00 := by
+        intro h0
+        exact hmem (by rw [h0]; decide)
+      constructor
+      · intro other c₂' h
+        rw [ref_readValue_unassigned K c' code d' hr hass] at h
+        exact absurd h (by simp)
+      · intro failure h
+        rw [ref_readValue_unassigned K c' code d' hr hass] at h
+        injection h with hf
+        subst hf
+        obtain ⟨r, hspec, hcl⟩ :=
+          spec_readValue_unassigned K c code d hs (encodingOf_none_of_not_assigned hass) hne
+        exact ⟨r, hspec, by rw [hcl]; rfl⟩
+
+
 end SpecAMQP.Proofs
