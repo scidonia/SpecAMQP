@@ -28,6 +28,7 @@ thing under test would only show that it equals itself.
 from __future__ import annotations
 
 import pathlib
+from xml.etree import ElementTree
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 ARTIFACT = ROOT / "spec" / "oasis" / "amqp-core-types-v1.0-os.xml"
@@ -44,6 +45,66 @@ MAP_CLAUSE = "amqp:types/section:primitive-type-definitions/type:map.1"
 # nothing in the data, which is why the zero-width element family is legal even when
 # the element count exceeds the buffer (ledger/ambiguities/zero-width-array-count.json).
 ENCODINGS_CLAUSE = "amqp-core-types-v1.0-os.xml#amqp:types/section:encodings.1"
+# The constructor BNF: the ranges a format code may lie in, which is what makes an
+# octet a *constructor* the grammar admits and the declared table assigns no encoding to
+# two different facts. Cited by every vector that turns on the difference.
+CONSTRUCTOR_BNF = "amqp-core-types-v1.0-os.xml#picture.3"
+# The descriptor prefix, written `%x00 descriptor constructor`: not an encoding of any
+# type and still a legal element constructor, because an array's element constructor is a
+# constructor and this is one.
+DESCRIBED_CONSTRUCTOR = 0x00
+# The escape octets — each range's sixteenth code, `%x4F %x00-FF` and its eleven
+# siblings — which the BNF reserves for future formats and the declared surface
+# therefore assigns nothing. Named once here because two families read the set: the
+# reserved-octet refusals below, and the unassigned half of the element-constructor
+# space, which is every code inside the BNF's ranges that is neither an escape octet nor
+# an assignment.
+ESCAPE_OCTETS = (0x4F, 0x5F, 0x6F, 0x7F, 0x8F, 0x9F, 0xAF, 0xBF, 0xCF, 0xDF, 0xEF, 0xFF)
+
+
+def _declared_types() -> dict[str, ElementTree.Element]:
+    """Every named type in Part 1, by name, so a restricted type can be followed to the
+    primitive it is defined over."""
+    return {t.get("name"): t for t in ElementTree.parse(ARTIFACT).getroot().iter("type")
+            if t.get("name")}
+
+
+def _primitive_of(types: dict[str, ElementTree.Element], name: str) -> str:
+    current = types.get(name)
+    while current is not None and current.get("class") == "restricted":
+        current = types.get(current.get("source"))
+    if current is None or current.get("class") != "primitive":
+        raise SystemExit(f"gen-value-vectors: {name!r} does not resolve to a primitive")
+    return current.get("name")
+
+
+def declared_element_constructors() -> dict[int, str]:
+    """The element-constructor space, read from the artifact rather than typed: every
+    encoding's octet, with the primitive type its owner resolves to — which is the value
+    kind the form carries, and so the kind an item of that form must be.
+
+    The descriptor prefix is added by hand because it is not an encoding: it is a
+    `constructor` in the BNF and carries described values, and an array may declare it.
+    """
+    types = _declared_types()
+    found: dict[int, str] = {}
+    for element in types.values():
+        if element.get("class") != "primitive":
+            continue
+        for encoding in element.iter("encoding"):
+            found[int(encoding.get("code"), 16)] = _primitive_of(types, element.get("name"))
+    found[DESCRIBED_CONSTRUCTOR] = "described"
+    return found
+
+
+def unassigned_element_constructors() -> list[int]:
+    """The octets inside the constructor BNF's ranges that the declared surface assigns
+    no encoding. `0x57` is one: it lies in `fixed-one`'s range and the table gives it no
+    row — the constructor the reference once wrote for an array with no elements, and
+    then refused when its own reader was handed the octets back."""
+    assigned = declared_element_constructors()
+    return [code for code in range(0x40, 0xFF)
+            if code not in ESCAPE_OCTETS and code not in assigned]
 
 # ---------------------------------------------------------------- the encoder
 
@@ -399,6 +460,26 @@ def self_check() -> None:
                 f"gen-value-vectors: the encoder disagrees with the artifact's {name} example\n"
                 f"  artifact: {expected.hex()}\n  produced: {produced.hex()}"
             )
+    # The declared-versus-actual family's two halves must partition the constructor-by-item
+    # space. A staged pair the declared constructor *does* carry would be written by
+    # neither half — a hole in both — and the landed half must not be empty, since a family
+    # that excludes everything proves nothing.
+    accepts = declared_element_constructors()
+    staged = staged_mismatch_pairs()
+    for code, label in sorted(staged):
+        if code not in accepts:
+            raise SystemExit(
+                f"gen-value-vectors: staged pair {code:#04x} is not a declared "
+                f"constructor")
+        if not item_is_wrong(code, accepts[code], STAGED_ITEM_BY_LABEL[label]):
+            raise SystemExit(
+                f"gen-value-vectors: the staged pair ({code:#04x}, {label!r}) is one the "
+                f"declared constructor carries, so neither family would write it")
+    landed = [(code, label) for code, owner in accepts.items()
+              for label, item in STAGED_ITEMS
+              if item_is_wrong(code, owner, item) and (code, label) not in staged]
+    if not landed:
+        raise SystemExit("gen-value-vectors: the landed mismatch family is empty")
 
 
 # ------------------------------------------------------------------- families
@@ -701,24 +782,48 @@ def properties() -> list[dict]:
 # `format-code` or the descriptor prefix — and its `format-code` production admits all
 # four categories, so a scalar, a compound and an array are each legal element data.
 
-# Every element constructor a reader reads, with the note each vector carries. The
-# ones the corpus already had vectors for (null, the booleans, ubyte, ushort, uint,
-# ulong, byte, short, int, long, float, double and the decimals, char, timestamp, uuid,
-# binary, string, symbol) appear here too, because an array's *declared* form decides
-# how its elements are written and a construction the earlier families never exercised
-# is written here for the first time.
+# Every element constructor the declared surface assigns, with the note each vector
+# carries. The list is the table's own space read back — 39 encodings of Part 1 plus the
+# descriptor prefix, which is not an encoding and is a legal element constructor — and it
+# is stated in code order so that a missing code is visible as a gap. The earlier version
+# of this list held nineteen of them: the sixteen-octet forms had no vector at all, which
+# is the width the *boundaries of a size field* never reach, and a constructor with no
+# array vector is a form whose elements were never written in its declared shape.
 ELEMENT_FORMS = [
     (0x00, "described", "the descriptor prefix stands as the element constructor, so "
                         "each element carries its own descriptor and value"),
+    (0x40, "null", "the null constructor, whose elements carry no octets at all"),
+    (0x41, "true", "the boolean true constructor, which carries no octets either: the "
+                   "value is the constructor itself"),
+    (0x42, "false", "the boolean false constructor, on the same terms as `true`"),
     (0x43, "uint0", "the uint zero form, whose elements carry no octets at all"),
     (0x44, "ulong0", "the ulong zero form, whose elements carry no octets at all"),
     (0x45, "list0", "the empty-list form, whose elements carry no octets at all"),
+    (0x50, "ubyte", "one octet of unsigned data"),
+    (0x51, "byte", "one octet of two's complement"),
     (0x52, "smalluint", "a one-octet unsigned element"),
     (0x53, "smallulong", "a one-octet unsigned element"),
+    (0x54, "smallint", "a one-octet signed element"),
+    (0x55, "smalllong", "a one-octet signed element"),
     (0x56, "boolean", "one octet, false for 0x00 and true for anything else"),
+    (0x60, "ushort", "two octets of unsigned data"),
     (0x61, "short", "two octets of two's complement"),
+    (0x70, "uint", "four octets of unsigned data"),
     (0x71, "int", "four octets of two's complement"),
+    (0x72, "float", "four octets of binary32"),
+    (0x73, "char", "a UTF-32BE code point in four octets"),
+    (0x74, "decimal32", "four octets of Binary Integer Decimal"),
+    (0x80, "ulong", "eight octets of unsigned data"),
     (0x81, "long", "eight octets of two's complement"),
+    (0x82, "double", "eight octets of binary64"),
+    (0x83, "timestamp", "eight octets of milliseconds since the epoch"),
+    (0x84, "decimal64", "eight octets of Binary Integer Decimal"),
+    (0x94, "decimal128", "sixteen octets of Binary Integer Decimal — the widest fixed "
+                         "form the table declares"),
+    (0x98, "uuid", "sixteen octets, the only other fixed sixteen"),
+    (0xA0, "vbin8", "a one-octet length prefix, then the payload"),
+    (0xA1, "str8", "a one-octet length prefix, then the payload"),
+    (0xA3, "sym8", "a one-octet length prefix, then the payload"),
     (0xB0, "vbin32", "a four-octet length prefix, then the payload"),
     (0xB1, "str32", "a four-octet length prefix, then the payload"),
     (0xB3, "sym32", "a four-octet length prefix, then the payload"),
@@ -733,29 +838,77 @@ ELEMENT_FORMS = [
 
 
 def element_value(constructor: int, index: int) -> dict:
-    """The `index`-th element an array of this declared constructor carries."""
+    """The `index`-th element an array of this declared constructor carries.
+
+    One branch per constructor the declared surface assigns, so a value the form cannot
+    carry is a corpus defect raised by the encoder rather than an element written in
+    another form: the array states its element constructor once, and every element is
+    read back in that form and no other.
+    """
     if constructor == 0x00:
         return {"type": "described",
                 "descriptor": {"type": "symbol", "text": "element"},
                 "value": {"type": "ubyte", "value": index % 256}}
+    if constructor == 0x40:
+        return {"type": "null"}
+    if constructor == 0x41:
+        return {"type": "boolean", "value": True}
+    if constructor == 0x42:
+        return {"type": "boolean", "value": False}
     if constructor == 0x43:
         return {"type": "uint", "value": 0}
     if constructor == 0x44:
         return {"type": "ulong", "value": 0}
     if constructor == 0x45:
         return {"type": "list", "items": []}
+    if constructor == 0x50:
+        return {"type": "ubyte", "value": index % 256}
+    if constructor == 0x51:
+        return {"type": "byte", "value": index % 128}
     if constructor == 0x52:
         return {"type": "uint", "value": index % 256}
     if constructor == 0x53:
         return {"type": "ulong", "value": index % 256}
+    if constructor == 0x54:
+        return {"type": "int", "value": index % 128}
+    if constructor == 0x55:
+        return {"type": "long", "value": index % 128}
     if constructor == 0x56:
         return {"type": "boolean", "value": index % 2 == 0}
+    if constructor == 0x60:
+        return {"type": "ushort", "value": index % 65536}
     if constructor == 0x61:
         return {"type": "short", "value": index - 128}
+    if constructor == 0x70:
+        return {"type": "uint", "value": index % 65536}
     if constructor == 0x71:
         return {"type": "int", "value": index - 128}
+    if constructor == 0x72:
+        return {"type": "float", "hex": "3f800000"}
+    if constructor == 0x73:
+        return {"type": "char", "codepoint": 65}
+    if constructor == 0x74:
+        return {"type": "decimal32", "hex": "00000000"}
+    if constructor == 0x80:
+        return {"type": "ulong", "value": index % 65536}
     if constructor == 0x81:
         return {"type": "long", "value": index - 128}
+    if constructor == 0x82:
+        return {"type": "double", "hex": "3ff0000000000000"}
+    if constructor == 0x83:
+        return {"type": "timestamp", "milliseconds": index}
+    if constructor == 0x84:
+        return {"type": "decimal64", "hex": "0000000000000000"}
+    if constructor == 0x94:
+        return {"type": "decimal128", "hex": "00" * 16}
+    if constructor == 0x98:
+        return {"type": "uuid", "hex": "00" * 16}
+    if constructor == 0xA0:
+        return {"type": "binary", "hex": "ab" * (1 + index % 2)}
+    if constructor == 0xA1:
+        return {"type": "string", "text": "s" * (1 + index % 2)}
+    if constructor == 0xA3:
+        return {"type": "symbol", "text": "k" * (1 + index % 2)}
     if constructor == 0xB0:
         return {"type": "binary", "hex": "ab" * (1 + index % 2)}
     if constructor == 0xB1:
@@ -889,18 +1042,13 @@ def element_rejects() -> list[dict]:
            "announces two, with the octets present in the buffer: the array measures "
            "more than its size field declares")
 
-    # An element constructor that is not a constructor the grammar assigns: the escape
-    # octet 0x4F, and 0x46, a format code the table leaves unassigned inside the
-    # zero-data range. Both are refused before any element is read, so an array that
-    # declares no elements at all is refused too — a reader that only looked at the
-    # elements would accept the empty one.
-    for label, octet in (("escape-4f", 0x4F), ("unassigned-46", 0x46)):
-        for count in (0, 1):
-            octets = bytes([0xE0, 2 + count, count, octet]) + b"\x00" * count
-            reject(f"constructor-{label}-{count}-elements", octets, "unassigned",
-                   f"an array of {count} element(s) whose element constructor is "
-                   f"0x{octet:02X}, which no format code assigns: refused for the "
-                   f"constructor, whether or not elements follow")
+    # An element constructor that is not one the grammar assigns, and an element
+    # constructor the grammar admits but the declared surface leaves unassigned, are the
+    # subject of `constructor_disagreement` below: that family walks the whole space at
+    # zero, one and two items and in both directions, so it owns these codes. The two
+    # samples that stood here — the escape octet 0x4F and the unassigned 0x46 — are
+    # subsumed by it rather than kept beside it: a family that samples a space and a
+    # family that sweeps it cannot both be the record of what is covered.
     return vectors
 
 
@@ -981,6 +1129,270 @@ def element_writer_refusals() -> list[dict]:
     return vectors
 
 
+# ------------------------------------------------- declared-versus-actual vectors
+#
+# Three negatives have escaped this corpus, and all three are one shape: a container
+# whose declared element constructor disagrees with what it carries.
+#
+#   1. `.array 0x57 []` — a declared constructor that is assigned no encoding, carrying
+#      no elements. The reference *wrote* it (`e0020057`) and then refused those octets
+#      when its own reader was handed them back; `.array 0x57 [.null]` refused correctly
+#      and the empty list did not, because the check that refuses a wrong item runs once
+#      per element and an empty item list never reaches it.
+#   2. `.array 0x00 [null]` and `.array 0xE0 [null]` — a declared constructor the table
+#      assigns, carrying an item that is not the kind it requires.
+#   3. a `map8` whose count field disagrees with its items.
+#
+# The pattern generalises along two axes, and this family walks both rather than sampling
+# them:
+#
+#   * the *item list's boundary* — zero, one and two items — because a family that tests
+#     one item of a case says nothing about none, which is exactly how (1) escaped;
+#   * the *constructor space* — every octet the declared surface assigns (fixed widths
+#     one, two, four, eight and sixteen; the variable widths; the compounds; the arrays)
+#     and every octet inside the BNF's ranges it leaves unassigned.
+#
+# **The expectations are read from Part 1, never from an artefact.** An array's elements
+# are "encoded according to the supplied array element constructor" (`picture.9`); the
+# element constructor is a `constructor`, whose category the ranges of the constructor BNF
+# (`picture.3`) fix; and a format code the declared surface assigns no encoding is a
+# decode error rather than a value (`encodings.1`). The classes are this corpus's own
+# vocabulary, as `tests/contracts/value-vector.schema.json` states them: an octet with no
+# assignment is `unassigned`, and a form that cannot carry a value's *shape* is
+# `malformed`. The **write direction carries the same expectation as the read
+# direction**, because a writer's domain has to sit inside what its reader accepts — the
+# property whose failure was escape (1).
+
+# The items a declared constructor is asked to carry when it is expected to refuse them.
+# One per shape the element forms distinguish: a value that carries no octets at all, a
+# one-octet scalar, and a compound. A constructor whose declared form carries one of them
+# is asked the other two, so each is asked at least twice — which is the point, since a
+# single probe per constructor is what a sampling family would do.
+WRONG_ITEMS = (
+    ("null", {"type": "null"}),
+    ("ubyte", {"type": "ubyte", "value": 7}),
+    ("list", {"type": "list", "items": []}),
+)
+
+# The item space the *staged* family sweeps, which is wider because its subject is a
+# defect rather than a rule: every shape the element forms distinguish, plus the two
+# boolean values, so that a constructor whose form fixes its *value* rather than only its
+# kind can be asked for the other value.
+STAGED_ITEMS = WRONG_ITEMS + (
+    ("string", {"type": "string", "text": "x"}),
+    ("described", {"type": "described", "descriptor": {"type": "symbol", "text": "d"},
+                   "value": {"type": "null"}}),
+    ("array", {"type": "array", "constructor": "40", "items": []}),
+    ("map", {"type": "map", "pairs": []}),
+    ("boolean-true", {"type": "boolean", "value": True}),
+    ("boolean-false", {"type": "boolean", "value": False}),
+)
+STAGED_ITEM_BY_LABEL = dict(STAGED_ITEMS)
+
+# The two boolean constructors that carry their *value* rather than an octet: `%x41` is
+# the boolean true and `%x42` the boolean false, so an element of the other value is not
+# an element the declared constructor carries — the kind agrees and the value does not.
+ZERO_OCTET_BOOLEAN = {0x41: True, 0x42: False}
+
+
+def item_is_wrong(constructor: int, owner: str, item: dict) -> bool:
+    """Whether a declared constructor's form cannot carry this item. The declared
+    surface fixes the form, and for the two zero-octet boolean constructors the form *is*
+    the value, so the check is the value's and not only the kind's."""
+    if constructor in ZERO_OCTET_BOOLEAN:
+        return (item["type"] != "boolean"
+                or item["value"] != ZERO_OCTET_BOOLEAN[constructor])
+    return item["type"] != owner
+
+
+def staged_mismatch_pairs() -> frozenset[tuple[int, str]]:
+    """The `(constructor, item)` pairs whose answers the two artefacts give differently.
+
+    These are **staged for the fix slice rather than landed in the corpus**, and the
+    reason is the failure-first rule rather than convenience: each is a defect we intend
+    to remove, so it belongs in the slice that observes it failing and then fixes it.
+    Landing them here would either redden `s1_differential.sh` — which requires each
+    artefact to pass a corpus on its own — or need a named expected-fail pin, and a pin is
+    for a case we have decided *not* to fix, which is the wrong signal for a defect.
+
+    The set is the answer to one question — do the two artefacts agree on this pair? — and
+    it is a function of the tree the sweep was run against, not of the rule. It therefore
+    moved once already during this sitting, and the movement is recorded here because a
+    future reader will otherwise take this list for a property of the type system:
+
+    * **the zero-octet constructors with an item of another kind were staged and are now
+      landed.** `0x40` null, `0x41` true and `0x42` false used to be written by the
+      reference for *any* item — `Ref.encode (.array 0x40 [.ubyte 7]) = #[0xE0,0x02,0x01,
+      0x40]`, octets that decode to `[null]`, so the value written was lost — while the
+      specification refused `malformed`. The reference's `arrayElement` now makes each of
+      those three forms check the item it carries, so both artefacts refuse `malformed`
+      and the pairs are in the corpus. **They are green only while that reference fix is
+      in the tree**: if it is reverted, these vectors go red and belong back here.
+    * **`0x41` with `false`, `0x42` with `true`**, and the compound constructors below,
+      are what is still divergent. For the booleans the *kind* agrees and the *value*
+      does not: the reference now refuses `malformed` and the **specification writes**
+      `e0020141` for `.array 0x41 [false]`, octets that decode to `[true]`. Before the
+      reference fix both artefacts wrote it, which made the defect invisible to the
+      differential by construction — it is visible now because the expectation was read
+      from the artifact rather than from an artefact.
+    * **the compound constructors** — `0xC0`/`0xD0` list, `0xC1`/`0xD1` map — with an item
+      of the *other* compound kind: the **specification writes** (an empty list under
+      `0xC1` becomes `c10100`, the empty map) while the reference refuses `malformed`.
+    """
+    compound = {(ctor, "map") for ctor in (0xC0, 0xD0, 0xC1, 0xD1)}
+    compound |= {(ctor, "list") for ctor in (0xC0, 0xD0, 0xC1, 0xD1)}
+    boolean_value = {(0x41, "boolean-false"), (0x42, "boolean-true")}
+    accepts = declared_element_constructors()
+    return frozenset(
+        (ctor, label) for ctor, label in compound | boolean_value
+        if item_is_wrong(ctor, accepts[ctor], STAGED_ITEM_BY_LABEL[label]))
+
+
+def staged_constructor_disagreement() -> list[dict]:
+    """The staged vectors: every pair the landed family excludes, with the class the
+    artifact implies. Written by `--staged-constructor-disagreement` to a path outside the
+    corpus, never into `vectors/`: `s0_generator_fidelity.sh` must not have to account for
+    a corpus that is deliberately red."""
+    accepts = declared_element_constructors()
+    vectors: list[dict] = []
+    for constructor, label in sorted(staged_mismatch_pairs()):
+        owner = accepts[constructor]
+        item = STAGED_ITEM_BY_LABEL[label]
+        if not item_is_wrong(constructor, owner, item):
+            continue                    # the pair the declared constructor carries
+        for count in (1, 2):
+            vectors.append({
+                "vector": f"gen-array-element-staged-{constructor:02x}-{label}-{count}",
+                "kind": "encode",
+                "clauses": [ARRAY_ANCHOR, ENCODINGS_CLAUSE, CONSTRUCTOR_BNF],
+                "value": {"type": "array", "constructor": f"{constructor:02x}",
+                          "items": [dict(item) for _ in range(count)]},
+                "expectError": {"condition": "amqp:decode-error",
+                                "endpoint": "connection", "reason": "malformed"},
+                "note": f"STAGED: an array declaring element constructor "
+                        f"0x{constructor:02X}, whose declared form carries {owner}, with "
+                        f"{count} {label} element(s). Part 1 fixes the element's form by "
+                        f"the array's declared constructor (`picture.9`), so writing this "
+                        f"value is a shape violation and must be refused `malformed`. "
+                        f"This vector is the opening evidence of the fix slice for the "
+                        f"divergence `staged_mismatch_pairs` records; it is not in the "
+                        f"corpus because the artefacts do not yet agree on it.",
+            })
+    return vectors
+
+
+def constructor_disagreement() -> list[dict]:
+    """The landed declared-versus-actual family: the whole unassigned constructor space at
+    zero, one and two items in both directions, an item of a kind the declared constructor
+    does not carry, and one level of nesting.
+
+    The pairs `staged_mismatch_pairs` names are excluded, and the exclusion is stated
+    rather than silent: they are the subject of a staged finding, and the fix slice lands
+    them with the expectation this family would give them.
+    """
+    accepts = declared_element_constructors()
+    staged = staged_mismatch_pairs()
+    vectors: list[dict] = []
+
+    def reject(name: str, octets: bytes, note: str) -> None:
+        vectors.append({
+            "vector": name, "kind": "reject",
+            "clauses": [ARRAY_ANCHOR, ENCODINGS_CLAUSE, CONSTRUCTOR_BNF],
+            "bytes": octets.hex(),
+            "expectError": {"condition": "amqp:decode-error", "endpoint": "connection",
+                            "reason": "unassigned"},
+            "note": note,
+        })
+
+    def refuse(name: str, value: dict, note: str) -> None:
+        vectors.append({
+            "vector": name, "kind": "encode",
+            "clauses": [ARRAY_ANCHOR, ENCODINGS_CLAUSE, CONSTRUCTOR_BNF],
+            "value": value,
+            "expectError": {"condition": "amqp:decode-error", "endpoint": "connection",
+                            "reason": "unassigned"},
+            "note": note,
+        })
+
+    def element_array(constructor: int, items: list[dict]) -> dict:
+        return {"type": "array", "constructor": f"{constructor:02x}", "items": items}
+
+    # -- the unassigned half, at the item list's boundary -------------------------
+    # Every octet inside the BNF's ranges that the table assigns no encoding, and the
+    # twelve escape octets the BNF reserves for future formats. Both are refused for the
+    # constructor itself, so the count is varied to show that the constructor is consulted
+    # *before* any element — which is what makes the empty item list the case that escaped
+    # rather than a curiosity about it.
+    unassigned = unassigned_element_constructors()
+    for code in sorted(unassigned) + list(ESCAPE_OCTETS):
+        discovered = code in unassigned
+        status = ("the declared surface assigns no encoding" if discovered else
+                  "the BNF reserves it for future formats")
+        name = "unassigned" if discovered else "escape"
+        for count in (0, 1, 2):
+            reject(
+                f"gen-array-constructor-{name}-{code:02x}-{count}-read",
+                bytes([0xE0, 2 + count, count, code]) + b"\x00" * count,
+                f"an array8 declaring element constructor 0x{code:02X}, which {status}, "
+                f"with {count} element(s): the element-constructor lookup runs before any "
+                f"element is read, so the count does not change the answer — and at zero "
+                f"items it is the only thing that can refuse, which is how `.array 0x57 "
+                f"[]` escaped a corpus that already refused the one-element case")
+            refuse(
+                f"gen-array-constructor-{name}-{code:02x}-{count}-write",
+                element_array(code, [{"type": "null"}] * count),
+                f"the write direction of the same value: an array declaring element "
+                f"constructor 0x{code:02X}, which {status}, with {count} element(s). A "
+                f"writer's domain has to sit inside what its reader accepts, so the writer "
+                f"must refuse the value whose octets its own reader would refuse")
+
+    # -- the assigned half: an item the declared form does not carry ---------------
+    # Ordered by constructor so that a missing one is visible as a gap in the sweep, and
+    # at one and two items so that the per-element check is exercised more than once. The
+    # item space is the whole of `STAGED_ITEMS`, so that the landed family and the staged
+    # family partition it: a pair is in one of them or it is a hole, and `self_check`
+    # refuses both a hole and an overlap.
+    for code, owner in sorted(accepts.items()):
+        for label, item in STAGED_ITEMS:
+            if not item_is_wrong(code, owner, item) or (code, label) in staged:
+                continue
+            for count in (1, 2):
+                vectors.append({
+                    "vector": f"gen-array-element-mismatch-{code:02x}-{label}-{count}",
+                    "kind": "encode",
+                    "clauses": [ARRAY_ANCHOR, ENCODINGS_CLAUSE, CONSTRUCTOR_BNF],
+                    "value": element_array(code, [dict(item) for _ in range(count)]),
+                    "expectError": {"condition": "amqp:decode-error",
+                                    "endpoint": "connection", "reason": "malformed"},
+                    "note": f"an array declaring element constructor 0x{code:02X}, whose "
+                            f"declared form carries {owner}, with {count} {label} "
+                            f"element(s): the element constructor fixes the form every "
+                            f"element is written in, so an item the form does not carry is "
+                            f"a shape violation and class `malformed`",
+                })
+
+    # -- one level deep ------------------------------------------------------------
+    # An array whose declared element constructor is an array, whose own declared element
+    # constructor is unassigned: the hole is reachable at the second level too, and the
+    # nesting is where a family that only tested the outer constructor would stop.
+    for count in (0, 1):
+        inner = bytes([2 + count, count, 0x57]) + b"\x00" * count
+        outer = bytes([0xE0, 2 + len(inner), 1, 0xE0]) + inner
+        reject(f"gen-array-nested-unassigned-57-{count}-read", outer,
+               f"an array8 whose one element is an array8 declaring element constructor "
+               f"0x57 with {count} element(s): the outer array's declared constructor is "
+               f"the array form and every outer element is well formed in it, so the "
+               f"refusal can only come from the inner declared constructor — which no "
+               f"format code assigns")
+        refuse(f"gen-array-nested-unassigned-57-{count}-write",
+               element_array(0xE0, [element_array(0x57, [{"type": "null"}] * count)]),
+               f"the write direction of the same value: the outer array's element is an "
+               f"array that declares an unassigned constructor, and the inner constructor "
+               f"is refused before the inner item list — at {count} item(s) alike")
+
+    return vectors
+
+
 # ------------------------------------------------------------------ the corpus
 
 
@@ -995,7 +1407,8 @@ def corpus(limit_properties: int | None = None) -> list[dict]:
     """
     gold = golden() + element_arrays()
     vectors = (gold + rejects(gold) + element_rejects()
-               + element_writer_refusals() + properties())
+               + element_writer_refusals() + constructor_disagreement()
+               + properties())
     if limit_properties is not None:
         kept = [v for v in vectors if v["kind"] == "property"]
         vectors = ([v for v in vectors if v["kind"] != "property"]

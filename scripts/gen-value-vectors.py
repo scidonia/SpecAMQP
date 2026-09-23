@@ -62,6 +62,12 @@ def main(argv: list[str]) -> int:
                         help="also emit the rule-boundary negatives (the buffers just "
                              "outside those rules, each naming the class its clause "
                              "implies) to PATH")
+    parser.add_argument("--staged-constructor-disagreement", default=None, metavar="PATH",
+                        help="also emit the declared-versus-actual pairs the corpus "
+                             "stages for the fix slice — the ones where the two artefacts "
+                             "give different answers — to PATH, which must not be under "
+                             "vectors/: they are deliberately red and are the failing "
+                             "evidence that slice starts from")
     args = parser.parse_args(argv)
 
     values.self_check()
@@ -126,6 +132,18 @@ def main(argv: list[str]) -> int:
                   f"{args.value_boundary_negatives}")
             print(f"  sha256: {refused_digest}")
         boundaries.report(admitted_vectors, refused_vectors)
+
+    if args.staged_constructor_disagreement is not None:
+        # Staged, not corpus: each of these asserts what the artifact requires and at
+        # least one artefact does not yet do, so the file is written where the operator
+        # asks for it and never under `vectors/` — `s0_generator_fidelity.sh` accounts
+        # for every corpus there, and a corpus that is deliberately red is not one.
+        staged = values.staged_constructor_disagreement()
+        staged_digest = write_ndjson(pathlib.Path(args.staged_constructor_disagreement),
+                                     staged)
+        print(f"staged {len(staged)} declared-versus-actual vectors for the fix slice "
+              f"into {args.staged_constructor_disagreement}")
+        print(f"  sha256: {staged_digest}")
 
     if args.frames is not None:
         frame_vectors = frames.frame_corpus()

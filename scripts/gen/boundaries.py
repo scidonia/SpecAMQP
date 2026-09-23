@@ -166,6 +166,16 @@ def list8(items: bytes, count: int, *, count_in_size: bool) -> bytes:
     return bytes([0xC0, size, count]) + items
 
 
+def list8_declaring(declared: int, count: int, items: bytes) -> bytes:
+    """A list8 whose size field says exactly what the caller says.
+
+    The count-against-items negatives need the size and the count stated independently:
+    their whole subject is a buffer where one of the two disagrees with what is present,
+    and a builder that derived either from the items could not express it.
+    """
+    return bytes([0xC0, declared, count]) + items
+
+
 def reject(name: str, octets: bytes, clauses: list[str], reason: str, note: str) -> dict:
     """A vector whose octets a clause-conforming reader must refuse.
 
@@ -405,6 +415,57 @@ def boundary_negative_corpus() -> list[dict]:
         "variable-width constructor, so it states no class for data that does not fit the "
         "declared constructor; both artefacts report the framing class, and the vector "
         "states that with the artifact's silence recorded rather than filled."))
+
+    # --- one fault: a count that disagrees with the items present ---------------------
+    # The size field says how many octets there are to read the items from; the count field
+    # says how many items there are. The negatives above move the *size* and leave the count
+    # matching, so a reader that trusted the count and one that trusted the size answer the
+    # same on all of them. These are the other axis, and they are the compound half of the
+    # declared-versus-actual family: the container's own declaration against its contents.
+    vectors.append(reject(
+        "boundary-negative-list8-count-over-items", list8_declaring(2, 2, bytes([0x40])),
+        [ENCODINGS_CLAUSE], "truncated",
+        "A list8 whose size announces the count octet and one item octet, and whose count "
+        "announces two items: the framing is self-consistent and the items are not there, so "
+        "what runs out is the second item."))
+    vectors.append(reject(
+        "boundary-negative-list8-items-over-count", list8_declaring(4, 1, bytes([0x40, 0x40])),
+        [ENCODINGS_CLAUSE], "sizeMismatch",
+        "A list8 whose size announces the count octet and three item octets while the count "
+        "announces one item and two are present: the count is satisfied and the octets are not "
+        "all accounted for, so the disagreement is the size's."))
+    vectors.append(reject(
+        "boundary-negative-list8-zero-count-with-item", list8_declaring(2, 0, bytes([0x40])),
+        [ENCODINGS_CLAUSE], "sizeMismatch",
+        "A list8 that declares no items at all and carries one: the smallest count-versus-items "
+        "disagreement there is, and the one a reader that only counted to `count` would read as "
+        "an empty list while the octet sat unaccounted for."))
+    vectors.append(reject(
+        "boundary-negative-map8-count-over-items", map8_declaring(2, 2, bytes([0x40])),
+        [MAP_CLAUSE, ENCODINGS_CLAUSE], "truncated",
+        "A map8 whose even count of two items is satisfied by one item's octets only: parity is "
+        "sound, so the count against the items is the only rule broken. The control the parity "
+        "vectors need, since a reader that refused every two-item map would look as though it "
+        "enforced something."))
+    vectors.append(reject(
+        "boundary-negative-map8-items-over-count", map8_declaring(5, 2, bytes([0x40, 0x40])),
+        [MAP_CLAUSE, ENCODINGS_CLAUSE], "sizeMismatch",
+        "A map8 with an even count of two items, two items present, and a size two octets "
+        "larger than the count and items measure: the size is the only rule broken."))
+    vectors.append(reject(
+        "boundary-negative-array-count-over-data", array8_declaring(2, 2, 0x50, b""),
+        [ARRAY_ANCHOR], "truncated",
+        "An array8 declaring two elements of the one-octet ubyte form with no element data: "
+        "the declared size counts the count octet and the element constructor, so the array is "
+        "self-consistent and the elements are what run out."))
+    vectors.append(reject(
+        "boundary-negative-array-data-over-count",
+        array8_declaring(4, 1, 0x50, bytes([0x07, 0x07])),
+        [ARRAY_ANCHOR], "sizeMismatch",
+        "The same array with one element declared and two elements' octets present: the size "
+        "accounts for count, constructor and both octets, and the second octet is data no "
+        "declared element accounts for. The ubyte twin of the smalluint extra-data vector "
+        "above, so the class is a property of the count and not of the constructor's width."))
 
     # --- withheld: the trailing-octet case belongs to the carrier, not the value -------
     # A first draft carried seven refusals here — a zero-width or fixed-width value

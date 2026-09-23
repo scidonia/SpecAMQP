@@ -26,6 +26,12 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 FRAMING_CLAUSE = "amqp-core-transport-v1.0-os.xml#amqp:transport/section:framing.1"
 PERFORMATIVE_CLAUSE = "amqp-core-transport-v1.0-os.xml#amqp:transport/section:framing.3"
 SASL_CLAUSE = "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl.1"
+# The identity clause's own MUST for the empty frame: "Implementations MUST be prepared to
+# handle empty frames arriving on any valid channel", with the definition beside it — "a
+# frame consisting solely of a frame header, with no frame body". The frame layer's one
+# *legal* zero-octet body, and so the boundary the illegal ones are refused at.
+EMPTY_FRAME_CLAUSE = ("amqp-core-transport-v1.0-os.xml"
+                      "#amqp:transport/section:connections/doc:doc-idle-time-out.7")
 
 FRAME_HEADER = 8      # the layout: a fixed eight-octet frame header
 FRAME_WORD = 4        # DOFF counts four-octet words
@@ -276,19 +282,101 @@ def frame_corpus() -> list[dict]:
                note=f"DOFF of {largest}, the largest that still leaves the body inside SIZE "
                     f"for this frame, with the body beginning at the extended header's end")
 
+    # A declared-versus-actual family at the frame level, on the same reading as the value
+    # layer's: the frame's own SIZE and DOFF are what say where its body is, so a header
+    # whose declaration disagrees with the octets is refused, and the *legal* zero-octet
+    # case — the empty frame — is carried beside the illegal ones so that a reader which
+    # refused every bodyless frame could not pass by refusing the boundary.
+    #
+    # The empty frame is not an inference from the layout: the identity clause makes it a
+    # MUST. "Implementations MUST be prepared to handle empty frames arriving on any valid
+    # channel, though implementations SHOULD use channel 0 ... Apart from this use, empty
+    # frames have no meaning" — so both channels are carried, and the frame is a header and
+    # nothing else, because "a frame consisting solely of a frame header, with no frame
+    # body" is the clause's own definition of it.
+    for channel in (0, 1):
+        vectors.append({
+            "vector": f"gen-frame-empty-channel-{channel}", "kind": "frame-decode",
+            "clauses": [FRAMING_CLAUSE, EMPTY_FRAME_CLAUSE],
+            "bytes": (be(FRAME_HEADER, 4)
+                      + bytes([FRAME_MIN_DOFF, AMQP_FRAME]) + be(channel, 2)).hex(),
+            "frame": {"size": FRAME_HEADER, "doff": FRAME_MIN_DOFF,
+                      "type": f"{AMQP_FRAME:02x}", "channel": channel, "body": []},
+            "note": f"the empty frame on channel {channel}: a frame header and nothing "
+                    f"else, SIZE equal to the header's own eight octets and DOFF at its "
+                    f"minimum. The clause requires every implementation to handle one on "
+                    f"any valid channel, so this is the boundary a reader that read the "
+                    f"body before deciding is one octet away from refusing",
+        })
+
+    # The extended header is ``<IGNORED>`` for an AMQP frame, and a codec that *validated*
+    # it would pass every vector that leaves it zero. Four octets of `%xFF` are not a value
+    # in any constructor, so this is the buffer that tells an ignored area from a read one;
+    # the twelve-octet case is the same fact at a larger DOFF, so the check is not a
+    # property of one width.
+    frame_pair(vectors, "extended-header-nonzero", AMQP_FRAME, 3, open_body,
+               extended=b"\xff" * (3 * FRAME_WORD - FRAME_HEADER),
+               note="four octets of extended header holding `%xFF` four times, which no "
+                    "constructor assigns: the area is ignored, so the frame is read and "
+                    "the body decoded from after it")
+    frame_pair(vectors, "extended-header-twelve", AMQP_FRAME, 5, open_body,
+               extended=b"\x00" * (5 * FRAME_WORD - FRAME_HEADER),
+               note="twelve octets of extended header at DOFF five: the same ignored area "
+                    "at a larger length, so the boundary is the layout's rather than one "
+                    "width's")
+
     good = frame_octets(AMQP_FRAME, FRAME_MIN_DOFF, encode(open_body))
     below = bytearray(good)
     below[3] = FRAME_HEADER + open_octets - 2
     frame_reject(vectors, "size-below-body", bytes(below), "sizeMismatch",
                  "SIZE claims fewer octets than the performative needs")
+    # SIZE against the header itself, which the clause names separately from the body:
+    # "The frame is malformed if the size is less than the size of the frame header".
+    for label, size in (("size-below-header", FRAME_HEADER - 1), ("size-zero", 0)):
+        declared = bytearray(good)
+        declared[0:4] = be(size, 4)
+        frame_reject(vectors, label, bytes(declared), "sizeMismatch",
+                     f"SIZE declaring {size}, below the eight octets the frame header "
+                     f"alone occupies: the frame cannot be one, whatever follows")
+    # The other direction: SIZE larger than the octets present. The frame claims content it
+    # does not carry, so the body read runs out of buffer rather than out of SIZE.
+    over = bytearray(good)
+    over[0:4] = be(0x20, 4)
+    frame_reject(vectors, "size-over-buffer", bytes(over), "truncated",
+                 "SIZE declaring 32 octets while the buffer holds the frame's own twenty: "
+                 "the header is intact and the content is not there")
     inside = bytearray(good)
     inside[4] = FRAME_MIN_DOFF - 1
     frame_reject(vectors, "doff-below-minimum", bytes(inside), "sizeMismatch",
                  "DOFF of one puts the body inside the eight-octet header")
+    zero_doff = bytearray(good)
+    zero_doff[4] = 0
+    frame_reject(vectors, "doff-zero", bytes(zero_doff), "sizeMismatch",
+                 "DOFF of zero, the other side of the same rule: the field's minimum is "
+                 "two, and zero is below it rather than a body at the header's start")
     beyond = bytearray(good)
     beyond[4] = FRAME_MIN_DOFF + 2
     frame_reject(vectors, "doff-beyond-size", bytes(beyond), "sizeMismatch",
                  "DOFF puts the body past the octets SIZE declares")
+    max_doff = bytearray(good)
+    max_doff[4] = 0xFF
+    frame_reject(vectors, "doff-max", bytes(max_doff), "sizeMismatch",
+                 "DOFF at the largest value its one octet holds, which puts the body far "
+                 "past the octets SIZE declares: the boundary of the field rather than of "
+                 "the rule, so a reader that computed the body's start without comparing "
+                 "it to SIZE fails here and not above")
+    # An extended header with no body: the empty frame is "a frame consisting solely of a
+    # frame header", so the extra octets make this a frame that must carry a performative
+    # and does not. It separates the empty frame's special case from a general tolerance of
+    # zero-octet bodies.
+    extended_without_body = (be(FRAME_HEADER + (3 * FRAME_WORD - FRAME_HEADER), 4)
+                             + bytes([3, AMQP_FRAME]) + be(0, 2)
+                             + b"\x00" * (3 * FRAME_WORD - FRAME_HEADER))
+    frame_reject(vectors, "extended-header-without-body", extended_without_body,
+                 "sizeMismatch",
+                 "four octets of extended header and no body at all: the frame is more "
+                 "than a header, so it is not the empty frame, and its body is empty — "
+                 "which is a frame that carries no performative")
     unassigned_type = bytearray(good)
     unassigned_type[5] = 0x02
     frame_reject(vectors, "type-unknown", bytes(unassigned_type), "unsupported",
