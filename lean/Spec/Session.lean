@@ -895,7 +895,8 @@ def transferLink (session : Session) (outbound : Bool) (body : Value) :
       let completed := Delivery.step session.delivery id settled
       if session.senderSettleMode && !completed.settled then
         .error (refusal invalidField "malformed"
-          s!"the negotiated settlement mode is sender-settle-mode, so a delivery MUST be \
+          s!"the negotiated settlement mode is the settled choice of sender-settle-mode, so \
+            a delivery MUST be \
             settled in at least one of its transfers, and delivery {id} is not")
       else pure none
   let delivery ← delivery

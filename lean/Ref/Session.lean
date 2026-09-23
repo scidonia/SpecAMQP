@@ -697,7 +697,8 @@ def transferLink (endpoint : Endpoint) (outbound : Bool) (body : Value) :
                                           deliveryFormat := none }
   if !more && endpoint.senderSettleMode && !completed.settled then
     .error (refuse invalidFieldCondition "malformed"
-      s!"with sender-settle-mode negotiated, a delivery MUST be settled in at least one of \
+      s!"with the settled choice of sender-settle-mode negotiated, a delivery MUST be settled in at \
+        least one of \
         its transfers, and delivery {id} is not")
   -- The recording lives exactly as long as the delivery it is about: the transfer that *begins* a
   -- delivery records what it carried, a continuation leaves the recording alone, and the transfer
