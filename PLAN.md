@@ -287,6 +287,15 @@ its obligations need `simp only [BodiesAgree]` and `trivial` does not typecheck 
 needing round-trip lemmas at the bounds `unsignedOf`, `signedOf` and `boundedField` establish, and four compound clauses needing
 recursion at the fuel the reader hands down — `List.mapM` for items and a pair-level analogue for a map.
 
+**Three environment facts the signed route established, each worth the next run's minute.** `norm_num` and `ring` are Mathlib tactics
+and are **not available** in this module's import closure; `decide` and `omega` are the replacements, and reaching for the familiar one
+produces an error that reads like a broken proof rather than a missing import. `BodiesAgree`'s signed case compares the specification's
+`Int` on the *left*, so the round trip enters at `.symm` — the same orientation detail as the unsigned widths, and the reason the
+second encounter cost nothing. And an unused `simp only` argument is **dropped rather than suppressed**: nine went that way with the
+batch that took the proof to twenty of twenty-five, and the modules build with no lint notes at all. Progress at that point: twenty of
+twenty-five clauses, with `char` next through its accessor bridge (`Nat` against `Int`, a JSON accessor lemma before any arithmetic),
+then the four compounds, the fuel-64 join, and the determinism development.
+
 **Two shapes the carrier's middle taught, both worth the next run's first minute.** The six octet payloads are **not equal functions**
 on the two sides: the specification's `hexPayloadOf` and the reference's `fixedHex` perform the same reads and the same width check and
 differ in their failure *text*, so they relate one-directionally on the success path (`fixedHex_ok_hexPayloadOf`) rather than by equality
