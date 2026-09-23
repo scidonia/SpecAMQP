@@ -59,13 +59,16 @@ c661a0341ee5572bd716861459bcfbedbae36a7f  ledger/ambiguities/unmapped-begin.json
 9578902f04f638c68535c367b6127a6c2fa0fc1b  ledger/dispositions/part2-connection-establishment.json
 d81267f3bb9410b6e6bc8ca0aa4f9b6e1160b88b  ledger/dispositions/part2-links.json
 3185e38c6382084520c7a2054b4a47df26be9b61  ledger/dispositions/part2-performatives-link-state.json
+4a147bb98a3e53f9cf8e853b4fd30695bde2dbaf  ledger/dispositions/part2-performatives-remainder.json
 6ba9df9da12041d4c8082b4194d6a00283799a13  ledger/dispositions/part2-performatives-settle-mode.json
 3f3caa07e2a71a7ecd26ef919f676f9455d17663  ledger/dispositions/part3-addressing.json
 c8b7d4be864c962c7e5b6072ce248b4ed7c22c5e  ledger/dispositions/part3-delivery-state.json
 0bdc5df2884cf4300ad0bc838ceeeb0a4926536e  ledger/dispositions/part3-message-format.json
+44d726c1a2f9bee92cb4b97f598e8d7bc37048f2  ledger/dispositions/part3-message-sections.json
 785c078dc5d6344deee8daecd3e44f7f81c65e54  ledger/dispositions/part4-transaction-outcomes.json
-f573411597e689159173d0bf6184b92501675f43  ledger/dispositions/part4-transactions.json
+2f39284388714d79b98c49aa4ed82296f300f640  ledger/dispositions/part4-transactions.json
 382ce2d12d45cce83d1f14ae982a76b5244795f6  ledger/dispositions/part5-sasl.json
+a4051fc8e176f77c802257edf82d54d649737dfb  ledger/dispositions/part5-security-layers.json
 f99bff4963bad3fd8080756fcacd69a2f4ad5e85  ledger/dispositions/picture-review.json
 75b32eeab481d1d5571a1a81b8a74b4097ff6192  ledger/dispositions/unkeyed-normative.json
 fd83990fdb34dca23fc732e566fa109c98af71b5  ledger/lowercase-keywords.json
@@ -75,7 +78,7 @@ fae3db7cde111a89b20982e85df213054988d697  tests/contracts/exchange-vector.schema
 9addf5e827c82fd34990f9636858ed75de642b64  tests/contracts/frame-vector.schema.json
 470e2cf5c611d8b49637d8fb30e1bfd0f8c1d3fa  tests/contracts/message-vector.schema.json
 d3d45a51befd4d402fc0d1f6e32da0f0cdcc1474  tests/contracts/r1_transport_shell.sh
-3343e7a1a49ebe569787099d4edb47bcdd8333da  tests/contracts/r2_endpoint_shell.sh
+3930a6a9fcc8b607e3a93c38b77e20455bfa6805  tests/contracts/r2_endpoint_shell.sh
 d077d693422502c1a2bc57f017c5db98cef01289  tests/contracts/s0_generator_fidelity.sh
 f5457f3e3647561dc84ed0761556857f431bcad9  tests/contracts/s0_lean_environment.sh
 c20885bbdb17ab564cfbacc1ee8b57a338ba7d88  tests/contracts/s0_sources_ledger.sh

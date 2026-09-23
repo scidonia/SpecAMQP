@@ -18,12 +18,13 @@
 # appears nowhere else, which the first attempt at this got wrong and this gate then said so precisely.
 #
 # The driver reports a case whose listener could not bind as INVALID and exits non-zero for it, so the
-# "the port was busy" failure can never satisfy this gate. It does collide, though, and systematically rather
-# than rarely: the driver derives its port base from its own pid, which cannot collide with itself but does
-# collide with the *previous* gate in filename order, since `r1_transport_shell.sh` runs immediately before
-# this one and leaves servers alive inside their timeouts. Measured once by running the suite in that order.
-# The driver's own fix — try the next port on a bind failure, deterministically, and print which port it took
-# — is owed; until it lands, a full-suite run reports this gate as INVALID and the reason is not the shell.
+# "the port was busy" failure can never satisfy this gate. That collision was real and systematic rather than
+# rare — a pid-derived base cannot collide with itself but does collide with the *previous* gate in filename
+# order, since `r1_transport_shell.sh` runs immediately before this one and leaves servers alive inside their
+# timeouts — and the driver's arbitration has since landed. It now scans forward over a bounded range, reads
+# the readiness line as the server's *own* announcement, prints the port it took, and exhausts the range into
+# the INVALID path. So an INVALID from a full-suite run means what it says: the range was exhausted, nothing
+# was tested, and that is worth reading before a re-run rather than waved through.
 
 set -euo pipefail
 
