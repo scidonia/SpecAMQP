@@ -8,17 +8,20 @@ import Proofs.ValueWireAgreement
 
 `Proofs.FrameConformance.ValueLayersAgree`, `Proofs.FrameSendConformance.ValueCarrierAgree` and
 `Proofs.FrameSendConformance.ValueWriterAgree` are the three value-layer hypotheses the frame
-layer's two `Conforms` instances rest on. This module asks what is provable about them, and the
-answer is not the one the instances' prose hoped for: **`ValueWriterAgree` was false as stated and is
+layer's two `Conforms` instances rest on. This module asks what is provable about them, and the answer
+is a status per hypothesis rather than one verdict: **`ValueWriterAgree` was false as stated and is
 undecided now** — classing the reference's writer made a reachable refutation of it expressible, and the
 fix that closed the hole it named withdrew the refutation and left a statement with no witness and no
-available proof; **`ValueLayersAgree` is undecided for the same shape of reason**, its divergence having
-been fixed earlier and its proof needing a value-layer instance that does not exist; and
-**`ValueCarrierAgree` is untested here**.
+available proof; **`ValueLayersAgree` is proved**, by `Proofs.ValueWireAgreement.valueLayersAgree` with
+no hypotheses, which is what made the frame layer's receive instance unconditional — this module was
+written before that development landed and said the opposite in the bullet below, and the correction is
+made there rather than left standing beside its replacement; and **`ValueCarrierAgree` is proved** as
+well (`Proofs.ValueCarrierAgreement.valueCarrierAgree_all`, which is what let the send instance drop its
+`carriers` parameter). What is left standing as an obligation is `ValueWriterAgree` alone.
 
 ## What the evidence says, statement by statement
 
-* **`ValueLayersAgree` was false when this module was written, and is undecided now.** Its
+* **`ValueLayersAgree` was false when this module was written, and is proved now.** Its
   divergence was a check-order difference inside the map path: the specification reads a compound's
   `size` and `count` fields and asks whether the count is even *before* it reads the items, while the
   reference read the items, compared the declared size with what they measured, and asked about
@@ -29,10 +32,12 @@ been fixed earlier and its proof needing a value-layer instance that does not ex
   now refuse it `malformed`; a sweep of 114,225 buffers (every length 1-3 buffer over a 45-octet
   alphabet, every length-4 buffer over a 12-octet alphabet, and a structured set of arrays,
   compounds and described values) now finds **no class divergence at all**. So the receive direction
-  has no witness: a refutation is not provable because the divergence is gone, and a proof is not
-  available here because it would need the value layer's own `Conforms` instance, which does not
-  exist. That state is *undecided*, and this module leaves it there rather than writing either
-  direction.
+  has no witness: a refutation is not provable because the divergence is gone. A proof was not
+  available *here* when this module was written — it needs the value layer's own reader agreement, which
+  this module does not contain — and it has since been written: `Proofs.ValueWireAgreement.valueLayersAgree`
+  proves the law with no hypotheses, and `Contracts.frame_receive_conformance` is that proof applied, so
+  the state this bullet used to end on (*undecided*) is over. What this module keeps is the measurement
+  the proof is a proof *about*: the witness, the sweep, and the class both artefacts now name.
 * **`ValueWriterAgree` was false, and this module carried the refutation; the hole that refuted it is
   closed, so the law is *undecided* now** — no witness, and no available proof either. Two families are
   worth separating, because they are different in kind and because one of them has been fixed.
@@ -76,9 +81,10 @@ been fixed earlier and its proof needing a value-layer instance that does not ex
     `lengthPrefixed`, `twosComplement`) per shape and a constructor-by-constructor correspondence on the
     element forms. That is the shape of `Proofs.ValueWireAgreement` for the readers, and its size is the
     size to expect.
-* **`ValueCarrierAgree` is untouched here**: it is a claim about the two corpus-vocabulary readers
-  (`Spec.Codec.valueOfJson` against `Ref.Vectors.valueOfJson`), not about the wire, and this module
-  has no evidence against it.
+* **`ValueCarrierAgree` is untouched here, and proved elsewhere**: it is a claim about the two
+  corpus-vocabulary readers (`Spec.Codec.valueOfJson` against `Ref.Vectors.valueOfJson`), not about the
+  wire, and this module has no evidence against it — `Proofs.ValueCarrierAgreement.valueCarrierAgree_all`
+  is the proof, and it is why the send instance's statement no longer names the carrier as a parameter.
 * **The send *endpoint*'s consequent was refutable before patch 3, and is undecided now — and the
   search that says so is stated here rather than assumed.** The record this bullet used to carry said
   the negation was *expressible and untried*: the reference's writer answered `Except String Octets`,
