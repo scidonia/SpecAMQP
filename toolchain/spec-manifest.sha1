@@ -53,7 +53,7 @@ c661a0341ee5572bd716861459bcfbedbae36a7f  ledger/ambiguities/unmapped-begin.json
 2dd54d7eeae541a3df93bd52a17aae4d8cff5a6e  ledger/ambiguities/version-mismatch-condition.json
 003cbf78615e5a2c39ff63ce21b19ef4ab0b6b68  ledger/ambiguities/zero-width-array-count.json
 7280ec69526349247e0dabbe081cbbcd3c2193e2  ledger/clauses.json
-dbbd1ed37790ec885143b4beaf8089c30bd03acb  ledger/coverage.json
+9a061ebe7e6cb3faca1264c8e141aaac7e52b2fe  ledger/coverage.json
 18dc26b3c3328b31c9524e7b34ca3e6a23b4e71e  ledger/dispositions/part0-conformance-and-transport-lifecycle.json
 b9adec25fda0261806d98c5ab248e8ea25beb310  ledger/dispositions/part1-types.json
 7bc3f5ef2558a4807162b02463c900c798e3d1ac  ledger/dispositions/part2-connection-establishment.json
