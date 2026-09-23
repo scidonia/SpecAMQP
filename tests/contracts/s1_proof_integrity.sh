@@ -53,7 +53,22 @@ die() {
   exit 1
 }
 
-note() { printf 'ok   %s\n' "$1"; }
+problems=0
+last_problems=0
+
+# A clause failure is recorded and the gate continues, so every clause reports on every run.
+problem() { printf 'problem: %s\n' "$1" >&2; problems=$((problems + 1)); }
+
+# A note states that the checks before it passed. It says so only if they did, because a
+# success line printed under a failure is how a transcript ends up asserting what is false.
+note() {
+  if [ "$problems" -eq "$last_problems" ]; then
+    printf 'ok   %s\n' "$1"
+  else
+    printf 'FAIL %s (see the problems above)\n' "$1"
+  fi
+  last_problems=$problems
+}
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
@@ -197,14 +212,14 @@ unsafe def dangerous : Nat := 1
 @[extern "planted_extern"] def foreign : Nat := 0
 PLANTED
 if python3 "$tmp/scan.py" "$extern_boundary" "$tmp/planted/Spec" >"$tmp/planted.log" 2>&1; then
-  die "the scanner passed a file containing sorry, native_decide, axiom, opaque and unsafe"
+  problem "the scanner passed a file containing sorry, native_decide, axiom, opaque and unsafe"
 fi
 for construct in sorry native_decide axiom opaque unsafe extern; do
   grep -q ": $construct" "$tmp/planted.log" ||
-    die "the planted control was not flagged for '$construct': $(cat "$tmp/planted.log")"
+    problem "the planted control was not flagged for '$construct': $(cat "$tmp/planted.log")"
 done
 grep -q "Planted.lean:4: sorry" "$tmp/planted.log" ||
-  die "the scanner does not report the line of the planted sorry: $(cat "$tmp/planted.log")"
+  problem "the scanner does not report the line of the planted sorry: $(cat "$tmp/planted.log")"
 note "planted control flagged with file and line; comments and docstrings ignored"
 
 # Planted control in the other direction: at the boundary an extern is permitted
@@ -214,16 +229,16 @@ cat >"$tmp/planted-allow/Impl/Transport.lean" <<'ALLOWED'
 @[extern "lean_planted_boundary"] def boundaryCall (x : UInt64) : UInt64 := x
 ALLOWED
 if ! python3 "$tmp/scan.py" "$extern_boundary" "$tmp/planted-allow/Impl" >"$tmp/allow.log" 2>&1; then
-  die "the scanner flagged the permitted boundary extern: $(cat "$tmp/allow.log")"
+  problem "the scanner flagged the permitted boundary extern: $(cat "$tmp/allow.log")"
 fi
 grep -q "boundary: 1 permitted" "$tmp/allow.log" ||
-  die "the scanner did not count the permitted boundary extern: $(cat "$tmp/allow.log")"
+  problem "the scanner did not count the permitted boundary extern: $(cat "$tmp/allow.log")"
 note "planted control: an extern at the boundary is counted and not flagged"
 
 # The real tree.
 python3 "$tmp/scan.py" "$extern_boundary" "${scanned_dirs[@]/#/$root/lean/}" \
   "${scanned_extra[@]}" >"$tmp/scan.log" 2>&1 ||
-  { cat "$tmp/scan.log"; die "the specification contains trust-bearing constructs"; }
+  { cat "$tmp/scan.log"; problem "the specification contains trust-bearing constructs"; }
 sed 's/^/     /' "$tmp/scan.log"
 note "no sorry, admit, native_decide, partial, axiom, constant, opaque, unsafe or @"'"'"'[implemented_by] beyond the counted boundary"
 
@@ -240,7 +255,7 @@ note "no sorry, admit, native_decide, partial, axiom, constant, opaque, unsafe o
     Proofs.CodecRoundTripNarrowest Proofs.CodecRoundTripVariable Spec.ReadLaws Spec.Message \
     Contracts.SaslAcceptance Proofs.SaslDialogue Contracts.FrameConformance \
     Contracts.ConnectionConformance Proofs.ConnectionConformance ) >"$tmp/axiombuild.log" 2>&1 ||
-  die "building the modules the axiom probe reads failed: $(tail -3 "$tmp/axiombuild.log")"
+  problem "building the modules the axiom probe reads failed: $(tail -3 "$tmp/axiombuild.log")"
 
 cat >"$tmp/Axioms.lean" <<'AXIOMS'
 import Contracts.FrameCodec
@@ -356,12 +371,12 @@ import Spec.Message
 #print axioms SpecAMQP.Proofs.exists_of_bind_ok
 AXIOMS
 ( cd "$root/lean" && LAKE_NO_CACHE=1 lake env lean "$tmp/Axioms.lean" ) >"$tmp/axioms.log" 2>&1 ||
-  die "could not print the accepted theorem's axioms: $(grep -m1 -E '\.lean:[0-9]+:[0-9]+: error' "$tmp/axioms.log" || tail -3 "$tmp/axioms.log")"
+  problem "could not print the accepted theorem's axioms: $(grep -m1 -E '\.lean:[0-9]+:[0-9]+: error' "$tmp/axioms.log" || tail -3 "$tmp/axioms.log")"
 grep -q "sorryAx" "$tmp/axioms.log" &&
-  { cat "$tmp/axioms.log"; die "the accepted theorem depends on sorryAx"; }
+  { cat "$tmp/axioms.log"; problem "the accepted theorem depends on sorryAx"; }
 grep -q "ofReduceBool" "$tmp/axioms.log" &&
-  { cat "$tmp/axioms.log"; die "the accepted theorem depends on native_decide's ofReduceBool"; }
-grep -q "sorryAx" "$tmp/scan.log" && die "an accepted theorem is missing from the inventory"
+  { cat "$tmp/axioms.log"; problem "the accepted theorem depends on native_decide's ofReduceBool"; }
+grep -q "sorryAx" "$tmp/scan.log" && problem "an accepted theorem is missing from the inventory"
 sed 's/^/     /' "$tmp/axioms.log" | grep "depends on axioms" | sed 's/^     //'
 for theorem in "$accepted_theorem" extended_header_width body_starts_after_the_header \
                SpecAMQP.Contracts.accepted_frames_carry_performatives \
@@ -391,16 +406,24 @@ for theorem in "$accepted_theorem" extended_header_width body_starts_after_the_h
                SpecAMQP.Spec.ReadLaws.extract_toList_eq_drop_take \
                SpecAMQP.Spec.ReadLaws.takeBe_eq_fold; do
   grep -q "$theorem' depends on axioms" "$tmp/axioms.log" ||
-    die "$theorem was not inventoried — the inventory names a theorem the kernel did not print"
+    problem "$theorem was not inventoried — the inventory names a theorem the kernel did not print"
 done
 note "every accepted theorem's axiom inventory contains no sorryAx and no ofReduceBool"
 
-printf 's1_proof_integrity: PASS\n'
+note "every clause above reported: the scan, the probe, the inventory and the package build"
 
 # The package build, which is the only check here that covers the module set rather
 # than a list of targets. `lake build` with no arguments builds every library and
 # executable the lakefile registers, so a module with unsolved goals fails here even
 # when no contract names it yet and no scan can see it.
 ( cd "$root/lean" && LAKE_NO_CACHE=1 lake build ) >"$tmp/packagebuild.log" 2>&1 ||
-  die "the package does not build: $(grep -m2 -E '^(error|✖|some modules)' "$tmp/packagebuild.log" | tr '\n' ' ')"
+  problem "the package does not build: $(grep -m2 -E '^(error|✖|some modules)' "$tmp/packagebuild.log" | tr '\n' ' ')"
 note "the whole package builds, proofs included, not only the targets the probes name"
+
+# Every clause has reported by now, so the verdict is this gate's own.
+if [ "$problems" -gt 0 ]; then
+  printf 's1_proof_integrity: FAIL: %d problem(s) across the four clauses\n' "$problems" >&2
+  exit 1
+fi
+
+echo "s1_proof_integrity: PASS"
