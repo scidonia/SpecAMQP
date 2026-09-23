@@ -840,9 +840,9 @@ what it may send. Both start at the a priori limits. -/
 structure Endpoint where
   state : State
   /-- The layer this exchange is in: AMQP, or SASL while a security layer is being
-  established. A peer begins in the AMQP layer, and either layer is entered by a header
-  that names it — the peer's own, or the one that arrives when this peer has not spoken
-  yet. -/
+  established. A peer begins in the AMQP layer unless it offers SASL first, in which case the
+  SASL layer precedes the connection; either layer is entered by a header whose protocol id
+  names it. -/
   layer : Layer
   phase : SaslPhase
   role : Option SaslRole
@@ -859,6 +859,14 @@ deriving Repr
 /-- A peer that has exchanged nothing. -/
 def Endpoint.initial : Endpoint :=
   ⟨.start, .amqp, .absent, none, [], Limits.aPriori, Limits.aPriori⟩
+
+/-- A peer that has exchanged nothing, at the layer it begins in: the AMQP layer, unless it offers
+SASL first, in which case the SASL layer precedes the connection (Part 5) — which is the layer the
+corpus's `AMQP\x03\x01\x00\x00` announces. Stated for a layer rather than for AMQP alone so that an
+implementation's starting state can be *proved* against a specification state instead of assumed equal
+to one. -/
+def Endpoint.initialFor (layer : Layer) : Endpoint :=
+  ⟨.start, layer, .absent, none, [], Limits.aPriori, Limits.aPriori⟩
 
 /-- What the connection layer did: the endpoint it is, and the octets it wrote. The
 writes are the header it sends — its own, or the supported one the artifact obliges a
