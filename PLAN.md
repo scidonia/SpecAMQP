@@ -983,6 +983,41 @@ Acceptance: the SASL state machine proved; mechanism negotiation exercised; PLAI
 
 Produce `HANDOFF.md`: the frozen interface, the ledger and coverage report, the vector corpus, the executable driver's invocation, and the requirements this specification places on implementation tooling (§23). No implementation work.
 
+## 23.2 The concurrent server: what is settled, what is proposed, and what must be proved
+
+Three things are called "concurrency" here and they need separating, because only the third is a design question.
+
+**Protocol concurrency is spec content already.** Sessions on channels, links on sessions, interleaved transfers: the specification's
+step is *per frame* and its `choose` is *set-valued*, so an interleaving of frames across channels **is** a sequence the relation admits.
+The corpus already drives multi-channel dialogues, and nothing new is needed to prove anything about it — it *is* the protocol.
+
+**Server concurrency — many connections — is where §23.1's existing decision applies.** `Std/Async/TCP` exists, and this plan refused it
+on trust grounds: it would credit "libuv's asynchronous machinery and Lean's async runtime, thousands of lines doing protocol-adjacent
+work with no name in our tree", where the chosen 236-line POSIX shim is small enough to name and **"keeps the endpoint's frame loop
+synchronous, which is the shape the core actually has"**. That last clause is the architecture: **one proved core per connection, sharing
+nothing.**
+
+**So the server is a dispatcher inside the unproved shell, and the concurrency lives there.** The proposed shape is deliberately boring:
+`accept` in a loop, and hand the socket to a fresh sequential endpoint. **Fork-per-connection is recommended over thread-per-connection**,
+because it makes the interleaving *host-level*: each process is a sequential endpoint of exactly the shape R3 relates to the specification,
+so there is no intra-program interleaving for a proof to reason about at all. Threads would need a pthread shim authored the way the socket
+shim was, under the same question of what gets credited, and would buy nothing the proofs can see.
+
+**What that leaves to prove: one theorem and one hypothesis, over the instance already in hand.**
+
+* **Per connection, R3** — the simulation the relation asks for. This is the rung under construction.
+* **Across connections, commutation** — two endpoints sharing no state commute, so any interleaving of their steps is equivalent to some
+  sequential composition of them. That is what makes "the server's behaviour projected onto connection *k* is spec-admitted" follow from the
+  per-connection instance, and it is a kernel fact about disjoint state. It is also *why* the share-nothing shape is the provable one: a
+  design sharing session or flow state across connections would owe a linearizability argument instead, in exactly the place where the state
+  is unproved.
+* **The delivery contract, as a named hypothesis** — each connection's octets are delivered in order and only to its own core. That is the
+  shell's obligation rather than the core's, it is not provable here, and it is what R4's differential exists to observe. The fairness
+  obligations attached to the specification's `SHOULD`s already have a home in the conformance interface.
+
+**What is genuinely open** is the dispatcher's mechanism — fork or threads — and that sits inside the named unproved boundary, so it changes
+what the *shell* owes rather than what the *proofs* owe. That is the point of putting the concurrency there.
+
 ## 14. Repository layout
 
 ```
