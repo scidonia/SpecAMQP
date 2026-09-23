@@ -169,6 +169,17 @@ already spent two agents' attention on it; and the register's last three live si
 could see into three entries with rejected readings beside them. Every one of those is the same lesson from a different direction — **the anchors are stable and the order is not, and the artefact
 that reads the whole tree is the only one that knows how many things there are.**
 
+**And the ledger's accretion is accepted, with the independent reading that makes the acceptance worth something.** A reviewer went through **169 dispositions across thirteen files** — every
+family the session's nine commits touched — and found **zero required findings**, verifying each `formalized:` value against the declaration's own lines rather than against the note's claim,
+resolving each `test:` id to its vector, and for the out-of-scope families checking the negative claim the notes rest on (that no declaration reads `priority`, `durable` or `node-properties`)
+instead of accepting it because it was asserted. Two observations were recorded and neither is a defect: several notes cite a `test:` vector whose own `clauses` array names neighbouring
+clauses rather than the ref being dispositioned, which each note discloses in the same sentence — a recurring shape that is always self-disclosed is one review away from being a shape that is
+sometimes not, so it is recorded as a pattern rather than repaired — and one note's claim about a stale line in the vectors was checked and is accurate.
+
+**The settle-mode question was answered by going to the XML rather than to the ledger's own prose**, which is the part worth keeping. The reviewer read `:3153` and `:3158`, read the generated
+choice table, and quoted the guard — confirming the finding independently and sharpening it twice in the same pass: *unenforced as well as misapplied*, and a **third** artefact keyed the same way
+(the corpus generator). A review that had accepted the note's summary would have confirmed nothing, because the note was written by the same hand that wrote the disposition.
+
 ## 7. Generated definition tables
 
 `scripts/gen-oasis-lean.py` reads the pinned bytes and emits `lean/Generated/Oasis/`, one module per declaration kind:
