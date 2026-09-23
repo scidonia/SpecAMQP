@@ -871,6 +871,25 @@ fixes within the hour, a report should state the commit it read, not the state i
 produced.
 
 
+**And the session surface is swept, with the same method finding the same shape of defect.** `generated-exchanges.ndjson` went 71 vectors / 278 step verdicts to **92 / 356**, with **zero of the
+278 pre-existing verdicts changed** — the sweep added coverage without moving anything it touched. Twenty-one vectors are carried, and fifteen are staged as the next fix slice's opening evidence: **four divergences**
+and **eleven shared gaps**, where a shared gap is a clause neither artefact enforces, so no differential can see it and the corpus is the only instrument that can.
+
+**The priority family produced sixteen of the thirty-six, and it is the session layer's form of the shape the value sweep found three of** — a declared or negotiated value against what the frame carries. Where the
+value layer's version was a *constructor* against its *contents*, the session layer's is a *negotiated mode* against a *field* (a settlement flag under the choice that forbids it, a receiver's mode under a
+`first` negotiation, a count against the credit actually held), and the same three-reading split appears: what the flag says, what its presence implies, and what the negotiated state permits.
+
+**And the corpus's blind spot showed a fifth time, in its sharpest form yet**: `flow/field:properties.1` is one of **five** sentences that read *"When the handle field is not set, this field MUST NOT be
+set"*, the register's `flow-link-field-without-handle` names all five, the reference's field list names **four** — `properties` is missing — and the corpus's existing vector for that clause used `available`,
+which both artefacts list. So a family of five was tested through one member, and the divergence sat behind the one nobody tried. **That is the third instance of the same property in one day** — no vector uses
+an unassigned array constructor, all 77 zero-width vectors carry a matching item, and a five-member rule is pinned through one member — and the general form is worth stating once: *a corpus built from the
+artifact's grammar covers the shapes the grammar admits and the members someone happened to type, and the defects live in the shapes and members it does not.*
+
+**And the sweep stated what it could not test, which is the part a later reader needs most**: four rules that could not become vectors at all — `max-frame-size.3`'s 512-octet floor (the clause constrains the
+*declaring* peer and no clause says what a receiver does, so the floor has no observable at this boundary); the **handle direction**, whose sentence is an unnumbered doc paragraph so no citation can carry it,
+which is why the corpus uses handle 0 on both ends everywhere and the direction stays untested; `delivery-count.4`, unreachable because a flow naming a handle needs an attached link at that end; and five
+clauses needing a link *identity* neither model has. **An untestable rule named is worth more than a test that looks like it covers one.**
+
 ## 11. Specification test vectors
 
 One shared format for everything the specification is tested against: NDJSON, schema-validated (`tests/contracts/vector.schema.json`), **logical time only** — timestamps are ordering tags, never wall-clock, so replay is deterministic on any machine.
