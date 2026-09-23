@@ -842,6 +842,19 @@ truncation goes. A specification quantified over a domain the assistant can deno
 change did not otherwise touch, breaking 23 elaborations. The rule extends: when adding a declaration, grep for `open`s that would **capture** it, not only for modules that **declare** the same name.
 
 
+**And the truncation family is closed, with its extent stated rather than asserted.** The reference's writer had **seven sites and twelve field writes** emitting a four-octet size, count or length through
+`u32be` — a variable value's length, an element's length, an element compound's size and count, a compound's size and count in two arms, an array's size and count in two arms — and all twelve now go through
+`Ref.fieldOctets`, which refuses class `limit` where the specification's `filled`/`compoundOctets`/`arrayOctets` do. **The boundary is the useful part**: six remaining `u32be` uses are *value* fields that
+cannot truncate (`.uint`/`.char` take a `UInt32`, `.int` is masked, and the same three element constructors), the `u16be` sites are narrow already, and the frame's own SIZE field was guarded from the start with
+class `sizeMismatch` in both artefacts. `ValueWriterAgree`'s first conjunct is true at that boundary *trivially* — the reference refuses, so there are no `ok` octets for the hypothesis to be given — and the law
+as a whole stays undecided, with the two-encoder traversal as the only thing between it and a proof.
+
+**And adding a corpus to a gate is not the same as wiring it.** The twelve staged vectors were added to `s1_differential.sh`'s loop, and the loop's `case` still had its catch-all `*) name=generated`, so the
+twelve-vector file wrote over the *generated* log and the non-vacuity check then read a histogram of one corpus while asking a question about another — red on any tree, failing on a number no change under
+`lean/Ref` could move. **A list of corpora and a mapping of corpora are different edits**, and the second is the one that fails silently; the new corpus now has its own guard (at least twelve vectors, each
+carrying a refusal expectation) so a small corpus cannot pass this gate vacuously, which is the failure mode small corpora are most exposed to.
+
+
 ## 11. Specification test vectors
 
 One shared format for everything the specification is tested against: NDJSON, schema-validated (`tests/contracts/vector.schema.json`), **logical time only** — timestamps are ordering tags, never wall-clock, so replay is deterministic on any machine.
