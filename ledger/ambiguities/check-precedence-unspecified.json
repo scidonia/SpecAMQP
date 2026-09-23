@@ -1,8 +1,12 @@
 {
  "adopted": "The artifact does not rank the checks, and the model keeps the order it already has",
+ "clauses": [
+  "amqp-core-types-v1.0-os.xml#amqp:types/section:primitive-type-definitions/type:map.1"
+ ],
  "consequences": [
   "No vector exercises a frame that breaks two rules at once, so both orders pass the whole corpus. The register entry is what stops a future change of order from looking like a refactor.",
-  "The lift queued against max-frame-size.1 has been withdrawn: its justification was a defect that measurement showed is no longer reproducible, and its only remaining effect was this precedence change."
+  "The lift queued against max-frame-size.1 has been withdrawn: its justification was a defect that measurement showed is no longer reproducible, and its only remaining effect was this precedence change.",
+  "**Extended one layer down, and the extension is the value layer's.** The same reading decides what a *value* buffer that breaks two rules reports: the case that provoked it is a `map8` whose count field is odd and whose size field disagrees with its items, where one artefact answered `malformed` (the parity MUST is broken) and the other `sizeMismatch` (the declared size disagrees) for the same bytes. The order adopted here applies unchanged \u2014 form checks before the size comparison \u2014 so the class is `malformed`, which is also the class the parity clause supports and the one the reference already gave whenever the size happened to agree. Three further pieces decided it: this entry's own adopted order for the frame layer; the reference's **array** path, which checks its count-based rule before reading elements and before the size comparison, making its map path the outlier inside itself; and the parity MUST being decidable from the count field alone, so refusing on it needs no item enumeration. The reference's map path now checks parity first, and both artefacts report `malformed` for those buffers."
  ],
  "evidence": "The artifact mandates a code for each rule separately \u2014 capacity exhaustion as amqp:frame-size-too-small and connection:framing-error as the clauses direct, an illegal state as amqp:illegal-state \u2014 and says nothing about a frame that breaks two at once. Measured rather than reasoned: a lift that moved the size comparison ahead of the state, role, channel and mandatory checks changed the name a twice-breaking frame fails with from amqp:illegal-state to amqp:connection:framing-error, in four cells across both paths and both artefacts.",
  "id": "check-precedence-unspecified",
