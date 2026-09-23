@@ -49,7 +49,9 @@ c80948aad7c0afaa70330570dd2624f60982d0b6  ledger/ambiguities/attach-retains-link
 1092310820915987af91379bc39de52d14bd5549  ledger/ambiguities/link-uniqueness-vacuous.json
 49aa74044fcaedbbd43858b42022b11e8860ccde  ledger/ambiguities/map-ordering.json
 d7cf7735d5765392d594e61138d761c141ef77a2  ledger/ambiguities/rejected-discharge-leaves-the-id-dischargeable.json
+25af84ed4ed482efc59e0b427637320bc3546eda  ledger/ambiguities/sasl-code-distinguishable.json
 05b506d10898cb78be78b095f0588947cfcf513f  ledger/ambiguities/sasl-dialogue-condition.json
+f834d005c183ad1c14946c3ce9f7ff40a0005d05  ledger/ambiguities/sasl-mechanism-profiles.json
 a78b2bcfe68699fc78794f1bc156a90b6214fdbe  ledger/ambiguities/second-open-refusal.json
 f1df18bddd8ad6dfa626560dfcf70419598c73dd  ledger/ambiguities/session-state-description-route.json
 0a438b210a37b4ed9558191f9987761a3de518b6  ledger/ambiguities/session-window-violation.json

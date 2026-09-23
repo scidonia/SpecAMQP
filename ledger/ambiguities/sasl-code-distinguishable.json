@@ -1,0 +1,32 @@
+{
+ "adopted": "field-value violations, codes distinguishable in the reason",
+ "clauses": [
+  "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl/type:sasl-outcome/field:additional-data.u1",
+  "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl/type:sasl-init/field:mechanism.1"
+ ],
+ "consequences": [
+  "An outcome's code reaches the per-vector reason rather than being collapsed to a boolean, so the four declared failure codes remain distinct observations of distinct causes.",
+  "An undeclared code is refused with `amqp:invalid-field` rather than treated as a failure: the code is a declared enumeration, so a value outside it violates the field and does not report an unsuccessful authentication.",
+  "`additional-data` on a non-ok code is refused with `amqp:invalid-field`, because the artifact states the field is not set when the authentication is unsuccessful.",
+  "The dialogue-level outcome is unchanged: the connection ends either way, so what the reading adds is the reason, not the verdict."
+ ],
+ "evidence": "The outcome's code is declared as a closed set \u2014 `ok` beside four failure codes, each naming a distinct cause \u2014 and the field carries the artifact's own statement that it is not set on an unsuccessful outcome. The differential contract compares per-vector reason classes and pins named reasons, so a code that reached the outcome and vanished before the report would be a specification that read the field and kept only a boolean. The second citation is carried because the same field-value discipline is what fixes the `sasl-init` mechanism probe: a missing or undeclared value is a violation of the field, not a fault elsewhere in the dialogue.",
+ "id": "sasl-code-distinguishable",
+ "open": false,
+ "question": "When an outcome carries an undeclared code, or additional-data on an unsuccessful outcome, is that a field-value violation \u2014 and does a failure code stay distinguishable once it has been read?",
+ "readings": [
+  {
+   "name": "field-value violations, codes distinguishable in the reason",
+   "statement": "Adopted. The code's declared value set is the artifact's, so anything outside it violates the field; and the artifact separates four failure causes, so the reason the peer is told carries which one it was."
+  },
+  {
+   "name": "treat any non-ok code as an indistinguishable failure",
+   "statement": "Rejected: it reads a declared enumeration and discards what the artifact distinguishes, and it would accept a code the artifact never declared as though the peer had reported something."
+  },
+  {
+   "name": "accept additional-data on an unsuccessful outcome",
+   "statement": "Rejected: the artifact states the field is not set in exactly that case."
+  }
+ ],
+ "schema_version": 1
+}

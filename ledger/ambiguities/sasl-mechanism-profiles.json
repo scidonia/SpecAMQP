@@ -1,0 +1,26 @@
+{
+ "adopted": "membership only; no profile ordering is modelled",
+ "clauses": [
+  "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl/type:sasl-init/field:mechanism.2"
+ ],
+ "consequences": [
+  "PLAIN and EXTERNAL enter the layer as authored exchanges whose octets come from the declared frames: a symbol mechanism, a binary initial response, and challenge/response rounds that iterate or not. Neither mechanism has a shape in our bytes, so neither gets one invented.",
+  "The ordering an implementation would consult \u2014 ANONYMOUS weakest, per RFC 4422 \u2014 is not checkable here: the artifact states the requirement without declaring an order, and any table of mechanism names would be our authority rather than the artifact's.",
+  "The clause is recorded in the contract's documentation as an unmodelled peer obligation, in the same shape S3's contract used for the claims that are transcription rather than theorem."
+ ],
+ "evidence": "The `sasl-init` mechanism field carries two statements: that the mechanism must be one the partner announced, and that each peer MUST authenticate using the highest-level security profile it can handle from the list the partner provided. The first is a membership rule and is modelled. The second presupposes an ordering of mechanisms by strength which the artifact never declares, and whose citation is RFC 4422 rather than anything in our vendored bytes. PLAIN appears in the artifact only in the overview's conformance clause; EXTERNAL does not appear in the vendored bytes at all.",
+ "id": "sasl-mechanism-profiles",
+ "open": false,
+ "question": "Does the modelled layer check that a peer chose the highest-level security profile it can handle, or only that it chose from the list it was offered?",
+ "readings": [
+  {
+   "name": "membership only; no profile ordering is modelled",
+   "statement": "Adopted. The ordering has no authority in the vendored artifacts, so a table asserting one would put our invention behind a normative MUST. The corpus still exercises PLAIN and EXTERNAL exchanges, because the plan's acceptance names them, but as frame shapes rather than as ranked profiles."
+  },
+  {
+   "name": "model a profile order (ANONYMOUS weakest) and check the choice",
+   "statement": "Rejected: it needs a mechanism table whose authority is RFC 4422 rather than the OASIS artifacts this repository specifies, and it would make an uncheckable requirement look checked."
+  }
+ ],
+ "schema_version": 1
+}
