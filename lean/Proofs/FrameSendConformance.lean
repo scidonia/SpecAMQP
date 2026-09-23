@@ -88,7 +88,15 @@ than a workaround:
    hypothesis at all. An earlier statement of this law was quantified over every related pair
    and was refuted by that ill-width witness; `Proofs.ValueLayerLaws.not_valueWriterAgree`
    recorded the refutation and was withdrawn in the commit that narrowed the domain, with the
-   two artefacts' answers kept there as the witness.
+   two artefacts' answers kept there as the witness. There has since been a second cycle of the
+   same kind, and the domain did not move this time, so the two are worth telling apart: classing
+   the reference's writer — its failure is `Ref.EncodeRefusal` now, a class the kernel can
+   compare — made `not_valueWriterAgree` expressible again at a **reachable** hole, an array whose
+   declared element constructor the grammar assigns no encoding and which carries no elements.
+   The reference wrote it where the specification refused, and it wrote octets its own reader
+   refused. The fix that closed the hole (the reference consults its declared constructor before
+   its elements) withdrew that refutation too, and `Proofs.ValueLayerLaws` carries both cycles:
+   the witness, the class agreement the fixed writers now show for it, and the closure in general.
 
 Assuming a frame-level writer agreement instead would be assuming this direction's
 conclusion, so the module states the value-layer law and proves the frame layer's part of it.
