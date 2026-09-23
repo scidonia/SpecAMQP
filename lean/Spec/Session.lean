@@ -457,8 +457,18 @@ structure Session where
   them. -/
   peerCount : Nat
   peerCredit : Nat
-  /-- Whether the settlement mode in force for this link's sender side is
-  `sender-settle-mode`, which is what `transfer/field:settled.4` turns on. -/
+  /-- Whether the settlement mode negotiated for this link's sender side is the `settled`
+  **choice** of the `sender-settle-mode` element, which is what `transfer/field:settled.4`
+  turns on — "If the negotiated value for snd-settle-mode at attachment is
+  <xref name="sender-settle-mode" choice="settled"/>, then this field MUST be true on at least
+  one transfer frame for a delivery".
+
+  The distinction is the whole of a defect: `sender-settle-mode` is the declared *type* of
+  `attach`'s `snd-settle-mode` field, whose choices are `unsettled`, `settled` and `mixed`,
+  and each of `.4` and `.6` additionally selects one choice within it. Reading the element's
+  *name* as though it named one value of its own type makes `.4`'s obligation — settle at
+  least once — govern the `unsettled` negotiation and `.6`'s — never settle — govern the
+  `settled` one, which is neither sentence. -/
   senderSettleMode : Bool
   /-- The delivery a transfer is carrying, while one is in progress. -/
   delivery : Option Delivery
@@ -696,14 +706,18 @@ def attachLink (session : Session) (outbound : Bool) (body : Value) :
           "a sender's attach MUST carry its initial delivery-count")
       else pure 0
   let senderSettle :=
-    -- `transfer/field:settled.4` speaks of "the negotiated value for snd-settle-mode" being
-    -- `sender-settle-mode`, which is the `unsettled` value of the field's declared type:
-    -- the mode in which the sender carries the settling. The number is the table's.
-    let unsettled :=
-      ((choiceValue? "sender-settle-mode" "unsettled").bind String.toNat?).getD 0
-    match fieldValue "attach" "snd-settle-mode" body with
-    | some value => valueNat value == some unsettled
-    | none => false
+    -- `transfer/field:settled.4`'s antecedent is the *choice* `<xref name="sender-settle-mode"
+    -- choice="settled"/>` of `attach`'s `snd-settle-mode` field, not the field's declared
+    -- *type*. `sender-settle-mode` names the type, whose choices are `unsettled`, `settled`
+    -- and `mixed`; `.4` and `.6` each select one choice within it, and reading the name where
+    -- the sentence selects a choice inverts which obligation governs which negotiated value —
+    -- settling on at least one transfer would be required of the sender that negotiated
+    -- `unsettled` and forbidden to the one that negotiated `settled`. The number is the
+    -- table's, read through the choice table rather than typed, and the selection is written
+    -- as the comparison the clause states so that what the session records is definitionally
+    -- the choice the artifact names.
+    (fieldValue "attach" "snd-settle-mode" body).bind valueNat ==
+      ((choiceValue? "sender-settle-mode" "settled").bind String.toNat?)
   let position : Option Position :=
     match role with
     | LinkRole.sender => some ⟨initialCount, 0⟩
@@ -873,8 +887,11 @@ def transferLink (session : Session) (outbound : Bool) (body : Value) :
     if aborted then pure none
     else if more then pure (some (Delivery.step session.delivery id settled))
     else
-      -- the delivery completes here: `settled.4` obliges a sender whose negotiated mode
-      -- is sender-settle-mode to settle it in at least one of its transfers
+      -- the delivery completes here: `settled.4` obliges a sender whose negotiated mode is
+      -- the `settled` *choice* of `sender-settle-mode` to settle it in at least one of its
+      -- transfers. The element names the field's declared type; the sentence selects a
+      -- choice within it, and reading the name where the sentence selects a choice is what
+      -- put this guard under the wrong negotiation.
       let completed := Delivery.step session.delivery id settled
       if session.senderSettleMode && !completed.settled then
         .error (refusal invalidField "malformed"

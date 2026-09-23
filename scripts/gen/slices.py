@@ -449,19 +449,27 @@ class Corpus:
                             "message-format": {"type": "uint", "value": 0}})
 
     def attach_body(self, role: bool = False, handle: int = 0, name: str = "link",
-                    initial_delivery_count: int = 0, sender_settle: int | None = None) -> dict:
+                    initial_delivery_count: int = 0,
+                    snd_settle_mode: int | None = None) -> dict:
         """An `attach`. The `role` field's declared type is a restricted `boolean` whose
         `sender` value is false and whose `receiver` value is true, and
         `initial-delivery-count` "MUST NOT be null if role is sender", so this carries it
-        exactly in that case."""
+        exactly in that case.
+
+        `snd_settle_mode` is the number of a **choice** of the declared element
+        `sender-settle-mode` — `unsettled` (0), `settled` (1), `mixed` (2) — and not the
+        element itself. The element names the field's type and the sentences that constrain
+        `transfer`'s `settled` field each select one of those choices, so a value written
+        here is a negotiation, and reading the element's *name* where a sentence selects a
+        *choice* inverts which obligation is in force."""
         fields: dict[str, dict] = {"name": {"type": "string", "text": name},
                                    "handle": {"type": "uint", "value": handle},
                                    "role": {"type": "boolean", "value": role}}
         if not role:
             fields["initial-delivery-count"] = {"type": "uint",
                                                 "value": initial_delivery_count}
-        if sender_settle is not None:
-            fields["snd-settle-mode"] = {"type": "ubyte", "value": sender_settle}
+        if snd_settle_mode is not None:
+            fields["snd-settle-mode"] = {"type": "ubyte", "value": snd_settle_mode}
         return self.body("attach", **fields)
 
     def detach_body(self, handle: int = 0, closed: bool = True) -> dict:
@@ -1449,7 +1457,13 @@ def session_corpus(tables: Corpus) -> list[dict]:
     vectors.append(exchange(
         "exchange-link-sender-settle-mode-unmet", start=s("MAPPED"), clauses=transfer_fields,
         steps=[t.send_frame(AMQP_FRAME, t.attach_body(role=True), state=s("MAPPED"), channel=1),
-               t.receive_frame(AMQP_FRAME, t.attach_body(role=False, sender_settle=0),
+               # `settled.4` turns on the *choice* `<xref name="sender-settle-mode"
+               # choice="settled"/>`, not on the element's name, so the negotiation this
+               # vector carries is that choice's number — read from the artifact's own
+               # choice table rather than written as a numeral somebody remembered.
+               t.receive_frame(AMQP_FRAME,
+                               t.attach_body(role=False, snd_settle_mode=choice_value(
+                                   TRANSPORT, "sender-settle-mode", "settled")),
                                state=s("MAPPED"), channel=1),
                # the peer is this link's sender, so its flow echoes the credit this
                # endpoint last sent rather than granting any
@@ -1458,10 +1472,10 @@ def session_corpus(tables: Corpus) -> list[dict]:
                t.refused("receive", reason="malformed", condition=INVALID_FIELD,
                          state=s("DISCARDING"), body=t.fragment_body(0, 1), channel=1,
                          payload=message,
-                         note="snd-settle-mode was negotiated to sender-settle-mode, whose "
-                              "obligation is that a delivery MUST be settled in at least "
-                              "one of its transfers, and this delivery never carries the "
-                              "flag")],
+                         note="snd-settle-mode was negotiated to the `settled` choice of "
+                              "sender-settle-mode, whose obligation is that a delivery MUST "
+                              "be settled in at least one of its transfers, and this delivery "
+                              "never carries the flag")],
         note="settled.4 in the receive direction: the sender's obligation, checked where "
              "the delivery ends — the frame is well formed and the delivery it carries "
              "breaks the negotiated mode"))

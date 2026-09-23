@@ -338,7 +338,13 @@ structure Endpoint where
   /-- The partner's delivery-count and link-credit as its last flow reported them. -/
   peerCount : Nat
   peerCredit : Nat
-  /-- Whether the sender side's settlement mode is sender-settle-mode. -/
+  /-- Whether the settlement mode negotiated for this link's sender side is the `settled`
+  **choice** of the `sender-settle-mode` element, which is what `transfer/field:settled.4`
+  turns on. `sender-settle-mode` is the declared *type* of `attach`'s `snd-settle-mode`,
+  whose choices are `unsettled`, `settled` and `mixed`; the sentence selects one of them, so
+  treating the element's name as though it named one value of its own type inverts the
+  obligation — settling in at least one transfer would be demanded of the `unsettled`
+  negotiation and never of the `settled` one. -/
   senderSettleMode : Bool
   /-- The delivery in progress, while one is. -/
   delivery : Option Delivery
@@ -543,9 +549,11 @@ def attachLink (endpoint : Endpoint) (outbound : Bool) (body : Value) :
           "a sender's attach MUST carry its initial delivery-count")
       else pure 0
   let settle :=
+    -- the choice, not the element: `settled.4`'s antecedent is the `settled` value of
+    -- `sender-settle-mode`, read from the generated choice table rather than typed
     match valueOfField "attach" "snd-settle-mode" body with
     | some value =>
-      numberOf value == (((declaredChoice "sender-settle-mode" "unsettled").bind String.toNat?).getD 0)
+      numberOf value == (((declaredChoice "sender-settle-mode" "settled").bind String.toNat?).getD 0)
     | none => false
   if outbound then
     -- a fresh link starts with nothing agreed: see `Spec/Session`'s attach for the same
