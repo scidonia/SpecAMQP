@@ -16,7 +16,7 @@ c5ee92929caed5a244bae9a85cea9d0af5e7749a  lean/Contracts/TypeSystem.lean
 e4fd18dbb21535504cc782d8fb6d360e2c89c2b8  lean/Spec/Codec.lean
 e53591db4b916e797445d227165fb7fd42b98af6  lean/Spec/Connection.lean
 2a205f752ad6833b88e2064a498eba8b86193fba  lean/Spec/ConnectionCodec.lean
-d196467009441b90ba700953415355a5ee002a0a  lean/Spec/Frame.lean
+c92c679a91d5a504610bbd47f27ffe33f7776971  lean/Spec/Frame.lean
 31e43aed7900e071a7a1615d739be50f716b5b74  lean/Spec/FrameCodec.lean
 7c2fc8950376880dfbba4beb86a052316ea8b589  lean/Spec/Main.lean
 af27786b1647aa21d5d5ed293a39109c8536e629  lean/Spec/Message.lean
@@ -80,6 +80,7 @@ f89f5a8c5aa42bfe98ef1e180e9bae75213953de  tests/contracts/s6_transactions.sh
 5003de4bb012c2bc64f5b85d9f5e23142467f6b6  tests/contracts/s7_sasl.sh
 c6fbe09193411f7d9addf96285de6626cff85db7  tests/contracts/value-vector.schema.json
 db82368890d436450b3c199292a6c76d7c1ede34  tests/contracts/value_boundaries.sh
+56f7d28450643ce4131bcb9bf69166378642b803  tests/contracts/value_class_agreement.sh
 7415b0ec31b4819fa0819ba2bfde045dafba9859  tests/contracts/vector.schema.json
 8df812612ca8156e5895814a18385cb775f1e1db  toolchain/sources.toml
 63f3cb8b35942d9451fdbc5dc6b1caf09e224d05  vectors/flow-negative.ndjson
