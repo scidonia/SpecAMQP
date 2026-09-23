@@ -1709,7 +1709,14 @@ lands beside its predecessor reads as two facts rather than as one fact and its 
 `Proofs.ValueWireAgreement` declares a parameterised one — two different relations sharing a fully-qualified name in a shared namespace, neither module importing the other, so neither had any reason to
 notice and neither was wrong. **The discharge of the value layer's instance added `import Proofs.ValueWireAgreement` to `Contracts/FrameConformance.lean`**, which put both modules in one environment for
 the first time (the trust gate's axiom probe imports the accepted-theorem modules together), and the whole-package build failed with `environment already contains 'SpecAMQP.Proofs.StepAgrees' from
-Proofs.ValueWireAgreement`. **There were two such names, not one, and the reported error was a sample rather than the set.** Fixing the first — `StepAgrees` — revealed
+Proofs.ValueWireAgreement`. **The class is enumerable in one command, from artefacts the repository already builds** — the `.ilean` declaration tables `lake` writes per module are a per-module inventory, so
+`jq -r '.decls|keys[]' .lake/build/lib/lean/*/*.ilean | sort | uniq -d` names every fully-qualified name two modules share. **It is recorded as a check rather than wired as a gate**, for two
+reasons: a stale ilean for a module that has been deleted makes it over-report (the safe direction, but a false-positive mode a gate must not have), and **a live collision is already caught by the right
+gate** — the whole-package build fails inside `s1_proof_integrity`, which is what happened with both names. What the command adds is early warning about a *latent* collision, which is worth having in the
+plan and not worth a twentieth contract that can cry wolf. **And the order that matters when fixing one is "who else names this" before "who declares this"**: a name can be pinned from outside — one of
+these two was, by a planner-owned contract stating its public theorem over the fully-qualified name — and the compiler points at that break only *after* the annotation has been applied.
+
+**There were two such names, not one, and the reported error was a sample rather than the set.** Fixing the first — `StepAgrees` — revealed
 `SpecAMQP.Proofs.ReadersAgree`, declared nullary in the connection module and parameterised in the wire module, because **Lean aborts an import on the first collision it meets and says nothing about the rest**. The
 slice that fixed it went to the built `.ilean` declaration tables and enumerated *every* name the two modules share, which is the method that makes the second one a fix rather than another red gate; a single name
 handed over from a gate's output is a sample of a class. **And the name was pinned from outside**: `Contracts/ConnectionConformance.lean` states `connection_conformance_public (readers : SpecAMQP.Proofs.ReadersAgree)`,
