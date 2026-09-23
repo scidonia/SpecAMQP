@@ -14,6 +14,7 @@ python3 scripts/gen-value-vectors.py --out "$tmp/values.ndjson" >"$tmp/v.log" 2>
 python3 scripts/gen-value-vectors.py --frames "$tmp/frames.ndjson" >"$tmp/f.log" 2>&1
 python3 scripts/gen-exchange-vectors.py --out "$tmp/exchanges.ndjson" >"$tmp/e.log" 2>&1
 python3 scripts/gen-value-vectors.py --messages "$tmp/messages.ndjson" >"$tmp/m.log" 2>&1
+python3 scripts/gen-value-vectors.py --flow "$tmp/flow.ndjson" --flow-negative "$tmp/flow-negative.ndjson" >"$tmp/fl.log" 2>&1
 status=0
 check() {  # name, generated, committed
   if cmp -s "$2" "$3"; then
@@ -28,6 +29,8 @@ check values    "$tmp/values.ndjson"    vectors/generated.ndjson
 check frames    "$tmp/frames.ndjson"    vectors/generated-frames.ndjson
 check exchanges "$tmp/exchanges.ndjson" vectors/generated-exchanges.ndjson
 check messages  "$tmp/messages.ndjson"  vectors/message/generated.ndjson
+check flow          "$tmp/flow.ndjson"          vectors/flow.ndjson
+check flow-negative "$tmp/flow-negative.ndjson" vectors/flow-negative.ndjson
 if [ "$status" -ne 0 ]; then
   echo "check FAILED: a generated corpus is not what its generator produces"
   echo "a hand-edit to generated output reverts at the next regeneration, and the gate that"

@@ -10,6 +10,7 @@ lives here, one file per family.
 | `gen/values.py` | the value corpus: the Part 1 encoder, its self-check against the artifact's worked examples, and the golden, reject, property and element families | `scripts/gen-value-vectors.py --out` |
 | `gen/frames.py` | the frame corpus: every performative in both directions, the size and DOFF boundaries, and the layout's malformed arithmetic | `scripts/gen-value-vectors.py --frames` |
 | `gen/slices.py` | the per-slice exchange corpora: the connection and session families, and the mutation controls that are meant to fail | `scripts/gen-exchange-vectors.py` |
+| `gen/flows.py` | the fragmentation adequacy control: one message at every interior split point the artifact permits, and the split points it does not | `scripts/gen-value-vectors.py --flow --flow-negative` |
 
 The split exists so that two slices can add corpus families in the same wave without
 editing one file: a new family is a module here plus one dispatch line in whichever
