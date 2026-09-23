@@ -3226,9 +3226,14 @@ The readers' agreement is a parameter of the proposition rather than of the theo
 because the arriving case *needs* it: the octets of an arriving buffer become a body on each side
 independently, and only `ReadersAgree` says the two bodies are the same body. A `StepAgrees` that left
 it out would be the same proposition for every hypothesis, and its arriving case would be a claim about
-two readers nothing has related. -/
+two readers nothing has related.
 
-def StepAgrees : Prop :=
+`private` for the reason this file's other local devices are (`specSymbol?`, `versionTriple`,
+`items_forall₂`): nothing outside the module names it. And for one more: it is one of two relations
+called `StepAgrees` in this namespace, the other being `Proofs.ValueWireAgreement`'s, and the two stayed
+apart only because no module imported both until a contract did. -/
+
+private def StepAgrees : Prop :=
   ∀ (h : ReadersAgree) (s : SpecAMQP.Spec.Connection.Endpoint) (i : SpecAMQP.Ref.Connection.Peer)
     (hR : refPeerOf s = i) (outbound : Bool)
     (sub : SpecAMQP.Spec.Connection.Submission) (offer : SpecAMQP.Ref.Connection.Offer),

@@ -1224,8 +1224,13 @@ def ReadersAgreeAt
       ∃ refusal : SpecAMQP.Spec.Codec.Refusal, Ks c = .error refusal ∧
         (SpecAMQP.Ref.Frame.valueFailure failure).reasonClass = refusal.reasonClass)
 
-/-- The same obligation at every pair of agreeing cursors. -/
-def ReadersAgree
+/-- The same obligation at every pair of agreeing cursors.
+
+`private` because nothing outside this module names it, and because the name is already spoken for in
+this namespace: `Proofs.ConnectionConformance`'s `ReadersAgree` is the frame layer's hypothesis and
+`Contracts.ConnectionConformance` names it in that layer's acceptance declaration, so the wire side is
+the one that has to move. -/
+private def ReadersAgree
     (Ks : SpecAMQP.Spec.Codec.Cursor → Except SpecAMQP.Spec.Codec.Refusal
       (SpecAMQP.Spec.Codec.Value × SpecAMQP.Spec.Codec.Cursor))
     (Kr : SpecAMQP.Ref.Cursor → Except SpecAMQP.Ref.DecodeError
