@@ -1182,39 +1182,35 @@ def check_resolves(
     return problems
 
 
-def vector_ids(directory: Path) -> set[str]:
-    """Every `vector` id in the corpus: one JSON object per line, one id per vector."""
-    ids: set[str] = set()
-    for path in sorted(directory.glob("*.ndjson")):
-        for line in path.read_text(encoding="utf-8").splitlines():
-            if line.strip():
-                identifier = json.loads(line).get("vector")
-                if identifier:
-                    ids.add(identifier)
-    return ids
-
-
 def check_carries(dispositions: dict[str, dict], vectors_dir: Path, required: bool) -> list[str]:
-    """Every `test:` value must name a vector that exists in `vectors/*.ndjson`.
+    """Every `test:` value must name a vector that exists in the corpus tree.
 
     A vector id is the ledger's handle on an observable: the disposition says the
     clause is witnessed by that vector's verdict. A vector renamed or never generated
     leaves the claim unwitnessed while the disposition still reads as decided. There
     is no exemption here, because a `test:` value names something the repository
     already commits to: it resolves or it is wrong.
+
+    The corpus is read whole rather than at the top level alone. The message and
+    exchange families write into subdirectories, so a glob of `*.ndjson` would report
+    a legitimate disposition as pointing at nothing — a false failure whose message
+    says the id does not resolve, which is the hardest kind to attribute. Measured
+    before the change: a `test:` value naming `msg-bare-properties-data` (which exists
+    in `vectors/message/messages.ndjson`) was reported as "no vector in
+    vectors/*.ndjson".
     """
     if not required:
         return []
     if not vectors_dir.is_dir():
         return [f"{vectors_dir}: the vector corpus every test: value claims is missing"]
-    ids = vector_ids(vectors_dir)
+    ids = set().union(*corpus_ids(vectors_dir).values())
     problems: list[str] = []
     for ref, entry in sorted(dispositions.items()):
         for value in disposition_values(entry, TEST_PREFIX):
             if value not in ids:
                 problems.append(
-                    f"{entry['file']}: {ref}: test:{value} is no vector in "
-                    f"{vectors_dir.name}/*.ndjson"
+                    f"{entry['file']}: {ref}: test:{value} is no vector under "
+                    f"{vectors_dir.name}/"
                 )
     return problems
 
@@ -1261,9 +1257,10 @@ def ledger_strings(root: Path):
 def corpus_ids(vectors_dir: Path) -> dict[str, set[str]]:
     """Every vector id, by the corpus file that holds it, for every corpus under the tree.
 
-    This is deliberately wider than `vector_ids`, which reads the top level alone: a note
-    may name a corpus in a subdirectory, and a check that cannot see those would report a
-    correct note as citing something absent.
+    The corpus tree is read whole. The message and exchange families write into
+    subdirectories, and a reader that globbed the top level alone would report a correct
+    name as absent — which is why `check_carries` resolves `test:` values against this
+    rather than against a top-level glob.
     """
     corpora: dict[str, set[str]] = {}
     for path in sorted(vectors_dir.rglob("*.ndjson")):
@@ -1519,7 +1516,7 @@ def command_check(args: argparse.Namespace) -> int:
                 "formalized: convention"
             )
         tests = sum(len(disposition_values(entry, TEST_PREFIX)) for entry in dispositions.values())
-        print(f"test: {tests} vector id(s) checked against vectors/*.ndjson")
+        print(f"test: {tests} vector id(s) checked against vectors/**/*.ndjson")
         named = corpus_named_strings(Path(args.out))
         tokens = sum(
             len([
