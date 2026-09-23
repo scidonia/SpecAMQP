@@ -46,13 +46,17 @@ treatment every other layer boundary gets here.
 A later slice set out to discharge `ValueLayersAgree` and refuted it, and the refutation was checked
 here at the source rather than taken from the report. Six octets are enough:
 
-`#[0xC1, 0x08, 0x03, 0x40, 0x40, 0x40]` — a `map8` whose count field is 3, odd — is refused by the
-specification as `malformed: a map declares 3 item(s): keys and values come in pairs, so an odd count
-is not a map`, and by the reference as `DecodeError.sizeMismatch "map" 8 4`. Both refuse; they disagree
-about **which class names the refusal**, and the class is part of the observable — §10's `Output`
-carries the refusal and the corpus compares the class — so the value layers do not agree. The
-divergence is reachable at the frame layer, so `Conforms specFrame refFrame` is **false** as an
-unconditional statement, and therefore:
+`#[0xC1, 0x08, 0x03, 0x40, 0x40, 0x40]` — a `map8` whose count field is 3, odd — *was* refused by the
+specification as `malformed:` and by the reference as `DecodeError.sizeMismatch "map" 8 4`: both
+refused, and they disagreed about **which class named the refusal**, which is part of the observable,
+since §10's `Output` carries the refusal and the corpus compares the class. The parity order was
+aligned to the artifact's reading and **the same buffer now draws `malformed` from both**, and a sweep
+of 114,225 buffers — every buffer of length one to three over the format-code alphabet, every length-four
+buffer over a narrower one, all 256 array element constructors, arrays of zero-width and nested and
+described elements, and compounds with size and count crossed — finds **no remaining class divergence**,
+with both readers refusing the same 77,124 of them. So the sentence this paragraph used to support,
+that `Conforms specFrame refFrame` is false as an unconditional statement, has no witness left, and
+therefore:
 
 * `frame_conformance_public` is *true and vacuous*: its hypothesis is false, so the theorem says
   nothing about the two artefacts. It is not withdrawn — the proof is real, the relation is
