@@ -21,7 +21,9 @@ proved**, in seven families —
 * `map`, whose reference reads the same array one step less far, and which `mapM_getArr?_collapse`
   brings back into the specification's two-stage shape.
 
-What remains is the join described below, not a clause.
+What remains is the join described below, not a clause — and the join is proved at the end of this
+module: `valueCarrierAgree_all` is `ValueCarrierAgree` itself, so the specification's own carrier
+claim is discharged here rather than assumed by the frame instances.
 The route to each is named at the end of this header. What is *not* yet done is the join: the
 statement is at fuel 64 (`Ref.Vectors.valueOfJson 64 json = .ok other → ∃ body, …`), while every
 clause here is at `valueOfJson (fuel + 1)` with the discriminant as a hypothesis, so discharging it
@@ -802,11 +804,15 @@ a fuel-indexed restatement: `ValueCarrierAgrees fuel` is the claim at `fuel`, an
 the compound clauses need, since they read their items with `valueOfJson fuel` and so consume the
 claim at the fuel beneath them.
 
-That fixes the induction: `ValueCarrierAgrees 0` holds vacuously (both readers refuse at fuel 0),
-and the step is a lemma whose cases are the clauses above — the scalar ones used as they stand, the
-compound ones consuming the induction hypothesis at `fuel`. The step is not written yet; the
-statement, its base case and the reduction to the contract's form are, and they are what the step
-will be stated against. -/
+That fixes the induction, and the three pieces are below: the base case holds vacuously, the step
+splits the reference's own dispatch into its twenty-five literals and calls the matching clause for
+each — the compound four being passed the induction hypothesis — and `Nat.rec` runs the induction
+out to every fuel, so `ValueCarrierAgree` itself follows at 64.
+
+The step's one wrinkle, worth knowing before editing it: the clauses take the reference's *own*
+answer and unfold it with the discriminant themselves, so the step must keep the original hypothesis
+(`horig`) for them rather than pass the branch it has already reduced. The two are equal only once
+`hk` is in scope, which is not a reduction Lean will make on its own. -/
 
 /-- **The corpus readers' agreement at a given fuel.** `ValueCarrierAgree` is this at 64. -/
 def ValueCarrierAgrees (fuel : Nat) : Prop :=
@@ -1492,5 +1498,58 @@ theorem carrier_clause_map (fuel : Nat) (json : Json)
     rfl
   · simp only [BodiesAgree]
     exact hagree
+
+/-- **The step of the induction.** The reference's own success carries the discriminant, the
+dispatch is split into its twenty-five literals, and each branch is its clause - the two value-layer
+parameters being the fuel beneath and the discriminant equality the clause wants. -/
+theorem valueCarrierAgrees_succ (fuel : Nat) (ih : ValueCarrierAgrees fuel) :
+    ValueCarrierAgrees (fuel + 1) := by
+  intro json other h
+  -- the clauses take the reader's own answer and unfold it with the discriminant themselves
+  have horig : SpecAMQP.Ref.Vectors.valueOfJson (fuel + 1) json = .ok other := h
+  cases hk : json.getObjValAs? String "type" with
+  | error err =>
+    unfold SpecAMQP.Ref.Vectors.valueOfJson at h
+    simp only [hk, Bind.bind, Except.bind] at h
+    cases h
+  | ok kind =>
+    unfold SpecAMQP.Ref.Vectors.valueOfJson at h
+    simp only [hk, Bind.bind, Except.bind] at h
+    split at h
+    · exact carrier_clause_null fuel json hk other horig
+    · exact carrier_clause_boolean fuel json hk other horig
+    · exact carrier_clause_ubyte fuel json hk other horig
+    · exact carrier_clause_ushort fuel json hk other horig
+    · exact carrier_clause_uint fuel json hk other horig
+    · exact carrier_clause_ulong fuel json hk other horig
+    · exact carrier_clause_byte fuel json hk other horig
+    · exact carrier_clause_short fuel json hk other horig
+    · exact carrier_clause_int fuel json hk other horig
+    · exact carrier_clause_long fuel json hk other horig
+    · exact carrier_clause_char fuel json hk other horig ih
+    · exact carrier_clause_timestamp fuel json hk other horig
+    · exact carrier_clause_float fuel json hk other horig
+    · exact carrier_clause_double fuel json hk other horig
+    · exact carrier_clause_decimal32 fuel json hk other horig
+    · exact carrier_clause_decimal64 fuel json hk other horig
+    · exact carrier_clause_decimal128 fuel json hk other horig
+    · exact carrier_clause_uuid fuel json hk other horig
+    · exact carrier_clause_string fuel json hk other horig
+    · exact carrier_clause_symbol fuel json hk other horig
+    · exact carrier_clause_binary fuel json hk other horig
+    · exact carrier_clause_list fuel json hk other horig ih
+    · exact carrier_clause_map fuel json hk other horig ih
+    · exact carrier_clause_array fuel json hk other horig ih
+    · exact carrier_clause_described fuel json hk other horig ih
+    · simp at h
+
+/-- **Every fuel**: the base is vacuous, the step is the lemma above. -/
+theorem valueCarrierAgrees_all : ∀ fuel, ValueCarrierAgrees fuel
+  | 0 => valueCarrierAgrees_zero
+  | fuel + 1 => valueCarrierAgrees_succ fuel (valueCarrierAgrees_all fuel)
+
+/-- `ValueCarrierAgree` itself, from the fuel-indexed family. -/
+theorem valueCarrierAgree_all : ValueCarrierAgree :=
+  valueCarrierAgree_of_agrees (valueCarrierAgrees_all 64)
 
 end SpecAMQP.Proofs
