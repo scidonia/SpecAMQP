@@ -459,7 +459,7 @@ in §2 and §4 (`grep -n "does not use" toolchain/downstream-pins.toml`).
 `PLAN.md` §23.1. Four rungs, and this is where each of them actually stands — no rung is
 accepted, and the difference between "landed" and "accepted" is the whole point of the section.
 
-**R1 — the transport shell: landed, under independent review, not accepted.** The commit is
+**R1 — the transport shell: ACCEPTED.** Two review rounds returned findings against it and both are addressed; the acceptance record is `PLAN.md` §23.1's R1 bullet, and it is worth reading for how the findings changed rather than for their number. Original heading and state follow, kept because the sequence is the useful part: **landed, under independent review, not accepted.** The commit is
 `d68ac31`; an independent review inspected it and returned **`changes_requested`** with five P1
 findings: the trust disclosure listed `setsockopt` as absent while `listen` calls it; a
 non-resolving `lean/Loopback/` path in the same disclosure; a positive short-write path claimed
