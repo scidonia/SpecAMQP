@@ -1,4 +1,5 @@
 import Contracts.Conformance
+import Proofs.ValueCarrierAgreement
 import Proofs.FrameConformance
 import Proofs.ReadProgress
 import Proofs.FrameSendConformance
@@ -13,12 +14,11 @@ the reference's reader reads off a buffer, the specification's reader reads too 
 consumed and bodies the frame layer views the same way - or a refusal of the same class. This module
 is that claim's development, and it is **in progress**. Landed: the formulation (with the fuel bound
 its truth needs), the base case, the octet step and its payload bridges, the branch *pattern*, and
-**27 of the 40 arms** — the described branch and all twenty-four non-recursive rows: the five other
-zero-width rows, the one-octet payloads, the wide unsigned and `char` widths, the six opaque widths,
-and the six variable rows. Still owed: the seven *signed* rows, whose value equations need a
-`signedOfOctets` round trip; the six compound and array rows, with the three loop relations they
-share; the dispatch that turns the arms into the induction step; and the fuel induction itself, whose
-entry point is free. What each owes and how it is
+**34 of the 40 arms** — the described branch and every row that reads no recursive value: the five
+other zero-width rows, the one-octet payloads, the wide unsigned and `char` widths, the seven *signed*
+widths, the six opaque widths, and the six variable rows. Still owed: the six compound and array rows,
+with the three loop relations they share; the dispatch that turns the arms into the induction step;
+and the fuel induction itself, whose entry point is free. What each owes and how it is
 proved is stated where it belongs rather than in a list here: see the octet step's arithmetic, and
 `arm_0x00`'s docstring for the pattern the branches follow.
 
@@ -1338,7 +1338,7 @@ that its neighbours do not is stated in its own docstring; the groups, and why e
   compare nothing, so their relation is equality of arrays and their value equations are `rfl`.
 
 What is deliberately *not* here: the seven signed rows, whose value equations need a
-`signedOfOctets` round trip, and the compound and array rows, which need the loop relations. Both are
+`SpecAMQP.Spec.Codec.signedOfOctets` round trip, and the compound and array rows, which need the loop relations. Both are
 named in the module's header and in the plan rather than left to look finished. -/
 
 /-- **The octet an 8-bit boolean carries is zero exactly when the octet is `0x00`.** The reference
@@ -2149,5 +2149,349 @@ theorem arm_0xB3 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Re
           exact readersAgree_utf8 "symbol" bytes (fun s => .symbol s) (fun s => .symbol s)
             (fun s => by simp only [BodiesAgree])))
     (spec_takeU8_data hs)
+
+
+/-! ## The signed rows
+
+Seven rows carry two's-complement integers, and each owes a *value equation* rather than a new read:
+the specification computes the field's value with `SpecAMQP.Spec.Codec.signedOfOctets` (a conditional subtraction of the
+modulus) while the reference keeps it in a width-carrying carrier (`Int8`…`Int64`) built from the
+same octets. The bridges below are therefore pure arithmetic on two spellings of one number, and the
+three narrow rows (`0x51`, `0x54`, `0x55` — one octet carrying a wider-typed value) additionally need
+the reference's *sign extension*: `Int32.ofBitVec (BitVec.ofNat 32 (signedOctet b % 2 ^ 32).toNat)`.
+`Proofs/ValueCarrierAgreement`'s `i8_toInt`…`i64_toInt` are exactly that sign extension — the corpus
+side reached them from the other direction — which is why this module imports that one. -/
+
+/-- **A two's-complement field, as the carrier the same octets make.** `SpecAMQP.Spec.Codec.signedOfOctets` subtracts the
+modulus above the half-way point and `BitVec.toInt` does the same, so the two are one function in two
+spellings; the condition each tests is `2 * m < 2 ^ (8 * w)`, which is `m < 2 ^ (8 * w - 1)`. -/
+theorem signedOfOctets_8 (m : Nat) (h : m < 2 ^ 8) :
+    SpecAMQP.Spec.Codec.signedOfOctets 1 m = (Int8.ofBitVec (BitVec.ofNat 8 m)).toInt := by
+  rw [Int8.toInt_ofBitVec, BitVec.toInt, BitVec.toNat_ofNat, Nat.mod_eq_of_lt h]
+  unfold SpecAMQP.Spec.Codec.signedOfOctets
+  split <;> split <;> omega
+
+/-- The same at two octets. -/
+theorem signedOfOctets_16 (m : Nat) (h : m < 2 ^ 16) :
+    SpecAMQP.Spec.Codec.signedOfOctets 2 m = (Int16.ofBitVec (BitVec.ofNat 16 m)).toInt := by
+  rw [Int16.toInt_ofBitVec, BitVec.toInt, BitVec.toNat_ofNat, Nat.mod_eq_of_lt h]
+  unfold SpecAMQP.Spec.Codec.signedOfOctets
+  split <;> split <;> omega
+
+/-- The same at four octets. -/
+theorem signedOfOctets_32 (m : Nat) (h : m < 2 ^ 32) :
+    SpecAMQP.Spec.Codec.signedOfOctets 4 m = (Int32.ofBitVec (BitVec.ofNat 32 m)).toInt := by
+  rw [Int32.toInt_ofBitVec, BitVec.toInt, BitVec.toNat_ofNat, Nat.mod_eq_of_lt h]
+  unfold SpecAMQP.Spec.Codec.signedOfOctets
+  split <;> split <;> omega
+
+/-- The same at eight octets. -/
+theorem signedOfOctets_64 (m : Nat) (h : m < 2 ^ 64) :
+    SpecAMQP.Spec.Codec.signedOfOctets 8 m = (Int64.ofBitVec (BitVec.ofNat 64 m)).toInt := by
+  rw [Int64.toInt_ofBitVec, BitVec.toInt, BitVec.toNat_ofNat, Nat.mod_eq_of_lt h]
+  unfold SpecAMQP.Spec.Codec.signedOfOctets
+  split <;> split <;> omega
+
+/-- **The reference's octet reader, as the specification's one-octet field.** The reference spells a
+signed octet `signedOctet`, the specification `SpecAMQP.Spec.Codec.signedOfOctets 1`; this is the first bridge as an
+equation between the two, which is what the narrow rows' value equations rewrite through. -/
+theorem signedOctet_eq (b : UInt8) :
+    SpecAMQP.Ref.signedOctet b = SpecAMQP.Spec.Codec.signedOfOctets 1 b.toNat := by
+  unfold SpecAMQP.Ref.signedOctet
+  exact (signedOfOctets_8 b.toNat b.toNat_lt).symm
+
+/-- The range a signed octet's value actually occupies, which is what the sign-extension lemmas below
+need: one octet of two's complement is `-2 ^ 7` to `2 ^ 7 - 1`, never the wider type's extremes. -/
+theorem signedOctet_bounds (b : UInt8) :
+    -(2 ^ 7) ≤ SpecAMQP.Ref.signedOctet b ∧ SpecAMQP.Ref.signedOctet b ≤ 2 ^ 7 - 1 := by
+  rw [signedOctet_eq b]
+  unfold SpecAMQP.Spec.Codec.signedOfOctets
+  have hlt := b.toNat_lt
+  split <;> omega
+
+/-- **The reference's sign extension into `Int32`.** A signed octet read into a four-octet carrier
+keeps its sign: the octet's value is taken modulo the wider modulus and interpreted again, which is
+the identity exactly on the octet's own range. `Proofs/ValueCarrierAgreement`'s `i32_toInt` is this
+statement, reached from the corpus side; here it is applied to what the *reader* produced. -/
+theorem signedOctet_int32 (b : UInt8) :
+    (Int32.ofBitVec (BitVec.ofNat 32
+      (SpecAMQP.Ref.signedOctet b % 4294967296).toNat)).toInt = SpecAMQP.Spec.Codec.signedOfOctets 1 b.toNat := by
+  rw [← signedOctet_eq b]
+  exact i32_toInt (SpecAMQP.Ref.signedOctet b) (by have := signedOctet_bounds b; omega)
+    (by have := signedOctet_bounds b; omega)
+
+/-- The same sign extension into `Int64`. -/
+theorem signedOctet_int64 (b : UInt8) :
+    (Int64.ofBitVec (BitVec.ofNat 64
+      (SpecAMQP.Ref.signedOctet b % 18446744073709551616).toNat)).toInt =
+      SpecAMQP.Spec.Codec.signedOfOctets 1 b.toNat := by
+  rw [← signedOctet_eq b]
+  exact i64_toInt (SpecAMQP.Ref.signedOctet b) (by have := signedOctet_bounds b; omega)
+    (by have := signedOctet_bounds b; omega)
+
+/-- **The `byte` row (`0x51`).** One octet, read as a signed byte: the specification's field value and
+the reference's `Int8` carrier are the same number in two spellings. -/
+theorem arm_0x51 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x51, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x51, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0x51 : UInt8).toNat = .fixed 1 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x51 : UInt8) =
+      .ok ⟨81, none, SpecAMQP.Generated.Oasis.Category.fixed, 1, "byte",
+        "8-bit two's-complement integer"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.takeBytes 1 d >>= fun p =>
+        .ok (.byte (SpecAMQP.Spec.Codec.signedOfOctets 1 (payloadNat p.1)), p.2) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    rfl
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      SpecAMQP.Ref.takeU8 d' >>= fun p =>
+        .ok (.byte (Int8.ofBitVec (BitVec.ofNat 8 p.1.toNat)), p.2) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_step (stepAgreesAll_takeU8Nat d d' hd)
+    (fun bytes => .byte (SpecAMQP.Spec.Codec.signedOfOctets 1 (payloadNat bytes)))
+    (fun b => .byte (Int8.ofBitVec (BitVec.ofNat 8 b.toNat)))
+    (fun a b hrel _ _ => by
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact signedOfOctets_8 b.toNat b.toNat_lt)
+    hS hR (spec_takeU8_data hs)
+
+/-- **The `smallint` row (`0x54`).** One octet read into a four-octet `int`: the reference sign-extends
+the octet, which is `signedOctet_int32`, and the specification's one-octet field already carries that
+value. -/
+theorem arm_0x54 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x54, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x54, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0x54 : UInt8).toNat = .fixed 1 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x54 : UInt8) =
+      .ok ⟨84, some "smallint", SpecAMQP.Generated.Oasis.Category.fixed, 1, "int",
+        "8-bit two's-complement integer"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.takeBytes 1 d >>= fun p =>
+        .ok (.int (SpecAMQP.Spec.Codec.signedOfOctets 1 (payloadNat p.1)), p.2) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    rfl
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      SpecAMQP.Ref.takeU8 d' >>= fun p =>
+        .ok (.int (Int32.ofBitVec (BitVec.ofNat 32
+          (SpecAMQP.Ref.signedOctet p.1 % 4294967296).toNat)), p.2) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_step (stepAgreesAll_takeU8Nat d d' hd)
+    (fun bytes => .int (SpecAMQP.Spec.Codec.signedOfOctets 1 (payloadNat bytes)))
+    (fun b => .int (Int32.ofBitVec (BitVec.ofNat 32
+      (SpecAMQP.Ref.signedOctet b % 4294967296).toNat)))
+    (fun a b hrel _ _ => by
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact (signedOctet_int32 b).symm)
+    hS hR (spec_takeU8_data hs)
+
+/-- **The `smalllong` row (`0x55`).** The same one-octet form at `long`, with the eight-octet sign
+extension. -/
+theorem arm_0x55 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x55, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x55, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0x55 : UInt8).toNat = .fixed 1 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x55 : UInt8) =
+      .ok ⟨85, some "smalllong", SpecAMQP.Generated.Oasis.Category.fixed, 1, "long",
+        "8-bit two's-complement integer"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.takeBytes 1 d >>= fun p =>
+        .ok (.long (SpecAMQP.Spec.Codec.signedOfOctets 1 (payloadNat p.1)), p.2) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    rfl
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      SpecAMQP.Ref.takeU8 d' >>= fun p =>
+        .ok (.long (Int64.ofBitVec (BitVec.ofNat 64
+          (SpecAMQP.Ref.signedOctet p.1 % 18446744073709551616).toNat)), p.2) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_step (stepAgreesAll_takeU8Nat d d' hd)
+    (fun bytes => .long (SpecAMQP.Spec.Codec.signedOfOctets 1 (payloadNat bytes)))
+    (fun b => .long (Int64.ofBitVec (BitVec.ofNat 64
+      (SpecAMQP.Ref.signedOctet b % 18446744073709551616).toNat)))
+    (fun a b hrel _ _ => by
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact (signedOctet_int64 b).symm)
+    hS hR (spec_takeU8_data hs)
+
+/-- **The `short` row (`0x61`).** Two octets as a signed sixteen-bit integer: the same fold as the
+unsigned row, and the same value in two spellings. -/
+theorem arm_0x61 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x61, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x61, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0x61 : UInt8).toNat = .fixed 2 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x61 : UInt8) =
+      .ok ⟨97, none, SpecAMQP.Generated.Oasis.Category.fixed, 2, "short",
+        "16-bit two's-complement integer in network byte order"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.takeBytes 2 d >>= fun p =>
+        .ok (.short (SpecAMQP.Spec.Codec.signedOfOctets 2 (payloadNat p.1)), p.2) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    rfl
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      SpecAMQP.Ref.takeBeU 2 d' >>= fun p =>
+        .ok (.short (Int16.ofBitVec (BitVec.ofNat 16 p.1)), p.2) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_step (stepAgreesAll_takeBeNat 2 d d' hd)
+    (fun bytes => .short (SpecAMQP.Spec.Codec.signedOfOctets 2 (payloadNat bytes)))
+    (fun n => .short (Int16.ofBitVec (BitVec.ofNat 16 n)))
+    (fun a b hrel f hf => by
+      have hlt : b < 2 ^ 16 := by
+        have h1 := payloadNat_lt_of_takeBytes hf
+        rw [hrel] at h1
+        have h2 : (256 : Nat) ^ 2 = 2 ^ 16 := by decide
+        rw [h2] at h1
+        exact h1
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact signedOfOctets_16 b hlt)
+    hS hR (spec_takeU8_data hs)
+
+/-- **The `int` row (`0x71`).** The same at four octets. -/
+theorem arm_0x71 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x71, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x71, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0x71 : UInt8).toNat = .fixed 4 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x71 : UInt8) =
+      .ok ⟨113, none, SpecAMQP.Generated.Oasis.Category.fixed, 4, "int",
+        "32-bit two's-complement integer in network byte order"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.takeBytes 4 d >>= fun p =>
+        .ok (.int (SpecAMQP.Spec.Codec.signedOfOctets 4 (payloadNat p.1)), p.2) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    rfl
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      SpecAMQP.Ref.takeBeU 4 d' >>= fun p =>
+        .ok (.int (Int32.ofBitVec (BitVec.ofNat 32 p.1)), p.2) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_step (stepAgreesAll_takeBeNat 4 d d' hd)
+    (fun bytes => .int (SpecAMQP.Spec.Codec.signedOfOctets 4 (payloadNat bytes)))
+    (fun n => .int (Int32.ofBitVec (BitVec.ofNat 32 n)))
+    (fun a b hrel f hf => by
+      have hlt : b < 2 ^ 32 := by
+        have h1 := payloadNat_lt_of_takeBytes hf
+        rw [hrel] at h1
+        have h2 : (256 : Nat) ^ 4 = 2 ^ 32 := by decide
+        rw [h2] at h1
+        exact h1
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact signedOfOctets_32 b hlt)
+    hS hR (spec_takeU8_data hs)
+
+/-- **The `long` row (`0x81`).** The same at eight octets. -/
+theorem arm_0x81 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x81, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x81, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0x81 : UInt8).toNat = .fixed 8 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x81 : UInt8) =
+      .ok ⟨129, none, SpecAMQP.Generated.Oasis.Category.fixed, 8, "long",
+        "64-bit two's-complement integer in network byte order"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.takeBytes 8 d >>= fun p =>
+        .ok (.long (SpecAMQP.Spec.Codec.signedOfOctets 8 (payloadNat p.1)), p.2) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    rfl
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      SpecAMQP.Ref.takeBeU 8 d' >>= fun p =>
+        .ok (.long (Int64.ofBitVec (BitVec.ofNat 64 p.1)), p.2) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_step (stepAgreesAll_takeBeNat 8 d d' hd)
+    (fun bytes => .long (SpecAMQP.Spec.Codec.signedOfOctets 8 (payloadNat bytes)))
+    (fun n => .long (Int64.ofBitVec (BitVec.ofNat 64 n)))
+    (fun a b hrel f hf => by
+      have hlt : b < 2 ^ 64 := by
+        have h1 := payloadNat_lt_of_takeBytes hf
+        rw [hrel] at h1
+        have h2 : (256 : Nat) ^ 8 = 2 ^ 64 := by decide
+        rw [h2] at h1
+        exact h1
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact signedOfOctets_64 b hlt)
+    hS hR (spec_takeU8_data hs)
+
+/-- **The `timestamp` row (`0x83`).** The same eight octets read as a signed count of milliseconds:
+the row's only content beyond `long` is which type name the two artefacts give the value. -/
+theorem arm_0x83 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x83, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x83, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0x83 : UInt8).toNat = .fixed 8 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x83 : UInt8) =
+      .ok ⟨131, some "ms64", SpecAMQP.Generated.Oasis.Category.fixed, 8, "timestamp",
+        "64-bit two's-complement integer representing milliseconds since the unix epoch"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.takeBytes 8 d >>= fun p =>
+        .ok (.timestamp (SpecAMQP.Spec.Codec.signedOfOctets 8 (payloadNat p.1)), p.2) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    rfl
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      SpecAMQP.Ref.takeBeU 8 d' >>= fun p =>
+        .ok (.timestamp (Int64.ofBitVec (BitVec.ofNat 64 p.1)), p.2) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_step (stepAgreesAll_takeBeNat 8 d d' hd)
+    (fun bytes => .timestamp (SpecAMQP.Spec.Codec.signedOfOctets 8 (payloadNat bytes)))
+    (fun n => .timestamp (Int64.ofBitVec (BitVec.ofNat 64 n)))
+    (fun a b hrel f hf => by
+      have hlt : b < 2 ^ 64 := by
+        have h1 := payloadNat_lt_of_takeBytes hf
+        rw [hrel] at h1
+        have h2 : (256 : Nat) ^ 8 = 2 ^ 64 := by decide
+        rw [h2] at h1
+        exact h1
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact signedOfOctets_64 b hlt)
+    hS hR (spec_takeU8_data hs)
 
 end SpecAMQP.Proofs
