@@ -56,7 +56,11 @@
          "sizeMismatch",
          "malformed",
          "limit",
-         "illegalState"
+         "illegalState",
+         "auth",
+         "sys",
+         "sys-perm",
+         "sys-temp"
         ],
         "type": "string"
        },

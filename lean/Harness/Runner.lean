@@ -91,7 +91,13 @@ which is a failure neither the encoder nor the decoder can see on its own. -/
 def reasonClassOf (detail : String) : Option String :=
   let head := (detail.splitOn ":").head?.getD "" |>.trimAscii.toString
   if ["truncated", "unassigned", "unsupported", "sizeMismatch", "malformed", "limit",
-      "illegalState"].contains head
+      "illegalState",
+      -- The four failure codes the security artifact declares for `sasl-code`, appended
+      -- because they are the only observable a failed authentication has: the artifact
+      -- names no condition for it, so a code that did not reach this vocabulary would be
+      -- read, reported and compared by nothing. Read from `Generated.Oasis.Choices`
+      -- (`amqp:security/section:sasl/type:sasl-code`), never typed.
+      "auth", "sys", "sys-perm", "sys-temp"].contains head
   then some head
   else none
 
