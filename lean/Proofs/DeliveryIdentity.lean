@@ -246,6 +246,16 @@ this module's sibling took for its one tied operation: state one named-successor
 *without* reducing to it, then prove the operation theorem as a case split applying them. Both are
 proof engineering in this layer's `do`-blocks. Neither changes what the two artefacts do, and the
 rule itself is pinned by `vectors/flow-negative.ndjson` independently of this module.
+
+**Two places the next attempt should start**, recorded because they are cheaper than rediscovering
+the shape. `attachLink`, `detachLink` and `dispositionLink` failing at exactly 27 goals each, with
+`s'` abstract in all of them, suggests they share one obstruction rather than three — worth testing
+by tying the *easiest* of the three first: if one closes, the other two probably follow, and if
+none does, the obstruction is upstream of all three and belongs in the reduction rather than in any
+one operation. And `DeliveryIdentity.of_cleared` is the shape the ties look like they should be
+built on — a successor that clears the three fields satisfies the invariant whatever else it
+changes — so if the ties turn out not to be reducible to it, that is itself a finding about the
+shape rather than a failure of the lemma.
 -/
 
 end SpecAMQP.Proofs.DeliveryIdentity
