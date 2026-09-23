@@ -20,7 +20,7 @@ with R3 as the proof still owed — and whose framing laws are proved. What it d
 | `lean/Spec/` | the handwritten semantics: executable, total, and independent of every consumer |
 | `lean/Ref/` | an independently written reference implementation, authored from the artifacts and sharing no definition with `lean/Spec/` |
 | `lean/Impl/` | the shipped endpoint's Lean side: the pure protocol core, whose `Conforms` instance is R3 and **undischarged**, and `Transport.lean` — the one module in this directory that is not proved (the socket boundary, `PLAN.md` §23.1) |
-| `lean/Shell/` | the shipped process: the recv/feed/write loop and the socket lifecycle over the proved core. It imports the boundary because it owns the `IO`, which is why it sits outside `lean/Impl/` — that directory's claim is about its own files |
+| `lean/Shell/` | the shipped process: the recv/feed/write loop and the socket lifecycle over the protocol core — whose conformance is stated and owed (R3), not proved. It imports the boundary because it owns the `IO`, which is why it sits outside `lean/Impl/` — that directory's claim is about its own files |
 | `lean/Harness/` | the runner: corpus replay, per-step verdicts, and the reason-class vocabulary the corpus schemas mirror |
 | `lean/Contracts/` | acceptance declarations: the exact propositions the specification claims |
 | `lean/Proofs/` | proofs of those declarations |

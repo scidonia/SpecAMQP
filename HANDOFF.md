@@ -529,7 +529,8 @@ they are one development rather than two.
 ```sh
 git log --oneline -1 -- lean/Impl lean/Shell
 cd lean && LAKE_NO_CACHE=1 lake build && lake exe amqp-endpoint --help
-shell bash tests/contracts/r1_transport_shell.sh    # R1's contract; R2 has none yet
+shell bash tests/contracts/r1_transport_shell.sh    # R1's contract
+shell bash tests/contracts/r2_endpoint_shell.sh   # R2's shell rung, forcing the short read and the looped write
 grep -n "second transcription" PLAN.md               # when the front end's fix is recorded
 ```
 
