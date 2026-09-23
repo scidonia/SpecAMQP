@@ -350,20 +350,38 @@ termination_by fuel _ _ => (fuel, 0)
 
 /-- A map: `size`, `count` constructed items, then the same size agreement a list
 requires. Part 1 requires an even number of items, so an odd count is malformed
-rather than a map with a dangling key. Pairs keep the order they arrived in. -/
+rather than a map with a dangling key. Pairs keep the order they arrived in.
+
+The parity of the count is decided **before** the items are read and before the
+declared size is compared, and the reason is the clause: "Map encodings MUST contain
+an even number of items" is a requirement on the map's own form, and the count field
+alone decides it, so a buffer that breaks both rules is the malformed map it is rather
+than a size contradiction — which is also how this reader's own array path orders its
+count-based refusal (`readArray` refuses a count above `arrayElementLimit` before it
+reads an element) and how the register reads the artifact's silence on precedence
+(`ledger/ambiguities/check-precedence-unspecified.json`: form checks before the size
+comparison). Until this order was adopted, a buffer with an odd count *and* an
+inconsistent size made this reader answer `sizeMismatch` where the specification
+answered `malformed`, which is a class divergence the differential's corpus did not
+reach; `Proofs.ValueLayerLaws` records it. The `pairUp` arm below is kept as a second
+line of defence rather than deleted, the same way `readElement`'s `unassigned` clause
+is. -/
 def readMap : Nat → Nat → Cursor → Result Value
   | 0, _, _ => .error (.truncated "no octets left")
   | fuel + 1, width, c => do
     let (size, c) ← takeBeU width c
     let start := c.pos                  -- the size counts what follows it
     let (count, c) ← takeBeU width c
-    let (items, c) ← readItems fuel count c
-    if c.pos - start != size then
-      .error (.sizeMismatch "map" size (c.pos - start))
-    else
-      match pairUp items with
-      | some pairs => return (.map pairs, c)
-      | none => .error (.malformed "a map must have an even number of items")
+    if count % 2 != 0 then
+      .error (.malformed "a map must have an even number of items")
+    else do
+      let (items, c) ← readItems fuel count c
+      if c.pos - start != size then
+        .error (.sizeMismatch "map" size (c.pos - start))
+      else
+        match pairUp items with
+        | some pairs => return (.map pairs, c)
+        | none => .error (.malformed "a map must have an even number of items")
 termination_by fuel _ _ => (fuel, 0)
 
 /-- Items taken two at a time, key then value: the pairing a map encoding

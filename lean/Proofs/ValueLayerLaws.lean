@@ -13,8 +13,10 @@ witnesses that are in the repository's own vocabulary, and the third is untested
 
 ## What is refuted, and what is not
 
-* **`ValueLayersAgree` is false**, and the divergence is a check-order difference inside the map
-  path. The specification reads a compound's `size` and `count` fields and asks whether the count
+* **`ValueLayersAgree` was false**, and the divergence was a check-order difference inside the map
+  path — a difference `Ref.Value.readMap` no longer has, because its parity guard now runs before the
+  items are read, so the two readers agree on every buffer in this module's battery. What remains
+  unprovable is the class comparison itself (see below), not the agreement. The specification reads a compound's `size` and `count` fields and asks whether the count
   is even *before* it reads the items; the reference reads the items, compares the declared size
   with what they measured, and asks about parity afterwards. Part 1 forbids an odd count outright
   ("Map encodings MUST contain an even number of items", `amqp-core-types-v1.0-os.xml`
@@ -72,9 +74,11 @@ open SpecAMQP.Harness (Octets)
 
 `map8` (`%xC1`), its size field `%x03`, its count field `%x01`, then one `null` (`%x40`).
 
-Two defects in one buffer, which is what makes the readers' check order observable: the count is
-odd, which Part 1 forbids, *and* the size field says three octets follow it while the count field
-and the one item measure two. -/
+Two defects in one buffer, which is what made the readers' check order observable: the count is odd,
+which Part 1 forbids, *and* the size field says three octets follow it while the count field and the
+one item measure two. When the two readers ranked those checks differently this buffer was the
+smallest witness of a class divergence (`sizeMismatch` against `malformed`); `Ref.Value.readMap` now
+decides parity first, as `Spec.Codec` always has, so the two answers below agree. -/
 def mapWitness : Octets := #[0xC1, 0x03, 0x01, 0x40]
 
 theorem mapWitness_size : mapWitness.size = 4 := by decide
@@ -85,16 +89,6 @@ Each lemma walks one decision of `Ref.readValue` (or of the map path beneath it)
 fact its caller supplies, which is how the repository's frame proofs walk a reader: the recursive
 definition is unfolded once, the branch that the concrete octets select is reduced, and the
 remaining work is the caller's hypotheses. -/
-
-theorem ref_readValue_null (fuel : Nat) (c c' : SpecAMQP.Ref.Cursor)
-    (h : SpecAMQP.Ref.takeU8 c = .ok (0x40, c')) :
-    SpecAMQP.Ref.readValue (fuel + 1) c = .ok (.null, c') := by
-  unfold SpecAMQP.Ref.readValue
-  try dsimp only []
-  rw [h]
-  try simp only [Bind.bind, Except.bind]
-  try dsimp only []
-  try (first | rfl | (split <;> first | rfl | simp_all))
 
 theorem ref_readValue_map (fuel : Nat) (c c' : SpecAMQP.Ref.Cursor)
     (h : SpecAMQP.Ref.takeU8 c = .ok (0xC1, c')) :
@@ -112,65 +106,45 @@ theorem ref_readItems_nil (fuel : Nat) (c : SpecAMQP.Ref.Cursor) :
   try dsimp only []
   try (first | rfl | (split <;> first | rfl | simp_all))
 
-theorem ref_readItems_cons (fuel count : Nat) (c c' c'' : SpecAMQP.Ref.Cursor)
-    (item : SpecAMQP.Ref.Value) (items : List SpecAMQP.Ref.Value)
-    (h : SpecAMQP.Ref.readValue fuel c = .ok (item, c'))
-    (hrest : SpecAMQP.Ref.readItems fuel count c' = .ok (items, c'')) :
-    SpecAMQP.Ref.readItems (fuel + 1) (count + 1) c = .ok (item :: items, c'') := by
-  unfold SpecAMQP.Ref.readItems
-  try dsimp only []
-  rw [h]
-  try simp only [Bind.bind, Except.bind]
-  try dsimp only []
-  rw [hrest]
-  try dsimp only []
-  try (first | rfl | (split <;> first | rfl | simp_all))
-
-/-- **The reference's map read up to its size comparison.** The items are read first, the declared
-size is compared with what they measured, and only then is the count's parity consulted. This is
-the step whose order differs from the specification's. -/
-theorem ref_readMap_sizeMismatch (fuel width : Nat) (c c₁ c₂ c₃ : SpecAMQP.Ref.Cursor)
-    (size count : Nat) (items : List SpecAMQP.Ref.Value)
+/-- **The reference's map read up to its parity guard.** The count field alone decides whether the
+items are read at all: an odd count is refused before `readItems` is reached and before the declared
+size is compared. This is the order the specification has always had, and the order this reader now
+shares with its own array path. -/
+theorem ref_readMap_odd (fuel width : Nat) (c c₁ c₂ : SpecAMQP.Ref.Cursor)
+    (size count : Nat)
     (h₁ : SpecAMQP.Ref.takeBeU width c = .ok (size, c₁))
     (h₂ : SpecAMQP.Ref.takeBeU width c₁ = .ok (count, c₂))
-    (h₃ : SpecAMQP.Ref.readItems fuel count c₂ = .ok (items, c₃))
-    (hne : (c₃.pos - c₁.pos != size) = true) :
+    (hodd : (count % 2 != 0) = true) :
     SpecAMQP.Ref.readMap (fuel + 1) width c =
-      .error (.sizeMismatch "map" size (c₃.pos - c₁.pos)) := by
+      .error (.malformed "a map must have an even number of items") := by
   unfold SpecAMQP.Ref.readMap
   try dsimp only []
   rw [h₁]
   try simp only [Bind.bind, Except.bind]
   try dsimp only []
   rw [h₂]
-  try simp only [Bind.bind, Except.bind]
   try dsimp only []
-  rw [h₃]
-  try simp only [Bind.bind, Except.bind]
-  try dsimp only []
-  rw [hne]
+  rw [hodd]
   try dsimp only []
   try (first | rfl | (split <;> first | rfl | simp_all))
 
-/-- **The reference's answer to the witness**: a `sizeMismatch` naming the declared `3` and the
-measured `2` — the count field's own octet plus the one item — and never a word about parity. -/
+/-- **The reference's answer to the witness, now the aligned one**: the parity refusal, the same
+class the specification names for the same buffer in `spec_mapWitness_decodeValue`. Before
+`Ref.Value.readMap`'s parity guard was moved ahead of the items read this theorem read
+`.error (.sizeMismatch "map" 3 2)`, and the two artefacts disagreed about the class. -/
 theorem ref_mapWitness_decode :
-    SpecAMQP.Ref.decode mapWitness = .error (.sizeMismatch "map" 3 2) := by
+    SpecAMQP.Ref.decode mapWitness = .error (.malformed "a map must have an even number of items") := by
   have hstep : SpecAMQP.Ref.readValue 4 { data := mapWitness, pos := 0 } =
       SpecAMQP.Ref.readMap 3 1 { data := mapWitness, pos := 1 } :=
     ref_readValue_map 3 _ _ (by decide)
-  have hrest : SpecAMQP.Ref.readMap 3 1 { data := mapWitness, pos := 1 } =
-      .error (.sizeMismatch "map" 3 2) :=
-    ref_readMap_sizeMismatch (fuel := 2) (width := 1)
+  have hmap : SpecAMQP.Ref.readMap 3 1 { data := mapWitness, pos := 1 } =
+      .error (.malformed "a map must have an even number of items") :=
+    ref_readMap_odd (fuel := 2) (width := 1)
       (c := { data := mapWitness, pos := 1 }) (c₁ := { data := mapWitness, pos := 2 })
-      (c₂ := { data := mapWitness, pos := 3 }) (c₃ := { data := mapWitness, pos := 4 })
-      (size := 3) (count := 1) (items := [.null])
-      (by decide) (by decide)
-      (ref_readItems_cons 1 0 _ _ _ .null [] (ref_readValue_null 0 _ _ (by decide))
-        (ref_readItems_nil 0 _))
-      (by decide)
+      (c₂ := { data := mapWitness, pos := 3 }) (size := 3) (count := 1)
+      (by decide) (by decide) (by decide)
   unfold SpecAMQP.Ref.decode
-  rw [mapWitness_size, hstep, hrest]
+  rw [mapWitness_size, hstep, hmap]
   try dsimp only []
   try (first | rfl | (split <;> first | rfl | simp_all))
 
