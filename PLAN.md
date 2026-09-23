@@ -879,6 +879,11 @@ produced.
 278 pre-existing verdicts changed** — the sweep added coverage without moving anything it touched. Twenty-one vectors are carried, and fifteen are staged as the next fix slice's opening evidence: **four divergences**
 and **eleven shared gaps**, where a shared gap is a clause neither artefact enforces, so no differential can see it and the corpus is the only instrument that can.
 
+**Six of those fifteen have since been promoted, which empties the divergence class.** Two moved at `61c0430` once the reference's field list gained `properties` and its count reader learned that a present-and-null `delivery-count` is not an integer, and the
+last four at `1a21b0a` once both artefacts read the transfer flags by value and the aborted delivery reached the credit spend — taking the corpus to **98 vectors / 383 step verdicts** with **no pre-existing verdict moved** and the refusals moving only where the
+new vectors refuse (`limit` 12→14, `malformed` 18→20). Nine remain staged, all of them shared gaps, so the corpus is still the only instrument that can see any of them. **What the nine are is classified two paragraphs below by disposition rather than by
+count**, because a count here moves every time a milestone lands and the classification does not.
+
 **And the sweep's own inference about two of those four divergences was wrong, in a way that earned a rule.** It staged the credit an aborted delivery spends as *undecided* — "the register is silent, which is why this is staged rather
 than decided" — and the register is indeed silent about it, because the reading does not live in the register. `flow-control.5` ("whenever the sender increases delivery-count, it MUST decrease link-credit by the same amount"),
 `flow-control.9` and `links.33` are each dispositioned **`formalized:SpecAMQP.Spec.Session.transferLink`**: the specification implements a reading, and the disposition names the declaration that carries it. **The register's silence does not make

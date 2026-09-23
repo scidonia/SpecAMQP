@@ -104,10 +104,10 @@ af7bb1f7da0bf50c65238f43394e42eb3d248ae7  vectors/constructor-disagreement.ndjso
 240d04abf05f593c59062c75e2ed16a2ac6185ed  vectors/flow.ndjson
 0f123312d720c0282d52ceb90467270f289dc6ed  vectors/frames-negative.ndjson
 860b8160aeeff3a1c8033f86292924a99e797a9c  vectors/frames.ndjson
-592d7a7ec6e2af590ec23c1cbcf7508c2fce4d0e  vectors/generated-exchanges.ndjson
+4ba242e5273244f9421c5dd48fd53c57df3fae89  vectors/generated-exchanges.ndjson
 8a192591a2dd0907664c3501963469af085e88ac  vectors/generated-frames.ndjson
 4a842a5f63cacefa036e922f31581432817c3228  vectors/generated.ndjson
-0cf6a529cde5e608dc6c7bbe3c4af763afd78f9a  vectors/isolation.md
+2a23e385efaf5e63f2598ea2e05e916d25dd0bbe  vectors/isolation.md
 2c6eb7f4cfd6e68184c967a121928251f346e669  vectors/message/deliveries.ndjson
 56025501f1567db480e31b5d76f8b00761951b75  vectors/message/generated.ndjson
 d488702b9362fdcd2b3e182af1b58627dd5a3f28  vectors/message/messages-negative.ndjson
