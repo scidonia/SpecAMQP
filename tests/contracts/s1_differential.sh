@@ -55,7 +55,8 @@ run() { # exe corpus outfile
 for corpus in "$worked" "$generated" "$disagreement"; do
   case "$corpus" in
     "$worked") name=worked ;;
-    *) name=generated ;;
+    "$generated") name=generated ;;
+    *) name=disagreement ;;
   esac
   run amqp-ref "$corpus" "$tmp/ref-$name.log"
   run amqp-spec "$corpus" "$tmp/spec-$name.log"
@@ -166,6 +167,24 @@ print(f"     {name}: {len(reference)} vectors, identical verdicts from both arte
 PYCMP
   note "$name: verdicts identical across both artefacts"
 done
+
+# The disagreement corpus is small and every vector in it expects a refusal: assert both
+# properties, so an emptied or expectation-less file cannot pass this gate vacuously.
+python3 - "$disagreement" <<'PYDIS' || exit 1
+import json, pathlib, sys
+lines = [json.loads(l) for l in pathlib.Path(sys.argv[1]).read_text().splitlines() if l.strip()]
+problems = []
+if len(lines) < 12:
+    problems.append(f"{len(lines)} vectors: the declared-versus-actual family is expected to carry at least 12")
+for v in lines:
+    if "expectError" not in v:
+        problems.append(f"{v.get('vector', v.get('id', '?'))}: no expectation, so a pass would mean nothing")
+for problem in problems:
+    print(f"  differential: {problem}")
+if problems:
+    raise SystemExit(1)
+print(f"     disagreement: {len(lines)} vectors, each carrying a refusal expectation")
+PYDIS
 
 # The comparison must have something to compare: rejections present in both runs,
 # and vectors that both artefacts accepted, in each corpus.
