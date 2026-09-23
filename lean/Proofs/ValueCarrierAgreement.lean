@@ -9,16 +9,16 @@ open Lean (Json)
 `FrameSendConformance.ValueCarrierAgree` is the value layer's claim in the corpus vocabulary: a
 value the reference's carrier reads is one the specification's also reads, and the two readings
 agree as values. This module is its proof, one clause at a time, and it is **in progress**: twenty-
-two of the twenty-five clauses are proved, in six families —
+three of the twenty-five clauses are proved, in six families —
 
 * the structured scalars `null`, `boolean`, `string`, `symbol`;
 * the octet payloads `binary`, `float`, `double`, `decimal32`, `decimal64`, `decimal128`, `uuid`;
 * the unsigned widths `ubyte`, `ushort`, `uint`, `ulong`;
 * the signed widths `byte`, `short`, `int`, `long`, and `timestamp`;
-* the compounds `list` and `described`, which take the claim one fuel down as a parameter;
+* the compounds `list`, `array` and `described`, which take the claim one fuel down as a parameter;
 
-and the remaining three are `array`, `map`, and `char` (whose blocker is the JSON accessor bridge
-named at the end of this header).
+and the remaining two are `map` and `char` (whose blocker is the JSON accessor bridge named at the
+end of this header).
 The route to each is named at the end of this header. What is *not* yet done is the join: the
 statement is at fuel 64 (`Ref.Vectors.valueOfJson 64 json = .ok other → ∃ body, …`), while every
 clause here is at `valueOfJson (fuel + 1)` with the discriminant as a hypothesis, so discharging it
@@ -907,5 +907,50 @@ theorem carrier_clause_described (fuel : Nat) (json : Json)
             rfl, by
             simp only [BodiesAgree]
             exact ⟨hagreeD, hagreeV⟩⟩
+
+/-- **The `"array"` clause.** The same constructor octet and the same items, read in the opposite
+order on the two sides; the item accord is the shared list lemma. -/
+theorem carrier_clause_array (fuel : Nat) (json : Json)
+    (hk : json.getObjValAs? String "type" = .ok "array") (other : SpecAMQP.Ref.Value)
+    (h : SpecAMQP.Ref.Vectors.valueOfJson (fuel + 1) json = .ok other)
+    (ih : ValueCarrierAgrees fuel) :
+    ∃ body : SpecAMQP.Spec.Codec.Value,
+      SpecAMQP.Spec.Codec.valueOfJson (fuel + 1) json = .ok body ∧ BodiesAgree body other := by
+  unfold SpecAMQP.Ref.Vectors.valueOfJson at h
+  unfold SpecAMQP.Spec.Codec.valueOfJson
+  simp only [Bind.bind, Except.bind] at h ⊢
+  simp only [hk] at h ⊢
+  cases hc : json.getObjValAs? String "constructor" with
+  | error err => simp [hc] at h
+  | ok hex =>
+    simp only [hc] at h ⊢
+    cases hx : SpecAMQP.Harness.ofHex hex with
+    | error err => simp [hx] at h
+    | ok ctor =>
+      simp only [hx] at h ⊢
+      cases hi : json.getObjValAs? (Array Json) "items" with
+      | error err => simp [hi] at h
+      | ok items =>
+        simp only [hi] at h ⊢
+        cases hm : items.toList.mapM (SpecAMQP.Ref.Vectors.valueOfJson fuel) with
+        | error err => simp [hm] at h
+        | ok values =>
+          simp only [hm] at h ⊢
+          cases hcl : ctor.toList with
+          | nil => simp only [hcl] at h ⊢; simp at h
+          | cons c rest =>
+            cases rest with
+            | nil =>
+              simp only [hcl] at h ⊢
+              injection h with hb
+              subst hb
+              obtain ⟨bodies, hbodies, hlist⟩ :=
+                mapM_valueOfJson_agrees fuel ih items.toList values hm
+              exact ⟨.array c bodies, by
+                simp only [hbodies]
+                rfl, by
+                simp only [BodiesAgree]
+                exact ⟨trivial, hlist⟩⟩
+            | cons c2 rest2 => simp only [hcl] at h ⊢; simp at h
 
 end SpecAMQP.Proofs
