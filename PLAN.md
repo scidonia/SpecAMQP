@@ -1476,46 +1476,6 @@ and `slice-open-channel-max-wrong-type`. A finding recorded next to the code it 
 whoever read the plan.
 
 
-## 23.2 The concurrent server: what is settled, what is proposed, and what must be proved
-
-Three things are called "concurrency" here and they need separating, because only the third is a design question.
-
-**Protocol concurrency is spec content already.** Sessions on channels, links on sessions, interleaved transfers: the specification's
-step is *per frame* and its `choose` is *set-valued*, so an interleaving of frames across channels **is** a sequence the relation admits.
-The corpus already drives multi-channel dialogues, and nothing new is needed to prove anything about it — it *is* the protocol.
-
-**Server concurrency — many connections — is where §23.1's existing decision applies.** `Std/Async/TCP` exists, and this plan refused it
-on trust grounds: it would credit "libuv's asynchronous machinery and Lean's async runtime, thousands of lines doing protocol-adjacent
-work with no name in our tree", where the chosen 236-line POSIX shim is small enough to name and **"keeps the endpoint's frame loop
-synchronous, which is the shape the core actually has"**. That last clause is the architecture: **one proved core per connection, sharing
-nothing.**
-
-**So the server is a dispatcher inside the unproved shell, and the concurrency lives there.** The proposed shape is deliberately boring:
-`accept` in a loop, and hand the socket to a fresh sequential endpoint. **Fork-per-connection is recommended over thread-per-connection**,
-because it makes the interleaving *host-level*: each process is a sequential endpoint of exactly the shape R3 relates to the specification,
-so there is no intra-program interleaving for a proof to reason about at all. Threads would need a pthread shim authored the way the socket
-shim was, under the same question of what gets credited, and would buy nothing the proofs can see.
-
-**What that leaves to prove: one theorem and one hypothesis, over the instance already in hand.**
-
-* **Per connection, R3** — the simulation the relation asks for. This is the rung under construction.
-* **Across connections, commutation** — two endpoints sharing no state commute, so any interleaving of their steps is equivalent to some
-  sequential composition of them. That is what makes "the server's behaviour projected onto connection *k* is spec-admitted" follow from the
-  per-connection instance, and it is a kernel fact about disjoint state. It is also *why* the share-nothing shape is the provable one: a
-  design sharing session or flow state across connections would owe a linearizability argument instead, in exactly the place where the state
-  is unproved.
-**And a fourth value-layer statement belongs on that list, flagged from the receive-direction reconnaissance**: `Proofs/CodecFrameLaws.lean` carries
-`ValueConsumption` — that a read of an encoded value followed by an arbitrary tail stops at the value's own last octet — with
-`round_trip_on_encoded_values_of_consumption` deriving the contract's round trip from it. It is **stronger than the contract's dependency and it is what
-the frame layer's `SIZE` accounting actually needs**, which is exactly the kind of obligation that goes unlisted until someone audits the acceptance side.
-
-* **The delivery contract, as a named hypothesis** — each connection's octets are delivered in order and only to its own core. That is the
-  shell's obligation rather than the core's, it is not provable here, and it is what R4's differential exists to observe. The fairness
-  obligations attached to the specification's `SHOULD`s already have a home in the conformance interface.
-
-**What is genuinely open** is the dispatcher's mechanism — fork or threads — and that sits inside the named unproved boundary, so it changes
-what the *shell* owes rather than what the *proofs* owe. That is the point of putting the concurrency there.
-
 ## 14. Repository layout
 
 ```
@@ -1999,3 +1959,76 @@ both are now visible to a maintainer reading the socket table rather than only t
 - **R4 — the wire differential**: the corpus replayed against the endpoint over a socket, compared per vector against `amqp-spec` with the same verdict-and-reason comparison the in-process differential uses.
 
 **What this track does not claim.** Not that the binary is verified — the compiler link above is trusted and disclosed. Not that the shell is proved; it is the named hole, and it is kept small enough to read. Not performance: the endpoint is a reference to compare against, and measurement belongs to TemperMint where it is scheduled. And not that the endpoint replaces the second reading in `lean/Ref/`: the differential between two independent readings of the standard is a check on *the specification*, and adding a third runner over the same corpus does not make it redundant.
+
+### 23.2 The concurrent server: what is settled, what is proposed, and what must be proved
+
+Three things are called "concurrency" here and they need separating, because only the third is a design question.
+
+**Protocol concurrency is spec content already.** Sessions on channels, links on sessions, interleaved transfers: the specification's
+step is *per frame* and its `choose` is *set-valued*, so an interleaving of frames across channels **is** a sequence the relation admits.
+The corpus already drives multi-channel dialogues, and nothing new is needed to prove anything about it — it *is* the protocol.
+
+**Server concurrency — many connections — is where §23.1's existing decision applies.** `Std/Async/TCP` exists, and this plan refused it
+on trust grounds: it would credit "libuv's asynchronous machinery and Lean's async runtime, thousands of lines doing protocol-adjacent
+work with no name in our tree", where the chosen 236-line POSIX shim is small enough to name and **"keeps the endpoint's frame loop
+synchronous, which is the shape the core actually has"**. That last clause is the architecture: **one proved core per connection, sharing
+nothing.**
+
+**So the server is a dispatcher inside the unproved shell, and the concurrency lives there.** The proposed shape is deliberately boring:
+`accept` in a loop, and hand the socket to a fresh sequential endpoint. **Fork-per-connection is recommended over thread-per-connection**,
+because it makes the interleaving *host-level*: each process is a sequential endpoint of exactly the shape R3 relates to the specification,
+so there is no intra-program interleaving for a proof to reason about at all. Threads would need a pthread shim authored the way the socket
+shim was, under the same question of what gets credited, and would buy nothing the proofs can see.
+
+**What that leaves to prove: one theorem and one hypothesis, over the instance already in hand.**
+
+* **Per connection, R3** — the simulation the relation asks for. This is the rung under construction.
+* **Across connections, commutation** — two endpoints sharing no state commute, so any interleaving of their steps is equivalent to some
+  sequential composition of them. That is what makes "the server's behaviour projected onto connection *k* is spec-admitted" follow from the
+  per-connection instance, and it is a kernel fact about disjoint state. It is also *why* the share-nothing shape is the provable one: a
+  design sharing session or flow state across connections would owe a linearizability argument instead, in exactly the place where the state
+  is unproved.
+**And a fourth value-layer statement belongs on that list, flagged from the receive-direction reconnaissance**: `Proofs/CodecFrameLaws.lean` carries
+`ValueConsumption` — that a read of an encoded value followed by an arbitrary tail stops at the value's own last octet — with
+`round_trip_on_encoded_values_of_consumption` deriving the contract's round trip from it. It is **stronger than the contract's dependency and it is what
+the frame layer's `SIZE` accounting actually needs**, which is exactly the kind of obligation that goes unlisted until someone audits the acceptance side.
+
+* **The delivery contract, as a named hypothesis** — each connection's octets are delivered in order and only to its own core. That is the
+  shell's obligation rather than the core's, it is not provable here, and it is what R4's differential exists to observe. The fairness
+  obligations attached to the specification's `SHOULD`s already have a home in the conformance interface.
+
+**What is genuinely open** is the dispatcher's mechanism — fork or threads — and that sits inside the named unproved boundary, so it changes
+what the *shell* owes rather than what the *proofs* owe. That is the point of putting the concurrency there.
+
+### 23.3 The server's remaining obligations: what is a gap and what is the standard's boundary
+
+§23.2 settles how a server *runs* — one proved core per connection, the dispatcher inside the unproved shell. This is the other axis: what a server must *do* that the
+specification does not yet state or enforce. **Counts are deliberately absent and each category points at the record that carries them**, because those records move and this
+section would then be asserting a number that had gone stale.
+
+**1. Terminus behaviour is the standard's own boundary, not a gap in this work.** `source`/`target` semantics, routing, queues, filters, `dynamic` and `node-properties` are
+declared `out-of-scope: node-and-filter-behaviour` and `out-of-scope: container-node-topology` in the dispositions, and §3's non-goal says the same in prose: *AMQP core defines
+links and termini, not what a destination does with a message.* A specification that added routing would be specifying something else. A server implementer brings this from
+elsewhere, and that is the standard's division rather than an omission here.
+
+**2. The model's restrictions, which a server meets on its first day.** §13's D4 record keeps `MODEL RESTRICTION: the S4 slice contains at most one link per session` and
+classifies the clauses it touches as fully modelled, vacuous under the restriction, or deferred until a registry exists, with four named triggers that would widen it. What a
+server feels through it: **one delivery in progress, no link identity, no unsettled map, and no reattach or resume** — so **resumption, which is how a server survives a client
+reconnecting, is not modelled at all**, nor are interleaved deliveries on distinct links (`ledger/ambiguities/interleaved-deliveries-absorbed.json`) nor duplicate link names at
+one node (`ledger/ambiguities/link-uniqueness-vacuous.json`). *Multiple sessions per connection are modelled*: the connection maps incoming frames to sessions by channel. This
+is the largest thing a server needs and does not have, and it is a recorded decision with named widening triggers rather than an oversight.
+
+**3. Obligations the standard places on any peer that the model does not yet enforce.** The ledger's `deferred:` dispositions are the coverage record, concentrated in S5 (the
+message layer — sections, annotations, outcomes), then S4, S3-session, S6 (transactions) and S7-SASL. **The live and named list, for an implementer, is the staged corpus:**
+`scripts/staged-exchange-divergences.ndjson`, written by `scripts/gen-exchange-vectors.py --staged`, is where a clause obligation an artefact does not meet is recorded
+together with the register's reading of it, and `vectors/isolation.md` says what each vector's experiment witnessed. Read those two files rather than a summary of them, this
+one included.
+
+**4. Time, which the model does not have.** `open.idle-time-out` is the one Part 2 obligation whose subject is a clock, and it is treated as `environment:
+implementation-idle-policy` rather than as a rule: the conformance interface carries an opaque `tick` input (`lean/Contracts/Conformance.lean`) and **nothing in the semantics
+consumes it**. A server is the peer that must actually drop a silent connection, so this is the first gap a server implementer meets — and unlike category 2 it is not a decision
+awaiting a trigger, it is the boundary of what a step relation over frames can state.
+
+**5. Host-level assumptions a server leans on harder than a client.** `environment: server-hostname-default`, the TLS and SNI boundary entries, `tcp-ordered-stream` and
+`tcp-close-order`: assumptions about the host, recorded as assumptions, and the ones a listener depends on most. They sit in the ledger beside the clause they qualify, which is
+where an implementer should look rather than here.
