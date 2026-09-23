@@ -186,12 +186,24 @@ def pump (conn : Conn) (core : State) (app : App)
       live := keepGoing
   return core
 
+/-- **The layer a protocol header names.** The header *is* the decision: `announcedHeader` builds it from
+the layer this peer offers, and the connection starts in the layer that same header names, so announcing
+one layer and speaking the other is not a state this shell can reach. The protocol id is the field the
+layout draws at index 4 — `magic` is four octets — and anything that is not SASL's is read as AMQP, which
+is the conservative default rather than a third layer this peer does not speak. -/
+def layerOfHeader (header : Octets) : SpecAMQP.Spec.Connection.Layer :=
+  if header[4]? == some (SpecAMQP.Spec.Connection.octet
+      (SpecAMQP.Spec.Connection.Layer.protocolId SpecAMQP.Spec.Connection.Layer.sasl).code)
+  then .sasl else .amqp
+
 /-- **Run one connection from the application's opening move to the end**: the announced header first
 (the shell's only protocol act of its own, and the one §23.1 calls "a fixed header"), then the loop, then
 the socket's close. -/
 def runConnection (conn : Conn) (header : Octets) (app : App)
     (readOctets : USize := defaultReadOctets) : IO State := do
-  let core : State := { conn := SpecAMQP.Spec.Connection.Endpoint.initial, inbox := #[] }
+  let core : State :=
+    { conn := { SpecAMQP.Spec.Connection.Endpoint.initial with layer := layerOfHeader header },
+      inbox := #[] }
   match SpecAMQP.Impl.Core.submit core header with
   | .error message =>
     throw (IO.userError s!"this peer cannot announce its own header: {message}")
@@ -232,15 +244,16 @@ def dial (port : UInt16) (header : Octets) (app : App)
     conn.close
     throw e
 
-/-- The fixed header this peer announces, or a loud failure: the artifact stating no version for the AMQP
-layer is a defect in the tables this repository generates from, and it would leave the endpoint with
-nothing to send. -/
-def announcedHeader : IO Octets :=
-  match SpecAMQP.Impl.Core.announceHeader with
+/-- The fixed header a peer announces for a layer, or a loud failure: the artifact stating no version for
+that layer is a defect in the tables this repository generates from, and it would leave the endpoint with
+nothing to send. The layer defaults to AMQP, so a caller that offers only the AMQP layer says nothing. -/
+def announcedHeader (layer : SpecAMQP.Spec.Connection.Layer := .amqp) : IO Octets :=
+  match SpecAMQP.Impl.Core.announceHeaderFor layer with
   | some header => pure header
   | none =>
     throw (IO.userError
-      "the artifact states no version for the AMQP layer, so this peer has no header to announce")
+      s!"the artifact states no version for the {layer.name} layer, so this peer has no header to \
+announce")
 
 /-! ## Reading a command line
 
