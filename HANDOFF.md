@@ -538,14 +538,19 @@ git log --oneline -1 -- lean/Impl     # R2's core, committed
 ls lean/Impl
 ```
 
-**R3 — the conformance theorem: not started, and its declaration is not written either.** That is the
-planner's next pen: the repository's order is statement, then proof, then acceptance, and R3 has no
-`Contracts/` module and no relation stated beyond §1's plumbing. What exists: `lean/Impl/Core.lean:311`
+**R3 — the conformance theorem: not started, and its declaration is not written either.** The statement is frozen in
+`Contracts/EndpointConformance.lean` and the proof is what remains, so the "not started" this entry carried all
+session now applies to the proof alone. What exists: `lean/Impl/Core.lean:311`
 already defines `specCore : Endpoint State`, so the specification's side of the interface is wrapped by the
 implementation's own module; `Contracts/Conformance.lean` supplies `ConformsVia` and the `Endpoint`
-structure every other instance uses. What is missing: the implementation's `Endpoint` (the module exports
-its step; nothing wraps it as an `Endpoint` yet) and the relation, which §1's plumbing describes as
-`i.conn = s`. Naming those two is the declaration; the proof is R3. Its content is narrower than its name —
+structure every other instance uses. Both sides exist and are named: `Impl.Core.implCore` — renamed from
+`specCore` by `075061f`, which is what the earlier reading of this entry got wrong, since the wrapper was there
+and the *name* was the misleading part — and `Proofs.specConn`. The relation is `i.conn = s`, which needs no
+inbox clause because `step` neither reads nor writes `State.inbox`. **The statement is now frozen**:
+`Contracts/EndpointConformance.lean` declares `EndpointConforms` over exactly those three names, with no proof
+attached, which is the repository's order — statement, then proof, then acceptance. What remains is the proof,
+and its prerequisites are the value layer's agreement and, for the stream corollary rather than the unit
+instance, the `ValuePrefixDetermined` residual in `Proofs/CoreLaws.lean`. Its content is narrower than its name —
 it is the plumbing — and its prerequisites are the value layer's hypotheses (§2) and the layer proofs it
 reuses, which is why the value layer's agreement is the rung everything above it waits on.
 
