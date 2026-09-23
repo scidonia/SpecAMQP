@@ -405,8 +405,9 @@ coincidence of authorship that no verdict could show.
 **What each instance loses, and when — the discharge map, stated where someone looking for it will find it.**
 `frame_conformance_public (valueAgreement : ValueLayersAgree)` loses its hypothesis when the **wire-reading** development is proved, which
 is the receive-direction agreement this section describes. `frame_send_conformance_public (carriers : ValueCarrierAgree)
-(writers : ValueWriterAgree)` loses them **one at a time**: `carriers` once `map` and the join's step lemma land, `writers` once the writer
-law is proved over `CarrierReachable`. The connection instance's `ReadersAgree` follows the receive direction, and `EndpointConforms` (R3)
+(writers : ValueWriterAgree)` loses them **one at a time**: **`carriers` is discharged** — `valueCarrierAgree_all` supplies it, the theorem no
+longer takes it as a parameter, and the statement did not move to meet the proof — and `writers` remains, once
+the writer law is proved over `CarrierReachable`. The connection instance's `ReadersAgree` follows the receive direction, and `EndpointConforms` (R3)
 sits above all of them.
 
 **And `ValueWriterAgree`'s domain restriction is load-bearing — it must not be strengthened back.** Its unrestricted form was *refuted* at
@@ -1120,6 +1121,11 @@ shim was, under the same question of what gets credited, and would buy nothing t
   per-connection instance, and it is a kernel fact about disjoint state. It is also *why* the share-nothing shape is the provable one: a
   design sharing session or flow state across connections would owe a linearizability argument instead, in exactly the place where the state
   is unproved.
+**And a fourth value-layer statement belongs on that list, flagged from the receive-direction reconnaissance**: `Proofs/CodecFrameLaws.lean` carries
+`ValueConsumption` — that a read of an encoded value followed by an arbitrary tail stops at the value's own last octet — with
+`round_trip_on_encoded_values_of_consumption` deriving the contract's round trip from it. It is **stronger than the contract's dependency and it is what
+the frame layer's `SIZE` accounting actually needs**, which is exactly the kind of obligation that goes unlisted until someone audits the acceptance side.
+
 * **The delivery contract, as a named hypothesis** — each connection's octets are delivered in order and only to its own core. That is the
   shell's obligation rather than the core's, it is not provable here, and it is what R4's differential exists to observe. The fairness
   obligations attached to the specification's `SHOULD`s already have a home in the conformance interface.
