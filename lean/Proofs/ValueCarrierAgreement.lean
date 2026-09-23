@@ -17,8 +17,8 @@ three of the twenty-five clauses are proved, in six families —
 * the signed widths `byte`, `short`, `int`, `long`, and `timestamp`;
 * the compounds `list`, `array` and `described`, which take the claim one fuel down as a parameter;
 
-and the remaining two are `map` and `char` (whose blocker is the JSON accessor bridge named at the
-end of this header).
+and the remaining two are `map` and `char`, each blocked on a JSON-layer bridge named at the end of
+this header rather than on any AMQP content.
 The route to each is named at the end of this header. What is *not* yet done is the join: the
 statement is at fuel 64 (`Ref.Vectors.valueOfJson 64 json = .ok other → ∃ body, …`), while every
 clause here is at `valueOfJson (fuel + 1)` with the discriminant as a hypothesis, so discharging it
@@ -147,9 +147,17 @@ numerically in the other — and a closer that depends on the spelling is a clos
   also worth the planner's eye as a *fact about the two artefacts*: the specification accepts a
   code point written as a JSON natural, the reference as a JSON integer, and the corpus writes
   them as naturals, which is why no differential sees the difference.
-* **The four compounds** — `list`, `map`, `array`, `described` — where the recursion's fuel and the
-  item reads are the work, and where `BodiesAgree` recurses (`BodiesAgreeList`, `BodiesAgreePairs`,
-  and the constructor pair for `array`).
+* **`map`** — blocked on the JSON layer, for a *different* reason than `char`: the specification
+  reads the pairs array as `getObjValAs? (Array (Array Json)) "pairs"` while the reference reads it
+  as `getObjValAs? (Array Json) "pairs"` and then `getArr?` on each element. The two readings agree
+  (the nested instance is the element instance under the array one), but relating them is JSON-layer
+  plumbing of the same species as `char`'s bridge, over a `mapM` of `getArr?`. What `map` needs
+  beyond that is only the pair-level analogue of `mapM_valueOfJson_agrees`, with `BodiesAgreePairs`
+  as the obligation — no AMQP content is missing.
+
+  So the last two clauses are *both* blocked on the JSON layer and neither on the standard: of the
+  twenty-five, twenty-three are proved, and the two that remain wait on the layer beneath the corpus
+  vocabulary rather than on anything the corpus is about.
 * **Then the joint development**: prefix determinism and fuel monotonicity, which is what lets
   the clause lemmas be joined into one `valueOfJson` agreement over all buffers rather than
   re-derived per `Json`. `ValueLayersAgree` (`Proofs/ValueLayerLaws`) needs the same treatment on
