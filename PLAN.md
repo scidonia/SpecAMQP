@@ -982,6 +982,29 @@ Acceptance: the SASL state machine proved; mechanism negotiation exercised; PLAI
 ### H1 — handoff
 
 Produce `HANDOFF.md`: the frozen interface, the ledger and coverage report, the vector corpus, the executable driver's invocation, and the requirements this specification places on implementation tooling (§23). No implementation work.
+**R4 v1: the wire differential exists, discriminates, and its first run measured a design boundary.** `scripts/run-endpoint-wire-differential.sh`
+plus `scripts/endpoint/wire_peer.py` replay a corpus over a socket against the *shipped* endpoint, compute a per-step socket verdict from the
+peer's byte report and the endpoint's narration, and compare it per step against `amqp-spec`'s in-process verdict and reason class. Six
+vectors of `vectors/slice.ndjson`: **0 agree, 6 diverge** — and the divergence is *one* fact, not six. The endpoint reaches `HDR_EXCH` (its
+header matched byte-for-byte and the peer's was accepted) and then **sits there**: it never attempts the malformed `open` the vector requires
+it to refuse, because **it has no application**. In process the same step passes, since the harness attempts the send and the core refuses it.
+That is the **app-seam gap**, and it is a boundary rather than a defect: the shipped binary is a driver over `Impl.Core.step`, and the one
+application in the tree — `scripts/endpoint/EndpointProbe/Client.lean` — is itself a harness. Closing it means building the endpoint-side
+counterpart of the peer: a corpus-driven application that emits the bytes a `send` step describes, beside the probe under `scripts/endpoint/`
+and registered as a second executable, with the one-line `lakefile.lean` addition taken as a declared window in the endpoint author's tree.
+
+**Its five in-flight harness defects are instances of rules this plan already carries**, which is the useful part. A comparison keyed on bare
+vector ids where the verdicts are per *step* would have found **none** — vacuous, with its silence reading as agreement: the same bug that hid
+a family of class divergence in `s1_differential.sh` for the whole of one session, found this time *before* the comparison was trusted. A
+namespace mismatch (`connection:HDR_SENT` against `HDR_SENT`). The shell's header arriving as a preamble where a vector expects it
+mid-dialogue. A harness bug that made **every** refusal vector diverge "for a reason that was ours" — the subject rule, one level down. And a
+start function called in a subshell, losing the port it took and its descriptor on the readiness FIFO — the cleanup rule, which had already
+cost two other agents a plant each today.
+
+**And R4 has already earned its rung.** Two SASL vectors expect the endpoint to write `414d515000010000` and it writes something else —
+either the shell's SASL header choice or the vector, which is authored from the clauses. One of them is wrong, and the differential found
+where they disagree while still incomplete.
+
 
 ## 23.2 The concurrent server: what is settled, what is proposed, and what must be proved
 
