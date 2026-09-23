@@ -1601,6 +1601,12 @@ fails the step. A pin that read the committed ledger would have been holding a f
 read the generator rather than its output, it should**, because the output is precisely what the change is allowed to move: this is the same rule as the generator-fidelity gates, arriving from the other
 direction — one says the output must equal what the generator produces, the other says the check must look at the generator when the output is legitimately changing under it.
 
+**And a control has to vary the mechanism, not a proxy for it.** The assignment that fixed the wire comparator named `SPECAMQP_WIRE_READ_OCTETS` as the way to vary the coalescing condition; the
+slice measured it and found **identical verdicts at 8 and 4096**, because the read size is what the *client* asks for while the coalescing that matters happens in the *peer's* writes — the control is
+the peer's own `SPECAMQP_WIRE_COALESCE=1`. **A control chosen by reasoning about a name rather than by measuring the mechanism is a second guess wearing the shape of a check**, and it was the
+pre-fix runs that made the mechanism visible: at `read-octets=8` the refused challenge was attempted five times, at 4096 twice, and with the peer's steps 2 and 3 in one `sendall` the refusals land
+after the second `took HDR_EXCH` rather than before it. That is the flap the review predicted, measured rather than argued — and the same runs are what refuted the control I had endorsed.
+
 ## 17. Verification gates and their negative controls
 
 | Gate | Mechanism | Negative control |
@@ -1741,6 +1747,12 @@ The chain is therefore three links, and only the middle one is trusted:
 1. **The protocol core conforms to the specification — R3's obligation, not yet discharged.** `lean/Impl/` holds a pure endpoint: octets and events in, octets and events out, no `IO`. Its conformance to `Spec` is to be a `Conforms` instance of §10 with the relation `i.conn = s`, discharged in `lean/Proofs/`; `Core.specCore` exists with an empty `choose` and **no `Conforms` theorem about it does**. This link was written in the present tense before R2 landed and a review caught it, which is why it now names the rung instead of the fact — the chain is what the track *establishes*, and two of its three links are still owed.
 2. **The compiled binary refines the source — trusted, and disclosed.** Lean's compiler and runtime are not verified. This link is named in `HANDOFF.md` and in the trust gate's inventory the way `native_decide` is named, because a claim that a proof about Lean source is a claim about a binary is exactly the kind of assumption this repository discloses rather than implies.
 3. **The binary behaves as the corpus says — R4's obligation, not yet discharged.** The vectors already run against `amqp-spec` and `amqp-ref` through a runner interface that was frozen to be implementation-agnostic; the endpoint **is now the third runner** over the same corpus, at the wire rather than in process: `scripts/run-endpoint-wire-differential.sh` drives the shipped binary over a socket and compares it per vector against `amqp-spec`. **Nor do the shell's three unproved obligations rest on analogous evidence any longer** — `scripts/run-endpoint-shell.sh` drives the shipped `amqp-endpoint` over a real socket and *forces* all three, with `tests/contracts/r2_endpoint_shell.sh` as the gate over it: the read sizes are pinned at 3 and 5 octets so the eight-octet header cannot arrive in one read, the write loop is made to iterate under a 1024-octet send cap, and the orderly close is asserted from the server's own line. What this link still owes is not execution of the shipped loops but the corpus's verdicts — the differential currently reports two agreements and four divergences, each named by its step, with one divergence still unattributed — and R4's obligation is discharged when those are settled rather than when a runner exists.
+
+**Two corpus divergences are attributed in the run's own output now, and both are described as what they are.** The first is a seam property: two consecutive `send` steps played from one state have
+nothing to prompt the second, because the shell asks the application after each *unit* the peer's octets complete and no unit arrives between them — so the divergence line says so, naming
+`Shell.Driver.serveUnits` and labelling it "a known seam limitation, not the endpoint's answer". The second is a *design* decision rather than a defect: a vector whose pre-state is `START` is
+unreachable because the shell announces the header itself, and unblocking it would mean letting the application announce the header. **Neither is something the slice that found it should repair**, and
+both are now visible to a maintainer reading the socket table rather than only to one reading the history.
 
 **Rungs**, each landable and each verified on its own:
 
