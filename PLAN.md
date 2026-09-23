@@ -156,6 +156,18 @@ verified in *both* directions — a one-character change to a live citation fail
 a resolution check that cannot fail protects nothing, and this one was proved to fail before it was believed. The reason it matters is the reason the ledger exists at all: an
 `underspecified:` value is an *exemption*, and an exemption whose entry does not exist is invisible, which is how two pictures rode for months on a declaration that was never created.
 
+**The backlog is empty, and it emptied by kind rather than by exhaustion.** Every MUST and MUST NOT clause in the vendored artifacts now carries a disposition:
+`undispositioned must-class: 0` at **452 dispositions across 17 files**, with the ledger's own gate green and the full suite at **18 of 19 contracts passing in 201 seconds** — the single failure
+being a manifest entry behind a generated coverage file, a record catching up rather than a gate failing. The last batch landed with a **four-plant mutation control**: a stale digest, a clause that
+does not exist, a renamed declaration and a renamed vector each exit 1 with the diagnostic naming the offending file, while the pristine files in the same copy report zero problems. That control is
+what makes the zero readable: a coverage figure counts what was written down, and the undispositioned count is the one that can only reach zero by the whole corpus being decided.
+
+**The ways it emptied are worth more than the number.** Two collisions were caused by assignments and claims phrased as counts rather than anchors, both recorded in §16; a cross-audit found the same
+range-endpoint defect in the auditor's *own* files as in the ones it was auditing; a duplicate pair was settled by the loader in its first second, naming all 25 collisions, after a message exchange had
+already spent two agents' attention on it; and the register's last three live sites were decided only once the dispositions naming them made them visible, which is what turned an exemption nobody
+could see into three entries with rejected readings beside them. Every one of those is the same lesson from a different direction — **the anchors are stable and the order is not, and the artefact
+that reads the whole tree is the only one that knows how many things there are.**
+
 ## 7. Generated definition tables
 
 `scripts/gen-oasis-lean.py` reads the pinned bytes and emits `lean/Generated/Oasis/`, one module per declaration kind:
