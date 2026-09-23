@@ -497,10 +497,27 @@ carries the measured figures with the command that re-measures them and the READ
 its own, which is the repair for every drift found today: state it once, and measure it
 (`wc -l scripts/transport_shim.c`; `grep -c "^\s*\(//\|\*\|/\*\)" scripts/transport_shim.c`).
 
-**R2 — the endpoint core: being written, uncommitted.** `lean/Impl/Core.lean` exists in the
-working tree and is not committed, with `lean/Impl/Stream.lean` to follow; the core is a driver
-over `Spec.Connection.step` with a pure, total byte-stream front end, and the session layer is
-outside its scope, inherited through the connection layer's relay arm as a stated non-claim.
+**R2 — the endpoint core: landed, review returned findings, not accepted.** `22f1228` adds
+`lean/Impl/Core.lean` (384 lines), `lean/Impl/Stream.lean` (541), `lean/Proofs/CoreLaws.lean` (183)
+and the new `lean/Shell/` tree — `Driver.lean` (238, the recv/feed/write loop and the three
+obligations it states as unproved), `Main.lean` (116) and an `amqp-endpoint` executable. The core is
+a *driver* over `Spec.Connection.step` rather than a state machine, so R3's relation will be
+`i.conn = s` and what it proves is the plumbing; the shell sits outside `lean/Impl/` because the
+boundary's import constraint is what makes that directory's claim true, and the trust gate checks
+that half. An independent review returned **`changes_requested`** with four findings: the front
+end's extent computation is a **second transcription** of the frame reader's progress decision rather
+than a function of it; `readFrame`'s suffix-independence — the property that makes splitting a stream
+invisible — is **unproved**, so no present-tense claim about arbitrary fragmentation is available;
+**no committed test executes the shipped shell's loops** (R1's contract exercises a different
+implementation); and two documents claimed the core's `Conforms` instance and the corpus's endpoint
+runner as existing, which they are not — that one was mine and is corrected.
+
+```sh
+git log --oneline -1 -- lean/Impl lean/Shell
+cd lean && LAKE_NO_CACHE=1 lake build && lake exe amqp-endpoint --help
+shell bash tests/contracts/r1_transport_shell.sh    # R1's contract; R2 has none yet
+grep -n "second transcription" PLAN.md               # when the front end's fix is recorded
+```
 
 ```sh
 git status --porcelain lean/Impl      # ?? lean/Impl/Core.lean
