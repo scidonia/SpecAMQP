@@ -966,6 +966,15 @@ readiness, and a **dead server was carried into the case**. One port collision t
 failures, and the first attempt at diagnosing the collision could not see the collision for them. Readiness is the server's own
 announcement now, and an attempt that does not produce it reports the line it got instead.
 
+**Its two follow-on instances, one of which is a different species.** Found in the same harness while the first was being fixed:
+the scan helper launched `amqp-endpoint` as *every* case's server, when the short-write case's server must be the probe — the side
+that declares limits large enough for the frame — so a refactor **silently replaced the case's subject**, and the run still passed
+case 1 and failed case 2 for a reason that had nothing to do with the shell. That is the neighbouring defect, and it needs its own
+sentence: **a case's subject is as much of a claim as its expectation, and a helper's default can move it without touching a single
+assertion.** Pin what the subject *is*, not only what it does. The third instance is this rule in miniature — the probe printed its
+readiness line *before* binding, so a line existing before the port did lets a collision be read as readiness — and that it was found
+by looking for the first instance is the argument for writing rules down rather than remembering them.
+
 The general form is what earns this a place beside the other rules here: **a check that accepts *something* where it means *this
 thing* converts one real failure into several misleading ones.** That is worse than accepting nothing, because the failure is still
 there and the report now points at a dozen places it is not — and it is the same family as the gates whose scope was a list rather
