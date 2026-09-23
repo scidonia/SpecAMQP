@@ -4946,4 +4946,169 @@ theorem readCompound_map_body (F : Nat) (ih : WireAgreesUpTo (F - 2)) (decl : En
                 simp only [except_pure_ok] at hr
                 exact absurd hr (by simp)
 
+/-! ## The four compound and map arms
+
+The four arms that read a compound or a map are the first of the recursive arms, and they are the
+ones the two loop relations already close: every one of them resolves the specification's
+classification and table row with two `decide`-checked facts, hands *both* cursors to the body lemma
+at the value-level fuel, and then rewrites the body's two readers back into the arms the octets
+selected. What the arm adds to the body is nothing but that resolution — the body is already the
+`StepAgreesAt` relation the arm needs, so the arm is the body's two conjuncts with the readers
+rewritten.
+
+The fuel the body wants is the arm's fuel *less two*: a compound's header is two size fields, and it
+is those octets that put the item loops a level below the caller (`two_le_fuel_of_header` is what says
+so from the body's own hypotheses). A caller therefore hands the arm `WireAgreesUpTo (fuel - 2)`
+rather than the invariant itself, which is what the fuel induction's monotonicity supplies.
+
+The empty map is worth naming here rather than in the map body: `0xC1` with a zero count is a
+*success* on both sides and answers `map []`, while a zero count with the `list` owner answers
+`list []` — the owner is what the row's own field decides, and both arms carry it into the body. -/
+
+/-- **The `list8` row (`0xC0`).** The specification's `readValue` dispatches on the octet's
+classification and then on the declared table, and the row this octet resolves is a one-octet `list`;
+the reference matches the octet and reads at width one. Both hand their cursors to their own compound
+reader one fuel down, which is what `readCompound_list_body` relates. -/
+theorem arm_0xC0 (fuel : Nat) (ih : WireAgreesUpTo (fuel - 2)) (c : SpecAMQP.Spec.Codec.Cursor)
+    (c' : SpecAMQP.Ref.Cursor) (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor)
+    (hd : CursorAgrees d d') (hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0xC0, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0xC0, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hdata : d.data = c.data := spec_takeU8_data hs
+  have hclass : SpecAMQP.Spec.Value.classify (0xC0 : UInt8).toNat = .compound 1 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0xC0 : UInt8) =
+      .ok ⟨192, some "list8", SpecAMQP.Generated.Oasis.Category.compound, 1, "list",
+        "up to 2^8 - 1 list elements with total size less than 2^8 octets"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.readCompound fuel ⟨192, some "list8",
+        SpecAMQP.Generated.Oasis.Category.compound, 1, "list",
+        "up to 2^8 - 1 list elements with total size less than 2^8 octets"⟩ d := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' = SpecAMQP.Ref.readCompound fuel 1 d' := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  obtain ⟨hok, herr⟩ := readCompound_list_body fuel ih ⟨192, some "list8",
+    SpecAMQP.Generated.Oasis.Category.compound, 1, "list",
+    "up to 2^8 - 1 list elements with total size less than 2^8 octets"⟩ (by decide) rfl hd hb
+  constructor
+  · intro other c₂' h
+    rw [hR] at h
+    obtain ⟨body, c₂, hf, hba, hcd, hdat⟩ := hok other c₂' h
+    exact ⟨body, c₂, by rw [hS]; exact hf, hcd, by rw [hdat, hdata], hba⟩
+  · intro failure h
+    rw [hR] at h
+    obtain ⟨refusal, hf, hcl⟩ := herr failure h
+    exact ⟨refusal, by rw [hS]; exact hf, hcl⟩
+
+/-- **The `map8` row (`0xC1`).** The same shape at the map owner: the table's row is a `map`, the
+reference's octet selects its own map reader, and the pairing the map's value is belongs to the body. -/
+theorem arm_0xC1 (fuel : Nat) (ih : WireAgreesUpTo (fuel - 2)) (c : SpecAMQP.Spec.Codec.Cursor)
+    (c' : SpecAMQP.Ref.Cursor) (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor)
+    (hd : CursorAgrees d d') (hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0xC1, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0xC1, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hdata : d.data = c.data := spec_takeU8_data hs
+  have hclass : SpecAMQP.Spec.Value.classify (0xC1 : UInt8).toNat = .compound 1 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0xC1 : UInt8) =
+      .ok ⟨193, some "map8", SpecAMQP.Generated.Oasis.Category.compound, 1, "map",
+        "up to 2^8 - 1 octets of encoded map data"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.readCompound fuel ⟨193, some "map8",
+        SpecAMQP.Generated.Oasis.Category.compound, 1, "map",
+        "up to 2^8 - 1 octets of encoded map data"⟩ d := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' = SpecAMQP.Ref.readMap fuel 1 d' := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  obtain ⟨hok, herr⟩ := readCompound_map_body fuel ih ⟨193, some "map8",
+    SpecAMQP.Generated.Oasis.Category.compound, 1, "map",
+    "up to 2^8 - 1 octets of encoded map data"⟩ (by decide) rfl hd hb
+  constructor
+  · intro other c₂' h
+    rw [hR] at h
+    obtain ⟨body, c₂, hf, hba, hcd, hdat⟩ := hok other c₂' h
+    exact ⟨body, c₂, by rw [hS]; exact hf, hcd, by rw [hdat, hdata], hba⟩
+  · intro failure h
+    rw [hR] at h
+    obtain ⟨refusal, hf, hcl⟩ := herr failure h
+    exact ⟨refusal, by rw [hS]; exact hf, hcl⟩
+
+/-- **The `list32` row (`0xD0`).** The same list owner behind four-octet size fields: the
+specification's row declares width four and the reference reads at four, and the body's own bridges
+(`takeBe`/`takeBeU`) carry the wider fields. -/
+theorem arm_0xD0 (fuel : Nat) (ih : WireAgreesUpTo (fuel - 2)) (c : SpecAMQP.Spec.Codec.Cursor)
+    (c' : SpecAMQP.Ref.Cursor) (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor)
+    (hd : CursorAgrees d d') (hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0xD0, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0xD0, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hdata : d.data = c.data := spec_takeU8_data hs
+  have hclass : SpecAMQP.Spec.Value.classify (0xD0 : UInt8).toNat = .compound 4 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0xD0 : UInt8) =
+      .ok ⟨208, some "list32", SpecAMQP.Generated.Oasis.Category.compound, 4, "list",
+        "up to 2^32 - 1 list elements with total size less than 2^32 octets"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.readCompound fuel ⟨208, some "list32",
+        SpecAMQP.Generated.Oasis.Category.compound, 4, "list",
+        "up to 2^32 - 1 list elements with total size less than 2^32 octets"⟩ d := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' = SpecAMQP.Ref.readCompound fuel 4 d' := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  obtain ⟨hok, herr⟩ := readCompound_list_body fuel ih ⟨208, some "list32",
+    SpecAMQP.Generated.Oasis.Category.compound, 4, "list",
+    "up to 2^32 - 1 list elements with total size less than 2^32 octets"⟩ (by decide) rfl hd hb
+  constructor
+  · intro other c₂' h
+    rw [hR] at h
+    obtain ⟨body, c₂, hf, hba, hcd, hdat⟩ := hok other c₂' h
+    exact ⟨body, c₂, by rw [hS]; exact hf, hcd, by rw [hdat, hdata], hba⟩
+  · intro failure h
+    rw [hR] at h
+    obtain ⟨refusal, hf, hcl⟩ := herr failure h
+    exact ⟨refusal, by rw [hS]; exact hf, hcl⟩
+
+/-- **The `map32` row (`0xD1`).** The same map owner behind four-octet size fields. -/
+theorem arm_0xD1 (fuel : Nat) (ih : WireAgreesUpTo (fuel - 2)) (c : SpecAMQP.Spec.Codec.Cursor)
+    (c' : SpecAMQP.Ref.Cursor) (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor)
+    (hd : CursorAgrees d d') (hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0xD1, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0xD1, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hdata : d.data = c.data := spec_takeU8_data hs
+  have hclass : SpecAMQP.Spec.Value.classify (0xD1 : UInt8).toNat = .compound 4 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0xD1 : UInt8) =
+      .ok ⟨209, some "map32", SpecAMQP.Generated.Oasis.Category.compound, 4, "map",
+        "up to 2^32 - 1 octets of encoded map data"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.readCompound fuel ⟨209, some "map32",
+        SpecAMQP.Generated.Oasis.Category.compound, 4, "map",
+        "up to 2^32 - 1 octets of encoded map data"⟩ d := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' = SpecAMQP.Ref.readMap fuel 4 d' := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  obtain ⟨hok, herr⟩ := readCompound_map_body fuel ih ⟨209, some "map32",
+    SpecAMQP.Generated.Oasis.Category.compound, 4, "map",
+    "up to 2^32 - 1 octets of encoded map data"⟩ (by decide) rfl hd hb
+  constructor
+  · intro other c₂' h
+    rw [hR] at h
+    obtain ⟨body, c₂, hf, hba, hcd, hdat⟩ := hok other c₂' h
+    exact ⟨body, c₂, by rw [hS]; exact hf, hcd, by rw [hdat, hdata], hba⟩
+  · intro failure h
+    rw [hR] at h
+    obtain ⟨refusal, hf, hcl⟩ := herr failure h
+    exact ⟨refusal, by rw [hS]; exact hf, hcl⟩
+
 end SpecAMQP.Proofs
