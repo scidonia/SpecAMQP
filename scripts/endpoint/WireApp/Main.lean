@@ -21,21 +21,30 @@ sent, and the shell writes them.
 
 Two properties are deliberate and load-bearing:
 
-* **It is pure, and therefore idempotent.** `App` is a function of the core's state and the outputs just
-  produced, and the shell may ask it more than once in one state. Keying the choice on the *state* rather
-  than on an internal counter means the same state always gives the same answer, so a step is never sent
-  twice: an admitted send moves the core to the next state, and only the step played from that state can
-  be chosen next.
+* **It is pure: the same state always gives the same answer, and it is asked once per unit.** `App` is a
+  function of the core's state and the outputs just produced, and `Shell.Driver.serveUnits` asks it after
+  each unit a read completed — so a state the core reaches *inside* one read is one this application is
+  asked in, whatever the read size or how the kernel split the peer's writes, and a read that completes no
+  unit asks it nothing. Keying the choice on the *state* rather than on an internal counter is what makes
+  that safe for an **admitted** send: the core moves to the next state, and only the step played from that
+  state can be chosen next. A **refused** send does not move the core, so the same step is played again at
+  the next prompt — measured on `slice-sasl-challenge-from-client`, whose refused challenge is attempted
+  twice, once when the peer's header arrives and once when its `sasl-init` does, identically at a read of 8
+  octets and at a read of 64 with the peer's two frames written in one `sendall`. Attempted is not written:
+  the core refuses it both times, and not one octet of it reaches the wire.
 * **A state that matches no step sends nothing, and the differential reports that.** Silence here is a
   divergence with a name — "the vector expects the endpoint to write *n* octets and nothing arrived" — not
   a quiet success, which is why the observer is the differential rather than this module.
-* **It is asked only after a read, and that is the shell's loop rather than this application's choice.**
-  `Shell.Driver.pump` calls the application once per read, so a vector asking for two `send` steps in a
-  row — with nothing arriving between them — has its second send never prompted: the endpoint sits in the
-  state the first send left it in. Measured on `slice-open-missing-container-id` and
-  `slice-open-channel-max-wrong-type`, each at step 2. It is a property of the seam rather than a defect
-  in either artefact, and it becomes a finding the moment a corpus family needs two sends in a row —
-  which is why it is written here rather than left to be rediscovered.
+* **It is asked once per unit the peer's octets complete, and that is the shell's loop rather than this
+  application's choice.** `Shell.Driver.serveUnits` asks the application after each unit a read completed — so
+  a state the core reaches *inside* one read is one this application is asked in, whatever the read size or
+  how the kernel split the peer's writes — and asks it nothing at all when a read completes no unit. The
+  consequence for this application is the one to know about: a vector asking for two `send` steps in a row,
+  with nothing arriving between them, produces no second unit and therefore **no second prompt**, so its
+  second send is never played and the endpoint sits in the state the first send left it in. Measured on
+  `slice-open-missing-container-id` and `slice-open-channel-max-wrong-type`, each at step 2. The differential's
+  output says so in the divergence line itself (its two named seam causes), rather than leaving it to be
+  rediscovered when a corpus family needs two sends in a row.
 -/
 
 import Shell.Driver

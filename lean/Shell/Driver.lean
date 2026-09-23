@@ -21,9 +21,11 @@ The shell's own correctness, stated as the three obligations it does not prove a
 differential is the only tier that can test:
 
 1. **It loops on a short read.** `recv` promises at most what was asked for, so a read that returns part
-   of what the peer sent is ordinary and the octets it returned are fed to `Impl.Stream.feed`, which
-   keeps what does not yet make a unit. Neither this loop nor the boundary may assume that one read is
-   one frame.
+   of what the peer sent is ordinary: the octets it returned are appended to the octets still pending
+   (`Impl.Stream.pending`) and the units that completes are taken **one at a time** (`Impl.Stream.nextUnit`),
+   which keeps what does not yet make a unit. Neither this loop nor the boundary may assume that one read is
+   one frame — and, in the other direction, neither may assume that one read is one *unit*: a read that
+   completes two units is served as two, in order, with the application asked in between.
 2. **It writes exactly what the core returns, and all of it.** The octets of an `Output.frame` are written
    in the order the core produced them, looping while `send` accepts them in pieces, and a `send` that
    accepts nothing is a loud failure rather than a shorter payload. The shell adds no framing, no
@@ -35,10 +37,16 @@ differential is the only tier that can test:
    be completed — and ending the connection quietly. A transport failure is a different arm and it
    propagates as the `IO.Error` the boundary raised.
 
-What the shell *does* decide — and it is deliberately almost nothing — is the size of one `recv` request,
-and the sequencing of the socket's lifecycle (`listen`, `accept`, `connect`, `close`). Both are
-parameters or straight-line code, not protocol behaviour, which is why §10's relation can quantify past
-them.
+What the shell *does* decide — and it is deliberately almost nothing — is the size of one `recv` request, the
+sequencing of the socket's lifecycle (`listen`, `accept`, `connect`, `close`), and **when the application is
+asked relative to the core's units**: it asks after each unit a read completed (`serveUnits`), so a state the
+core reaches *inside* one read is one the application acts on before that read's remaining octets are read.
+That last one is a decision rather than an inference — the alternative is one prompt per read — and it is
+stated as one: nothing about it is protocol-shaped (`Impl.Stream.nextUnit` is `run`'s own iteration, so the
+units are still the core's), but a read that carries two of the peer's frames *is* two states, and a shell
+that asks once has made the process depend on how the kernel split the peer's writes. It is straight-line
+code over a proved step, which is why §10's relation can quantify past it, and it is named here rather than
+left to be rediscovered as a behaviour that changes with the read size.
 
 ## The seam with the proved part, function by function
 
@@ -48,8 +56,12 @@ The shell calls exactly these, and nothing else of the core:
   own protocol id and version (`Impl.Core.announceHeader`'s version comes from the generated constant
   table). The shell resolves its `none` — the artifact stating no version for the AMQP layer — into a
   loud failure.
-* `Impl.Stream.feed` — octets read from the socket, in whatever sizes the kernel returned them, to the
-  endpoint's state and the outputs to put on the wire.
+* `Impl.Stream.pending` — the octets a read returned, appended to the octets an earlier read left
+  incomplete, which is all a read does to the stream before a unit is decided.
+* `Impl.Stream.nextUnit` — **one** unit of those octets and only one: the endpoint's next state, the outputs
+  to put on the wire, and the octets that did not make a unit. The shell drives it rather than handing the
+  whole read to `Impl.Stream.feed` for the reason `serveUnits` states: the application is asked in *each*
+  state the core reaches, not only in the last one the read left.
 * `Impl.Core.submit` — the application asking to send octets, answered with what to write or with the
   reason its octets are not something this peer can send (a loud failure here, not a silent skip).
 * `Impl.Stream.closed` — the peer's orderly close.
@@ -152,37 +164,66 @@ def serveApp (conn : Conn) (core : State) (outs : List Output) (app : App) : IO 
         live := false
   return (core, live && !reply.done)
 
-/-- **Read once.** One `recv` request, fed to the core whatever its size: `none` is the peer's orderly
-close and ends the connection, and the octets that arrived incomplete are dropped with it
-(`Impl.Stream.closed`). -/
-def readOnce (conn : Conn) (core : State) (readOctets : USize) : IO (Option (State × List Output)) := do
+/-- **Serve one read's units**, the application asked after **each** unit rather than once per read.
+
+This is a decision the shell makes, so it is stated here rather than left implied: a state the core passes
+*through* inside one read is a state the application is asked in, so what the application does about it
+reaches the wire before the rest of that read is read. The alternative — asking once with the state the whole
+read left — makes the process depend on how the kernel happened to split the peer's writes, which is nothing
+the protocol says and nothing a vector can pin.
+
+Nothing protocol-shaped moves here: `Impl.Stream.nextUnit` is `run`'s own iteration (`run_some_nextUnit`), so
+the loop below is `feed`'s loop with an application consulted in between, over the same units, handing the
+layer the same octets. What the loop *adds* is the sequencing, and that is this module's part of the boundary
+rather than the core's. The outputs are written in the order the core produces them, as always, so a read that
+completes several units narrates them in order with the application's answers interleaved where they happened.
+Returns the state to continue from, and whether the application is still live. -/
+def serveUnits (conn : Conn) (core : State) (app : App) : IO (State × Bool) := do
+  let mut core := core
+  let mut live := true
+  let mut more := true
+  while more && live do
+    match SpecAMQP.Impl.Stream.nextUnit core with
+    | none => more := false
+    | some (core', outs) =>
+      writeOutputs conn outs
+      let (core'', keepGoing) ← serveApp conn core' outs app
+      core := core''
+      live := keepGoing
+  return (core, live)
+
+/-- **Read once.** One `recv` request, appended to what is already pending, its units served one at a time
+(`serveUnits`): `none` is the peer's orderly close and ends the connection, and the octets that arrived
+incomplete are dropped with it (`Impl.Stream.closed`). -/
+def readOnce (conn : Conn) (core : State) (app : App) (readOctets : USize) :
+    IO (Option (State × Bool)) := do
   let some bytes ← recv conn readOctets | return none
-  let (core', outs) := SpecAMQP.Impl.Stream.feed core bytes
-  writeOutputs conn outs
-  return some (core', outs)
+  let (core', live) ← serveUnits conn (SpecAMQP.Impl.Stream.pending core bytes) app
+  return some (core', live)
 
 /-- **The loop**: read, feed, write, ask the application, and repeat until the peer closes the stream or
 the application is finished.
 
 This is where the shell's three unproved obligations live: a short read is fed as it arrives (the core
 keeps what does not yet make a unit), the outputs are written whole and in order, and `recv`'s `none`
-ends the connection rather than being treated as a fault. Returns the state the connection ended in,
-which is what the process reports. -/
+ends the connection rather than being treated as a fault. The application is asked **after each unit the
+read completed** rather than once after the read (`serveUnits`), so the state the core reaches inside one
+read is a state the application acts on before the read's remaining octets are read. Returns the state the
+connection ended in, which is what the process reports. -/
 def pump (conn : Conn) (core : State) (app : App)
     (readOctets : USize := defaultReadOctets) : IO State := do
   let mut core := core
   let mut live := true
   while live do
-    match ← readOnce conn core readOctets with
+    match ← readOnce conn core app readOctets with
     | none =>
       -- the peer's orderly close (obligation 3 above): nothing further can arrive, and the octets held
       -- incomplete can never be completed, so they are dropped and the endpoint says so
       IO.println "endpoint: the peer closed the stream (orderly)"
       core := SpecAMQP.Impl.Stream.closed core
       live := false
-    | some (core', outs) =>
-      let (core'', keepGoing) ← serveApp conn core' outs app
-      core := core''
+    | some (core', keepGoing) =>
+      core := core'
       live := keepGoing
   return core
 

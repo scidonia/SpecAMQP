@@ -490,4 +490,65 @@ theorem closed_conn (state : State) : (closed state).conn = state.conn := rfl
 /-- An orderly close leaves nothing pending. -/
 theorem closed_inbox (state : State) : (closed state).inbox = #[] := rfl
 
+/-! ## The loop, one unit at a time
+
+`run`, `drain` and `feed` are the whole read path in one call: they consume every unit the octets hold and
+answer with the **final** state and the outputs of the whole read. That is the right answer for a programme
+that has nothing to say in between, and it is not enough for the shell, which asks the *application*
+(`Shell.Driver.App`) after the core has answered, and asks it **in the state the core is in**. When one read
+carries two of the peer's frames, the state the core passes *through* is a state the application is never
+asked in — `feed` reports only where the read left it.
+
+`nextUnit` closes that at its source: **one iteration of `run`'s loop, exposed**, with the octets that did
+not make a unit left pending where they were. It decides nothing `run` does not decide — the framer's unit is
+`nextUnitLength`, the layer's answer is `arriving`, and `run_some_nextUnit` ties the two — so a caller that
+drives it and asks its application in between runs `run`'s loop rather than a second one. What the layer is
+*handed* is unchanged: the front unit is still read out of the whole pending buffer, exactly as `run` reads
+it from the same octets.
+
+The section sits at the end of the module rather than beside `run` on purpose: a ledger disposition cites
+`closed` by line, and definitions inserted above it would move that citation without changing it. -/
+
+/-- **What a read leaves to be decided**: the octets that arrived, appended to the octets still pending. -/
+def pending (state : State) (bytes : ByteArray) : State :=
+  { state with inbox := state.inbox ++ toOctets bytes }
+
+/-- `feed` is `drain` over what a read leaves pending: the append is the whole of the difference, and this is
+the same fact `feed_eq` records, named for the two functions the shell now calls. -/
+theorem feed_pending (state : State) (bytes : ByteArray) :
+    feed state bytes = drain (pending state bytes) := rfl
+
+/-- **The front unit of what is pending, and only it**: the state the core reaches by answering those octets,
+the outputs it answers there, and the octets that did not make a unit kept in the inbox. `none` where the
+pending buffer holds no complete unit — "wait for more octets", never "nothing is there". -/
+def nextUnit (state : State) : Option (State × List Output) :=
+  match nextUnitLength state.conn.state state.inbox with
+  | none => none
+  | some n =>
+    let answer := arriving state.conn state.inbox
+    some ({ conn := answer.1, inbox := state.inbox.extract n state.inbox.size }, answer.2)
+
+/-- **`nextUnit` is `run`'s own iteration, spelled with the tail kept instead of recursed on.** The shell
+that drives `nextUnit` and asks its application after each unit is running the loop whose laws are proved
+above, one step at a time, and adds no protocol decision of its own: the unit is the framer's, the answer is
+the layer's, and the octets that remain are what did not make a unit. -/
+theorem run_some_nextUnit {state state' : State} {outs : List Output}
+    (h : nextUnit state = some (state', outs)) :
+    run state.conn state.inbox =
+      let (conn'', inbox'', outs'') := run state'.conn state'.inbox
+      (conn'', inbox'', outs ++ outs'') := by
+  unfold nextUnit at h
+  split at h
+  · exact absurd h (by simp)
+  · rename_i n hn
+    have hpair := Option.some.inj h
+    have hstate : state' = { conn := (arriving state.conn state.inbox).1,
+                             inbox := state.inbox.extract n state.inbox.size } :=
+      ((Prod.mk.injEq _ _ _ _).mp hpair).1.symm
+    have houts : outs = (arriving state.conn state.inbox).2 :=
+      ((Prod.mk.injEq _ _ _ _).mp hpair).2.symm
+    subst hstate
+    subst houts
+    rw [run_some hn]
+
 end SpecAMQP.Impl.Stream
