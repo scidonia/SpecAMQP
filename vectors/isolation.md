@@ -14,7 +14,7 @@ witnessed. The generated corpus's negatives are not listed: the label would be u
 
 ## The witnesses, and what they cost
 
-* **`exchange-link-handle-in-use`** — the attach guard removed (`Spec/Session.lean:621-624`) failed
+* **`exchange-link-handle-in-use`** — the attach guard removed (`Spec/Session.lean:696-699`) failed
   **exactly one step** in the whole corpus out of 307 step verdicts across two runs, the reference
   untouched. That is what rule-isolated evidence looks like: one rule, one failure.
 * **`exchange-link-credit-granted-and-spent`** and **`exchange-link-credit-counts-messages-not-frames`** —
@@ -96,8 +96,8 @@ their experiments are run.
 Drafted by the vector slice, whose experiments these are; reviewed, applied and committed by the planner as
 `vectors/**` requires.
 
-| `generated-exchanges` | `exchange-link-handle-in-use` | `attach/field:handle.2` | **isolated (witnessed)** | removing the guard at `Spec/Session.lean:621-624` failed **exactly this vector's step 4** and nothing else — across 278 step verdicts in `generated-exchanges.ndjson` and 29 in `slice.ndjson`, with the reference green throughout. The plan's record and the re-run agree. |
-| `generated-exchanges` | `exchange-link-credit-granted-and-spent` | the credit arithmetic (`Position.creditFor`; the spend at `Spec/Session.lean:809`) | **isolated (witnessed)** | removing the credit spend failed **this vector's step 5** and one other, `exchange-link-credit-counts-messages-not-frames#7`. The plan records three failures for this experiment — the two continuation steps plus step 5. **The difference is a finding, not an error on either side**: the plan measured the pre-fix layer, where a delivery whose single transfer leaves `more` unset never incremented the delivery-count, so a second delivery was admitted free; that defect has since been fixed, and its extra failure is gone. |
+| `generated-exchanges` | `exchange-link-handle-in-use` | `attach/field:handle.2` | **isolated (witnessed)** | removing the guard at `Spec/Session.lean:696-699` failed **exactly this vector's step 4** and nothing else — across 278 step verdicts in `generated-exchanges.ndjson` and 29 in `slice.ndjson`, with the reference green throughout. The plan's record and the re-run agree. |
+| `generated-exchanges` | `exchange-link-credit-granted-and-spent` | the credit arithmetic (`Position.creditFor`; the spend at `Spec/Session.lean:929`) | **isolated (witnessed)** | removing the credit spend failed **this vector's step 5** and one other, `exchange-link-credit-counts-messages-not-frames#7`. The plan records three failures for this experiment — the two continuation steps plus step 5. **The difference is a finding, not an error on either side**: the plan measured the pre-fix layer, where a delivery whose single transfer leaves `more` unset never incremented the delivery-count, so a second delivery was admitted free; that defect has since been fixed, and its extra failure is gone. |
 | `generated-exchanges` | `exchange-link-credit-counts-messages-not-frames` | the same | **isolated (witnessed)** | the same experiment; its step 7 is the second of the two failures. |
 | generated-exchanges.ndjson | `exchange-header-protocol-id-unsupported` | picture.24 | **broad** | no disabling experiment run; the label records absence of evidence rather than intent |
 | generated-exchanges.ndjson | `exchange-header-protocol-id-unassigned` | picture.24 | **broad** | no disabling experiment run; the label records absence of evidence rather than intent |

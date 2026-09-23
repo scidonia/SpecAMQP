@@ -59,7 +59,7 @@ b806ad2406f8fac2d686c5ed1f343029df8afa8e  ledger/dispositions/part1-types.json
 f5ec2898d2a8febbe01b6f01db47f3e019407c97  ledger/dispositions/part2-connection-establishment.json
 6f6fafa8142c6f04054b287f8514f28a6e7a292e  ledger/dispositions/part2-links.json
 6044f02e43e92b221a9ed94c2d1e9b8646fe828b  ledger/dispositions/part2-performatives-link-state.json
-3e1b0a6ee7205d1a4d63b547f24e9accc21414d8  ledger/dispositions/part2-performatives-remainder.json
+68d4932b8af755747d85b1d6b188bd89f3c2f0b4  ledger/dispositions/part2-performatives-remainder.json
 7b7b6d7b800ca63bad67b68039a873c0d786e46f  ledger/dispositions/part2-performatives-settle-mode.json
 c5f124464a072b0d7d9c21fddb6b19128de98769  ledger/dispositions/part3-addressing.json
 41cf1b06d3b79d7c1cda4c45840dc552f27fb11a  ledger/dispositions/part3-delivery-state.json
@@ -106,7 +106,7 @@ db82368890d436450b3c199292a6c76d7c1ede34  tests/contracts/value_boundaries.sh
 6e354e78cffc5e15fe9082d5e9493cac61b60d65  vectors/generated-exchanges.ndjson
 d6ce3953f0a2ffecd4c947bd66c7d4799b3b5339  vectors/generated-frames.ndjson
 a8ce18e74801ab8c0f20db6d21ac2ab66b3cab97  vectors/generated.ndjson
-e5f033faca866b81c8d3f614761858dc591ec2c0  vectors/isolation.md
+ee2bc60a67e8fb234b11de2d8f8bda597ce2ae2a  vectors/isolation.md
 2c6eb7f4cfd6e68184c967a121928251f346e669  vectors/message/deliveries.ndjson
 56025501f1567db480e31b5d76f8b00761951b75  vectors/message/generated.ndjson
 d488702b9362fdcd2b3e182af1b58627dd5a3f28  vectors/message/messages-negative.ndjson
