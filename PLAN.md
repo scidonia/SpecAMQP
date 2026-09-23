@@ -813,6 +813,16 @@ that carries an unverified claim forward is how a plan acquires facts nobody mea
 the compound rows refute; the docstring now carries the witness beside the bound it explains. **A rationale is a claim like any other and decays the same way** — this is the same lesson as the plan text
 that described landed work as owed and the note that said the model was keyed wrongly, arriving this time inside a proof module, where the temptation is to read prose as commentary rather than assertion.
 
+**And the writer law turned out to be *refutable*, by a witness the classing itself made expressible.** `Ref.encode (Ref.Value.array 0x57 [])` returns `#[0xE0,0x02,0x00,0x57]` — an array
+whose declared constructor `0x57` is unassigned — while `Spec.Codec.encodeValue (.array 0x57 [])` refuses, and, decisively, **`Ref.decode` refuses the octets `Ref.encode` wrote**. That is the reference
+disagreeing with *itself* rather than with the specification: `Ref.arrayElementItems` never consults the declared constructor when the element list is **empty**, so `arrayElement`'s catch-all — the arm
+that names `unassigned` for the non-empty case, and the arm patch 3 split — is never reached. `.array 0x57 [.null]` refuses correctly today; `.array 0x57 []` does not.
+
+**And the affordance did exactly what the paragraph above predicted, which is the part worth noticing.** Classing the writer fixed nothing: it made an existing defect **expressible**, turning a divergence
+invisible to every gate into a theorem with a witness. The law's statement is being replaced (its error side classed), the reference's array arm is being fixed to consult its declared constructor before its
+elements — the same shape as `elementDecl?` and patch 3 — and the refutation lands as the record of the state *before* the fix and is then replaced by the proof, with the witness kept in prose, because a
+refutation of a defect that has been fixed argues for a world a later commit changed.
+
 ## 11. Specification test vectors
 
 One shared format for everything the specification is tested against: NDJSON, schema-validated (`tests/contracts/vector.schema.json`), **logical time only** — timestamps are ordering tags, never wall-clock, so replay is deterministic on any machine.
