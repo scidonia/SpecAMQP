@@ -230,6 +230,11 @@ import Spec.Message
 #print axioms SpecAMQP.Spec.Message.recordState_settled
 #print axioms SpecAMQP.Spec.Message.settled_monotone
 #print axioms SpecAMQP.Spec.Message.terminal_absorbing
+-- S5's send direction, and the connection instance's tie-back (the connection suite is still
+-- landing its four remaining obligations, so only its proved lemmas are inventoried here).
+#print axioms SpecAMQP.Proofs.ref_frame_send_conforms
+#print axioms SpecAMQP.Proofs.ref_frame_send_conforms_existential
+#print axioms SpecAMQP.Proofs.specFrameSend_choose_is_the_writer
 #print axioms SpecAMQP.Proofs.takeBe_lt
 #print axioms SpecAMQP.Proofs.widthChoice_le_of_fits
 #print axioms SpecAMQP.Proofs.widthChoice_narrow_iff
