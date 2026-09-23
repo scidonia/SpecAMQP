@@ -1777,6 +1777,14 @@ so for that one the *wire* side had to move and the connection side could not �
 directories away. The cost of finding out was an import three modules away from either declaration. Lean has no module-private declarations by default; `private` is the annotation that makes
 a helper local, and a name only ever used inside one file should carry it — the alternative is a name that is global by accident and a collision that fires wherever two such accidents are first imported together.
 
+**And a fix can be protected by a proof rather than by a gate, which is worth knowing per fix.** The truncation family's refusal branch is reachable by **no corpus case at all** — every one would need a field value of
+2^32 or more — so no vector can defend it from regression. What defends it is `ref_fieldOctets_writes`: where a field fits, the guard writes exactly `u32be n`, which makes the change byte-identical on every
+corpus-reachable input and the refusal branch statically correct rather than merely untested. **So the repository has three kinds of protection doing distinct work** — a gate over a corpus, a witness in a scenario, and
+a theorem over the code — and a fix that looks covered by all three is usually covered by one. Naming which is which is the difference between a claim and a checked one, and it is why "the gates are green" never
+answers the question by itself: the suite here is **19 of 19** on a tree carrying the widened corpus, the specification's two writer arms, the truncation closure and the rewired differential, and none of those four
+is what makes that number mean anything without the other evidence beside it.
+
+
 ## 17. Verification gates and their negative controls
 
 | Gate | Mechanism | Negative control |
