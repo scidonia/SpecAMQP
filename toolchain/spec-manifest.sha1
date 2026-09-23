@@ -1,5 +1,5 @@
 cd53ded13c0c31f2d6bacd3d04e3195f5c091b76  lean/Spec/Codec.lean
-00ecd28751eeb34a99cc0160ddd96dddea9b10e3  lean/Spec/Connection.lean
+53dd4f16e663f2003337b5423327887b308d1cf2  lean/Spec/Connection.lean
 2a205f752ad6833b88e2064a498eba8b86193fba  lean/Spec/ConnectionCodec.lean
 d196467009441b90ba700953415355a5ee002a0a  lean/Spec/Frame.lean
 31e43aed7900e071a7a1615d739be50f716b5b74  lean/Spec/FrameCodec.lean
@@ -17,6 +17,7 @@ ac372f4848586250e81968f3ead62410d598b57c  lean/Contracts/FrameCodec.lean
 a17f9194a7f52f841e936457cac7b7d9f0c0ed95  lean/Contracts/FrameCodecAcceptance.lean
 eeb3c6c4881c6675670298155ebdb0825d234738  lean/Contracts/FrameConformance.lean
 33b42a63e6a0fc2419774220a7036fc7c3022909  lean/Contracts/MessageFormat.lean
+493378efcde0233ea750b3a5b29fa34ce13e0a35  lean/Contracts/Sasl.lean
 4451890c1389bf43a3ddf0e9b6ba17a34622c730  lean/Contracts/SessionCredit.lean
 a67c2b5be23a15b617bebef2fb595a10bb5357ca  lean/Contracts/SessionWindows.lean
 7a52a63a35cda512b63a483e43af4799ae81beea  lean/Contracts/Transaction.lean
@@ -36,6 +37,8 @@ c876f69bb22065b406c11b423b5ffb93d4d18426  vectors/message/sections.ndjson
 8a0698b69a00e858aefea2249a89ec7c20c1aed5  vectors/messages.ndjson
 0ae3389f5cb1a5360d7b8bcce6d601463b735b2e  vectors/open-bad-field.ndjson
 4edac54f39746f6464d5b2711111720c5b658b5e  vectors/primitives.ndjson
+6a727ec6002313ac695bb0746ebbd17c5bfed16b  vectors/sasl-negative.ndjson
+1dbd3b9bfcbbdc661b31a4d75a2b8081a49ca3ed  vectors/sasl.ndjson
 2f85e410608d4b6f8e220da9a45cd27497227e4a  vectors/slice.ndjson
 5016bfabb395b8ff29564fb6c95208622dd6d652  vectors/txn-negative.ndjson
 ecac919aaaf979c4765bc027729f1934278582cf  vectors/txn.ndjson

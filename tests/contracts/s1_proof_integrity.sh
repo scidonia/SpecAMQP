@@ -6,12 +6,19 @@
 #
 # Observable contract:
 #
-#   1. no handwritten Lean module under `lean/Spec`, `lean/Contracts`,
-#      `lean/Proofs`, `lean/Ref` or `lean/Harness` contains `sorry`, `admit`,
-#      `native_decide`, `partial def`,
-#      `axiom`, `unsafe`, `opaque`, `extern` or `@[implemented_by]` — and the
-#      scanner is not vacuous: a planted file containing each of those is flagged,
-#      with file and line, before the real tree is scanned;
+#   1. no handwritten or shipped Lean module under `lean/Spec`, `lean/Contracts`,
+#      `lean/Proofs`, `lean/Ref`, `lean/Harness` or `lean/Impl`, nor any module
+#      under `scripts/loopback`, contains `sorry`, `admit`, `native_decide`,
+#      `partial def`, `axiom`, `constant`, `unsafe`, `opaque`, `extern` or
+#      `@[implemented_by]` — and the scanner is not vacuous: a planted file
+#      containing each of those is flagged, with file and line, before the real
+#      tree is scanned;
+#   1a. the one permitted `extern` boundary is `lean/Impl/Transport.lean`
+#      (`PLAN.md` §23.1), where externs are counted and not flagged and anywhere
+#      else are flagged. Both directions are planted before the real tree is
+#      scanned, because an allowance that is only ever seen to pass is how an
+#      exemption becomes a hole, and the printed count is what makes the
+#      boundary's size a measurement rather than a claim;
 #   2. the accepted public theorem's transitive axiom inventory is printed and
 #      contains no `sorryAx`, and no axiom outside the reviewed list;
 #   3. generated and harness modules are out of scope by construction — the scan
@@ -26,7 +33,9 @@
 set -euo pipefail
 
 readonly root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-readonly scanned_dirs=(Spec Contracts Proofs Ref Harness)
+readonly scanned_dirs=(Spec Contracts Proofs Ref Harness Impl)
+readonly scanned_extra=("$root/scripts/loopback")
+readonly extern_boundary="Impl/Transport.lean"
 readonly accepted_theorem="SpecAMQP.Contracts.constructor_grammar_public"
 
 die() {
@@ -121,25 +130,40 @@ def strip_comments_and_strings(text: str) -> str:
     return "".join(out)
 
 
-def scan_file(path: pathlib.Path, base: pathlib.Path) -> list[str]:
+def scan_file(path: pathlib.Path, base: pathlib.Path,
+              boundary: str) -> tuple[list[str], int]:
+    """Findings, and how many permitted boundary externs this file carries."""
     stripped = strip_comments_and_strings(path.read_text(encoding="utf-8"))
-    found = []
+    relative = str(path.relative_to(base))
+    found, permitted = [], 0
     for name, pattern in PATTERNS:
         for match in pattern.finditer(stripped):
             line = stripped[: match.start()].count("\n") + 1
-            found.append(f"{path.relative_to(base)}:{line}: {name}")
-    return found
+            if name == "extern" and relative == boundary:
+                permitted += 1
+                continue
+            found.append(f"{relative}:{line}: {name}")
+    return found, permitted
 
 
 def main() -> int:
-    directories = [pathlib.Path(d) for d in sys.argv[1:]]
-    problems, scanned = [], 0
+    boundary = sys.argv[1]
+    directories = [pathlib.Path(d) for d in sys.argv[2:]]
+    problems, scanned, permitted = [], 0, 0
     for directory in directories:
+        if not directory.is_dir():
+            print(f"     {directory} is absent, so nothing under it was scanned")
+            continue
         for path in sorted(directory.rglob("*.lean")):
             scanned += 1
-            problems.extend(scan_file(path, directory.parent))
+            found, count = scan_file(path, directory.parent, boundary)
+            problems.extend(found)
+            permitted += count
     for problem in problems:
         print(f"  trust: {problem}")
+    if permitted:
+        print(f"     boundary: {permitted} permitted `@[extern]` declaration(s) "
+              f"in {boundary}")
     print(f"     scanned {scanned} module(s) under "
           f"{', '.join(str(d) for d in directories)}")
     return 1 if problems else 0
@@ -160,11 +184,12 @@ def worse : Nat := by native_decide
 axiom hidden : False
 opaque obscured : Nat
 unsafe def dangerous : Nat := 1
+@[extern "planted_extern"] def foreign : Nat := 0
 PLANTED
-if python3 "$tmp/scan.py" "$tmp/planted/Spec" >"$tmp/planted.log" 2>&1; then
+if python3 "$tmp/scan.py" "$extern_boundary" "$tmp/planted/Spec" >"$tmp/planted.log" 2>&1; then
   die "the scanner passed a file containing sorry, native_decide, axiom, opaque and unsafe"
 fi
-for construct in sorry native_decide axiom opaque unsafe; do
+for construct in sorry native_decide axiom opaque unsafe extern; do
   grep -q ": $construct" "$tmp/planted.log" ||
     die "the planted control was not flagged for '$construct': $(cat "$tmp/planted.log")"
 done
@@ -172,11 +197,25 @@ grep -q "Planted.lean:4: sorry" "$tmp/planted.log" ||
   die "the scanner does not report the line of the planted sorry: $(cat "$tmp/planted.log")"
 note "planted control flagged with file and line; comments and docstrings ignored"
 
+# Planted control in the other direction: at the boundary an extern is permitted
+# and counted, so the allowance is observed working rather than assumed benign.
+mkdir -p "$tmp/planted-allow/Impl"
+cat >"$tmp/planted-allow/Impl/Transport.lean" <<'ALLOWED'
+@[extern "lean_planted_boundary"] def boundaryCall (x : UInt64) : UInt64 := x
+ALLOWED
+if ! python3 "$tmp/scan.py" "$extern_boundary" "$tmp/planted-allow/Impl" >"$tmp/allow.log" 2>&1; then
+  die "the scanner flagged the permitted boundary extern: $(cat "$tmp/allow.log")"
+fi
+grep -q "boundary: 1 permitted" "$tmp/allow.log" ||
+  die "the scanner did not count the permitted boundary extern: $(cat "$tmp/allow.log")"
+note "planted control: an extern at the boundary is counted and not flagged"
+
 # The real tree.
-python3 "$tmp/scan.py" "${scanned_dirs[@]/#/$root/lean/}" >"$tmp/scan.log" 2>&1 ||
+python3 "$tmp/scan.py" "$extern_boundary" "${scanned_dirs[@]/#/$root/lean/}" \
+  "${scanned_extra[@]}" >"$tmp/scan.log" 2>&1 ||
   { cat "$tmp/scan.log"; die "the specification contains trust-bearing constructs"; }
-tail -1 "$tmp/scan.log" | sed 's/^/     /'
-note "no sorry, admit, native_decide, partial, axiom, opaque, unsafe or extern in handwritten modules"
+sed 's/^/     /' "$tmp/scan.log"
+note "no sorry, admit, native_decide, partial, axiom, constant, opaque, unsafe or @"'"'"'[implemented_by] beyond the counted boundary"
 
 # The accepted theorems' transitive axioms, printed by the kernel. Every proved theorem
 # the specification claims is inventoried here, not only the first: a theorem proved from
