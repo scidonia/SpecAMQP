@@ -1,7 +1,7 @@
 # SpecAMQP
 
 An **executable formal specification of AMQP 1.0 core** (OASIS Standard, Parts 0–5) written in Lean 4,
-with a clause-level ledger that makes completeness and fidelity *measurable* rather than asserted.
+with a clause-level ledger that makes completeness and fidelity *measurable*.
 
 **This repository holds a specification, and a reference implementation of it.** It defines what a
 conforming AMQP 1.0 endpoint must do, states that as mathematics a machine can run, records for every clause
