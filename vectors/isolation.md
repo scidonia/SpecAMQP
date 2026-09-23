@@ -5,12 +5,13 @@ R's reason**. Where that cannot be arranged the vector is not evidence for R at 
 conformance evidence*, which is a label rather than a claim, and the difference is what stops a corpus that
 passes from being read as a corpus that proves.
 
-62 rows, covering 62 distinct vectors — the same set as the corpus's hand-authored
-negatives outside the generated corpus, reconciled by recomputing that set from `vectors/*.ndjson` rather
-than from the table's own count. 53 are broad with no experiment run;
-7 are isolated, of which 5 are **witnessed by a disabling experiment
-actually run** and 2 are reasoned from construction with none; and 2 are broad **and**
-witnessed. The generated corpus's negatives are not listed: the label would be uniform and uninformative.
+68 rows, covering 68 distinct vectors — the corpus's hand-authored negatives *and*, since the session
+layer's sweep, the exchange corpus's generated ones, whose labels stopped being uniform once experiments
+were run on them. 53 are broad with no experiment run; 12 are isolated, of which 10 are **witnessed by a
+disabling experiment actually run** and 2 are reasoned from construction with none; and 3 are broad **and**
+witnessed. That last label is a result rather than a gap: the experiment ran, the vector stayed green, and
+it is therefore not evidence for the rule it was meant to isolate. The value corpus's negatives are still
+not listed: there the label would be uniform and uninformative.
 
 ## The witnesses, and what they cost
 
@@ -90,14 +91,22 @@ than typed.
 ## Limit, stated rather than implied
 
 The rule column for entries under `generated-exchanges.ndjson` carries the file-level rule rather than a
-per-vector one, because no experiment has been run for those vectors; per-vector precision is owed before
-their experiments are run.
+per-vector one. Six of them carry per-vector precision now because experiments were run on them, run the way
+the rest of this file's were: patch one guard in `lean/Spec/Session.lean`, rebuild, run both corpora,
+restore, and report exactly which steps moved. The patched file was restored byte-identical after each.
+
+**And the limit that remains is a property of the vector's expectation rather than of the experiment.** The
+corpus pins a refusal's *class* and the state it leaves, which is what the differential compares — so a
+vector cannot isolate a rule when a second rule can refuse the same frame as `malformed`. The `properties`
+row above is the witnessed instance: the experiment ran, the vector stayed green, and it is `broad
+(witnessed)` permanently rather than as a debt, because sharpening it would mean pinning prose the
+differential deliberately does not compare.
 
 Drafted by the vector slice, whose experiments these are; reviewed, applied and committed by the planner as
 `vectors/**` requires.
 
 | `generated-exchanges` | `exchange-link-handle-in-use` | `attach/field:handle.2` | **isolated (witnessed)** | removing the guard at `Spec/Session.lean:696-699` failed **exactly this vector's step 4** and nothing else — across 278 step verdicts in `generated-exchanges.ndjson` and 29 in `slice.ndjson`, with the reference green throughout. The plan's record and the re-run agree. |
-| `generated-exchanges` | `exchange-link-credit-granted-and-spent` | the credit arithmetic (`Position.creditFor`; the spend at `Spec/Session.lean:929`) | **isolated (witnessed)** | removing the credit spend failed **this vector's step 5** and one other, `exchange-link-credit-counts-messages-not-frames#7`. The plan records three failures for this experiment — the two continuation steps plus step 5. **The difference is a finding, not an error on either side**: the plan measured the pre-fix layer, where a delivery whose single transfer leaves `more` unset never incremented the delivery-count, so a second delivery was admitted free; that defect has since been fixed, and its extra failure is gone. |
+| `generated-exchanges` | `exchange-link-credit-granted-and-spent` | the credit arithmetic (`Position.creditFor`; the spend at `Spec/Session.lean:929`) | **isolated (witnessed)** | removing the credit spend failed **this vector's step 5** and one other, `exchange-link-credit-counts-messages-not-frames#7`. The plan records three failures for this experiment — the two continuation steps plus step 5. **The difference is a finding, not an error on either side**: the plan measured the pre-fix layer, where a delivery whose single transfer leaves `more` unset never incremented the delivery-count, so a second delivery was admitted free; that defect has since been fixed, and its extra failure is gone.**Re-run over the corpus at 383 step verdicts, this experiment fails four steps**: the two above plus the pair promoted today, `exchange-link-aborted-false-spends-no-credit#5` and `exchange-link-aborted-spends-the-credit#5` — the same guard carrying more witnesses rather than a change in its reach. |
 | `generated-exchanges` | `exchange-link-credit-counts-messages-not-frames` | the same | **isolated (witnessed)** | the same experiment; its step 7 is the second of the two failures. |
 | generated-exchanges.ndjson | `exchange-header-protocol-id-unsupported` | picture.24 | **broad** | no disabling experiment run; the label records absence of evidence rather than intent |
 | generated-exchanges.ndjson | `exchange-header-protocol-id-unassigned` | picture.24 | **broad** | no disabling experiment run; the label records absence of evidence rather than intent |
@@ -134,18 +143,18 @@ Drafted by the vector slice, whose experiments these are; reviewed, applied and 
 | generated-exchanges.ndjson | `exchange-connection-discarding-discards-session-frames` | picture.10 | **broad** | no disabling experiment run; the label records absence of evidence rather than intent |
 | generated-exchanges.ndjson | `exchange-link-handle-out-of-range` | amqp:transport/section:link-handles | **broad (witnessed)** | the same mutant that killed the bound + 1 vector left this one green: 5 is refused by the true bound and the widened one alike |
 | generated-exchanges.ndjson | `exchange-link-sender-settle-mode-unmet` | amqp:transport/section:link-handles | **broad** | no disabling experiment run; the label records absence of evidence rather than intent |
-| generated-exchanges.ndjson | `exchange-link-settled-false-under-settled-negotiation` | transfer/field:settled.4 | **broad** | no disabling experiment run; the label records absence of evidence rather than intent — `settled.4`'s obligation read against the flag's value, so a frame setting it false no longer satisfies a clause requiring it true |
+| generated-exchanges.ndjson | `exchange-link-settled-false-under-settled-negotiation` | transfer/field:settled.4 | **isolated (witnessed)** | dropping the `settled.4` guard failed this vector's step 4 and two others — `exchange-link-sender-settle-mode-unmet#4` and `exchange-link-settled-on-a-continuation-suffices#6` — so the guard carries three steps and this vector is one of its three witnesses | |
 | generated-exchanges.ndjson | `exchange-link-first-transfer-needs-its-fields` | amqp:transport/section:link-handles | **broad** | no disabling experiment run; the label records absence of evidence rather than intent |
 | generated-exchanges.ndjson | `exchange-link-detach-releases-handle` | amqp:transport/section:link-handles | **broad** | no disabling experiment run; the label records absence of evidence rather than intent |
 | generated-exchanges.ndjson | `exchange-link-disposition-direction` | amqp:transport/section:link-handles | **broad** | no disabling experiment run; the label records absence of evidence rather than intent |
 | generated-exchanges.ndjson | `exchange-link-flow-unattached-handle` | amqp:transport/section:flow-control | **broad** | no disabling experiment run; the label records absence of evidence rather than intent |
 | generated-exchanges.ndjson | `exchange-link-flow-field-without-handle` | amqp:transport/section:flow-control | **broad** | no disabling experiment run; the label records absence of evidence rather than intent |
-| generated-exchanges.ndjson | `exchange-flow-properties-without-handle` | amqp:transport/section:flow-control | **broad** | no disabling experiment run; the label records absence of evidence rather than intent — and this is the fifth member of the five-sentence `MUST NOT be set` coupling, which the sweep found pinned through one member only |
-| generated-exchanges.ndjson | `exchange-flow-sender-count-null` | amqp:transport/section:flow-control | **broad** | no disabling experiment run; the label records absence of evidence rather than intent — the null form of the field whose value the vector beside it pins |
+| generated-exchanges.ndjson | `exchange-flow-properties-without-handle` | amqp:transport/section:flow-control | **broad (witnessed)** | removing the `properties` entry from the handle-less field list left it **green**: `flowCountRefusal` refuses the same frame as `malformed` first, and the vector's expectation names only the class and the state, so a different rule satisfies it. It is not evidence for `properties.1` — what it witnessed was the reference's missing member, which admitted the frame, and that is a divergence rather than an isolation | |
+| generated-exchanges.ndjson | `exchange-flow-sender-count-null` | amqp:transport/section:flow-control | **isolated (witnessed)** | disabling `flowCountRefusal`'s non-integer branch — returning `none` where it refuses — failed **exactly this vector's step 4** and nothing else, across 383 step verdicts in `generated-exchanges.ndjson` and 29 in `slice.ndjson` | |
 | generated-exchanges.ndjson | `exchange-link-credit-echoed` | amqp:transport/section:flow-control | **broad** | no disabling experiment run; the label records absence of evidence rather than intent |
-| generated-exchanges.ndjson | `exchange-link-aborted-false-spends-no-credit` | amqp:transport/section:flow-control | **broad** | no disabling experiment run; the label records absence of evidence rather than intent — the abort spends the credit, which is `flow-control.9`'s limit reached through a discarded delivery |
-| generated-exchanges.ndjson | `exchange-link-aborted-spends-the-credit` | amqp:transport/section:flow-control | **broad** | no disabling experiment run; the label records absence of evidence rather than intent — the same spend with the abort actually set, and `links.33`'s discard |
-| generated-exchanges.ndjson | `exchange-link-more-false-completes-the-delivery` | links.29 | **broad** | no disabling experiment run; the label records absence of evidence rather than intent — the `more` flag read as a value, so a set-and-false flag ends the delivery rather than continuing it |
+| generated-exchanges.ndjson | `exchange-link-aborted-false-spends-no-credit` | amqp:transport/section:flow-control | **isolated (witnessed)** | removing the credit spend failed this vector's step 5 and three others — `exchange-link-credit-granted-and-spent#5`, `exchange-link-credit-counts-messages-not-frames#7` and `exchange-link-aborted-false-spends-the-credit#5` — so the spend carries four steps and this vector is one of its four witnesses | |
+| generated-exchanges.ndjson | `exchange-link-aborted-spends-the-credit` | amqp:transport/section:flow-control | **isolated (witnessed)** | removing the credit spend failed this vector's step 5 and three others — `exchange-link-credit-granted-and-spent#5`, `exchange-link-credit-counts-messages-not-frames#7` and `exchange-link-aborted-false-spends-no-credit#5` — so the spend carries four steps and this vector is one of its four witnesses | |
+| generated-exchanges.ndjson | `exchange-link-more-false-completes-the-delivery` | links.29 | **isolated (witnessed)** | reading `more` by presence again failed **exactly this vector's step 5** and nothing else, over the same two corpora | |
 | generated-exchanges.ndjson | `exchange-link-transfer-direction-received` | amqp:transport/section:sessions.7 | **broad** | no disabling experiment run; the label records absence of evidence rather than intent |
 | generated-exchanges.ndjson | `exchange-link-transfer-direction-sent` | amqp:transport/section:sessions.7 | **broad** | no disabling experiment run; the label records absence of evidence rather than intent |
 | generated-exchanges.ndjson | `exchange-session-send-end-in-begin-sent` | amqp:transport/section:sessions.7 | **broad** | no disabling experiment run; the label records absence of evidence rather than intent |
