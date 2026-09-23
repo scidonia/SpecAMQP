@@ -337,6 +337,22 @@ def numberAtField (typeName fieldName : String) (body : Value) :
       .error (refuse invalidFieldCondition "malformed"
         s!"the {typeName}'s {fieldName} field is set and is not an integer")
 
+/-- A boolean field read by the *value* it carries rather than by whether the body's list reaches
+it: a field the frame leaves unset — or carries a null where it belongs — reads false, and so does
+one whose value the declared type has no room for, the same leniency `Ref.Message`'s `boolField`
+gives a state's flags.
+
+A boolean field means its value, and the declared surface says so on its own: a field whose
+declared `default` is `false` and whose description begins "If true" has a reading in which that
+default is reachable, which a presence test cannot give it. The clauses are the other half of the
+same fact — `settled.1` ("if not set ... MUST be interpreted as being false") and `settled.2`
+("interpreted as true if and only if the value ... was true") are two answers to one input under
+the two tests, and `settled.4` obliges the flag to be *true*, not merely set. -/
+def booleanAtField (typeName fieldName : String) (body : Value) : Bool :=
+  match valueOfField typeName fieldName body with
+  | some (.boolean bit) => bit
+  | _ => false
+
 /-! ## The endpoint -/
 
 /-- One session endpoint: its state, the outgoing channel its begin assigned, the
@@ -673,7 +689,9 @@ def flowLink (endpoint : Endpoint) (outbound : Bool) (body : Value) :
 
 /-- The link's half of a transfer: the role its direction requires, the credit a sender
 spends, the fields a first transfer must carry, the `settled` interpretation with
-`settled.4`'s obligation at the end of a delivery, and `aborted`'s discard. -/
+`settled.4`'s obligation at the end of a delivery, and `aborted`'s discard — which voids
+the message the transfer carries rather than the transfer, so an aborted transfer still
+spends the credit it would have spent. -/
 def transferLink (endpoint : Endpoint) (outbound : Bool) (body : Value) :
     Except Refusal Endpoint := do
   let _ ← readHandle endpoint outbound "transfer" body
@@ -723,13 +741,20 @@ def transferLink (endpoint : Endpoint) (outbound : Bool) (body : Value) :
       .error (refuse invalidFieldCondition "malformed"
         "the message-format of a continuation transfer differs from the message-format of \
           the delivery it continues, which `transfer/field:message-format.u1` makes an error")
-  let settled := present "settled"
-  let aborted := present "aborted"
-  let more := !aborted && present "more"
+  let settled := booleanAtField "transfer" "settled" body
+  let aborted := booleanAtField "transfer" "aborted" body
+  -- `more.u1`: "if both the more and aborted fields are set to true, the aborted flag takes
+  -- precedence", which is what makes the abort's discard fall out of this reading rather than
+  -- needing a branch of its own — a transfer the abort carries continues no delivery, so it
+  -- records nothing and leaves `progress` empty below.
+  let more := !aborted && booleanAtField "transfer" "more" body
   let completed := Delivery.advance endpoint.delivery id settled
-  if aborted then return { endpoint with delivery := none, deliveryTag := none,
-                                          deliveryFormat := none }
-  if !more && endpoint.senderSettleMode && !completed.settled then
+  -- `settled.4` is about the delivery a transfer settles, and an abort voids the message rather
+  -- than the transfer: there is no delivery left for that obligation to be about, so the rule is
+  -- not read for an aborted transfer. What the abort does *not* void is the transfer's effect on
+  -- the link's flow-control state, and the block at the end of this function applies it for an
+  -- aborted transfer exactly as for any other.
+  if !aborted && !more && endpoint.senderSettleMode && !completed.settled then
     .error (refuse invalidFieldCondition "malformed"
       s!"with the settled choice of sender-settle-mode negotiated, a delivery MUST be settled in at \
         least one of \
@@ -750,7 +775,11 @@ def transferLink (endpoint : Endpoint) (outbound : Bool) (body : Value) :
   | some position =>
     -- the credit bounds messages rather than frames, and the delivery-count "is
     -- incremented whenever a message is sent": both move on the transfer that begins a
-    -- delivery, so a continuation of an already-counted delivery moves neither
+    -- delivery, so a continuation of an already-counted delivery moves neither. An aborted
+    -- transfer moves them the same way as any other — `aborted.1` voids the payload the frame
+    -- carries and not the frame, and `links.33` speaks of "the message data that was
+    -- transferred prior to the abort", while `flow-control.5` binds link-credit to
+    -- delivery-count in one movement.
     let starting := !continued
     let counted :=
       { position with count := if starting then position.count + 1 else position.count }
@@ -825,10 +854,11 @@ def dispositionLink (endpoint : Endpoint) (outbound : Bool) (body : Value) :
   match endpoint.delivery with
   | none => return endpoint
   | some delivery =>
-    let settled :=
-      match valueOfField "disposition" "settled" body with
-      | some .null | none => false
-      | some _ => true
+    -- the field's declared surface: `settled` is a boolean whose declared default is false and
+    -- whose description begins "If true, indicates that the referenced deliveries are considered
+    -- settled by the issuing endpoint", so the disposition is settled exactly when the field
+    -- carries true — a field set to false leaves the delivery alone.
+    let settled := booleanAtField "disposition" "settled" body
     if settled && first ≤ delivery.id && delivery.id ≤ last then
       return { endpoint with delivery := none, deliveryTag := none, deliveryFormat := none }
     else return endpoint
@@ -989,11 +1019,10 @@ def step (endpoint : Endpoint) (outbound : Bool) (channel : Nat) (body : Value)
            | some value => numberOf value)
       return { endpoint with windows := windows }
   | .transfer =>
-    -- the deliverable this transfer belongs to, settled as `settled.4` interprets it
+    -- the deliverable this transfer belongs to, settled as `settled.4` interprets it: the
+    -- transfer's own flag read by value, and the value a delivery already carries
     let settled :=
-      (match valueOfField "transfer" "settled" body with
-       | some .null | none => false
-       | some _ => true) ||
+      booleanAtField "transfer" "settled" body ||
         (match endpoint.delivery with
          | some delivery => delivery.settled
          | none => false)
