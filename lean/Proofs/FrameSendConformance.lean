@@ -654,9 +654,17 @@ theorem writeAgrees_error (reasonClass specMessage refMessage : String) :
 
 /-- **A frame the carrier built holds a carrier-reachable body.** `frameOfJson` reads its body
 with `valueOfJson`, so whatever value it puts in the frame is one the corpus reader produced —
-which is the reachability `writers_matched` takes as a parameter. The walk is the carrier's own
-do-block, read forward the way `carriers_matched` reads it: each shared read is one case split,
-and each failing branch is closed by the bind's own propagation. -/
+which is the reachability `writers_matched` takes as a parameter.
+
+**How to walk a `do`-block like this one.** Each shared read is one `cases` split, in the order the
+block performs them, and each failing branch is closed by the bind's own propagation
+(`| error err => simp [hread] at h`) — the shape `carriers_matched` uses for the same block. What
+does *not* work is casing the one read you want and leaving the enclosing reads as binds: the goal
+is then a chain of `match`es whose `simp` cannot propagate an inner `.error` through, so the
+failing branch is left unsolved with a nested-match goal. That was this lemma's first attempt —
+casing the body read alone, five binds deep, and `simp`/`simp_all` could not close it — and the
+fix is to walk the block from its first read. A caller that needs an early read's value therefore
+pays for the reads before it, which is the price of the artefact's own top-to-bottom order. -/
 theorem carrierReachable_body_of_frameOfJson {json : Json} {other : SpecAMQP.Ref.Frame.Frame}
     (h : SpecAMQP.Ref.Vectors.frameOfJson json = .ok other)
     {obody : SpecAMQP.Ref.Value} (hb : other.body = some obody) : CarrierReachable obody := by
