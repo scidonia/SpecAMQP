@@ -310,6 +310,33 @@ def windowField (typeName fieldName : String) (body : Value) : Except Refusal Na
   | .error refusal =>
     .error ⟨refusal.condition, refusal.reasonClass, refusal.text, none, false⟩
 
+/-- The number a frame's field carries, with the field's *presence* kept apart from its
+value: `none` where the body's list stops short of the field, `some number` where the list
+reaches it and that is what it carries, and a refusal where the list reaches it and what it
+carries is not an integer.
+
+Those are two questions and the type system makes them different ones. Its rule for a
+composite's fields lets a writer stop the list before the nulls that would end it — that is
+what a field the frame leaves unset looks like on the wire — so a null the list *does*
+reach is a value the frame carries, and one its grammar allows anywhere but after the last
+field that is set. A reader that answers both with `none` cannot tell a field a clause
+leaves to its default from one a clause requires and the frame set to something the
+declared type has no room for. `flow/field:delivery-count.2` is the second case: it requires
+a flow sent from the link's sender to carry that endpoint's current count, so a null where
+the count belongs breaks the field's rule and is refused, while a flow whose list stops
+before the field is a different claim — the clause's presence half — that this layer does
+not read. -/
+def numberAtField (typeName fieldName : String) (body : Value) :
+    Except Refusal (Option Nat) :=
+  match valueOfField typeName fieldName body with
+  | none => .ok none
+  | some value =>
+    match numberOf value with
+    | some number => .ok (some number)
+    | none =>
+      .error (refuse invalidFieldCondition "malformed"
+        s!"the {typeName}'s {fieldName} field is set and is not an integer")
+
 /-! ## The endpoint -/
 
 /-- One session endpoint: its state, the outgoing channel its begin assigned, the
@@ -588,7 +615,12 @@ def flowLink (endpoint : Endpoint) (outbound : Bool) (body : Value) :
     | some .null | none => false
     | some _ => true
   if !namesLink then
-    let carried := ["delivery-count", "link-credit", "available", "drain"].filter
+    -- the artifact's five field clauses that read "When the handle field is not set, this
+    -- field MUST NOT be set": `delivery-count.1`, `link-credit.1`, `available.1`,
+    -- `drain.1` and `properties.1`. `echo.2` carries a sixth occurrence of the phrase in
+    -- the MAY class and is a different rule — a handle-less `echo` asks for the session's
+    -- state, which is the field's one conforming use.
+    let carried := ["delivery-count", "link-credit", "available", "drain", "properties"].filter
       (fun field =>
         match valueOfField "flow" field body with
         | some .null | none => false
@@ -601,11 +633,13 @@ def flowLink (endpoint : Endpoint) (outbound : Bool) (body : Value) :
   | none => return endpoint
   | some position =>
     if !namesLink then return endpoint
-    let count :=
-      match valueOfField "flow" "delivery-count" body with
-      | some value => numberOf value
-      | none => none
-    match count with
+    -- The count, read through `numberAtField` so that a field the list stops before and one
+    -- it reaches with a null in it stay different answers: a flow that leaves the field
+    -- unset is admitted (`.2`'s presence half, which says the field MUST be set, is not this
+    -- layer's reading yet), while a count that is set to something that is not one is the
+    -- field's rule broken rather than the field absent.
+    let carried ← numberAtField "flow" "delivery-count" body
+    match carried with
     | none => return endpoint
     | some count =>
       let ours := if outbound then endpoint.role == some Role.sender
