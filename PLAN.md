@@ -128,6 +128,18 @@ close, so every declaration after a module's first `mutual` block was registered
 `writeArrayData` did. A gate that rejects correct values *and* accepts names that name nothing is worse than one that does either, and it was found by
 the exemption repair rather than by a failing check, because a gate that resolves too little fails silently in the accepting direction.
 
+**Zero values now ride on a forward promise.** The exemption is retired in practice: 144 values checked, 72 vector ids resolved, **zero exempt and zero
+unresolved**. The thirty that §9's stale layout had been protecting are dispositioned — seventeen carried by a declaration that actually holds the rule, thirteen
+uncarried with the gap named — and two of the thirteen *connect* to gaps already on the record rather than inventing new ones: the version-selection pair, where
+the model states one version per layer so there is no set to select from, and `version-negotiation.5`, the transport-role gap that `Contracts/Sasl.lean` and the
+S3 audit both record, deferred alongside `sasl.8` instead of filed separately.
+
+**And a class of defect that had no name until an audit looked for it: citations that drifted.** A pass over every note in one batch's files found **26 ranges
+ending a line long**, a citation with no directory in its path, and **one line number that had not held the comparison it claimed for many revisions**. All were
+corrected, and it is worth the paragraph because the ledger's citations are the only mechanism tying a disposition to the artifact's text: a range drifted by a
+line still points at *something*, and nothing checks whether it still points at the thing the note describes. It is the stale-claim family in its most mechanical
+form — a claim about a *location* — and the audit that found it was a reading rather than a gate, which is the honest statement of where that check sits today.
+
 ## 7. Generated definition tables
 
 `scripts/gen-oasis-lean.py` reads the pinned bytes and emits `lean/Generated/Oasis/`, one module per declaration kind:
