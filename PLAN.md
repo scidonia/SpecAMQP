@@ -1651,6 +1651,12 @@ not hypothetical: running HEAD's tool against HEAD's ledger reproduced `check FA
 **The working tree is the one place the inconsistency is invisible**, because there the pair is whole; both times the defect was in what a *checkout* would do rather than in what the tree did. It is
 worth naming as the third face of a rule this plan already carries twice — a generated table must equal what its generator produces, and a check that can read the generator should — because neither of
 those says anything about *when* the two land.
+**And the experiments rule was broken a second time, which is evidence about the habit rather than about the rule.** Three scratch modules — `ProbeTmp`, `WireScratchTmp` and a `.bak` of it — were left
+under `lean/Proofs/` while a sitting worked in them, and **the trust gate caught it**: `s1_proof_integrity` failed with `the package does not build: [594/596] Building Proofs.ProbeTmp`, because a module
+in that directory sits inside the library's glob and is therefore compiled, scanned and shippable. **It is worth recording precisely because a gate caught it rather than a reading** — the day's other
+findings were readings, and this is the case where the rule and the gate agree and the only problem was a tree left in a working state. The rule costs a mover nothing, since `/tmp` imports the project's
+modules; what it costs is the discipline of moving a file before the build is treated as evidence, and the second occurrence says that discipline is the part worth stating.
+
 ## 17. Verification gates and their negative controls
 
 | Gate | Mechanism | Negative control |
