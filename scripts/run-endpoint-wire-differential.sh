@@ -121,11 +121,23 @@ srv_fifo=""
 ready=""
 port=""
 
-# Start the endpoint — with R4's corpus-driven application — on the first port it can bind, with a FIFO
-# so that a server which blocks before flushing hangs this script rather than passing it. Returns 0 when
-# it is ready, 1 when no port in the scan could be bound, and 2 when the endpoint started and refused the
-# vector: a vector the application cannot play is a loud failure of its own, and retrying it on forty
-# ports would report a bind collision that never happened.
+# Start the endpoint — with R4's corpus-driven application — on the first port in `[first, first +
+# port_attempts)` that it can bind, with a FIFO so that a server which blocks before flushing hangs this
+# script rather than passing it.
+#
+# The shape is one convention with per-driver ranges, stated in the plan: a candidate port derived from
+# this process's own pid, a **forward scan** over a bounded range, and **the server's own announcement**
+# as readiness — scanned for in its output rather than assumed to be the first line it writes. The
+# derivation is a blind starting point and the *bind* is what arbitrates, which is why there is no lock,
+# no registry and no shared base: two drivers scanning at once take different ports, and a lock would
+# serialise them to buy nothing. The environment variables that pin the start and the bound are named per
+# driver (`SPECAMQP_WIRE_*` here, `SPECAMQP_ENDPOINT_*` in the shell's driver) for the same reason — a
+# shared base would make two suites race for one window instead of settling it by bind.
+#
+# Returns 0 when the endpoint announced the port it took, 1 when the range is exhausted — a **named
+# invalid**: this run tested nothing — and 2 when the endpoint started and refused the vector, since a
+# vector the application cannot play is a loud failure of its own and retrying it on forty ports would
+# report a bind collision that never happened.
 start_endpoint() {
   label=$1
   first=$2
@@ -138,16 +150,24 @@ start_endpoint() {
       >"$srv_fifo" 2>&1 &
     srv_pid=$!
     exec 3<"$srv_fifo"
-    if IFS= read -r ready <&3; then
-      if printf '%s' "$ready" | grep -q 'listening port='; then
-        return 0
+    readiness=""
+    announced=0
+    while IFS= read -r line <&3; do
+      readiness=$(printf '%s\n%s' "$readiness" "$line")
+      if printf '%s' "$line" | grep -q 'listening port='; then
+        announced=1
+        break
       fi
-      if printf '%s' "$ready" | grep -qE 'carries no vector|no start state|send a .value|asked to send'; then
-        printf '%s\n' "$ready" >"$work/$label.startup.log"
-        exec 3<&-
-        wait "$srv_pid" 2>/dev/null
-        return 2
-      fi
+    done
+    if [ "$announced" = 1 ]; then
+      ready="$readiness"
+      return 0
+    fi
+    if printf '%s' "$readiness" | grep -qE 'carries no vector|no start state|send a .value|asked to send'; then
+      printf '%s\n' "$readiness" >"$work/$label.startup.log"
+      exec 3<&-
+      wait "$srv_pid" 2>/dev/null
+      return 2
     fi
     exec 3<&-
     wait "$srv_pid" 2>/dev/null
@@ -318,16 +338,25 @@ for record in pathlib.Path(socket_log).read_text().splitlines():
             if state and in_state and in_state != state.split(":")[-1]:
                 step_problems.append(
                     f"the vector expects the peer in {state}; the endpoint is in {in_state}")
-        elif answer_index < len(answers) and answers[answer_index][0] == "took":
+        elif state and answer_index < len(answers) and answers[answer_index][0] == "took":
             in_state = answers[answer_index][1]
             answer_index += 1
-            if state and in_state != state.split(":")[-1]:
+            if in_state != state.split(":")[-1]:
                 step_problems.append(
                     f"the vector expects the peer in {state}; the endpoint said {in_state}")
-        else:
+        elif state:
             step_problems.append(
                 f"the vector expects the peer in {state}, and the endpoint narrated nothing for this "
                 f"step: it is in {in_state or 'no state it narrated'}")
+        elif answer_index < len(answers) and answers[answer_index][0] == "took":
+            # The step names no state, so the vector compares nothing about where the peer is — and it
+            # must not be read as demanding an answer either: a step that says nothing about the state is
+            # a step that leaves it alone. The endpoint's answer to it is still consumed, because it
+            # advances the state the next step is read from, and whether that answer arrives here or is
+            # folded into the step before it depends only on how the peer's writes coalesced in the
+            # endpoint's reads — a verdict must not turn on that.
+            in_state = answers[answer_index][1]
+            answer_index += 1
         # and the differential itself: this step's socket verdict against the specification's
         spec_entry = spec.get(f"{vector_id}#{number}")
         if spec_entry is not None:
