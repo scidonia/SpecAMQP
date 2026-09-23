@@ -56,8 +56,8 @@ namespace SpecAMQP.Proofs
 
 open SpecAMQP.Harness (Octets)
 open SpecAMQP.Spec.Frame
-open SpecAMQP.Spec.Frame (Frame FrameType decodeFrame encodeFrame bodyStart headerOctets
-  minDoff sizeOctets maxSize channelOctets doffOctets beAt)
+open SpecAMQP.Spec.Frame (Frame FrameType decodeFrame readFrame encodeFrame writeFrame bodyStart
+  headerOctets minDoff sizeOctets maxSize channelOctets doffOctets beAt)
 open SpecAMQP.Spec.Codec (Value decodeValue encodeValue beOctets)
 open SpecAMQP.Generated.Oasis (TypeDecl)
 
@@ -112,7 +112,8 @@ so "no body, or a described value naming a performative" is what an accepted fra
 theorem accepted_frames_carry_performatives :
     SpecAMQP.Contracts.AcceptedFramesCarryPerformatives := by
   intro bytes frame consumed h
-  unfold decodeFrame at h
+  rw [decodeFrame_eq_ok_iff] at h
+  unfold readFrame at h
   simp only [] at h
   repeat' split at h
   all_goals grind [carriesPerformative_eq]
@@ -127,7 +128,8 @@ is needed: the decoder already did it. -/
 theorem consumed_is_the_declared_size :
     SpecAMQP.Contracts.ConsumedIsTheDeclaredSize := by
   intro bytes frame consumed h
-  unfold decodeFrame at h
+  rw [decodeFrame_eq_ok_iff] at h
+  unfold readFrame at h
   simp only [] at h
   repeat' split at h
   all_goals grind
@@ -159,7 +161,8 @@ theorem encodeFrame_ok_facts (frame : Frame) (bytes : Octets) (h : encodeFrame f
           frame.payload.size) ++ beOctets 1 frame.doff ++ beOctets 1 frame.frameType.code ++
           beOctets channelOctets frame.channel).toArray ++ frame.extended ++ bodyOctets ++
           frame.payload := by
-  unfold encodeFrame at h
+  rw [encodeFrame_eq_ok_iff] at h
+  unfold writeFrame at h
   simp only [] at h
   repeat' split at h
   all_goals first
@@ -454,7 +457,8 @@ theorem decodeFrame_eq_ok_of (bytes : Octets) (frame : Frame) (consumed : Nat)
   have g3 : ¬ (bodyStart frame.doff > bytes.size) := by omega
   have g4 : ¬ (bytes.size < bytes.size) := by omega
   have g5 : ¬ (bodyStart frame.doff + consumed > bytes.size) := by omega
-  unfold decodeFrame
+  rw [decodeFrame_eq_ok_iff]
+  unfold readFrame
   dsimp only []
   rw [hSize, hDoff, hType, hChannel]
   rw [if_neg g1, if_neg g1, if_neg g2, if_neg g3, if_neg g4]

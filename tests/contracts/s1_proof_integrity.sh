@@ -271,7 +271,7 @@ import Spec.Message
 #print axioms SpecAMQP.Proofs.exists_of_bind_ok
 AXIOMS
 ( cd "$root/lean" && LAKE_NO_CACHE=1 lake env lean "$tmp/Axioms.lean" ) >"$tmp/axioms.log" 2>&1 ||
-  die "could not print the accepted theorem's axioms: $(grep -m1 -E ': error|': error|\.lean:[0-9]+:[0-9]+: error' "$tmp/axioms.log" || tail -3 "$tmp/axioms.log")"
+  die "could not print the accepted theorem's axioms: $(grep -m1 -E '\.lean:[0-9]+:[0-9]+: error' "$tmp/axioms.log" || tail -3 "$tmp/axioms.log")"
 grep -q "sorryAx" "$tmp/axioms.log" &&
   { cat "$tmp/axioms.log"; die "the accepted theorem depends on sorryAx"; }
 grep -q "ofReduceBool" "$tmp/axioms.log" &&

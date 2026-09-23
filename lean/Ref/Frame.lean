@@ -19,6 +19,15 @@ the value layer established, because the differential contract compares classes 
 the artefacts. A failure raised by the value layer is rendered by variant rather than by
 parsing its prose.
 
+The class is a **field** of a refusal, not a token a reader recovers by splitting the
+message: the class is the part of a refusal that is interface — the corpus compares classes
+between the artefacts, and this reader decides whether a value-layer failure was a
+truncation by class — and a class read back out of prose by `String.splitOn` is one no
+proof can reason about. So `readFrame` and `writeFrame` answer with a `Refusal`, whose
+`reasonClass` is the class and whose `message` is the class, a colon, and the prose; and
+`decodeFrame` and `encodeFrame` are those two functions rendered as that message, byte for
+byte what this module has always reported to a caller.
+
 Two things this layer does not do, both because they are not the frame layer's: it does
 not check which performative may appear in which state or on which channel (that
 dispatch is a picture, and belongs to the state machine), and it does not enforce a
@@ -150,11 +159,29 @@ deriving Repr
 def beAt (bytes : Octets) (start width : Nat) : Nat :=
   (bytes.extract start (start + width)).foldl (fun acc byte => acc * 256 + byte.toNat) 0
 
-/-- A refusal: the reason class, then what happened. -/
-def refusal (reasonClass prose : String) : String := s!"{reasonClass}: {prose}"
+/-- A refusal: the reason class this layer names, and the message a caller sees.
 
-/-- A value-layer failure as this layer reports it. -/
-def valueFailure (error : DecodeError) : String :=
+The class is a field rather than a token a reader recovers from the message, because the
+class is the part of a refusal that is interface — the corpus compares classes between the
+artefacts, and this reader decides whether a value-layer failure was a truncation by class
+— and a class read back out of prose by `String.splitOn` is one the kernel cannot reason
+about. The message travels with it so that every caller and every vector still sees byte
+for byte what this module reported before the class became a field. -/
+structure Refusal where
+  /-- The reason class this refusal names. -/
+  reasonClass : String
+  /-- The message a caller sees: the class, a colon, and the prose. -/
+  message : String
+deriving Repr, DecidableEq
+
+/-- A refusal: the reason class, then what happened. -/
+def refusal (reasonClass prose : String) : Refusal :=
+  ⟨reasonClass, s!"{reasonClass}: {prose}"⟩
+
+/-- A value-layer failure as this layer reports it: the class the value layer's own variant
+names — carried as a field, so this layer never recovers it by splitting the message — and the
+message this layer spells for it. -/
+def valueFailure (error : DecodeError) : Refusal :=
   match error with
   | .truncated context => refusal "truncated" context
   | .unassigned octet =>
@@ -174,15 +201,18 @@ def classOf (message : String) : String := (message.splitOn ":").head?.getD ""
 
 /-! ## Reading and writing -/
 
-/-- Decode the frame at the front of a buffer, reporting the octets it consumed as the
+/-- Read the frame at the front of a buffer, reporting the octets it consumed as the
 SIZE it declares.
 
 The header is read first, then the declared arithmetic is checked for self-consistency,
 then the buffer is checked to hold the frame it declares, and only then is the body
 read — from the body's start to the *end of the buffer*, so that a performative which
 runs past its own frame's SIZE becomes a size contradiction rather than a buffer
-truncation. The two are different defects and the corpus distinguishes them. -/
-def decodeFrame (bytes : Octets) : Except String (Frame × Nat) :=
+truncation. The two are different defects and the corpus distinguishes them.
+
+This is the layer's reader, and its refusal carries the reason class as a field; the
+message a caller sees is `decodeFrame` below, which renders that class. -/
+def readFrame (bytes : Octets) : Except Refusal (Frame × Nat) :=
   if bytes.size < headerOctets then
     .error (refusal "truncated" s!"a frame header is {headerOctets} octets and only \
       {bytes.size} are present")
@@ -221,7 +251,7 @@ def decodeFrame (bytes : Octets) : Except String (Frame × Nat) :=
         match decode (bytes.extract start bytes.size) with
         | .error e =>
           let rendered := valueFailure e
-          if classOf rendered = "truncated" then
+          if rendered.reasonClass = "truncated" then
             .error (refusal "sizeMismatch" s!"the performative at octet {start} does not \
               fit in the {size} octets SIZE declares")
           else .error rendered
@@ -248,14 +278,30 @@ def decodeFrame (bytes : Octets) : Except String (Frame × Nat) :=
               .error (refusal "malformed" "the frame body does not start with a \
                 described type, so it is not a performative")
 
-/-- Encode a frame, deriving the SIZE it declares from the octets it writes.
+/-- The reader as a caller sees it: `readFrame`'s refusal rendered as its message. The
+class it names is the field `readFrame` carries, so a reader of this form and a proof about
+`readFrame` cannot disagree about a class. -/
+def decodeFrame (bytes : Octets) : Except String (Frame × Nat) :=
+  (readFrame bytes).mapError Refusal.message
+
+/-- The two forms of the reader accept exactly the same frames: rendering a refusal to its
+message turns no answer into a different one, so a claim about `decodeFrame`'s accepted
+frame is a claim about `readFrame`'s, and a proof may work in whichever form it needs. -/
+theorem decodeFrame_eq_ok_iff (bytes : Octets) (frame : Frame) (consumed : Nat) :
+    decodeFrame bytes = .ok (frame, consumed) ↔ readFrame bytes = .ok (frame, consumed) := by
+  cases h : readFrame bytes <;> simp [decodeFrame, h, Except.mapError]
+
+/-- Write a frame, deriving the SIZE it declares from the octets it writes.
 
 DOFF is carried rather than derived, and an inconsistent one is refused: a DOFF that
 does not describe the extended header actually present would declare a body start the
 octets do not have. A DOFF the one-octet field cannot hold is refused as well — writing
 it would keep the low octet and drop the rest, which is a different frame than the one
-asked for, and one this module's own reader would refuse. -/
-def encodeFrame (frame : Frame) : Except String Octets :=
+asked for, and one this module's own reader would refuse.
+
+This is the layer's writer, and its refusal carries the reason class as a field; the
+message a caller sees is `encodeFrame` below, which renders that class. -/
+def writeFrame (frame : Frame) : Except Refusal Octets :=
   if frame.doff < minDoff then
     .error (refusal "sizeMismatch" s!"DOFF {frame.doff} is below the minimum {minDoff}")
   else if frame.channel > maxChannel then
@@ -288,7 +334,7 @@ def encodeFrame (frame : Frame) : Except String Octets :=
             {frame.kind.role} role a {frame.kind.name} frame carries")
       else
         match encode body with
-        | .error e => .error e
+        | .error e => .error ⟨classOf e, e⟩
         | .ok body =>
           let size := headerOctets + frame.extended.size + body.size + frame.payload.size
           if size ≤ maxSize then
@@ -301,5 +347,14 @@ def encodeFrame (frame : Frame) : Except String Octets :=
     | some _ =>
       .error (refusal "malformed" "the frame body is not a described type, so it is not \
         a performative")
+
+/-- The writer as a caller sees it: `writeFrame`'s refusal rendered as its message. -/
+def encodeFrame (frame : Frame) : Except String Octets :=
+  (writeFrame frame).mapError Refusal.message
+
+/-- The two forms of the writer accept exactly the same frames, for the same reason. -/
+theorem encodeFrame_eq_ok_iff (frame : Frame) (bytes : Octets) :
+    encodeFrame frame = .ok bytes ↔ writeFrame frame = .ok bytes := by
+  cases h : writeFrame frame <;> simp [encodeFrame, h, Except.mapError]
 
 end SpecAMQP.Ref.Frame
