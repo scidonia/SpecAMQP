@@ -316,6 +316,30 @@ Remaining and routed in the module's header: the signed widths (`BitVec.toInt_of
 `signedOf` carries), `char`, whose disagreement with the reference is in the *accessor* rather than the arithmetic — `Nat` against `Int`,
 a bridge before any proof — and the four compounds.
 
+**A species, now with three instances: two artefacts can agree on behaviour and differ in a dimension the corpus measures nothing about.**
+The third is `char`, and it is the sharpest because its dimension is not merely unmeasured but **inexpressible**. The specification reads a
+code point as a JSON *natural* (`codePointOf json` is `getObjValAs? Nat "codepoint"` plus a `≤ 1114111` check); the reference reads it as a
+JSON *integer* (`boundedField json "codepoint" 0 1114111`, which is `getObjValAs? Int "codepoint"` plus the same check). No vector can write
+an integer where a natural is expected — the corpus is JSON text, and `65` is a natural — so **no differential over the corpus could ever see
+this.** It is therefore a difference on an input the corpus cannot express rather than a conformance gap, and what it blocks is a *proof*:
+the `char` clause needs an accessor bridge,
+
+```lean
+theorem getObjValAs_nat_of_int (json : Json) (key : String) (i : Int) (h0 : 0 ≤ i)
+    (h : json.getObjValAs? Int key = .ok i) : json.getObjValAs? Nat key = .ok i.toNat
+```
+
+which through the instances (`FromJson Nat := ⟨Json.getNat?⟩`, `FromJson Int := ⟨Json.getInt?⟩`) reduces to the number layer — from
+`n.toInt? = some i` and `0 ≤ i`, `n.toNat? = some i.toNat` for `n : JsonNumber`, in `Lean/Data/Json/Basic.lean` — a relationship that is not
+in this repository's imports. So `char` is blocked on the JSON layer rather than on the standard, and the block is an hour of case analysis
+rather than a gap.
+
+The other two instances of the species are the `float`/`double` failure *text* and the two dispatchers' clause *orders*. All three belong in
+one place because they are the differential's own blind spots stated in advance: **the corpus compares verdicts and classes, so it is silent
+on wording, on order, and on a JSON number's type.** A downstream implementation should read that boundary before trusting a green corpus,
+and the proof is where the boundary becomes visible — which is the argument for a proof existing beside a test suite rather than instead of
+one.
+
 **What discharging the hypotheses would take, in order, so the next sitting does not rediscover the shape.** The refutations stand as theorems either way — a refuted hypothesis is a theorem or it is a rumour. Then: **(i)** decide the reading for each divergence, which needs the artifact's own text — for the odd-counted map, whether the count names items or entries and whether the *form* of the count is checked before or after its consistency with the octets. Where the artifact is silent, a register entry decides it, which is what the register is for. **(ii)** Align the two artefacts to that reading, one commit per divergence, since each is symmetric in a different place. **(iii)** Add a vector per divergence, because *reachability* is what decides whether the corpus could ever have seen it: the array-element family is reachable through the corpus vocabulary and the odd-count map is not, and that difference is a fact about the corpus rather than about the defect. **(iv)** Only then are the hypotheses provable and the two conditional instances unconditional. **The order is the point**: a vector written last would be a vector written from the fix rather than from the artifact, which is the rule this repository keeps and exactly why the differential cannot be the thing that finds this class of defect.
 
 **And a second divergence sits underneath the first, found by a sharper witness.** The reported buffer violated two rules at once — an odd count *and* a declared size inconsistent with its items — so it could not say which rule either artefact was answering. A buffer violating only parity, `#[0xC1, 0x03, 0x03, 0x40, 0x40, 0x40]` where the items measure exactly the declared three octets, gives `malformed` from the specification and `sizeMismatch "map" 3 4` from the reference: declared 3, **measured 4**. Four is what a map's content measures if the *count field is inside the size*, three if it is not — so the two artefact seem to differ about what a compound value's size field covers, which would change the class for every map and list rather than only the odd ones. The ledger's index yields the parity clause (`amqp:types/section:primitive-type-definitions/type:map.1`) and nothing on the size field's extent, so that question is open and is being settled from the artifact's prose. **It is the more important of the two**: a parity rule affects one malformed encoding, a size-accounting difference affects the whole corpus.
