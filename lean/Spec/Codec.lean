@@ -273,7 +273,9 @@ this way rather than naming them, so a wrong encoding here has to be a wrong tab
 def rowOf (owner : String) (width : Nat) : Except String EncodingDecl :=
   match encodings.find? (fun decl => decl.owner == owner && decl.width == width) with
   | some decl => .ok decl
-  | none => .error s!"the declared surface has no {owner} encoding of width {width}"
+  | none =>
+    .error (refusal "limit" s!"the declared surface has no {owner} encoding of width \
+      {width}")
 
 /-- The `boolean` row that names `true` or `false`, which is how the table
 distinguishes the two fixed-width zero-octet boolean encodings. -/
@@ -667,7 +669,9 @@ an array whose constructor is `float` carries four-octet elements, not whatever
 width an element would choose alone. -/
 def rawPayload (decl : EncodingDecl) (bits : Octets) : Except String (List UInt8) :=
   if bits.size = decl.width then .ok bits.toList
-  else .error s!"a {decl.owner} payload is {decl.width} octet(s) and the value has {bits.size}"
+  else
+    .error (refusal "limit" s!"a {decl.owner} payload is {decl.width} octet(s) and \
+      the value has {bits.size}")
 
 /-- A compound's octets under a declaration: the size field, the count field, then
 the body. The size counts the octets after it, so it is the count field's width plus
@@ -862,8 +866,8 @@ def writeDeclared : Value → Option EncodingDecl → UInt8 → Except String (L
     let tail ← writeValue inner
     return head ++ tail
   | item, none, constructor =>
-    .error s!"an array whose element constructor is 0x{toHex #[constructor]} carries \
-      described values, not {typeName item}"
+    .error (refusal "malformed" s!"an array whose element constructor is \
+      0x{toHex #[constructor]} carries described values, not {typeName item}")
   | item, some decl, _ =>
     match decl.category with
     | .fixed => writeFixedData decl item
@@ -897,7 +901,8 @@ def writeArrayData : Value → EncodingDecl → Except String (List UInt8)
       let elementDecl ← elementDecl? constructor
       let elements ← writeElements items elementDecl constructor
       arrayOctets decl constructor items.length elements
-  | item, _ => .error s!"an array encoding cannot carry {typeName item}"
+  | item, _ =>
+    .error (refusal "malformed" s!"an array encoding cannot carry {typeName item}")
 termination_by item _ => sizeOf item
 
 end
