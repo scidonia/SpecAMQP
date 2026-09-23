@@ -1203,8 +1203,11 @@ after a refusal, not yet attributed to core or vector.
 a product's default is a different decision from a differential's needs, and the app supplies the vector's header. **Revisit only when R4 grows a rung whose
 evidence is about the *shipped* binary offering SASL**, which is the condition that would change the answer rather than an open question left standing.
 
-**And a finding held for when it matters**: the shell prompting the application only after a read is a statement about the loop rather than about either
-artefact. It becomes a finding the moment a corpus family needs two sends in a row, and it is recorded here rather than rediscovered as a mystery.
+**And a finding held for when it matters, in the two places it will be met**: the shell prompting the application only after a read is a statement about the
+loop rather than about either artefact, and `7244007` writes it into the corpus-driven application's *header* — `Shell.Driver.pump` asks the application once per
+read, so two consecutive `send` steps with nothing arriving between them leave the second unprompted, measured at step 2 of `slice-open-missing-container-id`
+and `slice-open-channel-max-wrong-type`. A finding recorded next to the code it constrains travels with the code; one recorded only in a plan travels with
+whoever read the plan.
 
 
 ## 23.2 The concurrent server: what is settled, what is proposed, and what must be proved
