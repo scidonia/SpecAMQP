@@ -1,5 +1,6 @@
 import Contracts.Conformance
 import Proofs.ConnectionConformance
+import Proofs.ReadersAgree
 
 /-!
 # Acceptance: the connection layer conforms
@@ -65,5 +66,26 @@ rather than a lookalike of it. -/
 theorem connection_conformance_public (readers : SpecAMQP.Proofs.ReadersAgree) :
     Conforms SpecAMQP.Proofs.specConn SpecAMQP.Proofs.refConn :=
   SpecAMQP.Proofs.ref_connection_conforms_existential readers
+
+/-- **The connection layer conforms, discharged.**
+
+`connection_conformance_public` with its hypothesis supplied rather than named: `Proofs.readersAgree`
+proves the two frame readers' agreement with no hypotheses of its own, so this states the connection
+layer's conformance of the two endpoints themselves rather than of what would follow from a relation.
+The connection instance joins the frame layer's receive half as an unconditional `Conforms` instance.
+
+**One sentence of history, because it explains why the hypothesis was open rather than overlooked.**
+`ReadersAgree` demands `FramesAgree` on the frames, which includes `ValuesAgree` on the body — the whole
+value, elementwise — while the layer beneath it speaks in the *view* vocabulary a frame reader actually
+consults, since a frame reader reads a body only to ask which declared type its descriptor names and
+whether the frame type's role is among that type's `provides`. So the connection layer's hypothesis was
+one notch stronger than the frame layer could reach, and it stayed open until the value law's proof —
+which carries `BodiesAgree` internally and weakens it to view equality only at `valueLayersAgree` —
+donated the missing step, `valuesAgree_of_bodiesAgree`. **A relation stated one notch stronger than the
+layer beneath it can deliver is the fourth shape of this kind this specification has produced**, and in
+this case the stronger relation turned out to be true: what was missing was the step, not the fact. -/
+theorem connection_conformance :
+    Conforms SpecAMQP.Proofs.specConn SpecAMQP.Proofs.refConn :=
+  connection_conformance_public SpecAMQP.Proofs.readersAgree
 
 end SpecAMQP.Contracts

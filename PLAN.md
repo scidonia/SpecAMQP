@@ -325,6 +325,15 @@ rather than vacuous" is now a statement about these two endpoints rather than ab
 declaration, and its being unconditional is the difference the section insisted on. **Four instances are now landed** — frame receive, frame send (conditional on the writer law, with its consequent
 separately recorded as false for a reachable array body), connection, and the value layer's.
 
+**And the connection instance is discharged too, and it took a missing *step* rather than a missing fact.** `Proofs.readersAgree : ReadersAgree` — no hypotheses, axioms within the accepted set — and
+`Contracts.connection_conformance : Conforms specConn refConn` applies it, so the connection layer joins the frame layer's receive half as an **unconditional** `Conforms` instance. The hypothesis it replaces was
+open for a reason worth stating precisely: `ReadersAgree` demands `FramesAgree` on the frames, which includes `ValuesAgree` on the body — the whole value, elementwise — while the layer beneath it speaks in the
+*view* vocabulary a frame reader actually consults, since **a frame reader reads a body only to ask which declared type its descriptor names and whether the frame type's role is among that type's `provides`**.
+So the connection layer's hypothesis was one notch stronger than the frame layer could reach, and it stayed open until the value law's proof — which carries `BodiesAgree` internally and weakens it to view
+equality only at `valueLayersAgree` — donated the step, `valuesAgree_of_bodiesAgree`. **That is the fourth shape of this kind in one layer**, after the writer's reader-reachable domain, the wire law's cursor
+bound and the fuel irrelevance above the octet bound, and its distinguishing feature is that the stronger relation was *true*: what was missing was the step between two spellings of the same relation, not the
+fact. The frame send half remains conditional on the writer law, with its consequent separately recorded as false for a reachable array body.
+
 **And the discharge survived an independent review that was looking for exactly the failure modes this repository has produced before.** The reviewer measured both axiom sets itself rather than reading them
 from a report, found the contract's `ValueLayersAgree` declared exactly once with no narrower copy anywhere in the tree, traced the joint induction and confirmed **no circularity** — every recursive use
 consumes strictly lower fuel than the level being established, with `wireAgrees_succ`'s `ElementsDecideBelow K` supplied from the induction hypothesis at `K` rather than forwarded — checked that both
