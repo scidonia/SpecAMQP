@@ -214,8 +214,23 @@ the bound states, and at the entry point it holds for free: both entry points re
 `readValue bytes.size ⟨bytes, 0⟩`, and `bytes.size - 0 ≤ bytes.size`.
 
 A fuel is only ever a bound on a reader's *recursion*, so the bound is what a reader needs: every
-descent spends at least one octet, and the two readers' descents spend the same fuel per value, per
-compound item and per array element, which is what the branch lemmas show one branch at a time. A law
+descent spends at least one octet, and a reader spends fuel only by descending, which is what the
+branch lemmas show one branch at a time.
+
+What is **not** true, and what this docstring said until the compound rows were attempted, is that the
+two readers spend the same fuel for the same descent. The reference's `readCompound` matches on
+`fuel + 1` and so spends one unit on its own header, while the specification's `readValue` already
+spent that unit and its `readCompound` passes its own fuel through: the reference's `readCompound F`
+reads `readItems (F - 1)` where the specification's reads `readItems F`. The two *item loops* therefore
+sit one fuel apart at one value-level fuel, and the difference is visible in the loops themselves —
+`Ref.readItems 0 0 c` refuses where `Spec.readItems 1 0 c` accepts, so no statement of the form
+"ref `readItems j` ↔ spec `readItems j`" is provable from the readers as they are. The offset is an
+accounting difference and not a behavioural one — both readers answer identically at the fuel the
+contract uses, which is what the entry-point differential measures — and what closes it is the fact
+that the specification's fuel is irrelevant above the bound; the module header's section on the
+compound and array rows states that fact and the design it wants.
+
+A law
 quantified over every fuel a cursor can be paired with is a *different* law from the one the contract
 asks for, and not a stronger one. -/
 def WireAgrees (fuel : Nat) : Prop :=
