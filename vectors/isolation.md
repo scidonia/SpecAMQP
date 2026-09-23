@@ -44,6 +44,27 @@ field, at which point the branch becomes observable and the generator's descript
 case. Recording this is the point: a survivor that is understood is evidence about the specification's shape,
 and a survivor that is merely written down as equivalent would be an assumption.
 
+## The same two-enforcer shape, seen from the corpus side
+
+The security slice's mutation tier found the phenomenon above from the other direction, and it is worth its
+own section because it is the label's clearest instance yet. Its mutant **M2** disabled the mandatory-field
+guard on the five SASL performatives. Three of the five vectors written for that rule failed —
+`sasl-init-without-mechanism`, refused as an *unoffered mechanism* under `framing-error`, which is the
+original defect reappearing; and `sasl-challenge-without-challenge` and `sasl-response-without-response`,
+both admitted — while **two stayed green**: `sasl-outcome-without-code` and `sasl-mechanisms-null`.
+
+Those two are refused by a *second* enforcer with the same condition and class — `intField`'s unset-field
+arm and the empty-list arm respectively — so with the mandatory guard gone they pin the same behaviour
+through the other enforcer. By this file's test they are therefore **broad conformance evidence, not
+rule-isolated evidence**: neither can distinguish the guard it was written for from the guard that answers
+first. No vector in that family isolates the mandatory-field rule today; a fifth performative whose fields no
+other arm inspects would, and the shape to watch for when one is added is that its vector fails under M2
+while the others do not.
+
+The slice reported this rather than presenting five failing vectors as five witnesses, which is the reason it
+belongs here — a family whose members are green under their own rule's mutant looks like five pieces of
+evidence and is three.
+
 ## The two broad-witnessed rows are the ones worth keeping
 
 Each names a rule and stays green when that rule is disabled — one because a value of 5 is refused by the

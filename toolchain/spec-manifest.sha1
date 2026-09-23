@@ -13,13 +13,16 @@ d4de8144b2390024ff98ef4bb5a6ddc34ad5d2d4  lean/Spec/Value.lean
 f5eabce0d6dcbec66bdaf79152a0b5a0e171c12d  lean/Contracts/Codec.lean
 cb61d366aa72347b772dd32399e4e0dfe8a04a42  lean/Contracts/Conformance.lean
 75e98c72e8d523cfc61503f709736ec8872b2bf8  lean/Contracts/ConnectionLifecycle.lean
+4ac495317e0ba4e7ebfcc9a39843204b98427f77  lean/Contracts/FlowControl.lean
 ac372f4848586250e81968f3ead62410d598b57c  lean/Contracts/FrameCodec.lean
 a17f9194a7f52f841e936457cac7b7d9f0c0ed95  lean/Contracts/FrameCodecAcceptance.lean
 eeb3c6c4881c6675670298155ebdb0825d234738  lean/Contracts/FrameConformance.lean
 33b42a63e6a0fc2419774220a7036fc7c3022909  lean/Contracts/MessageFormat.lean
-493378efcde0233ea750b3a5b29fa34ce13e0a35  lean/Contracts/Sasl.lean
+f1b824c9c4aeae571c20a0acb2e7ff06d1b50741  lean/Contracts/Sasl.lean
+7c21024cca2563dd13547647dc85b03a7f9e06fa  lean/Contracts/SaslAcceptance.lean
 4451890c1389bf43a3ddf0e9b6ba17a34622c730  lean/Contracts/SessionCredit.lean
 a67c2b5be23a15b617bebef2fb595a10bb5357ca  lean/Contracts/SessionWindows.lean
+cd0b5ac08a97c9ff4c4074a2cade872b32c78da4  lean/Contracts/Settlement.lean
 7a52a63a35cda512b63a483e43af4799ae81beea  lean/Contracts/Transaction.lean
 c5ee92929caed5a244bae9a85cea9d0af5e7749a  lean/Contracts/TypeSystem.lean
 0f123312d720c0282d52ceb90467270f289dc6ed  vectors/frames-negative.ndjson
@@ -27,7 +30,7 @@ c5ee92929caed5a244bae9a85cea9d0af5e7749a  lean/Contracts/TypeSystem.lean
 ccc84acbd80928c1ee75368b208ccd018d50cfc4  vectors/generated-exchanges.ndjson
 d6ce3953f0a2ffecd4c947bd66c7d4799b3b5339  vectors/generated-frames.ndjson
 b22dd480096d2126ee8d6b764e03fc0540521cdb  vectors/generated.ndjson
-a8412a12ec4d84fe97a3c52f624d21e408d28df6  vectors/isolation.md
+e5f033faca866b81c8d3f614761858dc591ec2c0  vectors/isolation.md
 2c6eb7f4cfd6e68184c967a121928251f346e669  vectors/message/deliveries.ndjson
 56025501f1567db480e31b5d76f8b00761951b75  vectors/message/generated.ndjson
 d488702b9362fdcd2b3e182af1b58627dd5a3f28  vectors/message/messages-negative.ndjson
