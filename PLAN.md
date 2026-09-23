@@ -6,7 +6,9 @@ Produce, in this repository, **a complete, correct, executable formal specificat
 
 This repository holds the specification, the evidence that it is correct, and a **reference implementation written in Lean**. The two are deliberately separate artefacts: the specification is declarative, generated-table-driven and shaped for proof, while the reference implementation is operational, independently written from the same clauses, and compiled to a native executable by Lean itself — so its behaviour rests on no translation step. Differential testing runs the implementation against the specification and against recorded third-party exchanges; the corpus, not either artefact, is what both are measured by.
 
-Nothing here is Rust: extraction through Charon and Aeneas, proofs about a Rust programme, and performance work remain downstream (§23). What this repository now provides to that work is an executable oracle.
+Nothing here is Rust: extraction through Charon and Aeneas, proofs about a Rust programme, and performance work remain downstream (§23). What this repository now provides to that work is an executable oracle. **What is left out of that sentence is performance *work*, not measurement of our own instruments**: the corpus
+executables' cost is measured off-gate with the results committed (§16), because this repository has twice paid for not measuring it — an accumulator appending to the end of a list made the corpus quadratic, and
+it was found by someone noticing rather than by a measurement.
 
 ## 1. What "a correct specification" means here
 
@@ -58,7 +60,9 @@ Scan numbers size the work; the ledger is the work.
 
 ## 3. Non-goals
 
-- **No Rust, no extraction, no performance work.** The reference implementation is in Lean, and it is the only implementation here. A Rust programme, its extraction through Charon and Aeneas, proofs about it, optimised candidates and measurements belong to TemperMint and are scheduled there (§23).
+- **No Rust, no extraction, no performance work.** The reference implementation is in Lean, and it is the only implementation here. A Rust programme, its extraction through Charon and Aeneas, proofs about it, optimised candidates and performance *targets* belong to TemperMint and are scheduled there (§23). **What this repository does measure is its own instruments**: the two corpus executables' wall
+time and peak RSS over named workloads, off-gate and with the results committed under `bench/`, because the corpus's cost decides how far it can grow and because two performance defects made it unusable before anyone
+measured anything. The distinction is deliberate — **measurement here, optimisation there** — and the numbers are not a claim about any downstream artefact's speed.
 - **No claims about the reference implementation's conformance beyond its corpus.** It is an implementation, not a proof: what it satisfies is stated by the vectors it passes, and a clause it does not yet exercise is a clause it does not yet demonstrate. The specification's theorems are about the specification.
 - **No protocol extensions.** AMQP management (`amqp-man`), filter expressions (`filtex`), claims-based security (`amqp-cbs`), addressing, JMS mapping, HTTP-over-AMQP, event streams, and connection-info are out of scope; they exist as working drafts in `oasis-tcs/amqp-specs`, not as part of the OASIS Standard for core AMQP 1.0. Core must nonetheless model how unknown described types and pass-through annotations are handled.
 - **No broker or queue semantics.** AMQP core defines links and termini, not what a destination does with a message. `source`/`target` are formalized as protocol-visible field sets and obligations, not as a routing model.
@@ -1819,6 +1823,18 @@ a theorem over the code — and a fix that looks covered by all three is usually
 answers the question by itself: the suite here is **19 of 19** on a tree carrying the widened corpus, the specification's two writer arms, the truncation closure and the rewired differential, and none of those four
 is what makes that number mean anything without the other evidence beside it.
 
+
+**And the repository now measures its own instruments, off-gate, with the evidence committed.** `bench/run.py` measures the two corpus executables over named workloads, `bench/workloads.json` records why each
+workload exists, and `bench/results/corpus-instruments-<date>.json` is the committed record — carrying the environment (CPU, cores, memory, load at run time, toolchain, commit and dirty paths), the SHA-256 of each
+binary, each corpus and the runner itself, and min/median/max over seven measured repetitions with one warm-up discarded. **None of it is a gate**: this repository's rules forbid a test from touching a real clock, and a
+threshold that depends on host load would be measuring the machine rather than the code.
+
+**And the first run's own method is the part worth copying.** The obvious series — quarter, half, whole — *cannot* answer the complexity question for this corpus, and the measurement said so: `generated.ndjson`'s
+first quarter holds **51.9% of the bytes at 25.0% of the vectors** (mean line 466 bytes against 144 in each later quarter), so a prefix series moves volume and mixture together and its ratios mean nothing about cost.
+The runner therefore carries a second **growth series**: one fixed 17,598-vector base repeated ×1/×2/×4, mixture held exactly constant and the work ratio exactly 2.0000. **The result is 1.86× time for 2× work, at
+both steps and in both artefacts** — linear, with the slight sublinearity being the fixed startup cost amortising — which is precisely the measurement that would have caught the quadratic accumulator this repository
+was bitten by. The startup floor is a number worth having too: an empty corpus costs 0.049 s and the twenty-vector worked corpus the same, so any workload under a few thousand vectors measures process start rather
+than the code. Full corpus, for the record: 70,390 vectors in 0.726 s median for the reference and 0.688 s for the specification, at ~142 MB peak RSS each.
 
 ## 17. Verification gates and their negative controls
 
