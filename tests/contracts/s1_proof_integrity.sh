@@ -24,6 +24,10 @@
 #   3. generated and harness modules are out of scope by construction — the scan
 #      names the directories it covers, so an omission is visible rather than
 #      implied.
+#   **The clauses run in order and the first failure stops the gate, which hides the later ones.**
+#   That is not a hypothetical: clause 2's probe was unresolvable for several commits while clause 1
+#   failed first on two `sorry`s, so a red gate read as "the scan found trust" when the scan was in
+#   fact clean and the probe had not run. A green clause 1 is not evidence about clause 2.
 #   4. the whole package builds. Every other gate here — this one included until
 #      now — builds *named* targets, and a text scan cannot see an unclosed goal,
 #      so a proof module that does not compile is invisible to all of them until
@@ -233,7 +237,8 @@ note "no sorry, admit, native_decide, partial, axiom, constant, opaque, unsafe o
 ( cd "$root/lean" && LAKE_NO_CACHE=1 lake build Contracts.Codec Contracts.FrameCodec \
     Contracts.FrameCodecAcceptance Contracts.TypeSystem Proofs.CodecFrameLaws \
     Proofs.CodecRoundTrip Proofs.CodecRoundTripCompound Proofs.CodecRoundTripDescribed \
-    Proofs.CodecRoundTripNarrowest Proofs.CodecRoundTripVariable Spec.ReadLaws Spec.Message ) >"$tmp/axiombuild.log" 2>&1 ||
+    Proofs.CodecRoundTripNarrowest Proofs.CodecRoundTripVariable Spec.ReadLaws Spec.Message \
+    Contracts.SaslAcceptance Proofs.SaslDialogue Contracts.FrameConformance ) >"$tmp/axiombuild.log" 2>&1 ||
   die "building the modules the axiom probe reads failed: $(tail -3 "$tmp/axiombuild.log")"
 
 cat >"$tmp/Axioms.lean" <<'AXIOMS'
@@ -247,6 +252,9 @@ import Proofs.ExceptMap
 import Proofs.CodecRoundTripNarrowest
 import Proofs.CodecRoundTripVariable
 import Spec.ReadLaws
+import Contracts.FrameConformance
+import Contracts.SaslAcceptance
+import Proofs.SaslDialogue
 
 import Proofs.ReadProgress
 import Proofs.CodecNarrowestAssembly
@@ -304,6 +312,18 @@ import Spec.Message
 #print axioms SpecAMQP.Proofs.lengthWidthOf_wide
 #print axioms SpecAMQP.Proofs.two_pow_eight_mul
 #print axioms SpecAMQP.Proofs.lengthPrefixed_eq
+-- S7: the security layer's laws and the acceptance declarations that bind them. The three
+-- bindings are what make "proved" a fact about this layer rather than a sentence in a docstring,
+-- so each is asked, and the laws behind them are asked too.
+#print axioms SpecAMQP.Contracts.layer_admits_its_own_performatives_public
+#print axioms SpecAMQP.Contracts.dialogue_phase_never_goes_back_public
+#print axioms SpecAMQP.Contracts.only_an_ok_outcome_establishes_the_layer_public
+#print axioms SpecAMQP.Proofs.sasl_layer_admits_only_sasl_performatives
+#print axioms SpecAMQP.Proofs.amqp_layer_admits_no_sasl_performative
+#print axioms SpecAMQP.Proofs.sasl_phase_never_goes_back
+#print axioms SpecAMQP.Proofs.only_an_ok_outcome_establishes_the_layer
+#print axioms SpecAMQP.Proofs.dialogue_state_initial
+#print axioms SpecAMQP.Proofs.dialogue_state_step
 #print axioms SpecAMQP.Proofs.lengthPrefixed_ok
 #print axioms SpecAMQP.Proofs.takeBe_beOctets
 #print axioms SpecAMQP.Spec.ReadLaws.extract_toList_eq_drop_take

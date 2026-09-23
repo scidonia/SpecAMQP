@@ -183,6 +183,7 @@ shell bash tests/contracts/s2_frame_vectors.sh       # the frame layer's corpus
 shell bash tests/contracts/s3_exchanges.sh           # the exchange corpora, both artefacts, per-step refusals
 shell bash tests/contracts/s5_messages.sh            # the message layer's differential
 shell bash tests/contracts/s6_transactions.sh        # the transaction layer's differential
+shell bash tests/contracts/s7_sasl.sh                # the security layer: both corpora, per-step refusals, the four codes
 
 # the implementation track: R1's transport shell (PLAN.md §23.1)
 shell bash scripts/run-transport-loopback.sh         # two Lean processes over loopback; shim evidence

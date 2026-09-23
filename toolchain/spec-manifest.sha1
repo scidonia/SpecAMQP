@@ -19,7 +19,7 @@ a17f9194a7f52f841e936457cac7b7d9f0c0ed95  lean/Contracts/FrameCodecAcceptance.le
 eeb3c6c4881c6675670298155ebdb0825d234738  lean/Contracts/FrameConformance.lean
 33b42a63e6a0fc2419774220a7036fc7c3022909  lean/Contracts/MessageFormat.lean
 f1b824c9c4aeae571c20a0acb2e7ff06d1b50741  lean/Contracts/Sasl.lean
-7c21024cca2563dd13547647dc85b03a7f9e06fa  lean/Contracts/SaslAcceptance.lean
+2295e6f005de782702f084d0d97b36dc98a19e86  lean/Contracts/SaslAcceptance.lean
 4451890c1389bf43a3ddf0e9b6ba17a34622c730  lean/Contracts/SessionCredit.lean
 cd0b5ac08a97c9ff4c4074a2cade872b32c78da4  lean/Contracts/Settlement.lean
 7a52a63a35cda512b63a483e43af4799ae81beea  lean/Contracts/Transaction.lean
