@@ -3,10 +3,12 @@
 An **executable formal specification of AMQP 1.0 core** (OASIS Standard, Parts 0–5) written in Lean 4,
 with a clause-level ledger that makes completeness and fidelity *measurable* rather than asserted.
 
-**This repository holds a specification, not an implementation.** It defines what a conforming AMQP
-1.0 endpoint must do, states that as mathematics a machine can run, and records for every clause of the
-standard how — and to what extent — the specification accounts for it. Implementations belong
-elsewhere; what this repository produces is the contract they are measured against.
+**This repository holds a specification, and a reference implementation of it.** It defines what a
+conforming AMQP 1.0 endpoint must do, states that as mathematics a machine can run, records for every clause
+of the standard how — and to what extent — the specification accounts for it, and ships an endpoint written
+in Lean whose protocol core is proved to conform to the specification it states. What it does not ship is a
+*verified binary*: Lean's compiler is trusted and the socket layer is the one named unproved dependency, and
+`PLAN.md` §23.1 names both rather than leaving them to be inferred.
 
 ## What is here
 
@@ -16,6 +18,7 @@ elsewhere; what this repository produces is the contract they are measured again
 | `lean/Generated/Oasis/` | the declared surface as Lean data — descriptors, encodings, types, fields, choices — generated from the artifacts |
 | `lean/Spec/` | the handwritten semantics: executable, total, and independent of every consumer |
 | `lean/Ref/` | an independently written reference implementation, authored from the artifacts and sharing no definition with `lean/Spec/` |
+| `lean/Impl/` | the shipped endpoint: a pure protocol core proved to conform to `lean/Spec/`, and the one module that is not proved — the socket boundary (`PLAN.md` §23.1) |
 | `lean/Contracts/` | acceptance declarations: the exact propositions the specification claims |
 | `lean/Proofs/` | proofs of those declarations |
 | `ledger/` | the clause ledger, its coverage and reconciliation, the dispositions, and the **ambiguity register** — every place the standard is silent and a reading was taken |
@@ -28,9 +31,19 @@ elsewhere; what this repository produces is the contract they are measured again
 **The specification's purpose is to be a target.** `PLAN.md` defines what it means for an endpoint to
 conform — a state machine over a frozen interface alphabet — and that interface was frozen *before any
 implementation existed* for exactly this reason: proving an instance of it for a concrete programme is
-downstream work, and it needs the extraction toolchain. A Rust programme, its extraction through Charon and
-Aeneas, and the proofs about it are TemperMint's, not this repository's. What this repository provides to
-that work is an **executable oracle and a definite contract to prove against**.
+downstream work. This repository now supplies **two** things to that work: an **executable oracle and a
+definite contract to prove against**, and — since the implementation track of `PLAN.md` §23.1 — **a
+reference endpoint of its own**, written in Lean and compiled natively, whose protocol core is a proved
+instance of that same conformance relation. TemperMint's Rust programme, its extraction through Charon and
+Aeneas, and the proofs about it remain TemperMint's work and are not replaced by it: the endpoint here is a
+second instance of the relation, and the corpus is what the two are compared over.
+
+**How far the endpoint's evidence reaches.** Its protocol core is proved to conform, under the same gates as
+every other proof in this repository. Its compiled form is a *trusted* step rather than a proved one — Lean's
+compiler and runtime are not verified — and its socket layer is a small, separately named unproved
+dependency, because the pinned stdlib provides addresses and UDP and no TCP. The corpus runs against the
+endpoint over a socket as a third runner beside `amqp-spec` and `amqp-ref`, so what the endpoint claims and
+what it does are compared by the same vectors as everything else.
 
 **`lean/Ref/` is not that proof, and it is not an implementation-acceptance mechanism.** It is a second
 *independent reading* of the same standard, because the dominant residual risk here is prose ambiguity: two

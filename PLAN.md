@@ -877,7 +877,7 @@ The specification's six writer sites were changed by that slice under an explici
 
 ## 23. Handoff: what downstream implementation work needs from here
 
-This repository stops at the specification. The remaining work — a Rust reference implementation, its extraction through Charon and Aeneas, proofs that it conforms, a fast implementation, performance evidence — belongs to TemperMint and is scheduled there. What it needs from here, and what `HANDOFF.md` records:
+This repository holds the specification **and**, from the implementation track recorded at the end of this section, a reference implementation of it: an AMQP 1.0 endpoint written in Lean, compiled natively, whose protocol core is proved to conform to the frozen interface, with its socket layer as the one named unproved dependency. The remaining work — a Rust implementation, its extraction through Charon and Aeneas, proofs that it conforms, performance evidence — belongs to TemperMint and is scheduled there; this repository's endpoint is a *second instance* of the same conformance relation rather than a replacement for that work. What the specification work needs from here, and what `HANDOFF.md` records:
 
 1. **The frozen interface alphabet and conformance relation** (§10) — so an implementation's proof is a `Conforms` instance rather than a re-framing exercise.
 2. **The ledger and coverage report** — so implementation milestones can claim clause-level coverage in the same units as the specification, and gaps are visible on both sides.
@@ -885,3 +885,28 @@ This repository stops at the specification. The remaining work — a Rust refere
 4. **The executable specification** (`lake exe amqp-spec`) — the oracle for spec-vs-implementation differential testing, and the reason vectors can be checked without writing a checker.
 5. **The Lean/mathlib pin agreement** — so the specification's modules can be required directly by downstream proofs.
 6. **Requirements that need tooling changes**, for scheduling in TemperMint rather than implementing here: multi-target extraction sharing one source-closure identity; a certificate binding the specification, model, corpus, and a `Conforms`-style theorem; a certificate kind whose claim is "refines a specification" rather than "computes a specified value"; per-module proof-cost accounting; and a corpus dimension in replay that regenerates and compares every claim-bearing input byte-identically.
+
+### 23.1 The implementation track
+
+**The goal is a reference implementation of this specification**: an AMQP 1.0 endpoint, written in Lean, running as a native process, whose protocol core is a proved instance of the conformance relation §10 froze. It is a second instance of that relation beside TemperMint's Rust work, not a replacement for it, and it exists so that the corpus has a runner that speaks the protocol on a real transport rather than replaying vectors in process.
+
+**Where the extraction boundary is, and why it is there.** The property the boundary needs is that the *unproved* part be small, nameable, and unable to change a protocol decision. Three measurements fix it, all taken against the pinned toolchain rather than assumed:
+
+- **The C backend is already in use.** `lake build` compiles these modules to C and links them with `leanc` (clang 22.1.4 in the pinned shell), so `amqp-spec` and `amqp-ref` are already native binaries. Native compilation is therefore not the new part, and no new toolchain enters the repository.
+- **Lean erases proofs and types before code generation**, which is what makes "extraction" the right word for compiling a specification: the propositions proved about a function do not survive into its executable form, and the function does.
+- **The stdlib at this revision cannot open a socket.** It provides `Std/Net/Addr` and `Std/Async/UDP`, and no TCP. So the transport is the one dependency Lean cannot supply, and it is the natural place to put the boundary rather than a place chosen for convenience.
+
+The chain is therefore three links, and only the middle one is trusted:
+
+1. **The protocol core conforms to the specification — proved.** `lean/Impl/` holds a pure endpoint: octets and events in, octets and events out, no `IO`. Its conformance to `Spec` is a `Conforms` instance of §10, discharged in `lean/Proofs/` under the same gates as every other proof here.
+2. **The compiled binary refines the source — trusted, and disclosed.** Lean's compiler and runtime are not verified. This link is named in `HANDOFF.md` and in the trust gate's inventory the way `native_decide` is named, because a claim that a proof about Lean source is a claim about a binary is exactly the kind of assumption this repository discloses rather than implies.
+3. **The binary behaves as the corpus says — tested.** The vectors already run against `amqp-spec` and `amqp-ref` through a runner interface that was frozen to be implementation-agnostic; the endpoint becomes the third runner over the same corpus, at the wire rather than in process.
+
+**Rungs**, each landable and each verified on its own:
+
+- **R1 — the transport shell.** A `@[extern]` boundary to `accept`/`recv`/`send`/`close`, its C shim, and a two-process loopback exchange proving that a Lean binary can serve a connection and that the shim neither reorders nor truncates. This is the rung that must come first, because it is the only part whose honesty cannot be checked by building the rest.
+- **R2 — the endpoint core**, pure, total, and written against the specification's own vocabulary: a fixed header, then the frame loop over `Spec`'s steps.
+- **R3 — the conformance theorem**: the core is a `Conforms` instance, so its proofs are the layer proofs the frame and connection instances already established rather than a new development.
+- **R4 — the wire differential**: the corpus replayed against the endpoint over a socket, compared per vector against `amqp-spec` with the same verdict-and-reason comparison the in-process differential uses.
+
+**What this track does not claim.** Not that the binary is verified — the compiler link above is trusted and disclosed. Not that the shell is proved; it is the named hole, and it is kept small enough to read. Not performance: the endpoint is a reference to compare against, and measurement belongs to TemperMint where it is scheduled. And not that the endpoint replaces the second reading in `lean/Ref/`: the differential between two independent readings of the standard is a check on *the specification*, and adding a third runner over the same corpus does not make it redundant.
