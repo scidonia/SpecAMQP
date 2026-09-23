@@ -128,10 +128,23 @@ numerically in the other — and a closer that depends on the spelling is a clos
 ## What remains, and the route to it
 
 * **`char`** — the same round trip as `ubyte`, at 1114111, but *not* on the same read: the
-  specification reads `getObjValAs? Nat "codepoint"` through `codePointOf`, while the reference
-  reads `boundedField json "codepoint" 0 1114111` through `getObjValAs? Int`. That disagreement is
-  in the *accessor*, not the width, so this clause needs a `Nat`/`Int` accessor bridge before its
-  arithmetic.
+  specification reads `getObjValAs? Nat "codepoint"` through `codePointOf`, the reference reads
+  `boundedField json "codepoint" 0 1114111` through `getObjValAs? Int`. The disagreement is in the
+  *accessor*, so the clause needs a bridge whose exact goal is
+
+  ```lean
+  theorem getObjValAs_nat_of_int (json : Json) (key : String) (i : Int) (h0 : 0 ≤ i)
+      (h : json.getObjValAs? Int key = .ok i) : json.getObjValAs? Nat key = .ok i.toNat
+  ```
+
+  Through the instances (`FromJson Nat := ⟨Json.getNat?⟩`, `FromJson Int := ⟨Json.getInt?⟩`, both
+  in `Lean/Data/Json/FromToJson/Basic.lean`) this reduces to the *number* layer: from
+  `n.toInt? = some i` and `0 ≤ i`, `n.toNat? = some i.toNat` for `n : JsonNumber`
+  (`Lean/Data/Json/Basic.lean`). That is where the work is, and it is not in this repository's
+  imports - so `char` is blocked on a `JsonNumber` lemma rather than on any AMQP content. It is
+  also worth the planner's eye as a *fact about the two artefacts*: the specification accepts a
+  code point written as a JSON natural, the reference as a JSON integer, and the corpus writes
+  them as naturals, which is why no differential sees the difference.
 * **The four compounds** — `list`, `map`, `array`, `described` — where the recursion's fuel and the
   item reads are the work, and where `BodiesAgree` recurses (`BodiesAgreeList`, `BodiesAgreePairs`,
   and the constructor pair for `array`).
