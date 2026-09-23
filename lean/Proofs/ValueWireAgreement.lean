@@ -11,8 +11,13 @@ import Ref.Value
 `Proofs.FrameConformance.ValueLayersAgree` is the value layer's claim in the *wire* vocabulary: what
 the reference's reader reads off a buffer, the specification's reader reads too - the same octets
 consumed and bodies the frame layer views the same way - or a refusal of the same class. This module
-is that claim's development, and it is **in progress**: the formulation and the base case are below,
-and the per-branch lemmas and the fuel induction are the work it exists for.
+is that claim's development, and it is **in progress**. Landed: the formulation (with the fuel bound
+its truth needs), the base case, the octet step and its payload bridges, the branch *pattern* and its
+first three arms — the described branch and the two exemplars a scalar branch is copied from. Still
+owed: the remaining scalar, compound and array arms, the loop relations they share, the dispatch that
+turns the arms into the induction step, and the fuel induction itself. What each owes and how it is
+proved is stated where it belongs rather than in a list here: see the octet step's arithmetic, and
+`arm_0x00`'s docstring for the pattern the branches follow.
 
 ## Why a fuel-indexed formulation, and what it carries
 
@@ -120,13 +125,20 @@ The success conjunct carries `BodiesAgree`, which is *stronger* than the contrac
 is what the route needs: a described body's view is `some (typeOfDescriptor descriptor)`, so the two
 descriptors must correspond, and `BodiesAgree` is exactly the relation that says so - the same one
 the corpus side uses between the two value types. `bodyView_of_BodiesAgree` below recovers the
-contract's spelling, so the claim is still the contract's own. -/
+contract's spelling, so the claim is still the contract's own.
+
+It also carries `c₂.data = c.data`: a read hands its own buffer back, so the *octets the fuel has to
+cover* do not change as the induction descends. That component is what lets one read's bound become
+the next read's bound — a described value reads its descriptor and then its value at *one* fuel, and
+the second read's cursor is a position further on in the same buffer, so `d.pos ≤ d₂.pos`
+(`ReadProgress`'s `readValue_progress`) with the buffer fixed is exactly the inequality the bound
+needs. Without it the induction cannot relate one read's budget to the next's. -/
 def StepAgrees (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor) : Prop :=
   (∀ (other : SpecAMQP.Ref.Value) (c₂' : SpecAMQP.Ref.Cursor),
       SpecAMQP.Ref.readValue fuel c' = .ok (other, c₂') →
       ∃ (body : SpecAMQP.Spec.Codec.Value) (c₂ : SpecAMQP.Spec.Codec.Cursor),
         SpecAMQP.Spec.Codec.readValue fuel c = .ok (body, c₂) ∧
-        CursorAgrees c₂ c₂' ∧ BodiesAgree body other) ∧
+        CursorAgrees c₂ c₂' ∧ c₂.data = c.data ∧ BodiesAgree body other) ∧
   (∀ (failure : SpecAMQP.Ref.DecodeError),
       SpecAMQP.Ref.readValue fuel c' = .error failure →
       ∃ refusal : SpecAMQP.Spec.Codec.Refusal,
@@ -493,4 +505,279 @@ theorem spec_takeBe_one_of_takeU8 (d : SpecAMQP.Spec.Codec.Cursor) (b : UInt8)
   rw [hfold]
   rfl
 
+/-- A successful octet step's cursor is inside its buffer: the step took an octet from it. A
+zero-width row reads *nothing* through `takeBytes 0`, and that read still needs the position to be
+inside the buffer, so this is what a zero-width branch carries. -/
+theorem spec_takeU8_lt {c : SpecAMQP.Spec.Codec.Cursor} {b : UInt8}
+    {d : SpecAMQP.Spec.Codec.Cursor} (h : SpecAMQP.Spec.Codec.takeU8 c = .ok (b, d)) :
+    c.pos < c.data.size := by
+  by_contra hlt
+  unfold SpecAMQP.Spec.Codec.takeU8 at h
+  rw [dif_neg hlt] at h
+  exact absurd h (by simp)
+
+/-- An octet step leaves its cursor inside the buffer, which is what the zero-width rows' read of
+nothing needs. -/
+theorem spec_takeU8_next_le {c : SpecAMQP.Spec.Codec.Cursor} {b : UInt8}
+    {d : SpecAMQP.Spec.Codec.Cursor} (h : SpecAMQP.Spec.Codec.takeU8 c = .ok (b, d)) :
+    d.pos ≤ d.data.size := by
+  have hlt : c.pos < c.data.size := spec_takeU8_lt h
+  unfold SpecAMQP.Spec.Codec.takeU8 at h
+  rw [dif_pos hlt] at h
+  simp only [Except.ok.injEq, Prod.mk.injEq] at h
+  obtain ⟨-, hd⟩ := h
+  subst hd
+  dsimp only
+  omega
+theorem spec_takeBytes_zero (c : SpecAMQP.Spec.Codec.Cursor) (h : c.pos ≤ c.data.size) :
+    SpecAMQP.Spec.Codec.takeBytes 0 c = .ok (#[], ⟨c.data, c.pos + 0⟩) := by
+  have hempty : c.data.extract c.pos (c.pos + 0) = #[] := by
+    apply Array.eq_empty_of_size_eq_zero
+    rw [Array.size_extract]
+    omega
+  unfold SpecAMQP.Spec.Codec.takeBytes
+  rw [if_pos (by omega), hempty]
+
+/-- A one-octet payload read fails exactly where the octet step fails, with the same class: the two
+read the same octet, and each refuses it in its own words. -/
+theorem spec_takeBytes_one_class {c : SpecAMQP.Spec.Codec.Cursor}
+    (refusal : SpecAMQP.Spec.Codec.Refusal)
+    (h : SpecAMQP.Spec.Codec.takeU8 c = .error refusal) :
+    ∃ refusal' : SpecAMQP.Spec.Codec.Refusal,
+      SpecAMQP.Spec.Codec.takeBytes 1 c = .error refusal' ∧
+      refusal'.reasonClass = refusal.reasonClass := by
+  by_cases hlt : c.pos < c.data.size
+  · unfold SpecAMQP.Spec.Codec.takeU8 at h
+    rw [dif_pos hlt] at h
+    exact absurd h (by simp)
+  · unfold SpecAMQP.Spec.Codec.takeU8 at h
+    rw [dif_neg hlt] at h
+    simp only [Except.error.injEq] at h
+    subst h
+    unfold SpecAMQP.Spec.Codec.takeBytes
+    rw [if_neg (by omega)]
+    exact ⟨_, rfl, rfl⟩
+
+/-- The failure half of the width-one bridge: a payload read the reference fails, the specification
+fails with the same class. -/
+theorem spec_takeBytes_one_fails {c : SpecAMQP.Spec.Codec.Cursor} {c' : SpecAMQP.Ref.Cursor}
+    (hc : CursorAgrees c c') (failure : SpecAMQP.Ref.DecodeError)
+    (h : SpecAMQP.Ref.takeU8 c' = .error failure) :
+    ∃ refusal : SpecAMQP.Spec.Codec.Refusal,
+      SpecAMQP.Spec.Codec.takeBytes 1 c = .error refusal ∧
+      (SpecAMQP.Ref.Frame.valueFailure failure).reasonClass = refusal.reasonClass := by
+  obtain ⟨refusal, hspec, hcl⟩ := takeU8_fails hc failure h
+  obtain ⟨refusal', hbytes, hcl'⟩ := spec_takeBytes_one_class refusal hspec
+  exact ⟨refusal', hbytes, by rw [hcl, hcl']⟩
+
+/-- **One value read's budget is the next read's.** A read leaves its cursor further on in the same
+buffer, so the octets left at the cursor it hands back are no more than the octets left at the one it
+was given — which is what lets a branch that reads twice at one fuel pass the bound along. The buffer
+equality is the success conjunct's own, so this is stated against that component rather than against a
+reader of its own. -/
+theorem bound_of_read {fuel : Nat} {c d₂ : SpecAMQP.Spec.Codec.Cursor}
+    {v : SpecAMQP.Spec.Codec.Value} (h : SpecAMQP.Spec.Codec.readValue fuel c = .ok (v, d₂))
+    (hdata : d₂.data = c.data) (hb : c.data.size - c.pos ≤ fuel) :
+    d₂.data.size - d₂.pos ≤ fuel := by
+  have hpos := (readValue_progress fuel).1 c v d₂ h
+  have hsize : d₂.data.size = c.data.size := by rw [hdata]
+  omega
+
+/-! ## The described branch (`0x00`), and the pattern the rest follow
+
+A branch lemma is stated against the octet *step* rather than against the reader: what a dispatch
+gives its arms is a pair of cursors that agree and one octet that both readers took, and what a
+branch owes is `StepAgrees` one fuel up. The arm a reader selects is then its own, reduced by the
+literal octet the statement names — which is why a branch lemma carries the octet in its hypotheses
+and never in its statement, and why the branches below are written one octet at a time.
+
+Three moves recur, and each cost an iteration to find. The specification's dispatch is on
+`classify code.toNat` and its table lookups run `List.find?` over the generated surface, so a branch
+resolves its own side with two `decide`-checked facts — the classification and the row — rather than
+by `simp`: `decide` is ordinary evaluation over finite data, and the whole arm behind a lookup is a
+`match` whose scrutinee only reduces once the row is named. The reference's dispatch is on the octet
+itself and reduces by `rfl`. And every payload step is an `Except` bind, which the two lemmas in
+`Proofs/ExceptMap` reduce and nothing else does. -/
+
+/-- **The described branch (`0x00`).** The specification dispatches on the octet's *classification*
+and the reference on the octet itself, and `classify 0 = descriptor` is exactly the octet `0x00`, so
+the two readers run the same arm: a descriptor, then a value, then `.described`. Both reads are the
+induction hypothesis one fuel down — the descriptor first, then the value at the cursor the first read
+left — and the consumed octets agree because the hypothesis carries `CursorAgrees` through each of
+them.
+
+This is the branch the induction is shaped around: it is the only one that reads *two* values at one
+fuel, which is why the success conjunct carries the buffer the reads share, and it is the pattern the
+scalar branches follow with their reads replaced by a table lookup and the compound ones with theirs
+replaced by a loop. -/
+theorem arm_0x00 (fuel : Nat) (ih : WireAgrees fuel) (c : SpecAMQP.Spec.Codec.Cursor)
+    (c' : SpecAMQP.Ref.Cursor) (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor)
+    (hd : CursorAgrees d d') (hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x00, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x00, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hdata : d.data = c.data := spec_takeU8_data hs
+  have hclass : SpecAMQP.Spec.Value.classify (0x00 : UInt8).toNat = .descriptor := by decide
+  -- the arm each reader's own dispatch selects
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      (SpecAMQP.Spec.Codec.readValue fuel d) >>= (fun p =>
+        (SpecAMQP.Spec.Codec.readValue fuel p.2) >>= (fun q =>
+          .ok (.described p.1 q.1, q.2))) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass]
+    rfl
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      (SpecAMQP.Ref.readValue fuel d') >>= (fun p =>
+        (SpecAMQP.Ref.readValue fuel p.2) >>= (fun q =>
+          .ok (.described p.1 q.1, q.2))) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  constructor
+  · intro other c₂' h
+    rw [hR] at h
+    obtain ⟨⟨desc, d₂'⟩, h1, h⟩ := exists_of_bind_ok h
+    dsimp only at h
+    obtain ⟨⟨val, d₃'⟩, h2, h⟩ := exists_of_bind_ok h
+    dsimp only at h
+    obtain ⟨hother, hcur⟩ : .described desc val = other ∧ d₃' = c₂' := by
+      have hp := Except.ok.inj h
+      simpa only [Prod.mk.injEq] using hp
+    subst hother
+    subst hcur
+    obtain ⟨sdesc, d₂, hs1, hc1, hdat1, hb1⟩ := (ih d d' hd hb).1 desc d₂' h1
+    obtain ⟨sval, d₃, hs2, hc2, hdat2, hb2⟩ :=
+      (ih d₂ d₂' hc1 (bound_of_read hs1 hdat1 hb)).1 val d₃' h2
+    refine ⟨.described sdesc sval, d₃, ?_, hc2, ?_, ?_⟩
+    · rw [hS, hs1, except_bind_ok, hs2, except_bind_ok]
+    · rw [hdat2, hdat1, hdata]
+    · unfold BodiesAgree
+      exact ⟨hb1, hb2⟩
+  · intro failure h
+    rw [hR] at h
+    cases h1 : SpecAMQP.Ref.readValue fuel d' with
+    | error e =>
+      rw [h1] at h
+      rw [except_bind_error] at h
+      simp only [Except.error.injEq] at h
+      subst h
+      obtain ⟨refusal, hspec, hcl⟩ := (ih d d' hd hb).2 e h1
+      refine ⟨refusal, ?_, hcl⟩
+      rw [hS, hspec, except_bind_error]
+    | ok p =>
+      obtain ⟨desc, d₂'⟩ := p
+      rw [h1] at h
+      rw [except_bind_ok] at h
+      cases h2 : SpecAMQP.Ref.readValue fuel d₂' with
+      | error e =>
+        rw [h2] at h
+        rw [except_bind_error] at h
+        simp only [Except.error.injEq] at h
+        subst h
+        obtain ⟨sdesc, d₂, hs1, hc1, hdat1, -⟩ := (ih d d' hd hb).1 desc d₂' h1
+        obtain ⟨refusal, hspec, hcl⟩ :=
+          (ih d₂ d₂' hc1 (bound_of_read hs1 hdat1 hb)).2 e h2
+        refine ⟨refusal, ?_, hcl⟩
+        rw [hS, hs1, except_bind_ok, hspec, except_bind_error]
+      | ok q =>
+        rw [h2] at h
+        rw [except_bind_ok] at h
+        exact absurd h (by simp)
+
+/-- **A zero-width row (`0x40`, `null`).** The table's row for this octet names `null` at no width,
+so the specification reads no payload and answers the value the table names, while the reference
+matches the octet and answers the same value. Nothing recurses, which is why the scalar branches
+carry no bound: only the two tables have to be resolved. -/
+theorem arm_0x40 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x40, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x40, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0x40 : UInt8).toNat = .fixed 0 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x40 : UInt8) =
+      .ok ⟨64, none, SpecAMQP.Generated.Oasis.Category.fixed, 0, "null",
+        "the null value"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c = .ok (.null, d) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    try dsimp only
+    rw [spec_takeBytes_zero d (spec_takeU8_next_le hs), except_bind_ok]
+    rfl
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' = .ok (.null, d') := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  constructor
+  · intro other c₂' h
+    rw [hR] at h
+    obtain ⟨hother, hcur⟩ : .null = other ∧ d' = c₂' := by
+      have hp := Except.ok.inj h
+      simpa only [Prod.mk.injEq] using hp
+    subst hother
+    subst hcur
+    exact ⟨.null, d, hS, hd, spec_takeU8_data hs, by simp only [BodiesAgree]⟩
+  · intro failure h
+    rw [hR] at h
+    exact absurd h (by simp)
+
+/-- **A width-one row with a payload (`0x50`, `ubyte`).** The reference takes one octet and answers
+it; the specification's row reads one octet through `takeBytes`, accumulates it, and answers the
+number. The bridge is the whole content: the payload and the foldl are the octet the reference took,
+so the two values agree on the nose, and the cursor the reference's payload read left is the one the
+specification's row left. -/
+theorem arm_0x50 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x50, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x50, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hdata : d.data = c.data := spec_takeU8_data hs
+  have hclass : SpecAMQP.Spec.Value.classify (0x50 : UInt8).toNat = .fixed 1 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x50 : UInt8) =
+      .ok ⟨80, none, SpecAMQP.Generated.Oasis.Category.fixed, 1, "ubyte",
+        "8-bit unsigned integer"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      (SpecAMQP.Spec.Codec.takeBytes 1 d) >>= (fun p =>
+        .ok (.ubyte (p.1.foldl (fun acc x => acc * 256 + x.toNat) 0), p.2)) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    rfl
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      (SpecAMQP.Ref.takeU8 d') >>= (fun p => .ok (.ubyte p.1, p.2)) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  constructor
+  · intro other c₂' h
+    rw [hR] at h
+    obtain ⟨⟨b, d₂'⟩, h1, h⟩ := exists_of_bind_ok h
+    dsimp only at h
+    obtain ⟨hother, hcur⟩ : .ubyte b = other ∧ d₂' = c₂' := by
+      have hp := Except.ok.inj h
+      simpa only [Prod.mk.injEq] using hp
+    subst hother
+    subst hcur
+    obtain ⟨d₂, hsu8, hd₂⟩ := takeU8_agrees hd b d₂' h1
+    obtain ⟨hbytes, hfold⟩ := spec_takeBytes_one_of_takeU8 d b d₂ hsu8
+    refine ⟨.ubyte b.toNat, d₂, ?_, hd₂, ?_, ?_⟩
+    · rw [hS, hbytes, except_bind_ok, hfold]
+    · rw [spec_takeBytes_data hbytes, hdata]
+    · simp only [BodiesAgree]
+  · intro failure h
+    rw [hR] at h
+    cases h1 : SpecAMQP.Ref.takeU8 d' with
+    | error e =>
+      rw [h1] at h
+      rw [except_bind_error] at h
+      simp only [Except.error.injEq] at h
+      subst h
+      obtain ⟨refusal, hbytes, hcl⟩ := spec_takeBytes_one_fails hd e h1
+      exact ⟨refusal, by rw [hS, hbytes, except_bind_error], hcl⟩
+    | ok p =>
+      rw [h1] at h
+      rw [except_bind_ok] at h
+      exact absurd h (by simp)
 end SpecAMQP.Proofs
