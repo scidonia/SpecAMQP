@@ -1497,6 +1497,15 @@ exhausted without a bind is a named invalid**, "this run tested nothing", and ne
 distinguished by its own words from a port that could not be bound. Each driver names its own `SPECAMQP_*_PORT_BASE` and `*_PORT_ATTEMPTS` — the shape is shared and the ranges are not,
 since a shared base would make two suites race for one window instead of settling it by bind.
 
+**And a plan question from a slice goes to the session owner, by the name the session gives it.** There is no separate planner agent in a live session: a slice that tries to mail a
+"planner" fails with an unknown agent, which happened to two slices in one afternoon before each routed its question through the session owner instead. The rule is not that the planner
+is absent but that the *role* is held rather than spawned — the owner authors the contracts, decides the open choices, and answers within the turn. Some spawned agents also have no
+`hub` device at all and can only reply through their result, so a brief should name the channel as well as the owner: the question arrives either as a message or in the final report, and
+a slice must not stall waiting for an answer it has no channel to receive.
+**What both slices did instead is the part worth keeping**: each named the file and the site its question concerned, stated the decision it needed in a form that could be answered by the
+plan owner without re-deriving anything, and **continued on formulation-independent work while it waited**. That is the shape a plan question takes when it is asked well — it costs the
+owner a decision and costs the slice no time, which is the opposite of the two collisions earlier in the day, where a claim cost two agents' attention and produced a rule.
+
 ## 17. Verification gates and their negative controls
 
 | Gate | Mechanism | Negative control |
