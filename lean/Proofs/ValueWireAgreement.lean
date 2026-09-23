@@ -12,10 +12,13 @@ import Ref.Value
 the reference's reader reads off a buffer, the specification's reader reads too - the same octets
 consumed and bodies the frame layer views the same way - or a refusal of the same class. This module
 is that claim's development, and it is **in progress**. Landed: the formulation (with the fuel bound
-its truth needs), the base case, the octet step and its payload bridges, the branch *pattern* and its
-first three arms — the described branch and the two exemplars a scalar branch is copied from. Still
-owed: the remaining scalar, compound and array arms, the loop relations they share, the dispatch that
-turns the arms into the induction step, and the fuel induction itself. What each owes and how it is
+its truth needs), the base case, the octet step and its payload bridges, the branch *pattern*, and
+**27 of the 40 arms** — the described branch and all twenty-four non-recursive rows: the five other
+zero-width rows, the one-octet payloads, the wide unsigned and `char` widths, the six opaque widths,
+and the six variable rows. Still owed: the seven *signed* rows, whose value equations need a
+`signedOfOctets` round trip; the six compound and array rows, with the three loop relations they
+share; the dispatch that turns the arms into the induction step; and the fuel induction itself, whose
+entry point is free. What each owes and how it is
 proved is stated where it belongs rather than in a list here: see the octet step's arithmetic, and
 `arm_0x00`'s docstring for the pattern the branches follow.
 
@@ -780,4 +783,1371 @@ theorem arm_0x50 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Re
       rw [h1] at h
       rw [except_bind_ok] at h
       exact absurd h (by simp)
+/-! ## The arm machinery: a step, a relation, and one stem per shape
+
+Every arm still owed has the same skeleton — take the octet, read a payload, answer a value — and
+differs from its neighbours only in the payload's shape and in the value. Twenty-four proofs of the
+same two conjuncts would bury each arm's own content in boilerplate, so the skeleton is stated once
+as a **step**: a reader whose value is an *intermediate* (an octet, a payload, a number) rather than
+a body, with the relation between the two readers' intermediates made explicit. The relation is the
+useful part: the two artefacts often read the same octets into different values — the
+specification folds a payload into a number that the reference never forms bare — and a step
+agreement is exactly the statement that lets one reader's octets be the other's number.
+
+The instances below carry every fixed-width row. The relation each carries is the one its arm's
+values need:
+
+* `stepAgreesAll_takeBytes` — the opaque widths, where both readers hand the octets back and the
+  relation is equality of arrays;
+* `stepAgreesAll_takeBeNat` — the unsigned and `char` widths, where the specification folds the
+  octets it read while the reference folds them inside `takeBeU`, so the relation is
+  `payloadNat a = b`;
+* `stepAgreesAll_takeU8Nat` — the one-octet payloads, the same relation at width one;
+* `stepAgreesAll_takeBeEq`, `stepAgreesAll_takeBeOne` — the *variable* rows' length field, where both
+  readers produce the same number (or the reference's octet is that number), because those rows read
+  their length through `takeBe` rather than through the payload read a fixed row uses;
+* `readersAgree_utf8` — the third reader of the two text families, where both readers decode the same
+  octets with the same standard-library call and differ only in the refusal's prose. It is stated at
+  the *reader* level rather than as a step, and that is not a matter of taste: a step agreement hands
+  its intermediate back as one component of a pair, and re-pairing that component into the value the
+  reader answers produces a term equal to the reader's own only through `>>=`'s associativity — not a
+  definitional equality, and so not something a *hypothesis* can be checked against. The lesson is
+  the same one the fuel bound taught: state the law at the shape the consumer has.
+
+`readersAgreeAt_bind` is the composition the variable rows need — a length field, then the reader
+below it — and the three stems turn a step plus a value into the `StepAgrees` an arm owes: `reader_of_ok` for the zero-width rows, `reader_of_step` for the payload rows, and
+`reader_of_two_steps` for the variable ones. -/
+
+/-- **The number the specification accumulates a payload's octets into.** Named because three of the
+bridges below are stated in its terms and because it is the relation the number-carrying arms carry:
+the reference's number and the specification's octets meet here. -/
+def payloadNat (bytes : SpecAMQP.Harness.Octets) : Nat :=
+  bytes.foldl (fun acc b => acc * 256 + b.toNat) 0
+
+/-- **Two readers' *steps* agree up to a relation on their values.** A step is a reader whose value is
+an intermediate rather than a body; two steps agree when the reference's is a value the specification
+also reaches, related to it by `R`, at a cursor the two agree on, with the same octets in hand. The
+second conjunct is the refusal half, as in `StepAgrees`, and the buffer component is what an arm's
+fuel bound descends through. -/
+def StepAgreesAt {α β : Type} (R : α → β → Prop)
+    (f : SpecAMQP.Spec.Codec.Cursor → Except SpecAMQP.Spec.Codec.Refusal
+      (α × SpecAMQP.Spec.Codec.Cursor))
+    (g : SpecAMQP.Ref.Cursor → Except SpecAMQP.Ref.DecodeError
+      (β × SpecAMQP.Ref.Cursor))
+    (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor) : Prop :=
+  (∀ (b : β) (d' : SpecAMQP.Ref.Cursor), g c' = .ok (b, d') →
+      ∃ (a : α) (d : SpecAMQP.Spec.Codec.Cursor), f c = .ok (a, d) ∧ R a b ∧
+        CursorAgrees d d' ∧ d.data = c.data) ∧
+  (∀ failure : SpecAMQP.Ref.DecodeError, g c' = .error failure →
+      ∃ refusal : SpecAMQP.Spec.Codec.Refusal, f c = .error refusal ∧
+        (SpecAMQP.Ref.Frame.valueFailure failure).reasonClass = refusal.reasonClass)
+
+/-- The same obligation at every pair of agreeing cursors, which is the form a *nested* step needs:
+an inner step starts from the cursors its outer step handed back, and those are known to agree only
+from the outer step's own success. -/
+def StepAgreesAll {α β : Type} (R : α → β → Prop)
+    (f : SpecAMQP.Spec.Codec.Cursor → Except SpecAMQP.Spec.Codec.Refusal
+      (α × SpecAMQP.Spec.Codec.Cursor))
+    (g : SpecAMQP.Ref.Cursor → Except SpecAMQP.Ref.DecodeError
+      (β × SpecAMQP.Ref.Cursor)) : Prop :=
+  ∀ (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor),
+    CursorAgrees c c' → StepAgreesAt R f g c c'
+
+/-- **A payload read took at most what it asked for.** `takeBytes` answers an `extract`, and an
+extract is as long as the request or shorter; this is the first half of the bound a width-carrying
+arm's value equation needs. -/
+theorem spec_takeBytes_size_le {n : Nat} {c d : SpecAMQP.Spec.Codec.Cursor}
+    {bytes : SpecAMQP.Harness.Octets}
+    (h : SpecAMQP.Spec.Codec.takeBytes n c = .ok (bytes, d)) : bytes.size ≤ n := by
+  unfold SpecAMQP.Spec.Codec.takeBytes at h
+  split at h
+  · simp only [Except.ok.injEq, Prod.mk.injEq] at h
+    obtain ⟨hb, -⟩ := h
+    subst hb
+    rw [Array.size_extract]
+    omega
+  · exact absurd h (by simp)
+
+/-- **A fold over a payload is bounded by the payload's own width.** The array form of
+`CodecRoundTripNarrowest`'s `foldl_be_bound` at an empty accumulator: `w` octets accumulate to a
+number below `256 ^ w`, which is the reader's own account of what a width-`w` field can carry. -/
+theorem payloadNat_lt (bytes : SpecAMQP.Harness.Octets) :
+    payloadNat bytes < 256 ^ bytes.size := by
+  rw [payloadNat, ← Array.foldl_toList]
+  simpa using foldl_be_bound bytes.toList 0
+
+/-- The two facts a width-`w` payload's value equation needs, together: the payload is no longer than
+the width asked for, and the fold over it is below `256` to its own length. -/
+theorem payloadNat_lt_of_takeBytes {w : Nat} {c d : SpecAMQP.Spec.Codec.Cursor}
+    {bytes : SpecAMQP.Harness.Octets}
+    (h : SpecAMQP.Spec.Codec.takeBytes w c = .ok (bytes, d)) : payloadNat bytes < 256 ^ w :=
+  calc payloadNat bytes < 256 ^ bytes.size := payloadNat_lt bytes
+    _ ≤ 256 ^ w := Nat.pow_le_pow_right (by decide) (spec_takeBytes_size_le h)
+
+/-- A successful payload read is a successful big-endian field read at the same cursor, answering the
+number the fold gives. This is what puts a variable row's length step (which reads through `takeBe`)
+and a fixed row's payload step (which reads through `takeBytes`) on one footing. -/
+theorem spec_takeBe_of_takeBytes {w : Nat} {c d : SpecAMQP.Spec.Codec.Cursor}
+    {bytes : SpecAMQP.Harness.Octets}
+    (h : SpecAMQP.Spec.Codec.takeBytes w c = .ok (bytes, d)) :
+    SpecAMQP.Spec.Codec.takeBe w c = .ok (payloadNat bytes, d) := by
+  unfold SpecAMQP.Spec.Codec.takeBe
+  rw [h, except_bind_ok]
+  rfl
+
+/-- **The payload step, octet for octet.** Both readers take the same `n` octets off the same buffer at
+the same position; the relation is equality of the arrays, which is what the opaque rows' values wait
+for. -/
+theorem stepAgreesAll_takeBytes (n : Nat) :
+    StepAgreesAll (fun a b : SpecAMQP.Harness.Octets => a = b)
+      (SpecAMQP.Spec.Codec.takeBytes n) (SpecAMQP.Ref.takeBytes n) := by
+  intro c c' hc
+  constructor
+  · intro b d' h
+    obtain ⟨d, hspec, hcd⟩ := takeBytes_agrees hc n b d' h
+    exact ⟨b, d, hspec, rfl, hcd, spec_takeBytes_data hspec⟩
+  · intro failure h
+    exact takeBytes_fails hc n failure h
+
+/-- **The big-endian field step.** The reference folds the octets inside `takeBeU` and hands back a
+number; the specification's fixed-width rows fold the same octets outside it, so the two steps are
+related by `payloadNat a = b` rather than by an equality of arrays. -/
+theorem stepAgreesAll_takeBeNat (w : Nat) :
+    StepAgreesAll (fun (a : SpecAMQP.Harness.Octets) (b : Nat) => payloadNat a = b)
+      (SpecAMQP.Spec.Codec.takeBytes w) (SpecAMQP.Ref.takeBeU w) := by
+  intro c c' hc
+  constructor
+  · intro b d' h
+    unfold SpecAMQP.Ref.takeBeU at h
+    obtain ⟨⟨bytes, d₁'⟩, hb, h⟩ := exists_of_bind_ok h
+    dsimp only at h
+    rw [except_pure_ok] at h
+    have hp : (payloadNat bytes, d₁') = (b, d') := Except.ok.inj h
+    simp only [Prod.mk.injEq] at hp
+    obtain ⟨hm, hd⟩ := hp
+    subst hm
+    subst hd
+    obtain ⟨d, hspec, hcd⟩ := takeBytes_agrees hc w bytes d₁' hb
+    exact ⟨bytes, d, hspec, rfl, hcd, spec_takeBytes_data hspec⟩
+  · intro failure h
+    unfold SpecAMQP.Ref.takeBeU at h
+    cases hb : SpecAMQP.Ref.takeBytes w c' with
+    | error e =>
+      rw [hb] at h
+      rw [except_bind_error] at h
+      simp only [Except.error.injEq] at h
+      subst h
+      exact takeBytes_fails hc w e hb
+    | ok p =>
+      rw [hb] at h
+      rw [except_bind_ok] at h
+      exact absurd h (by simp)
+
+/-- **The one-octet payload step.** The same relation at width one: the reference's `takeU8` hands back
+the octet, and the landed width-one bridge says the octet it took is the fold the specification's
+`takeBytes 1` performs. -/
+theorem stepAgreesAll_takeU8Nat :
+    StepAgreesAll (fun (a : SpecAMQP.Harness.Octets) (b : UInt8) => payloadNat a = b.toNat)
+      (SpecAMQP.Spec.Codec.takeBytes 1) (SpecAMQP.Ref.takeU8) := by
+  intro c c' hc
+  constructor
+  · intro b d' h
+    obtain ⟨d₂, hsu8, hcd⟩ := takeU8_agrees hc b d' h
+    obtain ⟨hbytes, hfold⟩ := spec_takeBytes_one_of_takeU8 c b d₂ hsu8
+    exact ⟨c.data.extract c.pos (c.pos + 1), d₂, hbytes, by simpa only [payloadNat] using hfold,
+      hcd, spec_takeBytes_data hbytes⟩
+  · intro failure h
+    exact spec_takeBytes_one_fails hc failure h
+
+/-- **The variable rows' length step, four octets wide.** Both readers produce the same number, so the
+relation is equality — the difference between the two `takeBe`s is only which of them folds. -/
+theorem stepAgreesAll_takeBeEq (w : Nat) :
+    StepAgreesAll (fun a b : Nat => a = b) (SpecAMQP.Spec.Codec.takeBe w)
+      (SpecAMQP.Ref.takeBeU w) := by
+  intro c c' hc
+  constructor
+  · intro b d' h
+    unfold SpecAMQP.Ref.takeBeU at h
+    obtain ⟨⟨bytes, d₁'⟩, hb, h⟩ := exists_of_bind_ok h
+    dsimp only at h
+    rw [except_pure_ok] at h
+    have hp : (payloadNat bytes, d₁') = (b, d') := Except.ok.inj h
+    simp only [Prod.mk.injEq] at hp
+    obtain ⟨hm, hd⟩ := hp
+    subst hm
+    subst hd
+    obtain ⟨d, hspec, hcd⟩ := takeBytes_agrees hc w bytes d₁' hb
+    have hbe := spec_takeBe_of_takeBytes hspec
+    exact ⟨payloadNat bytes, d, hbe, rfl, hcd, spec_takeBe_data hbe⟩
+  · intro failure h
+    unfold SpecAMQP.Ref.takeBeU at h
+    cases hb : SpecAMQP.Ref.takeBytes w c' with
+    | error e =>
+      rw [hb] at h
+      rw [except_bind_error] at h
+      simp only [Except.error.injEq] at h
+      subst h
+      obtain ⟨refusal, hspec, hcl⟩ := takeBytes_fails hc w e hb
+      exact ⟨refusal, (spec_takeBe_error c w refusal).mpr hspec, hcl⟩
+    | ok p =>
+      rw [hb] at h
+      rw [except_bind_ok] at h
+      exact absurd h (by simp)
+
+/-- **The variable rows' length step, one octet wide.** Here the reference's octet reader is `takeU8`
+while the specification's length field is `takeBe 1`, and the landed width-one bridge relates them:
+the number the field carries is the octet's own value. -/
+theorem stepAgreesAll_takeBeOne :
+    StepAgreesAll (fun (a : Nat) (b : UInt8) => a = b.toNat) (SpecAMQP.Spec.Codec.takeBe 1)
+      (SpecAMQP.Ref.takeU8) := by
+  intro c c' hc
+  constructor
+  · intro b d' h
+    obtain ⟨d₂, hsu8, hcd⟩ := takeU8_agrees hc b d' h
+    have hbe := spec_takeBe_one_of_takeU8 c b d₂ hsu8
+    exact ⟨b.toNat, d₂, hbe, rfl, hcd, spec_takeBe_data hbe⟩
+  · intro failure h
+    obtain ⟨refusal, hspec, hcl⟩ := takeU8_fails hc failure h
+    obtain ⟨refusal', hbytes, hcl'⟩ := spec_takeBytes_one_class refusal hspec
+    exact ⟨refusal', (spec_takeBe_error c 1 refusal').mpr hbytes, by rw [hcl, hcl']⟩
+
+/-- **A payload the reference decodes is one the specification decodes**, to the same text: both
+readers ask the same standard-library question of the same octets, so the success half of the bridge
+is an identity. This is the wire-side counterpart of the corpus side's `fixedHex_ok_hexPayloadOf`. -/
+theorem utf8Of_ok_of_decodeString {bytes : SpecAMQP.Ref.Octets} {kind : String} {text : String}
+    (h : SpecAMQP.Ref.decodeString bytes kind = .ok text) :
+    SpecAMQP.Spec.Codec.utf8Of bytes kind = .ok text := by
+  unfold SpecAMQP.Ref.decodeString at h
+  unfold SpecAMQP.Spec.Codec.utf8Of
+  cases hu : String.fromUTF8? (ByteArray.mk bytes) with
+  | none => simp only [hu] at h; exact absurd h (by simp)
+  | some s => simp only [hu] at h ⊢; injection h with hb; subst hb; rfl
+
+/-- The failure half: the same question refused by both, with the same class — the two readers differ
+only in the prose of the refusal, which is why this is a class agreement rather than an equality. -/
+theorem utf8Of_error_of_decodeString {bytes : SpecAMQP.Ref.Octets} {kind : String}
+    {failure : SpecAMQP.Ref.DecodeError}
+    (h : SpecAMQP.Ref.decodeString bytes kind = .error failure) :
+    ∃ refusal : SpecAMQP.Spec.Codec.Refusal,
+      SpecAMQP.Spec.Codec.utf8Of bytes kind = .error refusal ∧
+      (SpecAMQP.Ref.Frame.valueFailure failure).reasonClass = refusal.reasonClass := by
+  unfold SpecAMQP.Ref.decodeString at h
+  cases hu : String.fromUTF8? (ByteArray.mk bytes) with
+  | none =>
+    simp only [hu] at h
+    injection h with hb
+    subst hb
+    refine ⟨SpecAMQP.Spec.Codec.refusal "malformed"
+      s!"a {kind} payload of {bytes.size} octet(s) is not valid UTF-8", ?_, rfl⟩
+    unfold SpecAMQP.Spec.Codec.utf8Of
+    simp only [hu]
+  | some s => simp only [hu] at h; exact absurd h (by simp)
+
+/-- **Two readers agree at one cursor pair.** The two conjuncts of `StepAgrees`, for readers whose
+fuel is already spent — which is what a step's *continuation* is, and what the composition below
+produces. The value relation is `BodiesAgree`, as in `StepAgrees`, and the buffer component says a
+reader hands back the buffer it was given. -/
+def ReadersAgreeAt
+    (Ks : SpecAMQP.Spec.Codec.Cursor → Except SpecAMQP.Spec.Codec.Refusal
+      (SpecAMQP.Spec.Codec.Value × SpecAMQP.Spec.Codec.Cursor))
+    (Kr : SpecAMQP.Ref.Cursor → Except SpecAMQP.Ref.DecodeError
+      (SpecAMQP.Ref.Value × SpecAMQP.Ref.Cursor))
+    (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor) : Prop :=
+  (∀ (other : SpecAMQP.Ref.Value) (c₂' : SpecAMQP.Ref.Cursor), Kr c' = .ok (other, c₂') →
+      ∃ (body : SpecAMQP.Spec.Codec.Value) (c₂ : SpecAMQP.Spec.Codec.Cursor),
+        Ks c = .ok (body, c₂) ∧ CursorAgrees c₂ c₂' ∧ c₂.data = c.data ∧ BodiesAgree body other) ∧
+  (∀ failure : SpecAMQP.Ref.DecodeError, Kr c' = .error failure →
+      ∃ refusal : SpecAMQP.Spec.Codec.Refusal, Ks c = .error refusal ∧
+        (SpecAMQP.Ref.Frame.valueFailure failure).reasonClass = refusal.reasonClass)
+
+/-- The same obligation at every pair of agreeing cursors. -/
+def ReadersAgree
+    (Ks : SpecAMQP.Spec.Codec.Cursor → Except SpecAMQP.Spec.Codec.Refusal
+      (SpecAMQP.Spec.Codec.Value × SpecAMQP.Spec.Codec.Cursor))
+    (Kr : SpecAMQP.Ref.Cursor → Except SpecAMQP.Ref.DecodeError
+      (SpecAMQP.Ref.Value × SpecAMQP.Ref.Cursor)) : Prop :=
+  ∀ (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor),
+    CursorAgrees c c' → ReadersAgreeAt Ks Kr c c'
+
+/-- **The two text families' decode, at one payload.** The same octets, the same standard-library
+test, the same string on success and the same class on refusal — stated as the *reader* each artefact
+writes (`utf8Of` then a value, the reference's `decodeStringAt` two-step), because the value the two
+readers answer is the text rather than the octets they took. `Sv`/`Rv` are the two artefacts'
+spellings of the value that text makes, which is what lets `string` and `symbol` share this lemma.
+The payload is an explicit argument because this reader is *indexed* by what the reader above it
+took, and the same array on both sides is what that reader's own agreement already gave. -/
+theorem readersAgree_utf8 (kind : String) (bytes : SpecAMQP.Harness.Octets)
+    (Sv : String → SpecAMQP.Spec.Codec.Value) (Rv : String → SpecAMQP.Ref.Value)
+    (hval : ∀ text : String, BodiesAgree (Sv text) (Rv text)) :
+    ReadersAgree
+      (fun f : SpecAMQP.Spec.Codec.Cursor =>
+        SpecAMQP.Spec.Codec.utf8Of bytes kind >>= fun s => .ok (Sv s, f))
+      (fun f' : SpecAMQP.Ref.Cursor =>
+        SpecAMQP.Ref.decodeStringAt bytes kind f' >>= fun r => .ok (Rv r.1, r.2)) := by
+  intro c c' hc
+  constructor
+  · intro other c₂' h
+    dsimp only at h
+    cases hd : SpecAMQP.Ref.decodeString bytes kind with
+    | error e =>
+      have hda : SpecAMQP.Ref.decodeStringAt bytes kind c' = .error e := by
+        unfold SpecAMQP.Ref.decodeStringAt
+        rw [hd]
+      rw [hda] at h
+      rw [except_bind_error] at h
+      exact absurd h (by simp)
+    | ok text =>
+      have hda : SpecAMQP.Ref.decodeStringAt bytes kind c' = .ok (text, c') := by
+        unfold SpecAMQP.Ref.decodeStringAt
+        rw [hd]
+      rw [hda] at h
+      rw [except_bind_ok] at h
+      dsimp only at h
+      obtain ⟨hother, hcur⟩ : Rv text = other ∧ c' = c₂' := by
+        have hp := Except.ok.inj h
+        simpa only [Prod.mk.injEq] using hp
+      subst hother
+      subst hcur
+      refine ⟨Sv text, c, ?_, hc, rfl, hval text⟩
+      dsimp only
+      rw [utf8Of_ok_of_decodeString hd, except_bind_ok]
+  · intro failure h
+    dsimp only at h
+    cases hd : SpecAMQP.Ref.decodeString bytes kind with
+    | ok text =>
+      have hda : SpecAMQP.Ref.decodeStringAt bytes kind c' = .ok (text, c') := by
+        unfold SpecAMQP.Ref.decodeStringAt
+        rw [hd]
+      rw [hda] at h
+      rw [except_bind_ok] at h
+      exact absurd h (by simp)
+    | error e =>
+      have hda : SpecAMQP.Ref.decodeStringAt bytes kind c' = .error e := by
+        unfold SpecAMQP.Ref.decodeStringAt
+        rw [hd]
+      rw [hda] at h
+      rw [except_bind_error] at h
+      rw [Except.error.injEq] at h
+      subst h
+      obtain ⟨r, hspec, hcl⟩ := utf8Of_error_of_decodeString hd
+      refine ⟨r, ?_, hcl⟩
+      dsimp only
+      rw [hspec, except_bind_error]
+/-- **A row that reads nothing but its octet.** The two readers answer a value and hand their cursors
+back; the value relation and the cursor agreement are the whole content, and the refusal half is
+vacuous because neither reader refuses. -/
+theorem reader_of_ok (fuel : Nat) {c : SpecAMQP.Spec.Codec.Cursor} {c' : SpecAMQP.Ref.Cursor}
+    {d : SpecAMQP.Spec.Codec.Cursor} {d' : SpecAMQP.Ref.Cursor} (hd : CursorAgrees d d')
+    (Sv : SpecAMQP.Spec.Codec.Value) (Rv : SpecAMQP.Ref.Value) (hval : BodiesAgree Sv Rv)
+    (hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c = .ok (Sv, d))
+    (hR : SpecAMQP.Ref.readValue (fuel + 1) c' = .ok (Rv, d'))
+    (hdata : d.data = c.data) : StepAgrees (fuel + 1) c c' := by
+  constructor
+  · intro other c₂' h
+    rw [hR] at h
+    obtain ⟨hother, hcur⟩ : Rv = other ∧ d' = c₂' := by
+      have hp := Except.ok.inj h
+      simpa only [Prod.mk.injEq] using hp
+    subst hother
+    subst hcur
+    exact ⟨Sv, d, hS, hd, hdata, hval⟩
+  · intro failure h
+    rw [hR] at h
+    exact absurd h (by simp)
+
+/-- **A row that reads one payload.** The step hands the reference a value the specification reaches
+too — related to it by `R` — and the arm answers a value from each; `hval` is the arm's own content,
+and it is stated against the specification's *step success* because that is where a width-carrying
+arm's bound on the number it read comes from: `R` alone cannot bound `payloadNat` of the payload a
+reader happened to accept, but the read that accepted it can. -/
+theorem reader_of_step {α β : Type} {R : α → β → Prop}
+    {StepS : SpecAMQP.Spec.Codec.Cursor → Except SpecAMQP.Spec.Codec.Refusal
+      (α × SpecAMQP.Spec.Codec.Cursor)}
+    {StepR : SpecAMQP.Ref.Cursor → Except SpecAMQP.Ref.DecodeError (β × SpecAMQP.Ref.Cursor)}
+    {fuel : Nat} {c : SpecAMQP.Spec.Codec.Cursor} {c' : SpecAMQP.Ref.Cursor}
+    {d : SpecAMQP.Spec.Codec.Cursor} {d' : SpecAMQP.Ref.Cursor}
+    (hstep : StepAgreesAt R StepS StepR d d')
+    (Sv : α → SpecAMQP.Spec.Codec.Value) (Rv : β → SpecAMQP.Ref.Value)
+    (hval : ∀ (a : α) (b : β), R a b → ∀ f : SpecAMQP.Spec.Codec.Cursor,
+      StepS d = .ok (a, f) → BodiesAgree (Sv a) (Rv b))
+    (hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c = StepS d >>= fun p => .ok (Sv p.1, p.2))
+    (hR : SpecAMQP.Ref.readValue (fuel + 1) c' = StepR d' >>= fun p => .ok (Rv p.1, p.2))
+    (hdata : d.data = c.data) : StepAgrees (fuel + 1) c c' := by
+  constructor
+  · intro other c₂' h
+    rw [hR] at h
+    obtain ⟨⟨b, d₂'⟩, hb, h⟩ := exists_of_bind_ok h
+    dsimp only at h
+    obtain ⟨hother, hcur⟩ : Rv b = other ∧ d₂' = c₂' := by
+      have hp := Except.ok.inj h
+      simpa only [Prod.mk.injEq] using hp
+    subst hother
+    subst hcur
+    obtain ⟨a, f₂, hf, hrel, hcd, hdat⟩ := hstep.1 b d₂' hb
+    exact ⟨Sv a, f₂, by rw [hS, hf, except_bind_ok], hcd, by rw [hdat, hdata],
+      hval a b hrel f₂ hf⟩
+  · intro failure h
+    rw [hR] at h
+    cases hb : StepR d' with
+    | error e =>
+      rw [hb] at h
+      rw [except_bind_error] at h
+      simp only [Except.error.injEq] at h
+      subst h
+      obtain ⟨refusal, hspec, hcl⟩ := hstep.2 e hb
+      exact ⟨refusal, by rw [hS, hspec, except_bind_error], hcl⟩
+    | ok p =>
+      rw [hb] at h
+      rw [except_bind_ok] at h
+      exact absurd h (by simp)
+
+/-- **A step composed with a reader below it.** The step's success hands back a value and two agreeing
+cursors, and the reader below is applied there; this is the same reduction as `stepAgreesAll_bind`,
+one level down, and it is what a variable row's length-then-payload read is. -/
+theorem readersAgreeAt_bind {α β : Type} {R : α → β → Prop}
+    {StepS : SpecAMQP.Spec.Codec.Cursor → Except SpecAMQP.Spec.Codec.Refusal
+      (α × SpecAMQP.Spec.Codec.Cursor)}
+    {StepR : SpecAMQP.Ref.Cursor → Except SpecAMQP.Ref.DecodeError (β × SpecAMQP.Ref.Cursor)}
+    {d : SpecAMQP.Spec.Codec.Cursor} {d' : SpecAMQP.Ref.Cursor}
+    (hstep : StepAgreesAt R StepS StepR d d')
+    {Ks : α → SpecAMQP.Spec.Codec.Cursor → Except SpecAMQP.Spec.Codec.Refusal
+      (SpecAMQP.Spec.Codec.Value × SpecAMQP.Spec.Codec.Cursor)}
+    {Kr : β → SpecAMQP.Ref.Cursor → Except SpecAMQP.Ref.DecodeError
+      (SpecAMQP.Ref.Value × SpecAMQP.Ref.Cursor)}
+    (hinner : ∀ (a : α) (b : β), R a b → ReadersAgree (Ks a) (Kr b)) :
+    ReadersAgreeAt (fun c => StepS c >>= fun p => Ks p.1 p.2)
+      (fun c' => StepR c' >>= fun p => Kr p.1 p.2) d d' := by
+  constructor
+  · intro other c₂' h
+    dsimp only at h ⊢
+    obtain ⟨⟨b, d₁'⟩, hb, h⟩ := exists_of_bind_ok h
+    dsimp only at h
+    obtain ⟨a, d₁, hspec, hrel, hcd, hdat⟩ := hstep.1 b d₁' hb
+    obtain ⟨body, d₂, hk, hcd2, hdat2, hba⟩ := (hinner a b hrel d₁ d₁' hcd).1 other c₂' h
+    exact ⟨body, d₂, by rw [hspec, except_bind_ok, hk], hcd2, by rw [hdat2, hdat], hba⟩
+  · intro failure h
+    dsimp only at h ⊢
+    cases hb : StepR d' with
+    | error e =>
+      rw [hb] at h
+      rw [except_bind_error] at h
+      simp only [Except.error.injEq] at h
+      subst h
+      obtain ⟨refusal, hspec, hcl⟩ := hstep.2 e hb
+      exact ⟨refusal, by rw [hspec, except_bind_error], hcl⟩
+    | ok p =>
+      obtain ⟨b, d₁'⟩ := p
+      rw [hb] at h
+      rw [except_bind_ok] at h
+      obtain ⟨a, d₁, hspec, hrel, hcd, -⟩ := hstep.1 b d₁' hb
+      cases hb2 : Kr b d₁' with
+      | error e =>
+        rw [hb2] at h
+        rw [Except.error.injEq] at h
+        subst h
+        obtain ⟨refusal, hspec2, hcl⟩ := (hinner a b hrel d₁ d₁' hcd).2 e hb2
+        exact ⟨refusal, by rw [hspec, except_bind_ok, hspec2], hcl⟩
+      | ok q =>
+        rw [hb2] at h
+        exact absurd h (by simp)
+
+/-- The same, at every pair of agreeing cursors: the form an inner reader is *used* in. -/
+theorem readersAgree_bind {α β : Type} {R : α → β → Prop}
+    {StepS : SpecAMQP.Spec.Codec.Cursor → Except SpecAMQP.Spec.Codec.Refusal
+      (α × SpecAMQP.Spec.Codec.Cursor)}
+    {StepR : SpecAMQP.Ref.Cursor → Except SpecAMQP.Ref.DecodeError (β × SpecAMQP.Ref.Cursor)}
+    (hstep : StepAgreesAll R StepS StepR)
+    {Ks : α → SpecAMQP.Spec.Codec.Cursor → Except SpecAMQP.Spec.Codec.Refusal
+      (SpecAMQP.Spec.Codec.Value × SpecAMQP.Spec.Codec.Cursor)}
+    {Kr : β → SpecAMQP.Ref.Cursor → Except SpecAMQP.Ref.DecodeError
+      (SpecAMQP.Ref.Value × SpecAMQP.Ref.Cursor)}
+    (hinner : ∀ (a : α) (b : β), R a b → ReadersAgree (Ks a) (Kr b)) :
+    ReadersAgree (fun c => StepS c >>= fun p => Ks p.1 p.2)
+      (fun c' => StepR c' >>= fun p => Kr p.1 p.2) :=
+  fun c c' hc => readersAgreeAt_bind (hstep c c' hc) hinner
+
+/-- **A reader that answers a value and hands its cursor back.** The last step of every arm's chain:
+the two readers have their payload and their value, nothing is consumed, and the agreement is the
+value relation alone. -/
+theorem readersAgree_ok (Sv : SpecAMQP.Spec.Codec.Value) (Rv : SpecAMQP.Ref.Value)
+    (hval : BodiesAgree Sv Rv) :
+    ReadersAgree (fun c => .ok (Sv, c)) (fun c' => .ok (Rv, c')) := by
+  intro c c' hc
+  constructor
+  · intro other c₂' h
+    obtain ⟨hother, hcur⟩ : Rv = other ∧ c' = c₂' := by
+      have hp := Except.ok.inj h
+      simpa only [Prod.mk.injEq] using hp
+    subst hother
+    subst hcur
+    exact ⟨Sv, c, rfl, hc, rfl, hval⟩
+  · intro failure h
+    exact absurd h (by simp)
+
+/-- **A variable row: a length field, then the payload that field announced.** The outer step's value
+decides the inner reader's, and the inner reader's agreement holds at whatever cursors the outer step
+left — which is why it is `ReadersAgree` rather than an obligation at `d`/`d'`. The rows that use this
+stem are the six whose read is two steps deep: the payload step is the *whole* rest of the reader,
+including the value it answers, so the composite is a reader rather than a step. -/
+theorem reader_of_two_steps {α β : Type} {R : α → β → Prop}
+    {Step1S : SpecAMQP.Spec.Codec.Cursor → Except SpecAMQP.Spec.Codec.Refusal
+      (α × SpecAMQP.Spec.Codec.Cursor)}
+    {Step1R : SpecAMQP.Ref.Cursor → Except SpecAMQP.Ref.DecodeError (β × SpecAMQP.Ref.Cursor)}
+    {fuel : Nat} {c : SpecAMQP.Spec.Codec.Cursor} {c' : SpecAMQP.Ref.Cursor}
+    {d : SpecAMQP.Spec.Codec.Cursor} {d' : SpecAMQP.Ref.Cursor}
+    (Step2S : α → SpecAMQP.Spec.Codec.Cursor → Except SpecAMQP.Spec.Codec.Refusal
+      (SpecAMQP.Spec.Codec.Value × SpecAMQP.Spec.Codec.Cursor))
+    (Step2R : β → SpecAMQP.Ref.Cursor → Except SpecAMQP.Ref.DecodeError
+      (SpecAMQP.Ref.Value × SpecAMQP.Ref.Cursor))
+    (h1 : StepAgreesAt R Step1S Step1R d d')
+    (hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c = Step1S d >>= fun p => Step2S p.1 p.2)
+    (hR : SpecAMQP.Ref.readValue (fuel + 1) c' = Step1R d' >>= fun p => Step2R p.1 p.2)
+    (h2 : ∀ (a : α) (b : β), R a b → ReadersAgree (Step2S a) (Step2R b))
+    (hdata : d.data = c.data) : StepAgrees (fuel + 1) c c' := by
+  obtain ⟨hok, herr⟩ := readersAgreeAt_bind h1 h2
+  constructor
+  · intro other c₂' h
+    rw [hR] at h
+    obtain ⟨body, c₂, hr, hcd, hdat, hba⟩ := hok other c₂' h
+    refine ⟨body, c₂, ?_, hcd, ?_, hba⟩
+    · rw [hS]
+      exact hr
+    · rw [hdat, hdata]
+  · intro failure h
+    rw [hR] at h
+    obtain ⟨refusal, hr, hcl⟩ := herr failure h
+    exact ⟨refusal, by rw [hS]; exact hr, hcl⟩
+
+/-! ## The fixed-width arms
+
+Everything below is one row of the declared surface per theorem, and every one of them is the octet
+step's hypothesis plus three `decide`-checked facts and an instance of a stem. What each row owes
+that its neighbours do not is stated in its own docstring; the groups, and why each is the size it is:
+
+* the zero-width rows (`0x41`–`0x45`) read no payload at all — the table names the value, and the
+  reference matches the octet — so they go through `reader_of_ok` and owe only their row;
+* the one-octet payloads (`0x52`, `0x53`, `0x56`) read their octet through the specification's
+  `takeBytes 1` and the reference's `takeU8`, which is `stepAgreesAll_takeU8Nat`: the relation is
+  `payloadNat` against the octet's own value, and the value equations are the width-carrying round
+  trips `Proofs/ValueCarrierAgreement` states for the corpus side (`u8_toNat` and its siblings);
+* the wide unsigned and `char` rows (`0x60`, `0x70`, `0x73`, `0x80`) read a big-endian field, so
+  their relation is `payloadNat a = b` and their value equations need the number's *bound*, which is
+  why `reader_of_step`'s value hypothesis is stated against the specification's own step success:
+  `payloadNat_lt_of_takeBytes` reads the bound off the read;
+* the opaque rows (`0x72`, `0x74`, `0x82`, `0x84`, `0x94`, `0x98`) carry their payload octets and
+  compare nothing, so their relation is equality of arrays and their value equations are `rfl`.
+
+What is deliberately *not* here: the seven signed rows, whose value equations need a
+`signedOfOctets` round trip, and the compound and array rows, which need the loop relations. Both are
+named in the module's header and in the plan rather than left to look finished. -/
+
+/-- **The octet an 8-bit boolean carries is zero exactly when the octet is `0x00`.** The reference
+compares the octet, the specification compares the number it folded the octet into, so this is the
+`0x56` row's whole value equation. Stated through `UInt8.toNat_inj` rather than by case analysis on
+the carrier, because the two `!=`s are `Bool`s and the bridge between them is the proposition. -/
+theorem uint8_ne_zero_bool (b : UInt8) : (b.toNat != 0) = (b != 0x00) := by
+  have key : b.toNat = 0 ↔ b = 0 := by
+    rw [← show (0 : UInt8).toNat = 0 from rfl]
+    exact UInt8.toNat_inj
+  rw [Bool.eq_iff_iff, bne_iff_ne, bne_iff_ne, ne_eq, ne_eq]
+  exact not_congr key
+
+/-- **The `true` row (`0x41`).** The table names the boolean and declares no payload, so the
+specification reads its zero octets and answers `true`; the reference matches the octet. -/
+theorem arm_0x41 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x41, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x41, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0x41 : UInt8).toNat = .fixed 0 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x41 : UInt8) =
+      .ok ⟨65, some "true", SpecAMQP.Generated.Oasis.Category.fixed, 0, "boolean",
+        "the boolean value true"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c = .ok (.boolean true, d) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    rw [spec_takeBytes_zero d (spec_takeU8_next_le hs), except_bind_ok]
+    rfl
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' = .ok (.boolean true, d') := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_ok fuel hd _ _ (by simp only [BodiesAgree]) hS hR (spec_takeU8_data hs)
+
+/-- **The `false` row (`0x42`).** The same row at the other boolean. -/
+theorem arm_0x42 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x42, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x42, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0x42 : UInt8).toNat = .fixed 0 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x42 : UInt8) =
+      .ok ⟨66, some "false", SpecAMQP.Generated.Oasis.Category.fixed, 0, "boolean",
+        "the boolean value false"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c = .ok (.boolean false, d) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    rw [spec_takeBytes_zero d (spec_takeU8_next_le hs), except_bind_ok]
+    rfl
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' = .ok (.boolean false, d') := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_ok fuel hd _ _ (by simp only [BodiesAgree]) hS hR (spec_takeU8_data hs)
+
+/-- **The `uint0` row (`0x43`).** The specification's fixed-width reader folds the zero octets it
+took into the number zero and answers `uint 0`; the reference matches the octet and answers the same.
+The fold over an empty payload is the accumulator, definitionally. -/
+theorem arm_0x43 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x43, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x43, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0x43 : UInt8).toNat = .fixed 0 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x43 : UInt8) =
+      .ok ⟨67, some "uint0", SpecAMQP.Generated.Oasis.Category.fixed, 0, "uint",
+        "the uint value 0"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c = .ok (.uint 0, d) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    rw [spec_takeBytes_zero d (spec_takeU8_next_le hs), except_bind_ok]
+    rfl
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' = .ok (.uint 0, d') := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_ok fuel hd _ _ (by simp only [BodiesAgree]; decide) hS hR
+    (spec_takeU8_data hs)
+
+/-- **The `ulong0` row (`0x44`).** The same zero form at the wider type. -/
+theorem arm_0x44 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x44, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x44, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0x44 : UInt8).toNat = .fixed 0 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x44 : UInt8) =
+      .ok ⟨68, some "ulong0", SpecAMQP.Generated.Oasis.Category.fixed, 0, "ulong",
+        "the ulong value 0"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c = .ok (.ulong 0, d) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    rw [spec_takeBytes_zero d (spec_takeU8_next_le hs), except_bind_ok]
+    rfl
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' = .ok (.ulong 0, d') := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_ok fuel hd _ _ (by simp only [BodiesAgree]; decide) hS hR
+    (spec_takeU8_data hs)
+
+/-- **The `list0` row (`0x45`).** The declared surface's zero-width `list`, which the specification's
+fixed-width reader answers as the empty list without recursing — one of the six zero-width rows that
+make an array of zero-width elements bounded by its count rather than by the buffer. -/
+theorem arm_0x45 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x45, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x45, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0x45 : UInt8).toNat = .fixed 0 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x45 : UInt8) =
+      .ok ⟨69, some "list0", SpecAMQP.Generated.Oasis.Category.fixed, 0, "list",
+        "the empty list (i.e. the list with no elements)"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c = .ok (.list [], d) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    rw [spec_takeBytes_zero d (spec_takeU8_next_le hs), except_bind_ok]
+    rfl
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' = .ok (.list [], d') := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_ok fuel hd _ _ (by simp only [BodiesAgree, BodiesAgreeList]) hS hR
+    (spec_takeU8_data hs)
+
+/-- **The `smalluint` row (`0x52`).** One octet, read as an unsigned integer: the specification folds
+the octet it took and the reference keeps it as a `UInt8`, so the value equation is the width-carrying
+round trip (`UInt8.toNat_toUInt32`). -/
+theorem arm_0x52 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x52, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x52, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0x52 : UInt8).toNat = .fixed 1 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x52 : UInt8) =
+      .ok ⟨82, some "smalluint", SpecAMQP.Generated.Oasis.Category.fixed, 1, "uint",
+        "unsigned integer value in the range 0 to 255 inclusive"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.takeBytes 1 d >>= fun p => .ok (.uint (payloadNat p.1), p.2) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    rfl
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      SpecAMQP.Ref.takeU8 d' >>= fun p => .ok (.uint p.1.toUInt32, p.2) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_step (stepAgreesAll_takeU8Nat d d' hd) (fun bytes => .uint (payloadNat bytes))
+    (fun b => .uint b.toUInt32)
+    (fun a b hrel _ _ => by
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact (UInt8.toNat_toUInt32 b).symm)
+    hS hR (spec_takeU8_data hs)
+
+/-- **The `smallulong` row (`0x53`).** The same one-octet payload at the wider type. -/
+theorem arm_0x53 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x53, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x53, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0x53 : UInt8).toNat = .fixed 1 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x53 : UInt8) =
+      .ok ⟨83, some "smallulong", SpecAMQP.Generated.Oasis.Category.fixed, 1, "ulong",
+        "unsigned long value in the range 0 to 255 inclusive"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.takeBytes 1 d >>= fun p => .ok (.ulong (payloadNat p.1), p.2) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    rfl
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      SpecAMQP.Ref.takeU8 d' >>= fun p => .ok (.ulong p.1.toUInt64, p.2) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_step (stepAgreesAll_takeU8Nat d d' hd) (fun bytes => .ulong (payloadNat bytes))
+    (fun b => .ulong b.toUInt64)
+    (fun a b hrel _ _ => by
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact (UInt8.toNat_toUInt64 b).symm)
+    hS hR (spec_takeU8_data hs)
+
+/-- **The `boolean` row at one octet (`0x56`).** The one row whose two readers compare the payload in
+different spellings: the specification folds the octet and asks whether the *number* is zero, the
+reference asks whether the *octet* is `0x00`. `uint8_ne_zero_bool` is the whole value equation. -/
+theorem arm_0x56 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x56, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x56, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0x56 : UInt8).toNat = .fixed 1 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x56 : UInt8) =
+      .ok ⟨86, none, SpecAMQP.Generated.Oasis.Category.fixed, 1, "boolean",
+        "boolean with the octet 0x00 being false and octet 0x01 being true"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.takeBytes 1 d >>= fun p => .ok (.boolean (payloadNat p.1 != 0), p.2) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    rfl
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      SpecAMQP.Ref.takeU8 d' >>= fun p => .ok (.boolean (p.1 != 0x00), p.2) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_step (stepAgreesAll_takeU8Nat d d' hd)
+    (fun bytes => .boolean (payloadNat bytes != 0)) (fun b => .boolean (b != 0x00))
+    (fun a b hrel _ _ => by
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact uint8_ne_zero_bool b)
+    hS hR (spec_takeU8_data hs)
+
+/-- **The `ushort` row (`0x60`).** Two octets folded into a number: the bound that makes the
+specification's `Nat` the reference's `UInt16` is the read's own (`payloadNat_lt_of_takeBytes`), and
+the value equation is the width-carrying round trip the corpus side states as `u16_toNat`. -/
+theorem arm_0x60 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x60, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x60, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0x60 : UInt8).toNat = .fixed 2 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x60 : UInt8) =
+      .ok ⟨96, none, SpecAMQP.Generated.Oasis.Category.fixed, 2, "ushort",
+        "16-bit unsigned integer in network byte order"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.takeBytes 2 d >>= fun p => .ok (.ushort (payloadNat p.1), p.2) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    rfl
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      SpecAMQP.Ref.takeBeU 2 d' >>= fun p => .ok (.ushort p.1.toUInt16, p.2) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_step (stepAgreesAll_takeBeNat 2 d d' hd) (fun bytes => .ushort (payloadNat bytes))
+    (fun n => .ushort n.toUInt16)
+    (fun a b hrel f hf => by
+      have hlt : b < 2 ^ 16 := by
+        have h1 := payloadNat_lt_of_takeBytes hf
+        rw [hrel] at h1
+        have h2 : (256 : Nat) ^ 2 = 2 ^ 16 := by decide
+        rw [h2] at h1
+        exact h1
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact (UInt16.toNat_ofNat_of_lt (n := b) hlt).symm)
+    hS hR (spec_takeU8_data hs)
+
+/-- **The `uint` row (`0x70`).** The same fold at four octets. -/
+theorem arm_0x70 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x70, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x70, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0x70 : UInt8).toNat = .fixed 4 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x70 : UInt8) =
+      .ok ⟨112, none, SpecAMQP.Generated.Oasis.Category.fixed, 4, "uint",
+        "32-bit unsigned integer in network byte order"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.takeBytes 4 d >>= fun p => .ok (.uint (payloadNat p.1), p.2) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    rfl
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      SpecAMQP.Ref.takeBeU 4 d' >>= fun p => .ok (.uint p.1.toUInt32, p.2) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_step (stepAgreesAll_takeBeNat 4 d d' hd) (fun bytes => .uint (payloadNat bytes))
+    (fun n => .uint n.toUInt32)
+    (fun a b hrel f hf => by
+      have hlt : b < 2 ^ 32 := by
+        have h1 := payloadNat_lt_of_takeBytes hf
+        rw [hrel] at h1
+        have h2 : (256 : Nat) ^ 4 = 2 ^ 32 := by decide
+        rw [h2] at h1
+        exact h1
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact (UInt32.toNat_ofNat_of_lt (n := b) hlt).symm)
+    hS hR (spec_takeU8_data hs)
+
+/-- **The `char` row (`0x73`).** The row the artifact frames as UTF-32BE, which this layer reads as
+the number it is: the same fold and the same width-carrying round trip as `uint`, and no judgement
+about whether the code point is assigned — that is the corpus vocabulary's business, not the wire's. -/
+theorem arm_0x73 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x73, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x73, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0x73 : UInt8).toNat = .fixed 4 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x73 : UInt8) =
+      .ok ⟨115, some "utf32", SpecAMQP.Generated.Oasis.Category.fixed, 4, "char",
+        "a UTF-32BE encoded Unicode character"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.takeBytes 4 d >>= fun p => .ok (.char (payloadNat p.1), p.2) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    rfl
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      SpecAMQP.Ref.takeBeU 4 d' >>= fun p => .ok (.char p.1.toUInt32, p.2) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_step (stepAgreesAll_takeBeNat 4 d d' hd) (fun bytes => .char (payloadNat bytes))
+    (fun n => .char n.toUInt32)
+    (fun a b hrel f hf => by
+      have hlt : b < 2 ^ 32 := by
+        have h1 := payloadNat_lt_of_takeBytes hf
+        rw [hrel] at h1
+        have h2 : (256 : Nat) ^ 4 = 2 ^ 32 := by decide
+        rw [h2] at h1
+        exact h1
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact (UInt32.toNat_ofNat_of_lt (n := b) hlt).symm)
+    hS hR (spec_takeU8_data hs)
+
+/-- **The `ulong` row (`0x80`).** The same fold at eight octets, where the bound is `2 ^ 64`. -/
+theorem arm_0x80 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x80, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x80, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0x80 : UInt8).toNat = .fixed 8 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x80 : UInt8) =
+      .ok ⟨128, none, SpecAMQP.Generated.Oasis.Category.fixed, 8, "ulong",
+        "64-bit unsigned integer in network byte order"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.takeBytes 8 d >>= fun p => .ok (.ulong (payloadNat p.1), p.2) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+    rfl
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      SpecAMQP.Ref.takeBeU 8 d' >>= fun p => .ok (.ulong p.1.toUInt64, p.2) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_step (stepAgreesAll_takeBeNat 8 d d' hd) (fun bytes => .ulong (payloadNat bytes))
+    (fun n => .ulong n.toUInt64)
+    (fun a b hrel f hf => by
+      have hlt : b < 2 ^ 64 := by
+        have h1 := payloadNat_lt_of_takeBytes hf
+        rw [hrel] at h1
+        have h2 : (256 : Nat) ^ 8 = 2 ^ 64 := by decide
+        rw [h2] at h1
+        exact h1
+      simp only [BodiesAgree]
+      rw [hrel]
+      exact (UInt64.toNat_ofNat_of_lt (n := b) hlt).symm)
+    hS hR (spec_takeU8_data hs)
+
+
+/-! ## The opaque widths
+
+Six rows carry their payload without interpreting it: the artifact fixes these encodings' framing and
+nothing in this layer does arithmetic on their contents, so the two readers answer the *octets* they
+took. That makes them the cheapest group of all — the step relation is equality of arrays and the
+value equation is `rfl` — and it is worth saying why the group is not smaller: `float`, `double`, the
+three decimals and `uuid` are the six rows of the declared surface whose payload the value domain
+keeps rather than reduces, and each one is still a separate arm because each is a separate arm of the
+reference's own literal dispatch. -/
+
+/-- **The `float` row (`0x72`).** Four payload octets, carried as they were read. -/
+theorem arm_0x72 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x72, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x72, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0x72 : UInt8).toNat = .fixed 4 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x72 : UInt8) =
+      .ok ⟨114, some "ieee-754", SpecAMQP.Generated.Oasis.Category.fixed, 4, "float",
+        "IEEE 754-2008 binary32"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.takeBytes 4 d >>= fun p => .ok (.float p.1, p.2) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      SpecAMQP.Ref.takeBytes 4 d' >>= fun p => .ok (.float p.1, p.2) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_step (stepAgreesAll_takeBytes 4 d d' hd) (fun bytes => .float bytes)
+    (fun bytes => .float bytes)
+    (fun a b hrel _ _ => by simpa only [BodiesAgree] using hrel)
+    hS hR (spec_takeU8_data hs)
+
+/-- **The `decimal32` row (`0x74`).** The same four octets under the artifact's Binary Integer Decimal
+framing, which this layer does not decode — the framing is what the row fixes. -/
+theorem arm_0x74 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x74, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x74, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0x74 : UInt8).toNat = .fixed 4 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x74 : UInt8) =
+      .ok ⟨116, some "ieee-754", SpecAMQP.Generated.Oasis.Category.fixed, 4, "decimal32",
+        "IEEE 754-2008 decimal32 using the Binary Integer Decimal encoding"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.takeBytes 4 d >>= fun p => .ok (.decimal32 p.1, p.2) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      SpecAMQP.Ref.takeBytes 4 d' >>= fun p => .ok (.decimal32 p.1, p.2) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_step (stepAgreesAll_takeBytes 4 d d' hd) (fun bytes => .decimal32 bytes)
+    (fun bytes => .decimal32 bytes)
+    (fun a b hrel _ _ => by simpa only [BodiesAgree] using hrel)
+    hS hR (spec_takeU8_data hs)
+
+/-- **The `double` row (`0x82`).** The same carrier at eight octets. -/
+theorem arm_0x82 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x82, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x82, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0x82 : UInt8).toNat = .fixed 8 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x82 : UInt8) =
+      .ok ⟨130, some "ieee-754", SpecAMQP.Generated.Oasis.Category.fixed, 8, "double",
+        "IEEE 754-2008 binary64"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.takeBytes 8 d >>= fun p => .ok (.double p.1, p.2) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      SpecAMQP.Ref.takeBytes 8 d' >>= fun p => .ok (.double p.1, p.2) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_step (stepAgreesAll_takeBytes 8 d d' hd) (fun bytes => .double bytes)
+    (fun bytes => .double bytes)
+    (fun a b hrel _ _ => by simpa only [BodiesAgree] using hrel)
+    hS hR (spec_takeU8_data hs)
+
+/-- **The `decimal64` row (`0x84`).** The same eight octets under the decimal framing. -/
+theorem arm_0x84 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x84, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x84, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0x84 : UInt8).toNat = .fixed 8 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x84 : UInt8) =
+      .ok ⟨132, some "ieee-754", SpecAMQP.Generated.Oasis.Category.fixed, 8, "decimal64",
+        "IEEE 754-2008 decimal64 using the Binary Integer Decimal encoding"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.takeBytes 8 d >>= fun p => .ok (.decimal64 p.1, p.2) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      SpecAMQP.Ref.takeBytes 8 d' >>= fun p => .ok (.decimal64 p.1, p.2) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_step (stepAgreesAll_takeBytes 8 d d' hd) (fun bytes => .decimal64 bytes)
+    (fun bytes => .decimal64 bytes)
+    (fun a b hrel _ _ => by simpa only [BodiesAgree] using hrel)
+    hS hR (spec_takeU8_data hs)
+
+/-- **The `decimal128` row (`0x94`).** Sixteen octets, the widest opaque payload the surface
+declares. -/
+theorem arm_0x94 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x94, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x94, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0x94 : UInt8).toNat = .fixed 16 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x94 : UInt8) =
+      .ok ⟨148, some "ieee-754", SpecAMQP.Generated.Oasis.Category.fixed, 16, "decimal128",
+        "IEEE 754-2008 decimal128 using the Binary Integer Decimal encoding"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.takeBytes 16 d >>= fun p => .ok (.decimal128 p.1, p.2) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      SpecAMQP.Ref.takeBytes 16 d' >>= fun p => .ok (.decimal128 p.1, p.2) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_step (stepAgreesAll_takeBytes 16 d d' hd) (fun bytes => .decimal128 bytes)
+    (fun bytes => .decimal128 bytes)
+    (fun a b hrel _ _ => by simpa only [BodiesAgree] using hrel)
+    hS hR (spec_takeU8_data hs)
+
+/-- **The `uuid` row (`0x98`).** The same sixteen octets, whose fields this layer does not interpret:
+the artifact fixes the width and the octet order, not what the fields mean. -/
+theorem arm_0x98 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0x98, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0x98, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0x98 : UInt8).toNat = .fixed 16 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0x98 : UInt8) =
+      .ok ⟨152, none, SpecAMQP.Generated.Oasis.Category.fixed, 16, "uuid",
+        "UUID as defined in section 4.1.2 of RFC-4122"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.takeBytes 16 d >>= fun p => .ok (.uuid p.1, p.2) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readFixed]
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      SpecAMQP.Ref.takeBytes 16 d' >>= fun p => .ok (.uuid p.1, p.2) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_step (stepAgreesAll_takeBytes 16 d d' hd) (fun bytes => .uuid bytes)
+    (fun bytes => .uuid bytes)
+    (fun a b hrel _ _ => by simpa only [BodiesAgree] using hrel)
+    hS hR (spec_takeU8_data hs)
+
+
+/-! ## The variable rows
+
+Six rows announce their own payload's length: `binary`, `string` and `symbol` in the eight- and
+thirty-two-bit forms. They are the only arms whose read is *two* steps deep — a length field, then the
+payload that field announced — and the reference reads the eight-bit length with its octet reader
+(`takeU8`) while the specification reads it as a field (`takeBe 1`), which is
+`stepAgreesAll_takeBeOne`: the relation is that the field's number is the octet's own value. The
+thirty-two-bit rows agree on the number itself (`stepAgreesAll_takeBeEq`), because both readers fold
+the same four octets.
+
+The inner reader is `readersAgree_bind`'s composition: it takes the payload the outer step's number
+announced and reads it at the cursors the outer step handed back. For `binary` the inner reader is the
+payload read followed by the value (`readersAgree_ok`); for `string` and `symbol` it is the payload
+read composed with `readersAgree_utf8`, the same-octets-same-text bridge above. -/
+
+/-- **The `vbin8` row (`0xA0`).** A one-octet length, then that many octets carried as binary. -/
+theorem arm_0xA0 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0xA0, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0xA0, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0xA0 : UInt8).toNat = .variable 1 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0xA0 : UInt8) =
+      .ok ⟨160, some "vbin8", SpecAMQP.Generated.Oasis.Category.variable, 1, "binary",
+        "up to 2^8 - 1 octets of binary data"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.takeBe 1 d >>= fun p =>
+        SpecAMQP.Spec.Codec.takeBytes p.1 p.2 >>= fun q => .ok (.binary q.1, q.2) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readVariable]
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      SpecAMQP.Ref.takeU8 d' >>= fun p =>
+        SpecAMQP.Ref.takeBytes p.1.toNat p.2 >>= fun q => .ok (.binary q.1.toList, q.2) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_two_steps
+    (fun n f => SpecAMQP.Spec.Codec.takeBytes n f >>= fun q => .ok (.binary q.1, q.2))
+    (fun b f' => SpecAMQP.Ref.takeBytes b.toNat f' >>= fun q => .ok (.binary q.1.toList, q.2))
+    (stepAgreesAll_takeBeOne d d' hd)
+    hS hR
+    (fun a b hab => by
+      rw [← hab]
+      exact readersAgree_bind (stepAgreesAll_takeBytes a)
+        (fun bytes bytes' hb => by
+          subst hb
+          exact readersAgree_ok (.binary bytes) (.binary bytes.toList)
+            (by simp only [BodiesAgree])))
+    (spec_takeU8_data hs)
+
+/-- **The `vbin32` row (`0xB0`).** The same payload behind a four-octet length, which both readers
+fold the same way. -/
+theorem arm_0xB0 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0xB0, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0xB0, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0xB0 : UInt8).toNat = .variable 4 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0xB0 : UInt8) =
+      .ok ⟨176, some "vbin32", SpecAMQP.Generated.Oasis.Category.variable, 4, "binary",
+        "up to 2^32 - 1 octets of binary data"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.takeBe 4 d >>= fun p =>
+        SpecAMQP.Spec.Codec.takeBytes p.1 p.2 >>= fun q => .ok (.binary q.1, q.2) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readVariable]
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      SpecAMQP.Ref.takeBeU 4 d' >>= fun p =>
+        SpecAMQP.Ref.takeBytes p.1 p.2 >>= fun q => .ok (.binary q.1.toList, q.2) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_two_steps
+    (fun n f => SpecAMQP.Spec.Codec.takeBytes n f >>= fun q => .ok (.binary q.1, q.2))
+    (fun b f' => SpecAMQP.Ref.takeBytes b f' >>= fun q => .ok (.binary q.1.toList, q.2))
+    (stepAgreesAll_takeBeEq 4 d d' hd)
+    hS hR
+    (fun a b hab => by
+      rw [← hab]
+      exact readersAgree_bind (stepAgreesAll_takeBytes a)
+        (fun bytes bytes' hb => by
+          subst hb
+          exact readersAgree_ok (.binary bytes) (.binary bytes.toList)
+            (by simp only [BodiesAgree])))
+    (spec_takeU8_data hs)
+
+/-- **The `str8-utf8` row (`0xA1`).** A one-octet length, the payload, then the payload decoded as
+UTF-8 — the step `stepAgreesAll_utf8` carries, since both readers ask the same standard-library
+question and the only difference is the refusal's prose. -/
+theorem arm_0xA1 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0xA1, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0xA1, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0xA1 : UInt8).toNat = .variable 1 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0xA1 : UInt8) =
+      .ok ⟨161, some "str8-utf8", SpecAMQP.Generated.Oasis.Category.variable, 1, "string",
+        "up to 2^8 - 1 octets worth of UTF-8 Unicode (with no byte order mark)"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.takeBe 1 d >>= fun p =>
+        SpecAMQP.Spec.Codec.takeBytes p.1 p.2 >>= fun q =>
+          SpecAMQP.Spec.Codec.utf8Of q.1 "string" >>= fun s => .ok (.string s, q.2) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readVariable]
+    rfl
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      SpecAMQP.Ref.takeU8 d' >>= fun p =>
+        SpecAMQP.Ref.takeBytes p.1.toNat p.2 >>= fun q =>
+          SpecAMQP.Ref.decodeStringAt q.1 "string" q.2 >>= fun r => .ok (.string r.1, r.2) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_two_steps
+    (fun n f => SpecAMQP.Spec.Codec.takeBytes n f >>= fun q =>
+      SpecAMQP.Spec.Codec.utf8Of q.1 "string" >>= fun s => .ok (.string s, q.2))
+    (fun b f' => SpecAMQP.Ref.takeBytes b.toNat f' >>= fun q =>
+      SpecAMQP.Ref.decodeStringAt q.1 "string" q.2 >>= fun r => .ok (.string r.1, r.2))
+    (stepAgreesAll_takeBeOne d d' hd)
+    hS hR
+    (fun a b hab => by
+      rw [← hab]
+      exact readersAgree_bind (stepAgreesAll_takeBytes a)
+        (fun bytes bytes' hb => by
+          subst hb
+          exact readersAgree_utf8 "string" bytes (fun s => .string s) (fun s => .string s)
+            (fun s => by simp only [BodiesAgree])))
+    (spec_takeU8_data hs)
+
+/-- **The `str32-utf8` row (`0xB1`).** The same text payload behind a four-octet length. -/
+theorem arm_0xB1 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0xB1, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0xB1, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0xB1 : UInt8).toNat = .variable 4 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0xB1 : UInt8) =
+      .ok ⟨177, some "str32-utf8", SpecAMQP.Generated.Oasis.Category.variable, 4, "string",
+        "up to 2^32 - 1 octets worth of UTF-8 Unicode (with no byte order mark)"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.takeBe 4 d >>= fun p =>
+        SpecAMQP.Spec.Codec.takeBytes p.1 p.2 >>= fun q =>
+          SpecAMQP.Spec.Codec.utf8Of q.1 "string" >>= fun s => .ok (.string s, q.2) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readVariable]
+    rfl
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      SpecAMQP.Ref.takeBeU 4 d' >>= fun p =>
+        SpecAMQP.Ref.takeBytes p.1 p.2 >>= fun q =>
+          SpecAMQP.Ref.decodeStringAt q.1 "string" q.2 >>= fun r => .ok (.string r.1, r.2) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_two_steps
+    (fun n f => SpecAMQP.Spec.Codec.takeBytes n f >>= fun q =>
+      SpecAMQP.Spec.Codec.utf8Of q.1 "string" >>= fun s => .ok (.string s, q.2))
+    (fun b f' => SpecAMQP.Ref.takeBytes b f' >>= fun q =>
+      SpecAMQP.Ref.decodeStringAt q.1 "string" q.2 >>= fun r => .ok (.string r.1, r.2))
+    (stepAgreesAll_takeBeEq 4 d d' hd)
+    hS hR
+    (fun a b hab => by
+      rw [← hab]
+      exact readersAgree_bind (stepAgreesAll_takeBytes a)
+        (fun bytes bytes' hb => by
+          subst hb
+          exact readersAgree_utf8 "string" bytes (fun s => .string s) (fun s => .string s)
+            (fun s => by simp only [BodiesAgree])))
+    (spec_takeU8_data hs)
+
+/-- **The `sym8` row (`0xA3`).** The symbol payload, which this layer decodes through the same UTF-8
+test as `string`: the artifact restricts symbols to ASCII on the wire, and requiring the stricter of
+the two rules is what makes the two artefacts agree on the payload. -/
+theorem arm_0xA3 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0xA3, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0xA3, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0xA3 : UInt8).toNat = .variable 1 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0xA3 : UInt8) =
+      .ok ⟨163, some "sym8", SpecAMQP.Generated.Oasis.Category.variable, 1, "symbol",
+        "up to 2^8 - 1 seven bit ASCII characters representing a symbolic value"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.takeBe 1 d >>= fun p =>
+        SpecAMQP.Spec.Codec.takeBytes p.1 p.2 >>= fun q =>
+          SpecAMQP.Spec.Codec.utf8Of q.1 "symbol" >>= fun s => .ok (.symbol s, q.2) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readVariable]
+    rfl
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      SpecAMQP.Ref.takeU8 d' >>= fun p =>
+        SpecAMQP.Ref.takeBytes p.1.toNat p.2 >>= fun q =>
+          SpecAMQP.Ref.decodeStringAt q.1 "symbol" q.2 >>= fun r => .ok (.symbol r.1, r.2) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_two_steps
+    (fun n f => SpecAMQP.Spec.Codec.takeBytes n f >>= fun q =>
+      SpecAMQP.Spec.Codec.utf8Of q.1 "symbol" >>= fun s => .ok (.symbol s, q.2))
+    (fun b f' => SpecAMQP.Ref.takeBytes b.toNat f' >>= fun q =>
+      SpecAMQP.Ref.decodeStringAt q.1 "symbol" q.2 >>= fun r => .ok (.symbol r.1, r.2))
+    (stepAgreesAll_takeBeOne d d' hd)
+    hS hR
+    (fun a b hab => by
+      rw [← hab]
+      exact readersAgree_bind (stepAgreesAll_takeBytes a)
+        (fun bytes bytes' hb => by
+          subst hb
+          exact readersAgree_utf8 "symbol" bytes (fun s => .symbol s) (fun s => .symbol s)
+            (fun s => by simp only [BodiesAgree])))
+    (spec_takeU8_data hs)
+
+/-- **The `sym32` row (`0xB3`).** The same symbol payload behind a four-octet length. -/
+theorem arm_0xB3 (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor)
+    (d : SpecAMQP.Spec.Codec.Cursor) (d' : SpecAMQP.Ref.Cursor) (hd : CursorAgrees d d')
+    (_hb : d.data.size - d.pos ≤ fuel)
+    (hs : SpecAMQP.Spec.Codec.takeU8 c = .ok (0xB3, d))
+    (hr : SpecAMQP.Ref.takeU8 c' = .ok (0xB3, d')) :
+    StepAgrees (fuel + 1) c c' := by
+  have hclass : SpecAMQP.Spec.Value.classify (0xB3 : UInt8).toNat = .variable 4 := by decide
+  have hdecl : SpecAMQP.Spec.Codec.dataDecl (0xB3 : UInt8) =
+      .ok ⟨179, some "sym32", SpecAMQP.Generated.Oasis.Category.variable, 4, "symbol",
+        "up to 2^32 - 1 seven bit ASCII characters representing a symbolic value"⟩ := by decide
+  have hS : SpecAMQP.Spec.Codec.readValue (fuel + 1) c =
+      SpecAMQP.Spec.Codec.takeBe 4 d >>= fun p =>
+        SpecAMQP.Spec.Codec.takeBytes p.1 p.2 >>= fun q =>
+          SpecAMQP.Spec.Codec.utf8Of q.1 "symbol" >>= fun s => .ok (.symbol s, q.2) := by
+    simp only [SpecAMQP.Spec.Codec.readValue]
+    rw [hs, except_bind_ok, hclass, hdecl, except_bind_ok]
+    simp only [SpecAMQP.Spec.Codec.readScalarData, SpecAMQP.Spec.Codec.readVariable]
+    rfl
+  have hR : SpecAMQP.Ref.readValue (fuel + 1) c' =
+      SpecAMQP.Ref.takeBeU 4 d' >>= fun p =>
+        SpecAMQP.Ref.takeBytes p.1 p.2 >>= fun q =>
+          SpecAMQP.Ref.decodeStringAt q.1 "symbol" q.2 >>= fun r => .ok (.symbol r.1, r.2) := by
+    simp only [SpecAMQP.Ref.readValue]
+    rw [hr, except_bind_ok]
+    rfl
+  exact reader_of_two_steps
+    (fun n f => SpecAMQP.Spec.Codec.takeBytes n f >>= fun q =>
+      SpecAMQP.Spec.Codec.utf8Of q.1 "symbol" >>= fun s => .ok (.symbol s, q.2))
+    (fun b f' => SpecAMQP.Ref.takeBytes b f' >>= fun q =>
+      SpecAMQP.Ref.decodeStringAt q.1 "symbol" q.2 >>= fun r => .ok (.symbol r.1, r.2))
+    (stepAgreesAll_takeBeEq 4 d d' hd)
+    hS hR
+    (fun a b hab => by
+      rw [← hab]
+      exact readersAgree_bind (stepAgreesAll_takeBytes a)
+        (fun bytes bytes' hb => by
+          subst hb
+          exact readersAgree_utf8 "symbol" bytes (fun s => .symbol s) (fun s => .symbol s)
+            (fun s => by simp only [BodiesAgree])))
+    (spec_takeU8_data hs)
+
 end SpecAMQP.Proofs
