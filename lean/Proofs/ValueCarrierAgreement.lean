@@ -763,4 +763,36 @@ theorem carrier_clause_timestamp (fuel : Nat) (json : Json)
       simp only [BodiesAgree]
       exact (i64_toInt n (by omega) (by omega)).symm⟩
 
+/-! ## The join: the family at a given fuel
+
+The clauses above are stated at `valueOfJson (fuel + 1)` with the discriminant as a hypothesis,
+because that is what makes each clause's own `match` reduce against a literal. The contract's
+`ValueCarrierAgree` is at fuel 64 and states the claim over *every* `Json`, so the two are joined by
+a fuel-indexed restatement: `ValueCarrierAgrees fuel` is the claim at `fuel`, and it is the shape
+the compound clauses need, since they read their items with `valueOfJson fuel` and so consume the
+claim at the fuel beneath them.
+
+That fixes the induction: `ValueCarrierAgrees 0` holds vacuously (both readers refuse at fuel 0),
+and the step is a lemma whose cases are the clauses above — the scalar ones used as they stand, the
+compound ones consuming the induction hypothesis at `fuel`. The step is not written yet; the
+statement, its base case and the reduction to the contract's form are, and they are what the step
+will be stated against. -/
+
+/-- **The corpus readers' agreement at a given fuel.** `ValueCarrierAgree` is this at 64. -/
+def ValueCarrierAgrees (fuel : Nat) : Prop :=
+  ∀ (json : Json) (other : SpecAMQP.Ref.Value),
+    SpecAMQP.Ref.Vectors.valueOfJson fuel json = .ok other →
+    ∃ body : SpecAMQP.Spec.Codec.Value,
+      SpecAMQP.Spec.Codec.valueOfJson fuel json = .ok body ∧ BodiesAgree body other
+
+/-- Nothing is read at fuel 0: both readers refuse, so the claim holds vacuously. -/
+theorem valueCarrierAgrees_zero : ValueCarrierAgrees 0 := by
+  intro json other h
+  unfold SpecAMQP.Ref.Vectors.valueOfJson at h
+  simp at h
+
+/-- **The contract's statement is this one at fuel 64**, so the step lemma is what stands between
+the clause family and `ValueCarrierAgree`. -/
+theorem valueCarrierAgree_of_agrees (h : ValueCarrierAgrees 64) : ValueCarrierAgree := h
+
 end SpecAMQP.Proofs
