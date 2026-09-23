@@ -875,6 +875,23 @@ Test forms:
 - **No test may call a network service, a model, a real clock, or randomness.** Third-party capture is manual, off-gate, and its *outputs* are committed; replay is offline. Any generated input uses a committed seed.
 - **Failure-first**: every new contract is run and observed failing before its implementation, with the exact command and diagnostic recorded. A test never observed to fail protects nothing.
 
+**The writer's domain, as a definition rather than an adjective.** `ValueWriterAgree`'s first conjunct is refuted on the
+ill-width family, and the restatement over the reader-reachable domain is now a one-line change with one predicate:
+
+```lean
+/-- A body an endpoint can hold: some region decodes to it. The wire is the only source of values, so a body no reader
+can produce cannot be sent by a conforming peer nor arise in the implementation answering one. -/
+def ReaderReachable (v : SpecAMQP.Ref.Value) : Prop :=
+  ∃ region : Octets, ∃ used : Nat, SpecAMQP.Ref.decode region = .ok (v, used)
+```
+
+`ValueWriterAgree` keeps its name and its two conjuncts and gains this as a hypothesis on the body: quantified over
+`ReaderReachable` values, the octet-equality conjunct is a candidate theorem rather than a refuted one, and the
+class-agreement conjunct is unchanged. The ill-width witness stays in `FrameSendConformance.lean`'s caveat, named, with
+the reason it sits outside the domain — a permissive writer's property over values no protocol path constructs — because
+a narrowed hypothesis with an unexplained narrowing is a defect wearing a domain, which is the sentence this paragraph
+exists to make checkable.
+
 **Ownership is what makes a window possible, and this session bought that rule three times.** A slice editing a file
 another slice needs must say so, and say when the file is buildable again. `ImplCore`'s one line — "frame is green at the
 current working tree, holding it still" — cost its author nothing and was worth half an hour to two other slices, which had
