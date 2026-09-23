@@ -557,14 +557,17 @@ witness alone: every item that is not `null` is refused. The matching cases stil
 `ref_encode_zeroWidthMatch` is their octets — which is the other half of the measurement, since the same
 four octets used to come from a mismatched value.
 
-**One interaction, named because it is a divergence this fix makes *visible* rather than makes.**
-`0x41` carries `true` and `0x42` carries `false`, so `Ref.arrayElement 0x41 (.boolean false)` is now
-refused — correctly, because writing nothing under `%x41` reads back as `true`. The specification still
-*writes* it: its `writeFixedData` boolean arm answers `.ok []` whenever the row's width is zero,
-regardless of `b`, so it drops the value rather than refusing it. That is a defect on the
-specification's side (`lean/Spec/**`, planner-owned) and it is reported rather than touched; until it is
-fixed the differential sees `0x41` with `false`, and `0x42` with `true`, as a shape divergence, and the
-reference's answer is the one both should give. -/
+**One interaction, which was a divergence this fix made *visible* and which the specification's own
+slice then closed.** `0x41` carries `true` and `0x42` carries `false`, so `Ref.arrayElement 0x41
+(.boolean false)` is refused — correctly, because writing nothing under `%x41` reads back as `true`. When
+this fix landed the specification still *wrote* that pair: its `writeFixedData` boolean arm answered
+`.ok []` for any zero-width boolean row regardless of `b`, so it dropped the value rather than refusing
+it, and the two artefacts read as a shape divergence for as long as that stood — with the reference
+giving the answer both should give. The specification's arm now compares the row's name against the
+value (`0ad854f`, the slice that also landed `constructor-disagreement.ndjson`'s four vectors for these
+two pairs), so **both refuse `malformed` and the pair is a class agreement like the rest**. It is
+recorded because a reader meeting the reference's refusal should be able to see that the divergence was
+real, transient and shared, rather than read it as a regression from this fix. -/
 
 /-- **The reader's side of the data loss**: under `%x40` this reader produces `null` whatever data
 follows, so an element written with no data at all under `%x40` reads back as a `null` — which is why a
@@ -588,8 +591,11 @@ theorem ref_arrayElement_null_refuses_mismatch {item : SpecAMQP.Ref.Value} (h : 
       SpecAMQP.Ref.assignedConstructor, SpecAMQP.Ref.typeName] <;>
     decide
 
-/-- The two boolean forms are subject to the same rule, and this is the case the specification does not
-yet refuse — `%x41` names `true`, so a `false` under it is a value that form cannot carry. -/
+/-- The two boolean forms are subject to the same rule: `%x41` names `true` and `%x42` names `false`, so
+a `false` under `%x41` is a value that form cannot carry, and the reference refuses it. The
+specification refuses it too — `writeFixedData` compares the row's name against the value since
+`0ad854f`, the slice that landed the four `constructor-disagreement` vectors for these two pairs — so
+this is a class agreement; it was not when this fix landed, and the paragraph above records why. -/
 theorem ref_arrayElement_true_refuses_false :
     SpecAMQP.Ref.arrayElement 0x41 (.boolean false) =
       .error (SpecAMQP.Ref.encodeRefusal "malformed"
