@@ -545,7 +545,11 @@ socket, compared per vector against `amqp-spec` with the same verdict-and-reason
   because the fields carrying settlement's mechanics have no keyed clause in the ledger.
   `Contracts/SessionCredit.lean`'s `SenderCreditInvariant` is in the same position: **stated
   rather than proved**, with the preservation lemma named as what will discharge it.
-- **the value layer's proof debt** — the three landed instances rest on `ValueLayersAgree`,
+- **the value layer's proof debt, restated** — the receive instance's `ValueLayersAgree` is undecided: the
+  divergence that refuted it is fixed and no other is known, but no proof exists, since discharging it needs the
+  value layer's own instance. The send instance is not conditional but **false** — an array body whose refusal the
+  two artefacts name differently — so patch 3's `arrayElement` split is the fix and `Proofs/FrameSendConformance.lean`
+  holds the refutation. Original entry: the three landed instances rest on `ValueLayersAgree`,
   `ValueCarrierAgree` and `ValueWriterAgree`, none of which is proved; the value-layer instance
   that would discharge them does not exist (`grep -rn "conformance_public" lean/Contracts/`).
   `PLAN.md` §13's S1.5 rungs record what remains: the dispatch lemma and the composition for

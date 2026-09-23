@@ -41,7 +41,7 @@ exactly that — so no change to either artefact was needed and none was made. W
 writer *law*, and it is a named hypothesis in the statement rather than an assumption, which is the same
 treatment every other layer boundary gets here.
 
-## The hypothesis this module rests on is false, so the instances are vacuous as stated
+## The receive hypothesis has no known divergence left, and the send direction's consequent is false
 
 A later slice set out to discharge `ValueLayersAgree` and refuted it, and the refutation was checked
 here at the source rather than taken from the report. Six octets are enough:
@@ -58,14 +58,29 @@ unconditional statement, and therefore:
   nothing about the two artefacts. It is not withdrawn — the proof is real, the relation is
   load-bearing under both mutation controls, and the composition is honest — but a reader must not
   take it as the frame layer's agreement established.
-* The same refutation reaches the send direction through `ValueWriterAgree`, whose array-element
-  family is *reachable through the corpus vocabulary*: `.array 0x57 [null]` gets `unassigned` from one
-  artefact and `limit` from the other.
-* And it reaches the connection instance, whose `ReadersAgree` is a frame-layer hypothesis.
+* `ValueLayersAgree` is **undecided**: no divergence is known — forty-five value-layer buffers, ten
+  frame-level and the eight odd-map corpus vectors agree in class on both artefacts — and no proof
+  exists, because discharging its two conjuncts needs the value layer's own `Conforms` instance.
+  Refuted and unproved are different states, and this one is the second. `frame_conformance_public`
+  is therefore conditional and undischarged rather than vacuous: its hypothesis is named rather than
+  assumed, and calling it vacuous now would be an assertion about a conjecture.
+* **The send direction is a different shape, and worse — `Conforms specFrameSend refFrameSend` is
+  false.** Not its hypothesis: its consequent. `.array 0x00 [null]` and `.array 0xE0 [null]` are
+  accepted by `frameOfJson`, the specification names the refusal `malformed:` because the element is
+  not the scalar that encoding requires, and the reference's `arrayElement` catch-all still names it
+  `limit:`. A reachable input, two classes, one observable. `Proofs/FrameSendConformance.lean` carries
+  that refutation as a theorem, so the day someone weakens the reference rather than fixing it, the
+  theorem goes red — which is what a refutation is for.
+* And it reaches the connection instance, whose `ReadersAgree` names the same layer and inherits the
+  receive direction's status: no known divergence, no proof.
 
-**What follows is a fix in one of the two readings, not a proof revision.** Both artefacts refuse
-these buffers and differ only about the class, so either one misreads the artifact or the artifact is
-silent and the register decides. `PLAN.md` §10 records the order of discharge — decide the reading,
+**What follows was a fix in one of the two readings, and the receive half is done.** Both artefacts
+refused those buffers and differed only about the class, so either one misread the artifact or the
+artifact was silent and the register decided; the reading was decided, both artefacts were aligned to
+it (`fd9bdc5`), and the witness above now draws the same class from both. The **send** half is still
+open and is patch 3's `arrayElement` split — the reference's catch-all names `limit` where the
+specification names the shape error — and until it lands the send instance is false rather than
+merely conditional. `PLAN.md` §10 records the order of discharge — decide the reading,
 align the artefacts, then add a vector, because a vector written before the fix is authored from the
 artifact and one written after it is authored from the fix. `Proofs/` carries the refutations as
 theorems, since a refuted hypothesis is a theorem or it is a rumour.
