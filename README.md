@@ -42,8 +42,8 @@ second instance of the relation, and the corpus is what the two are compared ove
 every other proof in this repository. Its compiled form is a *trusted* step rather than a proved one — Lean's
 compiler and runtime are not verified — and its socket layer is a small, separately named unproved
 dependency: **a choice rather than a necessity**, because the pinned stdlib does have TCP (`Std.Async/TCP`,
-over libuv compiled into `libleanshared.so`) and a POSIX wrapper of about two hundred readable lines was
-taken instead, so that the endpoint's frame loop stays synchronous and the unnamed part of the trust base
+over libuv compiled into `libleanshared.so`) and a POSIX wrapper — a couple of hundred lines, measured in
+`PLAN.md` §23.1 — was taken instead, so that the endpoint's frame loop stays synchronous and the unnamed part of the trust base
 stays small. `PLAN.md` §23.1 records the measurement, the decision and the rejected alternative, which was
 built and passed before it was rejected. The corpus runs against the
 endpoint over a socket as a third runner beside `amqp-spec` and `amqp-ref`, so what the endpoint claims and
