@@ -67,6 +67,14 @@ Deliberate choices, none of which a clause fixes:
   or array whose size or count does not fit the declared width — the writer refuses
   it by name rather than masking a field or writing a different form, so the
   writer's domain stays inside what the reader accepts.
+* **An array's declared element constructor is consulted before its elements**, by
+  `requireAssignedConstructor`, whether or not the array carries any. The check itself has
+  always been here — `arrayElement`'s catch-all refuses a constructor the grammar assigns no
+  encoding — but it ran once per element, so an array with no elements never reached it and
+  was written under a constructor neither this reader nor the specification accepts. The
+  specification consults its element declaration once, before any element
+  (`Spec.Codec.elementDecl?`), and an array declares its constructor in its encoding either
+  way, so this is the check in the place it is made rather than once per element.
 -/
 
 namespace SpecAMQP.Ref
@@ -681,6 +689,24 @@ def elementCompoundData (width : Nat) (kind : String) (count : Nat) (body : Octe
   else
     .ok (u32be size ++ u32be count ++ body)
 
+/-- An array's declared element constructor, refused by name when the grammar assigns it no encoding.
+
+This is the check the specification makes through `Spec.Codec.elementDecl?`, and the place matters as
+much as the check does. `arrayElement`'s catch-all already refused such a constructor when it met one
+with a value in hand, but it runs *once per element* — so an array with no elements never reached it
+and the declared constructor was never consulted at all. `.array %x57 [.null]` was refused and
+`.array %x57 []` was written, one element apart, and what was written was four octets this module's own
+reader then refused: `readArray` looks the element constructor up before it reads an element, exactly
+as the specification's writer does, so the writer and the reader disagreed about the same array.
+
+An array declares its element constructor whether or not it carries elements — the constructor octet is
+in the encoding either way — so the check belongs where the array is written rather than where an
+element is. -/
+def requireAssignedConstructor (constructor : UInt8) : Except EncodeRefusal Unit :=
+  if assignedConstructor constructor then .ok ()
+  else .error (encodeRefusal "unassigned" s!"octet {constructor.toNat} is not an encoding the \
+    constructor grammar assigns")
+
 mutual
 
 /-- The constructor-and-data encoding of a value. Equation-style clauses rather
@@ -688,11 +714,14 @@ than a `match`: a mutual block's `termination_by` hint binds the function's
 parameters, and a body that abstracts them itself leaves the hint with nothing to
 bind.
 
-Two values are refused rather than written: an array whose element count exceeds
-`arrayElementLimit`, and an array whose declared element form cannot carry one of its
-elements. The writer's domain has to sit inside what the reader accepts, and emitting
-octets the reader would then refuse — or masking a value into a different one — would
-make this implementation's own output unreadable or untrue. -/
+Three families are refused rather than written: an array whose element count exceeds
+`arrayElementLimit`, an array whose declared element constructor the grammar assigns no
+encoding, and an array whose declared element form cannot carry one of its elements. The
+first and the third are the specification's own checks; the second is the one this writer
+was missing, and its absence was the defect the third family exists to prevent — the
+writer's domain has to sit inside what the reader accepts, and emitting octets the reader
+would then refuse, or masking a value into a different one, would make this
+implementation's own output unreadable or untrue. -/
 def encode : Value → Except EncodeRefusal Octets
   | .null => .ok #[0x40]
   | .boolean true => .ok #[0x41]
@@ -741,6 +770,7 @@ def encode : Value → Except EncodeRefusal Octets
       .error (encodeRefusal "limit" s!"an array of {items.length} element(s): this writer \
         materialises at most {arrayElementLimit}")
     else do
+      let _ ← requireAssignedConstructor constructor
       let body ← arrayElementItems constructor items
       let count := items.length
       .ok (if 2 + body.size ≤ 255 && count ≤ 255 then
@@ -848,6 +878,7 @@ def arrayElement : UInt8 → Value → Except EncodeRefusal Octets
       .error (encodeRefusal "limit" s!"an array of {items.length} element(s): this writer \
         materialises at most {arrayElementLimit}")
     else do
+      let _ ← requireAssignedConstructor constructor
       let body ← arrayElementItems constructor items
       let count := items.length
       let size := 2 + body.size
@@ -861,6 +892,7 @@ def arrayElement : UInt8 → Value → Except EncodeRefusal Octets
       .error (encodeRefusal "limit" s!"an array of {items.length} element(s): this writer \
         materialises at most {arrayElementLimit}")
     else do
+      let _ ← requireAssignedConstructor constructor
       let body ← arrayElementItems constructor items
       let count := items.length
       return u32be (5 + body.size) ++ u32be count ++ #[constructor] ++ body
@@ -872,6 +904,14 @@ def arrayElement : UInt8 → Value → Except EncodeRefusal Octets
     -- carry is a shape refusal, `malformed`. Reporting both as `limit` was a class a conforming
     -- peer could not agree with, and it made an array element the one place where the two
     -- artefacts' writers differed in class on a body the corpus vocabulary can express.
+    --
+    -- The `unassigned` arm is a second line of defence now rather than the one an array path
+    -- reaches: `requireAssignedConstructor` consults the array's declared constructor before any
+    -- element is written, so no writer path arrives here under a constructor the grammar assigns
+    -- no encoding. It is kept for the same reason `readElement`'s own `unassigned` clause is —
+    -- `arrayElement` is a public function and a caller may ask it for one element under a
+    -- constructor an array path would have refused — and a guard that cannot be reached from this
+    -- module's own paths is still the right answer for the call that reaches it.
     if !assignedConstructor constructor then
       .error (encodeRefusal "unassigned" s!"octet {constructor.toNat} is not an encoding the \
         constructor grammar assigns")
