@@ -136,6 +136,13 @@
    "kind": "MUST",
    "note": "deferred: S6 \u2014 uncarried, and unenforced by design: the model has no source for the missing input. Whether a link endpoint supports transactional acquisition would be read from the flow frame's `properties` map, and no declaration reads a flow's properties \u2014 `flowLink` (lean/Spec/Session.lean:742-806) reads the link's own fields and the handle it must name. `Contracts/Transaction.lean:43-44` records this clause's `amqp-error` as stated in the ledger as unenforced rather than approximated, which is what this entry does.",
    "text_sha256": "c04b4f68aa9a5ae80137b667a27db6296468baaaa762810f81515146640ba4e2"
+  },
+  "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work/doc:transactional-acquisition.1": {
+   "clause_text": "An outcome sent by the controller before the transaction has discharged MUST be associated with the same transaction.",
+   "disposition": "deferred:S6",
+   "kind": "MUST",
+   "note": "deferred: S6 \u2014 uncarried: a MUST over an association between a delivery's outcome and the transaction that owns it, which is the delivery-state layer's to make and this layer does not make. What the layer holds is the control side's association: `State` carries the declared ids and a discharge is checked against the session's declared transaction, so the near-miss is real and is a different pair \u2014 nothing joins an outcome value to a transaction id. Contracts/Transaction.lean:40-42 puts the family exactly where this disposition does \u2014 \"Posting, acquiring and retiring a delivery are the delivery-state layer's semantics; this machine carries the transactional-state composite and nothing about what a resource does with it\" \u2014 and this clause is one of the 21 that note names, arriving under a doc anchor inside txn-work. No vector cites it, which is consistent rather than incidental: the corpus cannot witness an association the model does not make.",
+   "text_sha256": "df09e87069a6bf3ca34f19a37aecec3b174078b8b3cf43a3520e4bdd3adc5194"
   }
  }
 }

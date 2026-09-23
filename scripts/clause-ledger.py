@@ -1520,14 +1520,21 @@ def check_ambiguities(report: dict, dispositions: dict[str, dict], path: Path) -
     """Validate the ambiguity register against the ledger it cites.
 
     The register is where a clause whose reading is genuinely open gets decided, and
-    a disposition may cite a decision by id (`superseded:<id>`). Unvalidated, it is
-    documentation that drifts: a decision id nobody can find, a clause that was
-    reworded, a reading list with one entry. These are cheap invariants and they are
-    the difference between a register and a folder.
+    a disposition may cite a decision by id (`superseded:<id>`, `underspecified:<id>`).
+    Unvalidated, it is documentation that drifts: a decision id nobody can find, a clause
+    that was reworded, a reading list with one entry. These are cheap invariants and they
+    are the difference between a register and a folder.
+
+    The ids a disposition *cites* are resolved here too, and that half was missing: the
+    register was validated against itself and the ledger, while the values pointing into it
+    were exempt — the same shape as a `formalized:` naming a declaration nobody created, in
+    the one namespace where the pointer *is* the whole content of the value. Three sites
+    naming two ids that did not exist survived several green runs of this check before a
+    disposition audit read them by hand. Resolution is not conditional on the register
+    existing: a citation into a directory that is not there resolves nowhere, and saying so
+    is the point.
     """
     problems: list[str] = []
-    if not path.exists():
-        return problems
     known = {clause["ref"] for clause in report["clauses"]}
     known.update({picture["ref"] for picture in report.get("pictures", [])})
     seen: dict[str, str] = {}
@@ -1556,6 +1563,14 @@ def check_ambiguities(report: dict, dispositions: dict[str, dict], path: Path) -
         for ref in document.get("clauses", []):
             if ref not in known:
                 problems.append(f"{file.name}: cites {ref}, which is not a clause or picture in the ledger")
+    for ref, entry in dispositions.items():
+        value = entry.get("disposition", "")
+        for prefix in ("superseded:", "underspecified:"):
+            if value.startswith(prefix) and value[len(prefix) :] not in seen:
+                problems.append(
+                    f"{entry.get('file', '?')}: {ref}: {value} cites a decision that is not in "
+                    f"{path} (a value in this namespace resolves nowhere else)"
+                )
     return problems
 
 
