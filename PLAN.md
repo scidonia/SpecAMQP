@@ -697,6 +697,18 @@ the same wrong way** — the specification, the reference, and the corpus genera
 and disagree with the artifact's own choice attributes. That unanimity is exactly why no differential can see it, and why the defect had to be found by reading two clauses whose *rendered* text was identical
 and going back to the source to ask why they could be.
 
+**The settle-mode defect is fixed in all three artefacts at once, and the slice's evidence is the shape this repository asks for.** The selection now reads the *choice* the artifact names for each
+sentence — `choiceValue? "sender-settle-mode" "settled"` in the specification, `declaredChoice … "settled"` in the reference, `choice_value(TRANSPORT, "sender-settle-mode", "settled")` in the corpus
+generator — with the **proof attempted first** against the pre-fix model and observed failing on the inversion in a single line, and with a **two-directional control**: a scratch vector negotiating
+the other choice is *admitted* by both artefacts, so the guard is shown to fire under `settled` and not to fire under `unsettled`, which is the defect gone in both directions rather than one.
+
+**And the fix required reshaping the specification's own expression, which is what stating a selection as an equality costs.** `String.toNat?` is not kernel-reducible — `Slice.isNat` bottoms out in
+`ByteArray` primitives — so `rfl`, `decide` and `simp` all fail on the contract's right-hand side while `native_decide` is banned by the trust gate. Writing the *implementation* in the contract's shape
+makes the proof definitional and leaves every runtime branch unchanged, which the slice argued branch by branch rather than by sample. `Contracts/Settlement.lean`'s proposition is proved by
+`Proofs.Settlement.senderSettleModeIsTheChoiceTheClauseSelects`; the ledger's `.4` and `.5` entries moved from `deferred:S4` to `formalized:` on that declaration and the refusal that applies it,
+while `.6` stays deferred — its obligation is a safety over *every* transfer that the layer still does not check, and it is now *omitted* rather than *inverted*, which is a different sentence in the
+ledger because it is a different fact.
+
 ## 11. Specification test vectors
 
 One shared format for everything the specification is tested against: NDJSON, schema-validated (`tests/contracts/vector.schema.json`), **logical time only** — timestamps are ordering tags, never wall-clock, so replay is deterministic on any machine.
