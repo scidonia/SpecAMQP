@@ -159,7 +159,7 @@
    "clause_text": "In this case the sender will either apply that outcome at the source, or in the rare case that it cannot apply that outcome, indicate the terminal outcome that has been applied.",
    "disposition": "deferred:S5",
    "kind": "UNKEYED",
-   "note": "deferred: S5 \u2014 the messaging milestone owns this statement.",
+   "note": "deferred: S5 — the messaging milestone owns this statement.",
    "text_sha256": "7afb62641a9d704698835018efd9e769c2cdfdbff71a58be5414cc71d9d2970e",
    "unkeyed_phrases": [
     "cannot"
@@ -176,7 +176,7 @@
    "clause_text": "The only option available to the sender is to abort the transfer and to then (if possible) resend as a new delivery or else to report the possible message loss in some way if it cannot.",
    "disposition": "deferred:S5",
    "kind": "UNKEYED",
-   "note": "deferred: S5 \u2014 the messaging milestone owns this statement.",
+   "note": "deferred: S5 — the messaging milestone owns this statement.",
    "text_sha256": "a43aafd3435dd0aca63b9d31f94707f948dbf25bf5dc45479f901ff9aff7eba9",
    "unkeyed_phrases": [
     "cannot"
@@ -193,7 +193,7 @@
    "clause_text": "In this case the sender can simply abort the delivery as it cannot be resumed.",
    "disposition": "deferred:S5",
    "kind": "UNKEYED",
-   "note": "deferred: S5 \u2014 the messaging milestone owns this statement.",
+   "note": "deferred: S5 — the messaging milestone owns this statement.",
    "text_sha256": "f77a4a0e3e970b008815724a2c5400cd99177f3407de578083fbd509b8ecd6b2",
    "unkeyed_phrases": [
     "cannot"
@@ -207,7 +207,7 @@
    "text_sha256": "8a2d3180054922ff2f4355082dc1152779bba7642c55c6859fa2a7368e37176b"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/type:accepted.u2": {
-   "clause_text": "A delivery can become accepted at the source even before all transfer frames have been sent, this does not imply that the remaining transfers for the delivery will not be sent - only the aborted flag on the \u00abtransfer\u00bb performative can be used to indicate a premature termination of the transfer.",
+   "clause_text": "A delivery can become accepted at the source even before all transfer frames have been sent, this does not imply that the remaining transfers for the delivery will not be sent - only the aborted flag on the «transfer» performative can be used to indicate a premature termination of the transfer.",
    "disposition": "deferred:S5",
    "kind": "UNKEYED",
    "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
@@ -238,7 +238,7 @@
    "clause_text": "Data from sections prior to the given section cannot be retransmitted for this delivery.",
    "disposition": "deferred:S5",
    "kind": "UNKEYED",
-   "note": "deferred: S5 \u2014 the messaging milestone owns this statement.",
+   "note": "deferred: S5 — the messaging milestone owns this statement.",
    "text_sha256": "2be19a2223351f1be3bf7a217ce456fb10693e98c90ed6ecd5ad15fa12f82560",
    "unkeyed_phrases": [
     "cannot"
@@ -248,7 +248,7 @@
    "clause_text": "Bytes from the same section prior to the given offset section cannot be retransmitted for this delivery.",
    "disposition": "deferred:S5",
    "kind": "UNKEYED",
-   "note": "deferred: S5 \u2014 the messaging milestone owns this statement.",
+   "note": "deferred: S5 — the messaging milestone owns this statement.",
    "text_sha256": "9ee47b6d09d3a0c0fd2a84903eb55ed1454b21afea578aa538937f121b596fd1",
    "unkeyed_phrases": [
     "cannot"
@@ -317,7 +317,7 @@
    "clause_text": "If the recipient does not understand the annotation it cannot be acted upon and its effects (such as any implied propagation) cannot be acted upon.",
    "disposition": "deferred:S5",
    "kind": "UNKEYED",
-   "note": "deferred: S5 \u2014 the messaging milestone owns this statement.",
+   "note": "deferred: S5 — the messaging milestone owns this statement.",
    "text_sha256": "84da38d8d8f206a23277f6a786b51d6b448d02c09a2b8cd67dab2fdf875a5632",
    "unkeyed_phrases": [
     "cannot"
@@ -327,7 +327,7 @@
    "clause_text": "The symbolic key \"rejected\" is reserved for the use of communicating error information regarding rejected messages.",
    "disposition": "deferred:S3-annotations",
    "kind": "UNKEYED",
-   "note": "A reservation on the symbolic key `rejected` inside the delivery-annotations map. This is a rule about annotation content, and the codec deliberately does not interpret annotations \u2014 it decodes the map and leaves its meaning to the layer that reads the keys. Enforced where annotations are interpreted, not at the wire.",
+   "note": "A reservation on the symbolic key `rejected` inside the delivery-annotations map. This is a rule about annotation content, and the codec deliberately does not interpret annotations — it decodes the map and leaves its meaning to the layer that reads the keys. Enforced where annotations are interpreted, not at the wire.",
    "text_sha256": "63e1cd744372b1d10f32cb9f73b51fe9966d4bb3756f48996e4c33897f14e238",
    "unkeyed_phrases": [
     "is reserved"
@@ -341,7 +341,7 @@
    "text_sha256": "d0fe1c045eb2c4a43d66eb50b199f4a19954309735ad8894008293ac9c5598cb"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:first-acquirer.u1": {
-   "clause_text": "If this value is true, then this message has not been acquired by any other link (see \u00abdistribution-nodes\u00bb).",
+   "clause_text": "If this value is true, then this message has not been acquired by any other link (see «distribution-nodes»).",
    "disposition": "deferred:S5",
    "kind": "UNKEYED",
    "note": "The header's acquisition flag, which the message layer will read when it decodes a message's delivery history.",
@@ -351,7 +351,7 @@
    "clause_text": "Thus, for example, if 2 distinct priorities are implemented, then levels 0 to 4 are equivalent, and levels 5 to 9 are equivalent and levels 4 and 5 are distinct.",
    "disposition": "informative",
    "kind": "UNKEYED",
-   "note": "Opening with `Thus, for example` \u2014 an illustration of how priority levels map, not a requirement on an endpoint.",
+   "note": "Opening with `Thus, for example` — an illustration of how priority levels map, not a requirement on an endpoint.",
    "text_sha256": "1d882499623943b20a4a659690d0f97be531b6289efe315064ed3cb9a6682524"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:ttl.u1": {
@@ -445,7 +445,7 @@
    "clause_text": "It is invalid for this list to be null or empty.",
    "disposition": "formalized:SpecAMQP.Spec.Connection.stepSaslFrame",
    "kind": "UNKEYED",
-   "note": "The list is refused when it announces nothing: `stepSaslFrame`'s awaiting-mechanisms branch reads the announced symbols and refuses an empty list with `amqp:invalid-field` and the class `malformed`, quoting the artifact's own words that the list cannot be null or empty (lean/Spec/Connection.lean:1083-1089). The value previously read `Spec.Value.MultipleMandatory`, a declaration that was never written; the general rule it stood for is not carried either \u2014 see this batch's correction of `composite-type-representation.3` \u2014 so the entry now names the declaration that does carry the clause.",
+   "note": "The list is refused when it announces nothing: `stepSaslFrame`'s awaiting-mechanisms branch reads the announced symbols and refuses an empty list with `amqp:invalid-field` and the class `malformed`, quoting the artifact's own words that the list cannot be null or empty (lean/Spec/Connection.lean:1083-1089). The value previously read `Spec.Value.MultipleMandatory`, a declaration that was never written; the general rule it stood for is not carried either — see this batch's correction of `composite-type-representation.3` — so the entry now names the declaration that does carry the clause.",
    "text_sha256": "0f2e0b8b96e5844c0e7edc274e9400230aca239e3a4f00d40e47ad5a28f02e66",
    "unkeyed_phrases": [
     "is invalid"
@@ -459,7 +459,7 @@
    "text_sha256": "281286a356dba289645d7c6c2044f14ba3e6ad736fb48b931fb990f0cd5d86ac"
   },
   "amqp-core-security-v1.0-os.xml#amqp:security/section:tls.u1": {
-   "clause_text": "If it does so, then it is undefined what happens if this differs from hostname in the \u00absasl-init\u00bb and \u00abopen\u00bb frame frames.",
+   "clause_text": "If it does so, then it is undefined what happens if this differs from hostname in the «sasl-init» and «open» frame frames.",
    "disposition": "underspecified:tls-hostname-mismatch",
    "kind": "UNKEYED",
    "note": "Explicit silence: if a TLS connection is made to a hostname differing from the one in the SASL exchange, the artifact says it is undefined what happens. No obligation, and no assertion is admissible on either behaviour.",
@@ -542,7 +542,7 @@
    "clause_text": "No transactional work is allowed on the control link.",
    "disposition": "formalized:SpecAMQP.Spec.Transactions.notTheControlDialogue; test:txn-transactional-state-as-a-message-refused; test:txn-ordinary-message-on-the-control-link-admitted",
    "kind": "UNKEYED",
-   "note": "Refused where the work would be transactional and carried where it would not: the disarm names the carrier, because the same value means different things in a transfer's payload and in a disposition's state, and the sentence forbids transactional work rather than traffic. Disposed from deferred:S5 once the transaction slice implemented it \u2014 a reviewer caught that the entry still said the layer had not been written.",
+   "note": "Refused where the work would be transactional and carried where it would not: the disarm names the carrier, because the same value means different things in a transfer's payload and in a disposition's state, and the sentence forbids transactional work rather than traffic. Disposed from deferred:S5 once the transaction slice implemented it — a reviewer caught that the entry still said the layer had not been written.",
    "text_sha256": "a26f6871592a1bef0bac54be4dded66b9027af777163019533c75a0d95476ad2"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:transactions.u2": {
@@ -553,24 +553,24 @@
    "text_sha256": "f8e1e93508b9505a1f3886c0ebd87d8d78bdf9adc79caf96e4fc111d3eefcd5e"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-declare.u1": {
-   "clause_text": "Note that links to the \u00abcoordinator\u00bb cannot be resumed.",
+   "clause_text": "Note that links to the «coordinator» cannot be resumed.",
    "disposition": "deferred:S6",
    "kind": "UNKEYED",
-   "note": "deferred: S6 \u2014 the transaction machine's milestone owns this statement.",
+   "note": "deferred: S6 — the transaction machine's milestone owns this statement.",
    "text_sha256": "426c8c1303fa88e23fda2da183755e8b2a89c1853f903e78b557346aadb92473",
    "unkeyed_phrases": [
     "cannot"
    ]
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-discharge.u1": {
-   "clause_text": "As with the \u00abdeclare\u00bb message, it is an error if the sender sends the \u00abtransfer\u00bb pre-settled.",
+   "clause_text": "As with the «declare» message, it is an error if the sender sends the «transfer» pre-settled.",
    "disposition": "deferred:S5",
    "kind": "UNKEYED",
    "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
    "text_sha256": "4976d785845c31d63558ba850484fd5fe23bfa3c34b213534b90e17af850bb11"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.u1": {
-   "clause_text": "In the case of the \u00abflow\u00bb frame traveling from resource to controller, the txn-id does not indicate work that has been performed, but indicates with which transaction future transfers from that link will be performed.",
+   "clause_text": "In the case of the «flow» frame traveling from resource to controller, the txn-id does not indicate work that has been performed, but indicates with which transaction future transfers from that link will be performed.",
    "disposition": "deferred:S5",
    "kind": "UNKEYED",
    "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
@@ -612,7 +612,7 @@
    "text_sha256": "09735c20f86cfd2f4bc618ae4d452c4d27c91725caa2621c4f89b2a4bec012da"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.u4": {
-   "clause_text": "In the event of a controller-initiated rollback (a \u00abdischarge\u00bb where the fail flag is set to true) or a resource-initiated rollback (the \u00abdischarge\u00bb message being rejected, or the link to the \u00abcoordinator\u00bb being detached with an error), the outcome will not be applied, and the deliveries will still be \"live\" and will remain acquired by the controller, i.e., the resource can expect the controller to request a disposition for the delivery (either transactionally on a new transaction, or non-transactionally).",
+   "clause_text": "In the event of a controller-initiated rollback (a «discharge» where the fail flag is set to true) or a resource-initiated rollback (the «discharge» message being rejected, or the link to the «coordinator» being detached with an error), the outcome will not be applied, and the deliveries will still be \"live\" and will remain acquired by the controller, i.e., the resource can expect the controller to request a disposition for the delivery (either transactionally on a new transaction, or non-transactionally).",
    "disposition": "deferred:S5",
    "kind": "UNKEYED",
    "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
@@ -657,7 +657,7 @@
    "clause_text": "The use of pipelined frames by a peer cannot be distinguished by the peer's partner from non-pipelined use so long as the pipelined frames conform to the partner's capabilities and limitations.",
    "disposition": "deferred:S4",
    "kind": "UNKEYED",
-   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement.",
+   "note": "deferred: S4 — the session/link machine's milestone owns this statement.",
    "text_sha256": "b0b58ff0fc6da36b46eeef908f4f6bfb4c49fad936800bd204b9ac5bb41b5d90",
    "unkeyed_phrases": [
     "cannot"
@@ -678,7 +678,7 @@
    "text_sha256": "1f52403a55534cb7ea21b07b76c0264bb0ae20a6c5c340b354c3316f24a26179"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections/doc:doc-idle-time-out.u1": {
-   "clause_text": "Empty frames can only be sent after the \u00abopen\u00bb frame is sent.",
+   "clause_text": "Empty frames can only be sent after the «open» frame is sent.",
    "disposition": "deferred:S3-session",
    "kind": "UNKEYED",
    "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
@@ -705,14 +705,14 @@
    "clause_text": "The peer cannot send a frame because the smallest encoding of the performative with the currently valid values would be too large to fit within a frame of the agreed maximum frame size.",
    "disposition": "deferred:S4",
    "kind": "UNKEYED",
-   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement.",
+   "note": "deferred: S4 — the session/link machine's milestone owns this statement.",
    "text_sha256": "012db40ed18696e5a15efa315d9adbbcb3b69808b8a11ebc92bd0c663034219e",
    "unkeyed_phrases": [
     "cannot"
    ]
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/type:amqp-error/choice:frame-size-too-small.u2": {
-   "clause_text": "When transferring a message the message data can be sent in multiple \u00abtransfer\u00bb frames thereby avoiding this error.",
+   "clause_text": "When transferring a message the message data can be sent in multiple «transfer» frames thereby avoiding this error.",
    "disposition": "informative",
    "kind": "UNKEYED",
    "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes.",
@@ -823,7 +823,7 @@
    "clause_text": "A valid frame header cannot be formed from the incoming byte stream.",
    "disposition": "deferred:S4",
    "kind": "UNKEYED",
-   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement.",
+   "note": "deferred: S4 — the session/link machine's milestone owns this statement.",
    "text_sha256": "0d8e5d66c1f50f98248729defed3c7650078218b07ea02966d02cb9f1261863f",
    "unkeyed_phrases": [
     "cannot"
@@ -882,7 +882,7 @@
    "clause_text": "The address provided cannot be resolved to a terminus at the current container.",
    "disposition": "deferred:S4",
    "kind": "UNKEYED",
-   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement.",
+   "note": "deferred: S4 — the session/link machine's milestone owns this statement.",
    "text_sha256": "05fb1d33c46427a1db30dfcc0976ada62bf7653d1afb65162bc4a1beff096745",
    "unkeyed_phrases": [
     "cannot"
@@ -938,7 +938,7 @@
    "text_sha256": "1332b58fb0e661ae8dda8494acacd9f85da3c2657e7bb6e96c3adaee8bd7bf12"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/type:receiver-settle-mode/choice:second.u1": {
-   "clause_text": "The receiver will only settle after sending the \u00abdisposition\u00bb to the sender and receiving a \u00abdisposition\u00bb indicating settlement of the delivery from the sender.",
+   "clause_text": "The receiver will only settle after sending the «disposition» to the sender and receiving a «disposition» indicating settlement of the delivery from the sender.",
    "disposition": "deferred:S3-session",
    "kind": "UNKEYED",
    "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes.",
@@ -1001,7 +1001,7 @@
    "text_sha256": "249bd50dbd7b0ab4859a03537a156637c835334ea3c2a4f7d26bf9ef1faa5ae6"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.u2": {
-   "clause_text": "The link endpoint is then mapped to an unused handle, and an \u00abattach\u00bb frame is issued carrying the state of the newly created endpoint.",
+   "clause_text": "The link endpoint is then mapped to an unused handle, and an «attach» frame is issued carrying the state of the newly created endpoint.",
    "disposition": "deferred:S3-session",
    "kind": "UNKEYED",
    "note": "Link creation mapping an endpoint to an unused handle and issuing the attach: the link machine's prose. The handle registry exists; whether it carries this sentence is that slice's disposition to make.",
@@ -1022,7 +1022,7 @@
    "text_sha256": "c1d2cb488b4e77aa496e2893e7b38790b198260c2c96213d1ff8ecaf6f945a1d"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.u5": {
-   "clause_text": "If the remote peer has no record of the link, then no terminus will be located, and local terminus (source or target as appropriate) field in the \u00abattach\u00bb frame will be null.",
+   "clause_text": "If the remote peer has no record of the link, then no terminus will be located, and local terminus (source or target as appropriate) field in the «attach» frame will be null.",
    "disposition": "deferred:S3-session",
    "kind": "UNKEYED",
    "note": "No peer record of the link means no terminus is located: the attach's outcome for an unknown link.",
@@ -1060,7 +1060,7 @@
    "clause_text": "Only the receiver can independently choose a value for this field.",
    "disposition": "deferred:S4",
    "kind": "UNKEYED",
-   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement.",
+   "note": "deferred: S4 — the session/link machine's milestone owns this statement.",
    "text_sha256": "e82bbac840cf96fc557d7c34bedb58dd15b6660e939f69312f494031c542a243",
    "unkeyed_phrases": [
     "only the receiver can"
@@ -1070,7 +1070,7 @@
    "clause_text": "Only the sender can independently modify this field.",
    "disposition": "deferred:S4",
    "kind": "UNKEYED",
-   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement.",
+   "note": "deferred: S4 — the session/link machine's milestone owns this statement.",
    "text_sha256": "e0233cdfcb03212d1e69dac9df38db00516a61c049c13c5aeac820127a059431",
    "unkeyed_phrases": [
     "only the sender can"
@@ -1080,7 +1080,7 @@
    "clause_text": "Only the receiver can independently modify this field.",
    "disposition": "deferred:S4",
    "kind": "UNKEYED",
-   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement.",
+   "note": "deferred: S4 — the session/link machine's milestone owns this statement.",
    "text_sha256": "676b3282b47443dbdebbe3844b4b14221023c2f3784765c6dce33dda55324d6d",
    "unkeyed_phrases": [
     "only the receiver can"
@@ -1090,14 +1090,14 @@
    "clause_text": "When the map is incomplete the recipient of the map cannot take the absence of a delivery tag from the map as evidence of settlement.",
    "disposition": "deferred:S4",
    "kind": "UNKEYED",
-   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement.",
+   "note": "deferred: S4 — the session/link machine's milestone owns this statement.",
    "text_sha256": "855b0b16cac7d0e0da82f57a639c82423ed8f8892eccb2b63d21fc05d02a7c19",
    "unkeyed_phrases": [
     "cannot"
    ]
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:attach/field:max-message-size.u1": {
-   "clause_text": "Any attempt to deliver a message larger than this results in a message-size-exceeded \u00ablink-error\u00bb.",
+   "clause_text": "Any attempt to deliver a message larger than this results in a message-size-exceeded «link-error».",
    "disposition": "deferred:S3-session",
    "kind": "UNKEYED",
    "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
@@ -1149,7 +1149,7 @@
    "clause_text": "Only the sender can independently set this value.",
    "disposition": "deferred:S4",
    "kind": "UNKEYED",
-   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement.",
+   "note": "deferred: S4 — the session/link machine's milestone owns this statement.",
    "text_sha256": "f20e053727bc5a0aaaefefdf52f853ea0c716a1286ea94c5e679ee9f71cfa5a4",
    "unkeyed_phrases": [
     "only the sender can"
@@ -1159,7 +1159,7 @@
    "clause_text": "Only the receiver endpoint can independently set this value.",
    "disposition": "deferred:S4",
    "kind": "UNKEYED",
-   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement.",
+   "note": "deferred: S4 — the session/link machine's milestone owns this statement.",
    "text_sha256": "6fbc87c70e1ea4132882bd9d10953d1e0407879f911a7c0dbbbaa211f4dca295",
    "unkeyed_phrases": [
     "only the receiver endpoint can"
@@ -1193,7 +1193,7 @@
    "clause_text": "If the value is not set, then the sender does not have an idle time-out.",
    "disposition": "deferred:S3-connection",
    "kind": "UNKEYED",
-   "note": "Timing is a named assumption with nothing behind it in either tree, read from the code rather than assumed: Submission has no tick constructor, step dispatches on header/frame/arriving only, and no field the artifact's timer clauses hang off is read anywhere in either connection layer. The conformance alphabet has the tick channel and the layers hold no timer, threshold or expected-peer behaviour, so an endpoint gets no answer for a tick \u2014 which is its actual behaviour and not a modelling choice. A proof's doc comment is where this would be lost, so it is recorded here and in the plan as one of the obligations a simulation cannot check.",
+   "note": "Timing is a named assumption with nothing behind it in either tree, read from the code rather than assumed: Submission has no tick constructor, step dispatches on header/frame/arriving only, and no field the artifact's timer clauses hang off is read anywhere in either connection layer. The conformance alphabet has the tick channel and the layers hold no timer, threshold or expected-peer behaviour, so an endpoint gets no answer for a tick — which is its actual behaviour and not a modelling choice. A proof's doc comment is where this would be lost, so it is recorded here and in the plan as one of the obligations a simulation cannot check.",
    "text_sha256": "41026e18bfc29fb56c9f8ac59cc7458ee248ed733bae93001209f2c7d3067d46"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:incoming-locales.u1": {
@@ -1214,11 +1214,11 @@
    "clause_text": "If true, then the issuer is hinting that there is no need for the peer to urgently communicate updated delivery state.",
    "disposition": "informative",
    "kind": "UNKEYED",
-   "note": "`hinting that there is no need` \u2014 advisory, not a requirement on the peer.",
+   "note": "`hinting that there is no need` — advisory, not a requirement on the peer.",
    "text_sha256": "42a21902693b6af0c9e63ad6b9dbc490bbdc0a4a6de63bd6c6236941678b7e0f"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:batchable.u2": {
-   "clause_text": "If the message being delivered is too large to fit within a single frame, then the setting of batchable to true on any of the \u00abtransfer\u00bb performatives for the delivery is equivalent to setting batchable to true for all the \u00abtransfer\u00bb performatives for the delivery.",
+   "clause_text": "If the message being delivered is too large to fit within a single frame, then the setting of batchable to true on any of the «transfer» performatives for the delivery is equivalent to setting batchable to true for all the «transfer» performatives for the delivery.",
    "disposition": "deferred:S3-session",
    "kind": "UNKEYED",
    "note": "Setting batchable on any transfer of a multi-frame delivery is equivalent to setting it on all: a rule about the transfer family's fields.",
@@ -1260,11 +1260,11 @@
    "text_sha256": "ce51f7918874a6045b4057b97309d467151cf93a397ffc28a5c064f647e2ed58"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:rcv-settle-mode.u1": {
-   "clause_text": "If the negotiated link value is \u00abreceiver-settle-mode\u00bb, then it is illegal to set this field to \u00abreceiver-settle-mode\u00bb.",
+   "clause_text": "If the negotiated link value is «first», then it is illegal to set this field to «second».",
    "disposition": "deferred:S3-session",
    "kind": "UNKEYED",
    "note": "Setting the field to the negotiated link value is illegal: a transfer validation rule the link machine will state.",
-   "text_sha256": "3c3963c72790e68e044e90698a8af94075b745447ee6d39d60fec1aa4adb8ef3"
+   "text_sha256": "21e8ebd42fecf76f9f8f1c83e95306e873f4ff715a5d1ac242d01c1e9f061186"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:rcv-settle-mode.u2": {
    "clause_text": "If the message is being sent settled by the sender, the value of this field is ignored.",
@@ -1284,14 +1284,14 @@
    "clause_text": "In this state an endpoint cannot send or receive frames.",
    "disposition": "deferred:S4",
    "kind": "UNKEYED",
-   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement.",
+   "note": "deferred: S4 — the session/link machine's milestone owns this statement.",
    "text_sha256": "5f933d2322ca3a3f4c1b182df37647ca37885ac72595329650e513acb593d359",
    "unkeyed_phrases": [
     "cannot"
    ]
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions/doc:session-flow-control.u1": {
-   "clause_text": "If the next-incoming-id field of the \u00abflow\u00bb frame is not set, then remote-incoming-window is computed as follows:",
+   "clause_text": "If the next-incoming-id field of the «flow» frame is not set, then remote-incoming-window is computed as follows:",
    "disposition": "formalized:SpecAMQP.Contracts.receiving_flow_computes_remote_incoming_window",
    "kind": "UNKEYED",
    "note": "The unset branch of the remote-incoming-window formula, stated as a theorem over the constructor that computes the window so the two cannot drift (lean/Contracts/FlowControl.lean:97-102). The value named `SpecAMQP.Contracts.SessionWindows.receiving_flow_computes_remote_incoming_window`; that module was replaced by `FlowControl.lean`, whose own header records the replacement and why a corrected claim replaces the one it corrects (lean/Contracts/FlowControl.lean:7-10), so the path is corrected to the declaration that exists.",

@@ -67,11 +67,11 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:handle.1": {
    "class": "MUST",
-   "clause_text": "If set to a handle that is not currently associated with an attached link, the recipient MUST respond by ending the session with an «session-error» session error.",
+   "clause_text": "If set to a handle that is not currently associated with an attached link, the recipient MUST respond by ending the session with an «unattached-handle» session error.",
    "disposition": "formalized:SpecAMQP.Spec.Session.linkHandleOf; test:exchange-link-flow-unattached-handle",
    "kind": "MUST",
    "note": "Carried. Spec.Session.linkHandleOf resolves the handle a frame names against the endpoint's own and refuses every other value with the session error this sentence names: unattachedHandle (lean/Spec/Session.lean:219) is the unattached-handle member of the session-error family read from the generated choice table (:213-220), and the two refusals are the frame's handle matching no attached link (:621-622) and one that differs from the attached one (:623-625). The refusal's own placement is Spec.Session.step's: a link-level refusal is answered with the END an error that the session state permits, which is the \"ending the session\" this sentence requires. The witness is exchange-link-flow-unattached-handle in vectors/generated-exchanges.ndjson, whose citation array names this ref.",
-   "text_sha256": "2f7e8e501648c06d0192eed034481fcff456cfbe888d1b0d70193f221429a9e6"
+   "text_sha256": "92c400d488db74e9cb9e4b8e782cb066511748d7afaabec5767ed69c89e95f49"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:link-credit.1": {
    "class": "MUST",

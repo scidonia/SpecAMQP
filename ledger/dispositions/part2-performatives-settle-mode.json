@@ -1,26 +1,26 @@
 {
  "conventions": {
-  "deferred:": "A real obligation this plan carries; the suffix names the milestone whose scope in PLAN.md the clause falls in \u2014 S3-session, the session and link machine's slice, which is the label the unkeyed sentences of this same anchor already use. The note names the gap that keeps the clause out of the carrier set.",
-  "kind": "The clause's own keyword, read from the ledger's clause rather than inferred from the coverage class: the class is MUST for both forms, so kind and class diverge for MUST NOT \u2014 and this file's two clauses are a MUST and a MUST NOT of one conditional."
+  "deferred:": "A real obligation this plan carries; the suffix names the milestone whose scope in PLAN.md the clause falls in — S3-session, the session and link machine's slice, which is the label the unkeyed sentences of this same anchor already use. The note names the gap that keeps the clause out of the carrier set.",
+  "kind": "The clause's own keyword, read from the ledger's clause rather than inferred from the coverage class: the class is MUST for both forms, so kind and class diverge for MUST NOT — and this file's two clauses are a MUST and a MUST NOT of one conditional."
  },
  "design_consequences": [
   "The receiver's settlement mode is not modelled, and the contract says so in its own words: `Contracts/Settlement.lean` records under 'what this file deliberately does not claim' that '`rcv-settle-mode` is not modelled. The attach field negotiates when the *receiver* settles, and the session records only the sender's side of that negotiation, so a rule about the receiver's settlement has no subject here.' These two clauses are that rule, which is why they are deferred to the session slice rather than approximated.",
-  "The model does record one settle-mode quantity \u2014 `Session.senderSettleMode`, which `transferLink`'s completion rule turns on \u2014 so the gap is precisely the receiver's half: which moment a receiver may settle at is not a state the session carries."
+  "The model does record one settle-mode quantity — `Session.senderSettleMode`, which `transferLink`'s completion rule turns on — so the gap is precisely the receiver's half: which moment a receiver may settle at is not a state the session carries."
  ],
  "dispositions": {
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:rcv-settle-mode.1": {
-   "clause_text": "If \u00abreceiver-settle-mode\u00bb, this indicates that the receiver MUST settle the delivery once it has arrived without waiting for the sender to settle first.",
+   "clause_text": "If «first», this indicates that the receiver MUST settle the delivery once it has arrived without waiting for the sender to settle first.",
    "disposition": "deferred:S3-session",
    "kind": "MUST",
-   "note": "deferred: S3-session \u2014 uncarried: under `receiver-settle-mode` the receiver settles the delivery once it has arrived, and the session holds no receiver-side settlement state to settle from. `Contracts/Settlement.lean`'s closing section states the position exactly and is the record this entry defers to; the model's one settle-mode quantity is the sender's (`Session.senderSettleMode`, read by `transferLink`'s completion rule). The unkeyed sentences of this same anchor are deferred to the same slice, and one vector (`exchange-session-attach-defaults-admitted`) cites the clause for the conforming negotiation.",
-   "text_sha256": "3c136f9b2a1dd8f2d074b0cf77f2ad686cda54b05961100ea4404c0245d8c23f"
+   "note": "deferred: S3-session — uncarried: under `receiver-settle-mode` the receiver settles the delivery once it has arrived, and the session holds no receiver-side settlement state to settle from. `Contracts/Settlement.lean`'s closing section states the position exactly and is the record this entry defers to; the model's one settle-mode quantity is the sender's (`Session.senderSettleMode`, read by `transferLink`'s completion rule). The unkeyed sentences of this same anchor are deferred to the same slice, and one vector (`exchange-session-attach-defaults-admitted`) cites the clause for the conforming negotiation.",
+   "text_sha256": "cd296d39539a2fb04ebcb46420845abe3fad25e24a93f45275972d308ad3cf0d"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:rcv-settle-mode.2": {
-   "clause_text": "If \u00abreceiver-settle-mode\u00bb, this indicates that the receiver MUST NOT settle until sending its disposition to the sender and receiving a settled disposition from the sender.",
+   "clause_text": "If «second», this indicates that the receiver MUST NOT settle until sending its disposition to the sender and receiving a settled disposition from the sender.",
    "disposition": "deferred:S3-session",
    "kind": "MUST NOT",
-   "note": "deferred: S3-session \u2014 uncarried: the other half of the same conditional, for the receiver-settle-mode value in which the receiver must not settle until it has sent its disposition. Same missing state as `.1`, and the two clauses are one conditional keyed twice \u2014 its MUST and its MUST NOT \u2014 so both entries decide the same words.",
-   "text_sha256": "a3f8555bffb469fd01400b988fe3f3d06c5e7b1e6cdc83680206ecce2ebf7b37"
+   "note": "deferred: S3-session — uncarried: the other half of the same conditional, for the receiver-settle-mode value in which the receiver must not settle until it has sent its disposition. Same missing state as `.1`, and the two clauses are one conditional keyed twice — its MUST and its MUST NOT — so both entries decide the same words.",
+   "text_sha256": "978d0fdac88234f75b34d2cdb9542fe2b2f9d2c48e46187e64bac70dc895049d"
   }
  },
  "schema_version": 1
