@@ -1705,6 +1705,13 @@ an earlier commit had corrected the same pair once before, editing the adjacent 
 fix**. The remedy is mechanical and was not used — grep for the claim's own words (`vacuous`, `owed`, `is not modelled`) across the paragraph *and* the file, and fix every hit — because a correction that
 lands beside its predecessor reads as two facts rather than as one fact and its ghost.
 
+**And an import edge can turn a latent name collision live, which is a failure mode with no owner until it has one.** `Proofs.ConnectionConformance` declares a nullary `SpecAMQP.Proofs.StepAgrees` and
+`Proofs.ValueWireAgreement` declares a parameterised one — two different relations sharing a fully-qualified name in a shared namespace, neither module importing the other, so neither had any reason to
+notice and neither was wrong. **The discharge of the value layer's instance added `import Proofs.ValueWireAgreement` to `Contracts/FrameConformance.lean`**, which put both modules in one environment for
+the first time (the trust gate's axiom probe imports the accepted-theorem modules together), and the whole-package build failed with `environment already contains 'SpecAMQP.Proofs.StepAgrees' from
+Proofs.ValueWireAgreement`. **The cost of finding out was an import three modules away from either declaration.** Lean has no module-private declarations by default; `private` is the annotation that makes
+a helper local, and a name only ever used inside one file should carry it — the alternative is a name that is global by accident and a build that fails when two such accidents meet.
+
 ## 17. Verification gates and their negative controls
 
 | Gate | Mechanism | Negative control |
