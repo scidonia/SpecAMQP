@@ -914,6 +914,19 @@ and the body says "seven shape and nine capacity" without naming them. Its autho
 the right call and the reason the remedy here is a later commit rather than a rewrite. `git commit -F <file>` or a *quoted*
 heredoc avoids it entirely, and a message is the one artefact in a repository whose loss no compiler and no gate can catch.
 
+**Grep the claim, not the finding, and this session bought that rule seven times.** Every correction today was applied where it
+was noticed rather than where the claim was repeated. The README's "a pure protocol core proved to conform" was corrected in its
+prose while the same sentence stood four lines above it in that document's table. A gate row in `HANDOFF.md`, a layout list in
+`PLAN.md` §14, and the conformance contract's own witness paragraph each went stale within hours of being written, and two of
+those went stale while the same fact was being corrected in another file. A disposition's vector ids were copied from my own
+sentence rather than from the file they were supposed to cite. And a paragraph I wrote myself was falsified by patch 3 inside the
+hour, because the fix landed after the sentence and before anyone read it.
+
+The mechanical form is the one that works: **after changing a claim, grep the repository for its words.** The finding is a pointer
+at one copy — it is the copy someone happened to read — and the words are all of them. The words that moved most in this repository
+are "refuted", "vacuous", "as a theorem", "not started", and "vacuous" again; each of them was true somewhere and false in a
+second place, and only the grep found the second place.
+
 ## 17. Verification gates and their negative controls
 
 | Gate | Mechanism | Negative control |
