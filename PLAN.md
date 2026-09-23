@@ -225,6 +225,13 @@ Requirements:
 - **Nondeterminism is explicit.** Where the OASIS text says MAY, the choice is a first-class input to the specification (a policy stream), not a hidden decision inside a Lean definition. This is what makes the specification testable and what keeps it from being accidentally narrower than the standard.
 - **Canonical encodings are specified.** The type system is formalized with specificity preservation, so round-trip theorems hold on a stated equality class rather than on "some bytes came back".
 
+**And the specification's starting state is stated for a *layer*, not for AMQP alone** — `Endpoint.initialFor (layer : Layer)`, with `Endpoint.initial` as the AMQP-layer case — so that an
+implementation's starting state can be *proved* against a specification state rather than assumed equal to one. The corpus's `AMQP\x03\x01\x00\x00` announces the AMQP layer while a peer that
+offers SASL first begins in the security layer, so a constructor fixed to AMQP would have made every shell that starts in SASL assume precisely the thing the specification exists to state. The
+general shape is the one the independence rules ask for: a constructor parameterised by the *choice the standard leaves open*, rather than a constant that encodes our reading of it. The endpoint
+slice's other half is the same decision from the consumer's side — the shell calls the construction the specification declares, so the two cannot drift, and no second way into that state exists
+to drift towards.
+
 ## 10. The conformance interface
 
 The specification must define what it means for an endpoint to conform, or downstream work has no target. Fixed at S0/S1 and frozen thereafter. An endpoint is a state machine over an interface alphabet:
