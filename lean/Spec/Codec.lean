@@ -726,6 +726,18 @@ def arrayOctets (decl : EncodingDecl) (constructor : UInt8) (count : Nat)
     .error (refusal "limit" s!"no array encoding of width {decl.width} carries \
       {count} element(s) in {elements.length} octet(s)")
 
+/-- A zero-width integer form carries only the value it names: `uint0` is the uint value
+zero and `ulong0` the ulong value zero. A nonzero value under one is not a value the form
+is too small to hold — the form has no value field at all — but a value of the shape the
+form does not carry, so it is refused as `malformed`: the class the reference's writer
+names for the same body, and the same rule `list0`'s empty-list arm and `null`'s arm above
+follow. A value that *does* fit the declared width is the capacity family's `limit`. -/
+def zeroForm (owner : String) (n : Nat) : Except Refusal (List UInt8) :=
+  if n = 0 then .ok []
+  else
+    .error (refusal "malformed" s!"the {owner} zero form carries only zero and the value \
+      is {n}")
+
 /-- A fixed-width declaration's data: as many octets as the row declares, in the
 type's own form. A value of another type is refused rather than written short. -/
 def writeFixedData (decl : EncodingDecl) (value : Value) : Except Refusal (List UInt8) :=
@@ -734,8 +746,8 @@ def writeFixedData (decl : EncodingDecl) (value : Value) : Except Refusal (List 
   | "boolean", .boolean b => if decl.width = 0 then .ok [] else .ok [if b then 1 else 0]
   | "ubyte", .ubyte n => filled decl.width n
   | "ushort", .ushort n => filled decl.width n
-  | "uint", .uint n => filled decl.width n
-  | "ulong", .ulong n => filled decl.width n
+  | "uint", .uint n => if decl.width = 0 then zeroForm "uint" n else filled decl.width n
+  | "ulong", .ulong n => if decl.width = 0 then zeroForm "ulong" n else filled decl.width n
   | "byte", .byte i => twosComplement decl.width i
   | "short", .short i => twosComplement decl.width i
   | "int", .int i => twosComplement decl.width i
@@ -750,7 +762,7 @@ def writeFixedData (decl : EncodingDecl) (value : Value) : Except Refusal (List 
   | "uuid", .uuid bits => rawPayload decl bits
   | "list", .list [] => .ok []
   | owner, other =>
-    .error (refusal "limit" s!"the declared surface calls octet \
+    .error (refusal "malformed" s!"the declared surface calls octet \
       0x{toHex #[UInt8.ofNat decl.code]} a {owner} encoding, which cannot carry \
       {typeName other}")
 
@@ -762,7 +774,7 @@ def writeVariableData (decl : EncodingDecl) (value : Value) : Except Refusal (Li
   | "string", .string text => lengthPrefixed decl text.toUTF8.toList
   | "symbol", .symbol text => lengthPrefixed decl text.toUTF8.toList
   | owner, other =>
-    .error (refusal "limit" s!"the declared surface calls octet \
+    .error (refusal "malformed" s!"the declared surface calls octet \
       0x{toHex #[UInt8.ofNat decl.code]} a {owner} encoding, which cannot carry \
       {typeName other}")
 
@@ -917,7 +929,7 @@ def writeCompoundData : Value → EncodingDecl → Except Refusal (List UInt8)
     let body ← writePairs pairs
     compoundOctets decl (2 * pairs.length) body
   | item, decl =>
-    .error (refusal "limit" s!"the declared surface calls octet \
+    .error (refusal "malformed" s!"the declared surface calls octet \
       0x{toHex #[UInt8.ofNat decl.code]} a {decl.owner} encoding, which cannot carry \
       {typeName item}")
 termination_by item _ => sizeOf item

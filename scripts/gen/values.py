@@ -914,19 +914,32 @@ def element_rejects() -> list[dict]:
 # the encoder must refuse the value — and each pins the reason class both artefacts
 # must name, which is the check that makes a refusal worth having.
 
-ELEMENT_REFUSAL_CLASS = "limit"
+# The class each of these refusals names. Two different defects, and the differential
+# compares the class, so each vector pins its own:
+#
+#   * a form that cannot carry a value's *shape* — another type under a fixed-width or
+#     variable-width constructor, a nonzero value under a zero form, a non-empty list
+#     under `list0`, a scalar under a compound's declared form — is `malformed`;
+#   * a form whose declared width cannot carry the value's *magnitude* or its item count
+#     — 300 in a one-octet field, 300 items in a one-octet count — is `limit`.
+#
+# Both artefacts name the same class for each of these bodies, which is what the vectors
+# are for: the write side of the two artefacts agreed on neither until the shape family
+# was separated from the capacity family.
+ELEMENT_SHAPE_CLASS = "malformed"
+ELEMENT_CAPACITY_CLASS = "limit"
 
 
 def element_writer_refusals() -> list[dict]:
     """Values the declared element form cannot carry, in the encode direction."""
     vectors: list[dict] = []
 
-    def refuse(name: str, value: dict, note: str) -> None:
+    def refuse(name: str, value: dict, note: str, reason: str) -> None:
         vectors.append({
             "vector": f"gen-element-refuse-{name}", "kind": "encode",
             "clauses": [ENCODINGS_CLAUSE], "value": value,
             "expectError": {"condition": "amqp:decode-error",
-                            "reason": ELEMENT_REFUSAL_CLASS,
+                            "reason": reason,
                             "endpoint": "connection"},
             "note": note,
         })
@@ -935,27 +948,36 @@ def element_writer_refusals() -> list[dict]:
         return {"type": "array", "constructor": f"{constructor:02x}", "items": items}
 
     refuse("str8-element-over-long", array(0xA1, [{"type": "string", "text": "x" * 300}]),
-           "a str8 element cannot announce 300 octets in a one-octet length field")
+           "a str8 element cannot announce 300 octets in a one-octet length field",
+           ELEMENT_CAPACITY_CLASS)
     refuse("list8-element-over-count", array(0xC0, [
         {"type": "list", "items": [{"type": "ubyte", "value": 1}] * 300}]),
-        "a list8 element cannot announce 300 items in a one-octet count field")
+        "a list8 element cannot announce 300 items in a one-octet count field",
+        ELEMENT_CAPACITY_CLASS)
     refuse("array8-element-over-count", array(0xE0, [
         {"type": "array", "constructor": "40", "items": [{"type": "null"}] * 300}]),
-        "an array8 element cannot announce 300 elements in a one-octet count field")
+        "an array8 element cannot announce 300 elements in a one-octet count field",
+        ELEMENT_CAPACITY_CLASS)
     refuse("ubyte-element-holds-uint", array(0x50, [{"type": "uint", "value": 7}]),
-           "a ubyte element constructor cannot carry a uint")
+           "a ubyte element constructor cannot carry a uint",
+           ELEMENT_SHAPE_CLASS)
     refuse("smalluint-element-over-range", array(0x52, [{"type": "uint", "value": 300}]),
-           "a smalluint element carries one octet and 300 does not fit")
+           "a smalluint element carries one octet and 300 does not fit",
+           ELEMENT_CAPACITY_CLASS)
     refuse("smallint-element-over-range", array(0x54, [{"type": "int", "value": 300}]),
-           "a smallint element carries one signed octet and 300 does not fit")
+           "a smallint element carries one signed octet and 300 does not fit",
+           ELEMENT_CAPACITY_CLASS)
     refuse("uint0-element-nonzero", array(0x43, [{"type": "uint", "value": 1}]),
-           "the uint zero form carries only the value zero")
+           "the uint zero form carries only the value zero",
+           ELEMENT_SHAPE_CLASS)
     refuse("list0-element-nonempty", array(0x45, [
         {"type": "list", "items": [{"type": "null"}]}]),
-        "the empty-list form carries only the empty list")
+        "the empty-list form carries only the empty list",
+        ELEMENT_SHAPE_CLASS)
     refuse("list8-element-holds-ubyte", array(0xC0, [{"type": "ubyte", "value": 7}]),
            "a list8 element constructor cannot carry a ubyte: a compound's declared form "
-           "carries compound values")
+           "carries compound values",
+           ELEMENT_SHAPE_CLASS)
     return vectors
 
 
