@@ -337,6 +337,20 @@ def flatten_tokens(
     becomes `512`, because the artifact defines that constant, while a reference
     to a named element becomes `«open»`. Every referenced name is recorded, so the
     ledger keeps the link even where the rendered text resolves it.
+
+    An `<xref>` may instead select a *choice* of the element it names —
+    `<xref name="sender-settle-mode" choice="settled"/>`. What the sentence says is
+    the chosen value, and the artifact names it (`<choice name="settled">`), so the
+    choice renders as `«settled»`: the same name-in-guillemets convention as an
+    element reference, applied to the declaration the cross-reference resolves to.
+    Rendering the element's name instead made two clauses with opposite obligations
+    read identically, which is how one came to be applied under the other's
+    condition. The `choice` attribute decides, rather than the constant table: an
+    `<xref>` naming a choice selects a value of a declared type, and no constant is
+    a choice (the 13 `<definition>` names and every choice-carrying name in the
+    pinned artifacts are disjoint). A choice-bearing reference records both halves —
+    `sender-settle-mode/choice:settled` — so the link keeps the selection, which is
+    the collapse that recording the bare name alone reintroduced.
     """
     tokens: list[str] = []
 
@@ -346,6 +360,11 @@ def flatten_tokens(
 
     if element.tag == "xref" and element.attrib.get("name"):
         name = element.attrib["name"]
+        choice = element.attrib.get("choice")
+        if choice:
+            refs.append(f"{name}/choice:{choice}")
+            add(f"«{choice}»")
+            return tokens
         refs.append(name)
         add(constants.get(name, f"«{name}»"))
         return tokens
