@@ -1,6 +1,7 @@
 import Contracts.Conformance
 import Proofs.FrameConformance
 import Proofs.FrameSendConformance
+import Proofs.ValueCarrierAgreement
 
 /-!
 # Acceptance: the frame layer conforms
@@ -107,15 +108,20 @@ theorem frame_conformance_public (valueAgreement : SpecAMQP.Proofs.ValueLayersAg
   conforms_of_conforms_via SpecAMQP.Proofs.specFrame SpecAMQP.Proofs.refFrame _
     (SpecAMQP.Proofs.ref_frame_conforms valueAgreement)
 
-/-- **The frame layer conforms in the send direction**, given the two value-layer hypotheses.
+/-- **The frame layer conforms in the send direction**, given the writer law.
 
 An instance of `Conforms` at the send half of the frame layer: the specification's writer as `choose`, the
 reference's as `step`, and a simulation preserving the octets that go on the wire.
+
+The carrier hypothesis is discharged rather than assumed: `valueCarrierAgree_all` supplies
+`ValueCarrierAgree`, and **the statement did not move to meet the proof** — `ValueCarrierAgrees 64` *is*
+`ValueCarrierAgree` by definitional equality, which is why `valueCarrierAgree_of_agrees` is `:= h`. What
+remains is the writer law, and behind it the reference's writer carrying a class, which is the change that
+would also make the endpoint's refutation expressible.
 -/
-theorem frame_send_conformance_public (carriers : SpecAMQP.Proofs.ValueCarrierAgree)
-    (writers : SpecAMQP.Proofs.ValueWriterAgree) :
+theorem frame_send_conformance_public (writers : SpecAMQP.Proofs.ValueWriterAgree) :
     Conforms SpecAMQP.Proofs.specFrameSend SpecAMQP.Proofs.refFrameSend :=
   conforms_of_conforms_via SpecAMQP.Proofs.specFrameSend SpecAMQP.Proofs.refFrameSend _
-    (SpecAMQP.Proofs.ref_frame_send_conforms carriers writers)
+    (SpecAMQP.Proofs.ref_frame_send_conforms SpecAMQP.Proofs.valueCarrierAgree_all writers)
 
 end SpecAMQP.Contracts
