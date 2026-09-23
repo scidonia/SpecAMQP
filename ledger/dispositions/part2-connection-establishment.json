@@ -1,7 +1,7 @@
 {
  "conventions": {
   "environment:": "An assumption the specification rests on, named so that a claim can state that it depends on it.",
-  "formalized:": "A Lean declaration path that carries this clause's meaning. At S0 the declaration does not exist yet: the disposition is a commitment made by the plan, and becomes checkable when lean/Spec lands (a declaration-existence gate is added at S1).",
+  "formalized:": "A Lean declaration path that carries this clause's meaning. The values this file recorded at S0/S2 named modules the tree never held (`Spec.Endpoint.*`, `Spec.Wire.*`): the connection and session state machines were written in `lean/Spec/Connection.lean` and `lean/Spec/Session.lean`, the frame layer in `lean/Spec/Frame.lean` and `FrameCodec.lean`, and the performatives in `FrameCodec.lean`. Every path recorded here now names a declaration the module holds, and the ledger's existence gate resolves it against lean/** rather than taking the note's word for it; a clause nothing carries is deferred with the gap named. The convention that made those values promises is withdrawn, because the gate can only resolve what the file stops exempting.",
   "informative": "The keyword is not a conformance keyword (for example it is used as an adjective).",
   "out-of-scope:": "Deliberately outside core AMQP 1.0 as this specification bounds it, with the reason."
  },
@@ -13,65 +13,65 @@
  "dispositions": {
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:framing.1": {
    "clause_text": "This is an unsigned 32-bit integer that MUST contain the total frame size of the frame header, extended header, and frame body.",
-   "disposition": "formalized:Spec.Wire.frameSize",
+   "disposition": "formalized:SpecAMQP.Spec.Frame.declaredSize; formalized:SpecAMQP.Spec.Frame.frameExtent",
    "kind": "MUST",
-   "note": "The size field spans frame header, extended header and body; the ledger resolves the neighbouring constants so the rule reads as arithmetic rather than prose.",
+   "note": "The SIZE field is read at its declared width \u2014 `sizeOctets` is four (lean/Spec/Frame.lean:102) \u2014 by `declaredSize` (lean/Spec/Frame.lean:263), and the extent arithmetic is `frameExtent` (lean/Spec/Frame.lean:292-296): where the declaration is self-consistent a frame occupies exactly the SIZE it declares, counted from the frame's first octet, which is this sentence's 'the frame header, extended header, and frame body' as arithmetic. `declarationConsistent_eq_true_iff` proves the three consistency checks rather than asserting them.",
    "text_sha256": "5e6cff1dc670ff02cd898dcdd2af444574fe3661a50c6b487a83fcdaf80e1e08"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:framing.2": {
    "clause_text": "The subsequent bytes in the frame header MAY be interpreted differently depending on the type of the frame.",
-   "disposition": "formalized:Spec.Wire.FrameType",
+   "disposition": "formalized:SpecAMQP.Spec.Frame.FrameType",
    "kind": "MAY",
-   "note": "Latitude: header bytes beyond DOFF are interpreted per frame type. The extended header is ignored by this specification, so the freedom is modelled as nondeterminism in the relation rather than as a fixed reading.",
+   "note": "Latitude, carried as the type's own discrimination: `FrameType` is the TYPE octet's reading (lean/Spec/Frame.lean:121-136), `carriesPerformative` (lean/Spec/Frame.lean:176-179) is what each type promises about its body, and the structure keeps the octets no type interprets \u2014 `extended` for the extended header, `channel` for the two CHANNEL octets a SASL frame carries no meaning in (lean/Spec/Frame.lean:193-213). The freedom is therefore the type table's rather than a branch, which is what the note recorded as 'nondeterminism in the relation': the model does not choose a reading for a type it does not read.",
    "text_sha256": "77236ad97c495f4d354eb5f4b574988328e374a6a3eb67821cd290bf4a56bb5a"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:framing.3": {
    "clause_text": "The performative MUST be one of those defined in \u00abperformatives\u00bb and is encoded as a described type in the AMQP type system.",
-   "disposition": "formalized:Spec.Wire.frameBody",
+   "disposition": "formalized:SpecAMQP.Spec.Frame.carriesPerformative; formalized:SpecAMQP.Spec.Frame.readFrame",
    "kind": "MUST",
-   "note": "Body = exactly one described-type performative drawn from the performative table, followed by an opaque payload.",
+   "note": "`carriesPerformative` (lean/Spec/Frame.lean:176-179) requires the body's descriptor to name a declared type whose declared roles include the frame type's, and `readFrame` (lean/Spec/Frame.lean:346) is where a frame that fails it is refused \u2014 the check `Proofs/FrameConformance.lean` states as a law. The payload after the performative is `Frame.payload`, which 'the semantics of the given performative' gives meaning to and the frame layer does not read.",
    "text_sha256": "a6edb0f229b13fc32915655bfcfb72805e7dc6e181133649114849a9fbec90e2"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:framing.4": {
    "clause_text": "An AMQP frame with no body MAY be used to generate artificial traffic as needed to satisfy any negotiated idle timeout interval (see \u00abdoc-idle-time-out\u00bb).",
-   "disposition": "formalized:Spec.Wire.emptyFrame",
+   "disposition": "formalized:SpecAMQP.Spec.Frame.Frame",
    "kind": "MAY",
-   "note": "Permitted artificial traffic for idle-timeout satisfaction. A MAY: it licenses a frame shape, and imposes nothing.",
+   "note": "The frame with no body is the structure with `body := none` (lean/Spec/Frame.lean:193-213), and that field's documentation is this clause read closely: 'a frame consisting solely of a frame header, with no frame body', and 'apart from this use, empty frames have no meaning'. A MAY: it licenses a shape and the model admits it \u2014 no declaration requires one to be sent, so the idle-timeout use is left to the peer that wants it.",
    "text_sha256": "532974365bcc582efbaa01ca5f9992b0bb92c5f39a368f8dd0606c1ad3a45eb8"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open.1": {
    "clause_text": "The first frame sent on a connection in either direction MUST contain an open performative.",
-   "disposition": "formalized:Spec.Endpoint.openFirst",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.permitsSend; formalized:SpecAMQP.Spec.Connection.State.sendClass",
    "kind": "MUST",
-   "note": "Initial-state obligation of the connection machine; a negative vector covers a first frame that is not open.",
+   "note": "The first frame in each direction is an `open` because that is the table's send column: after the header exchange the legal send is `open` (`State.sendClass`, lean/Spec/Connection.lean:272-279) and `permitsSend` (lean/Spec/Connection.lean:911-917) is the guard `stepAmqpFrame` applies (lean/Spec/Connection.lean:1210-1215). The exclusion of a *second* `open` is not the table's \u2014 the artifact says the first frame contains an open, which implies at most one \u2014 and the function's own documentation cites the register's `second-open-refusal` for it. No vector in the corpus cites this clause; the refusal is exercised through `version-negotiation.1`'s vectors, which reach the same row.",
    "text_sha256": "0d993e1d21d782f3e69fb9d11f4e7ca6a334460cc402a69979f28bc141de7f5d"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:channel-max.1": {
    "clause_text": "A peer MUST not use channel numbers outside the range that its partner can handle.",
-   "disposition": "formalized:Spec.Endpoint.channelBound",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.stepAmqpFrame; formalized:SpecAMQP.Spec.Connection.limitsFor; test:exchange-pipelined-channel-limit",
    "kind": "MUST",
-   "note": "The OASIS text writes \"MUST not\" here (lowercase not); read as MUST NOT with the reading recorded in the ambiguity register.",
+   "note": "A channel above the partner's bound is refused in `stepAmqpFrame` (`refuseUnless (channel \u2264 limits.channelMax)`, lean/Spec/Connection.lean:1234-1237), against the limits in force for the direction the frame travels \u2014 `limitsFor` (lean/Spec/Connection.lean:980) chooses the partner's declared limit for a send and this peer's for a receive. The artifact writes 'MUST not' here (lowercase not); the register's reading of it is unchanged by this repair.",
    "text_sha256": "c7674d7c23f3de3d292f4fdaefb3d523666307e9e8ff2a1377e5caf7e2a7a6da"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:channel-max.2": {
    "clause_text": "A peer that receives a channel number outside the supported range MUST close the connection with the framing-error error-code.",
-   "disposition": "formalized:Spec.Endpoint.channelBoundError",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.stepAmqpFrame; formalized:SpecAMQP.Spec.Connection.framingError; test:exchange-session-channel-above-the-declared-bound; test:exchange-pipelined-channel-limit",
    "kind": "MUST",
-   "note": "Mandated refusal: close the connection with amqp:connection:framing-error. Error-condition mapping is generated, not hand-typed.",
+   "note": "The same guard, and the condition is the clause's: the refusal is built with `refusal`, whose condition is `framingError` = `amqp:connection:framing-error` read from the generated table (lean/Spec/Connection.lean:344-368), while the field-value failures of the same function use `fieldRefusal`'s `invalid-field`. The two vectors name this clause, one of them a session channel above the bound it declared.",
    "text_sha256": "4887644757ff77308cbfab034297ee55d934d2ce9256307769c2be6e1b9f76c4"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:desired-capabilities.1": {
    "clause_text": "The desired-capability list defines which extension capabilities the sender MAY use if the receiver offers them (i.e., they are in the offered-capabilities list received by the sender of the desired-capabilities).",
-   "disposition": "formalized:Spec.Endpoint.capabilityDesire",
+   "disposition": "deferred:S4",
    "kind": "MAY",
-   "note": "Latitude over which offered capabilities may be used. The semantics of individual capabilities belong to the extensions that define them, which are out of scope.",
+   "note": "deferred: S4 \u2014 uncarried: the latitude over which declared capabilities may be used has no carrier, because nothing in the tree handles capabilities: no declaration in `lean/Spec` or `lean/Ref` reads `desired-capabilities` or `offered-capabilities`, so the field is carried by the generated table and acted on by nothing. The same finding is already recorded for the attach's capability clause (`attach/field:desired-capabilities.1`, deferred:S4), which is why this entry uses the same value rather than inventing a near-miss. The semantics of individual capabilities belong to the extensions that define them, which the plan bounds out, so what is missing is the protocol-visible half: which capabilities a peer may *use* given the partner's offer.",
    "text_sha256": "f5b4a30566b6bbb2de71a84029f36f23f92f51d01985926b2cfcae21629f2c3d"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:desired-capabilities.2": {
    "clause_text": "The sender MUST NOT attempt to use any capabilities it did not declare in the desired-capabilities field.",
-   "disposition": "formalized:Spec.Endpoint.capabilityUse",
+   "disposition": "deferred:S4",
    "kind": "MUST NOT",
-   "note": "MUST NOT use an undeclared capability: an obligation over the declared capability set, independent of what any particular capability means.",
+   "note": "deferred: S4 \u2014 uncarried: 'the sender MUST NOT attempt to use any capabilities it did not declare' is an obligation over a declared set the model does not hold \u2014 nothing in the tree handles capabilities: no declaration in `lean/Spec` or `lean/Ref` reads `desired-capabilities` or `offered-capabilities`, so the field is carried by the generated table and acted on by nothing. The same finding is already recorded for the attach's capability clause (`attach/field:desired-capabilities.1`, deferred:S4), which is why this entry uses the same value rather than inventing a near-miss.",
    "text_sha256": "6922bb1f1fab8ecb9295003d3c3102dbb847c33e3248fa4434cb428991e2c1ac"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:hostname.1": {
@@ -104,9 +104,9 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:idle-time-out.2": {
    "clause_text": "If the receiver is unable or unwilling to support the idle time-out then it SHOULD close the connection with an error explaining why (e.g., because it is too small).",
-   "disposition": "formalized:Spec.Endpoint.idleTimeoutRefusal",
+   "disposition": "environment:implementation-idle-policy",
    "kind": "SHOULD",
-   "note": "SHOULD-class refusal path: close the connection with an error explaining why the proposed timeout is unsupportable.",
+   "note": "The assumption is the implementation's willingness: a peer that is unable or unwilling to support the proposed timeout is a fact about that implementation rather than about the protocol, which is the same environment the neighbouring sentences are recorded under (`.3` and `.4`, `environment:implementation-idle-policy`). What is *not* carried is the SHOULD's observable \u2014 a close carrying an error that explains why \u2014 and no declaration in `lean/Spec` closes for a timeout: the connection's idle-timeout obligations are the table's (`doc-idle-time-out.10` is `State.sendClass`/`permitsSend` there), and this sentence's half has no site.",
    "text_sha256": "94ccd6792da1a8e4b928fc5e8c06896e38b88f4365a85e77460b6dc4c137feba"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:idle-time-out.3": {
@@ -134,35 +134,35 @@
    "clause_text": "A peer MUST NOT send frames larger than its partner can handle.",
    "disposition": "formalized:Spec.Connection.stepAmqpFrame",
    "kind": "MUST NOT",
-   "note": "The comparison sits at Connection.lean:1053 inside `stepAmqpFrame`, as `refuseUnless (size \u2264 limits.maxFrameSize)` with the message branching on direction (the partner's limit for a send, this peer's for a receive), and `limitsFor` routes to `remoteLimits` or `localLimits` accordingly. The obligation is therefore carried by one declaration reached by two paths \u2014 and the sending path does not currently reach it for a frame one octet over the partner's *declared* maximum, which the session sweep's eight-step probe shows while the a priori case in `exchange-pipelined-frame-size-limit` refuses correctly. Recorded as a defect in a reached carrier, not as a missing one. **Amended after the lift was measured**: that defect is no longer reproducible. A frame one octet over the partner's declared maximum, produced canonically rather than through the corpus codec's re-encoding, is refused on the sending path by both artefacts, before and after the comparison is moved \u2014 so the note described the state at the time it was written and the code moved under it. The lift that was queued to close this was withdrawn: it would have changed which check a twice-breaking frame fails, and the artifact does not rank the checks (see ledger/ambiguities/check-precedence-unspecified.json).",
+   "note": "The comparison sits at lean/Spec/Connection.lean:1228 inside `stepAmqpFrame`, as `refuseUnless (size \u2264 limits.maxFrameSize)` with the message branching on direction (the partner's limit for a send, this peer's for a receive), and `limitsFor` routes to `remoteLimits` or `localLimits` accordingly. The obligation is therefore carried by one declaration reached by two paths \u2014 and the sending path does not currently reach it for a frame one octet over the partner's *declared* maximum, which the session sweep's eight-step probe shows while the a priori case in `exchange-pipelined-frame-size-limit` refuses correctly. Recorded as a defect in a reached carrier, not as a missing one. **Amended after the lift was measured**: that defect is no longer reproducible. A frame one octet over the partner's declared maximum, produced canonically rather than through the corpus codec's re-encoding, is refused on the sending path by both artefacts, before and after the comparison is moved \u2014 so the note described the state at the time it was written and the code moved under it. The lift that was queued to close this was withdrawn: it would have changed which check a twice-breaking frame fails, and the artifact does not rank the checks (see ledger/ambiguities/check-precedence-unspecified.json).",
    "text_sha256": "97783ab79b63d57287d31eb65e403938c09edc83c89c1ec888d1c69fdd310c0a"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:max-frame-size.2": {
    "clause_text": "A peer that receives an oversized frame MUST close the connection with the framing-error error-code.",
-   "disposition": "formalized:Spec.Endpoint.oversizedFrameError",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.stepAmqpFrame; formalized:SpecAMQP.Spec.Connection.framingError; test:exchange-oversized-frame-received; test:exchange-pipelined-frame-size-limit",
    "kind": "MUST",
-   "note": "Mandated refusal: close the connection with amqp:connection:framing-error.",
+   "note": "An oversized frame is refused in `stepAmqpFrame` (`refuseUnless (size \u2264 limits.maxFrameSize)`, lean/Spec/Connection.lean:1228-1231) under the same `framingError` condition the clause names, and the limit is the direction's (`limitsFor`, as `.channel-max.1`). Two vectors cite the clause.",
    "text_sha256": "07922771984e5e856068151b683da3457cd5179081dbcd38f239c1ae28ef647f"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:max-frame-size.3": {
    "clause_text": "Both peers MUST accept frames of up to 512 octets.",
-   "disposition": "formalized:Spec.Wire.MIN_MAX_FRAME_SIZE",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.minMaxFrameSize; formalized:SpecAMQP.Spec.Connection.Limits.aPriori",
    "kind": "MUST",
-   "note": "The ledger renders the MIN-MAX-FRAME-SIZE constant as 512 through the generated constant table, so the obligation is stated with its value and a vector can exercise exactly that boundary.",
+   "note": "The constant is read from the generated table rather than typed (`minMaxFrameSize`, lean/Spec/Connection.lean:677, which is 512 through \u00abMIN-MAX-FRAME-SIZE\u00bb), and the limits in force before any negotiation are `Limits.aPriori` (lean/Spec/Connection.lean:683), whose documentation quotes the artifact's rule that the maximum frame size is MIN-MAX-FRAME-SIZE until an `open` says otherwise. The boundary is enforced on every received frame in `stepAmqpFrame` (lean/Spec/Connection.lean:1228, `refuseUnless (size \u2264 limits.maxFrameSize)`), so the ledger's rendering of the constant as 512 is what the refusal compares against.",
    "text_sha256": "3f3fe60800a169856dcfd89d5ef85a88118f9d9a9c8966c6d0ccec1576813f7d"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:offered-capabilities.1": {
    "clause_text": "If the receiver of the offered-capabilities requires an extension capability which is not present in the offered-capability list then it MUST close the connection.",
-   "disposition": "formalized:Spec.Endpoint.capabilityRequired",
+   "disposition": "deferred:S4",
    "kind": "MUST",
-   "note": "Mandated close when a capability the receiver needs is absent from the offered list; the error condition comes from the generated table.",
+   "note": "deferred: S4 \u2014 uncarried: the mandated close when a capability the receiver requires is absent from the partner's offer. nothing in the tree handles capabilities: no declaration in `lean/Spec` or `lean/Ref` reads `desired-capabilities` or `offered-capabilities`, so the field is carried by the generated table and acted on by nothing. The same finding is already recorded for the attach's capability clause (`attach/field:desired-capabilities.1`, deferred:S4), which is why this entry uses the same value rather than inventing a near-miss. The close itself would be the table's, but the capability comparison that triggers it has no subject.",
    "text_sha256": "750de4333bb10ef1531c79a495ef1ac2b6866640e6881ade5203137d0106ea2c"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:outgoing-locales.1": {
    "clause_text": "A peer MUST support at least the en-US locale (see \u00abietf-language-tag\u00bb).",
-   "disposition": "formalized:Spec.Endpoint.localeSupportEnUS",
+   "disposition": "environment:locale-policy",
    "kind": "MUST",
-   "note": "At least en-US must be supported; the value is a generated constant rather than a literal in the specification.",
+   "note": "The requirement is on the peer's locale support rather than on anything it sends: no declaration holds a locale table or checks an announced locale, and the sibling latitude is recorded under the same id (`incoming-locales.1`). Naming the environment is what makes the entry honest about where the obligation is discharged, and records that the support itself is unobservable on the wire \u2014 the clause's neighbouring unkeyed sentence, that en-US is chosen when nothing else is supported, is deferred in the ledger as the session layer's.",
    "text_sha256": "37a0bda27b26896d11e65317cc9e592a41a96e0bd676aec809b261b9bb338ccf"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:transport.1": {
@@ -174,114 +174,114 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:transport.2": {
    "clause_text": "The precise requirement for a connection is that if the n th frame arrives, all frames prior to n MUST also have arrived.",
-   "disposition": "formalized:Spec.Wire.WellFormedFrame",
+   "disposition": "environment:tcp-ordered-stream; formalized:SpecAMQP.Spec.Frame.frameExtent",
    "kind": "MUST",
-   "note": "Descriptive sentence carrying the negotiated-maximum-frame-size requirement that makes defragmentation into complete frames well defined.",
+   "note": "The ordering itself is the transport's, not a declaration's: this specification rests on TCP delivering an ordered byte stream, which is the assumption `environment:tcp-ordered-stream` names \u2014 the plan's own example of an environment id. What the model carries is the half that would otherwise be a reader's licence to skip ahead: `frameExtent` (lean/Spec/Frame.lean:292-296) attributes a frame the octets its own declaration claims and never a following frame's, so a reader holding frame n knows every earlier octet was consumed. The note this entry carried before the repair described the clause as carrying the negotiated-maximum-frame-size requirement, which is a different sentence \u2014 `open/field:max-frame-size.2/.3`, dispositioned there \u2014 so the misdescription is recorded here rather than carried forward.",
    "text_sha256": "f6bf3e16e55de5eaeb4933806536756a9c393c196483ffb98f41a14e631e4358"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:transport.3": {
    "clause_text": "A single connection MAY have multiple independent sessions active simultaneously, up to the negotiated channel limit.",
-   "disposition": "formalized:Spec.Endpoint.sessionMultiplexing",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.stepAmqpFrame; formalized:SpecAMQP.Spec.Connection.minMaxFrameSize",
    "kind": "MAY",
-   "note": "Sessions are multiplexed on channels, bounded by the negotiated channel-max; the bound is formalized with the channel-max field.",
+   "note": "Latitude that the channel machinery is what makes usable: a connection multiplexes sessions by channel, and the model's session layer is reached by channel \u2014 the dispatch in `step` routes every non-header submission by the channel it carries (lean/Spec/Connection.lean:1246-1270), and the channel bound the clause attaches is `stepAmqpFrame`'s (lean/Spec/Connection.lean:1234-1237) against `limitsFor`. The model holds one session endpoint, so 'up to the negotiated channel limit' is carried as the bound and not as a count of concurrent sessions, which is the model restriction the session layer's own documentation records.",
    "text_sha256": "3ad2324126690f77cf30dea7b2b28afa2113ffb344c78d2dc71ebd43cdc61be3"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.1": {
    "clause_text": "Prior to sending any frames on a connection, each peer MUST start by sending a protocol header that indicates the protocol version used on the connection.",
-   "disposition": "formalized:Spec.Wire.CONNECTION_HEADER",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.ProtocolHeader; formalized:SpecAMQP.Spec.Connection.State.sendClass",
    "kind": "MUST",
-   "note": "Precedes any frame: the header is not itself a frame. Formalized together with the initial state of the connection machine.",
+   "note": "The header's shape is `ProtocolHeader` \u2014 the four-octet protocol name, the protocol id, the version triple (lean/Spec/Connection.lean:156-164, with the magic at :148) \u2014 and 'prior to sending any frames' is the state table's first row: `State.sendClass` sends a header in START and nothing else (lean/Spec/Connection.lean:272-274), so no frame is legal before one. `stepHeader` (lean/Spec/Connection.lean:1015) is the step that accepts it and fixes the layer.",
    "text_sha256": "407a874a85162f5a3c3b841b3dc51b8c1b585d974ae9edfc61bfbbd3d641b67d"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.10": {
    "clause_text": "When choosing a protocol version to respond with, the server SHOULD choose the highest supported version that is less than or equal to the requested version.",
-   "disposition": "formalized:Spec.Endpoint.versionSelection",
+   "disposition": "deferred:S4",
    "kind": "SHOULD",
-   "note": "SHOULD-class preference: highest supported version not exceeding the requested one.",
+   "note": "deferred: S4 \u2014 uncarried: the choice among versions has no subject in this model. Each layer states one version \u2014 `Layer.version` (lean/Spec/Connection.lean:132-134) \u2014 and `decodeHeader` refuses anything that is not exactly that version (lean/Spec/Connection.lean:426-460), so 'the highest supported version not exceeding the requested one' is a rule over a set of supported versions the model does not have. The interface contract's paragraph on what a SHOULD becomes (`Contracts/Conformance.lean:24-29`) is the record this obligation belongs in when the set exists.",
    "text_sha256": "4fc8b58260b3e14b62c79dd66952f673c0d74279fc91ee4538ed6e612c2a4eaf"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.11": {
    "clause_text": "If no such version exists, the server SHOULD respond with the highest supported version.",
-   "disposition": "formalized:Spec.Endpoint.versionSelection",
+   "disposition": "deferred:S4",
    "kind": "SHOULD",
-   "note": "SHOULD-class fallback when no supported version is below the request.",
+   "note": "deferred: S4 \u2014 uncarried: the fallback half of the same choice \u2014 the highest supported version when none is at or below the request. The model has one version per layer (`Layer.version`, lean/Spec/Connection.lean:132-134), so neither branch of the selection rule exists; the record is `.10`'s and this entry decides the other sentence of it.",
    "text_sha256": "bd453117a5e57bd925dbe94a640322a42cfa99e4eac1b02db6c1e18d72d6aa7d"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.12": {
    "clause_text": "If the server cannot parse the protocol header, the server MUST send a valid protocol header with a supported protocol version and then close the socket.",
-   "disposition": "formalized:Spec.Endpoint.serverUnparsableHeader",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.headerFailure; formalized:SpecAMQP.Spec.Connection.decodeHeader; test:exchange-header-truncated; test:exchange-header-malformed",
    "kind": "MUST",
-   "note": "Unparsable header still receives a valid header before the close, so the failure is legible to the peer.",
+   "note": "An unparsable header is refused by `decodeHeader` \u2014 too few octets is `truncated`, bytes that are not a header are `malformed` (lean/Spec/Connection.lean:426-460) \u2014 and the refusal is answered by `headerFailure`, which writes a valid header and ends the connection (lean/Spec/Connection.lean:414-416). Both vectors cite the clause, one for each way a header can be unreadable.",
    "text_sha256": "fc8c04d1983f22d50a5f1bfeacbe5afc066fa7c0ae1dc4852b48d054e4a8fea8"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.13": {
    "clause_text": "In this case, the server MUST send a protocol header with an acceptable protocol id (and version) and then close the socket.",
-   "disposition": "formalized:Spec.Endpoint.serverUnacceptableProtocolId",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.decodeHeader; formalized:SpecAMQP.Spec.Connection.headerFailure; test:exchange-header-protocol-id-unsupported",
    "kind": "MUST",
-   "note": "Unacceptable protocol id: announce an acceptable id and version, then close.",
+   "note": "An unacceptable protocol id is refused by the same reader, with the same reply-then-close: `decodeHeader`'s `unsupported` for an id this peer does not speak and for an unassigned one (lean/Spec/Connection.lean:426-460), answered by `headerFailure` (lean/Spec/Connection.lean:414-416). The vector cites the clause.",
    "text_sha256": "8a181c1a874dfca9fb9218040d2771351d4ceda6259742a4888d7410bfc311bf"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.14": {
    "clause_text": "It MAY choose any protocol id.",
-   "disposition": "formalized:Spec.Endpoint.serverProtocolIdLatitude",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.negotiationReply",
    "kind": "MAY",
-   "note": "MAY: any protocol id may be chosen. Recorded as nondeterminism in the relation, not as a fixed choice.",
+   "note": "The latitude is *resolved* rather than modelled, and the entry says so: `negotiationReply` answers the failing layer with that layer's own protocol id (lean/Spec/Connection.lean:405-410), which is one choice among the any this sentence permits. So what is carried is a permitted reply, not the freedom to choose another \u2014 a model that admitted any id would need the reply to be an input, which is the shape `startPolicy` and the frame types' per-type reading already give their MAYs.",
    "text_sha256": "c88c08975aa9f13d1a681446a98c408e35409eb7b1b2a740eda9a79c92ca9442"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.2": {
    "clause_text": "Any data appearing beyond the protocol header MUST match the version indicated by the protocol header.",
-   "disposition": "formalized:Spec.Wire.protocolHeaderVersion",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.stepHeader",
    "kind": "MUST",
-   "note": "Everything after the header must belong to the version the header announced.",
+   "note": "Everything beyond the header belonging to the version the header announced is `stepHeader`'s layering: the header's own protocol id decides the layer, and a header arriving after this peer has sent one must name that layer or it is the table's `R:HDR[!=S:HDR]` row (lean/Spec/Connection.lean:1015-1050). The function's own documentation records why the send-side mirror of that check is not decoration \u2014 without it a peer could switch the layer by sending a header instead of refusing one.",
    "text_sha256": "f5791d0809ed6e76db11214f1a7a76e95e7a9d1ae43bd009b07f7351585a6322"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.3": {
    "clause_text": "If the incoming and outgoing protocol headers do not match, both peers MUST close their outgoing stream and SHOULD read the incoming stream until it is terminated.",
-   "disposition": "formalized:Spec.Endpoint.protocolHeaderMismatch",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.stepHeader; formalized:SpecAMQP.Spec.Connection.headerFailure; test:exchange-two-headers; test:exchange-header-mismatch-in-hdr-sent",
    "kind": "MUST",
-   "note": "MUST half: both peers close their outgoing stream.",
+   "note": "A header that disagrees with the header this peer sent is the table's `R:HDR[!=S:HDR]` row: `stepHeader` refuses it (lean/Spec/Connection.lean:1015-1050, whose documentation states the send-side mirror as the reason the check is not decoration), and `headerFailure` (lean/Spec/Connection.lean:414-416) leaves the refusal in the END state with the reply the section mandates written \u2014 so both halves of the sentence are in the tree, and both vectors cite the clause.",
    "text_sha256": "b7d98bf73aede5725151eef296e35dd8b2e487e3a38420cbeae8e9f35ece1405"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.4": {
    "clause_text": "If the incoming and outgoing protocol headers do not match, both peers MUST close their outgoing stream and SHOULD read the incoming stream until it is terminated.",
-   "disposition": "formalized:Spec.Endpoint.protocolHeaderMismatchProgress",
+   "disposition": "deferred:S4",
    "kind": "SHOULD",
-   "note": "SHOULD half: keep reading the incoming stream until it closes. Expressed as a fairness-qualified progress obligation, never as a MUST.",
+   "note": "deferred: S4 \u2014 uncarried: the SHOULD to keep reading the incoming stream until it is terminated is a progress obligation, and the plan and the interface contract say where such obligations live (`Contracts/Conformance.lean:90-93`: 'progress under a stated fairness assumption ... stated per layer where a layer has something to say about them') \u2014 but no declaration states this one. Near-miss worth naming: the table's DISCARDING row is the shape it would take (`State.receiveClass` receives any frame and writes nothing, lean/Spec/Connection.lean:289-303), and the *refusal* that follows a failed negotiation does not reach it \u2014 `headerFailure` leaves the endpoint in END (lean/Spec/Connection.lean:414-416), whose receive class is `nothing`.",
    "text_sha256": "b7d98bf73aede5725151eef296e35dd8b2e487e3a38420cbeae8e9f35ece1405"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.5": {
    "clause_text": "The AMQP peer which acted in the role of the TCP client (i.e. the peer that actively opened the connection) MUST immediately send its outgoing protocol header on establishment of the TCP connection.",
-   "disposition": "formalized:Spec.Endpoint.roleIsClient",
+   "disposition": "deferred:R2",
    "kind": "MUST",
-   "note": "Role-dependent obligation: the TCP client sends its header immediately, without waiting.",
+   "note": "deferred: R2 \u2014 uncarried: 'the peer which acted in the role of the TCP client ... MUST immediately send its outgoing protocol header' is an obligation keyed on the transport role, and `Endpoint` has no field for which end opened the socket. The same gap is already recorded twice: PLAN.md's S3 audit names it as the finding whose vector cannot be written until the model can express the role, and `Contracts/Sasl.lean:75-90` states it for the SASL correspondence with the goal written out (an `Endpoint` carrying the transport role, an environment assumption fixing it when the socket is opened, and a guard on the announcement). What the model *does* carry is the exchange's order being undetermined \u2014 `.6`'s entry \u2014 which is why this sentence cannot be enforced rather than being missed.",
    "text_sha256": "01f0f3515a82eb2ccf330c8dcd185804e0df245885055223f7d7b1aa5d11dac5"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.6": {
    "clause_text": "The AMQP peer which acted in the role of the TCP server MAY elect to wait until receiving the incoming protocol header before sending its own outgoing protocol header.",
-   "disposition": "formalized:Spec.Endpoint.roleIsServer",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.State.receiveClass; formalized:SpecAMQP.Spec.Connection.stepHeader",
    "kind": "MAY",
-   "note": "Latitude that makes the handshake nondeterministic: the server may wait or may send first. The relation admits both orders.",
+   "note": "The latitude is admitted as latitude: the table's START row receives a header and sends a header (`State.receiveClass` and `State.sendClass`, lean/Spec/Connection.lean:272-290), and `stepHeader` accepts the header in either direction from that state (lean/Spec/Connection.lean:1015-1050), so both orders of the exchange are permitted and neither peer is required to send first. Which peer is the *server* is a transport fact the endpoint does not hold, which is the gap `.5` records.",
    "text_sha256": "0b763924ee5657cf8d85f448153e11c57247e1b9d7b03ea078d53989071b6eaf"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.7": {
    "clause_text": "When the client opens a new socket connection to a server, it MUST send a protocol header with the client's preferred protocol version.",
-   "disposition": "formalized:Spec.Endpoint.clientHeaderObligation",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.stepHeader; formalized:SpecAMQP.Spec.Connection.ProtocolHeader",
    "kind": "MUST",
-   "note": "Client sends a header announcing its preferred version.",
+   "note": "The header a peer sends carries its own protocol version: `ProtocolHeader` is the four-octet magic plus the protocol id and the version triple (lean/Spec/Connection.lean:156-164), and `stepHeader` fixes the exchange's layer from the header's own protocol id (lean/Spec/Connection.lean:1015-1030). That the header is sent before anything else is the START row's send class, as `.1`/`.1`'s entry records.",
    "text_sha256": "db8ae9144909e93dba3c8cb313b7880f32cc542eb64f25e119510e408d3d115f"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.8": {
    "clause_text": "If the requested protocol version is supported, the server MUST send its own protocol header with the requested version to the socket, and then proceed according to the protocol definition.",
-   "disposition": "formalized:Spec.Endpoint.serverAcceptsVersion",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.negotiationReply; formalized:SpecAMQP.Spec.Connection.stepHeader",
    "kind": "MUST",
-   "note": "When the requested version is supported, the server echoes that version and proceeds to the open exchange.",
+   "note": "A supported request is answered with the requested version: `negotiationReply` builds the reply from the layer's own stated version (lean/Spec/Connection.lean:405-410), and `decodeHeader` has already established that the requested version equals the stated one (lean/Spec/Connection.lean:426-460), so the reply carries the version the peer asked for; `stepHeader` is where the exchange proceeds.",
    "text_sha256": "a11bccdbc4556e45344cecfd4eb11442a689e4bc0a38c2ecea44886f8c79f3c8"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.9": {
    "clause_text": "If the requested protocol version is not supported, the server MUST send a protocol header with a supported protocol version and then close the socket.",
-   "disposition": "formalized:Spec.Endpoint.serverRefusesVersion",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.decodeHeader; formalized:SpecAMQP.Spec.Connection.headerFailure; test:exchange-header-version-unsupported",
    "kind": "MUST",
-   "note": "When it is not supported, the server announces a supported version and closes: a mandated refusal with a negative vector.",
+   "note": "An unsupported version is refused by `decodeHeader` with the class `unsupported` (lean/Spec/Connection.lean:426-460) and `headerFailure` answers with a header for a version this peer does speak and ends the connection (lean/Spec/Connection.lean:414-416) \u2014 the clause's 'send a protocol header with a supported protocol version and then close the socket' as the refusal's reply and its state. The vector cites the clause.",
    "text_sha256": "8115b15ced04f446da2b928ca8b8aea515ebee3e5dc6042378c78513ed96e387"
   }
  },

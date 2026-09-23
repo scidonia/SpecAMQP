@@ -43,9 +43,9 @@
   },
   "amqp-core-transport-v1.0-os.xml#picture.14": {
    "clause_text": "[picture] Frame Layout: REQUIRED OPTIONAL OPTIONAL +--------------+-----------------+------------+ | frame header | extended header | frame body | +--------------+-----------------+...",
-   "disposition": "formalized:Spec.Wire.frameLayout",
+   "disposition": "formalized:SpecAMQP.Spec.Frame.Frame; formalized:SpecAMQP.Spec.Frame.bodyStart",
    "kind": "picture",
-   "note": "Normative layout: the frame header is fixed width while the extended header and frame body are variable; the REQUIRED/OPTIONAL lanes are the same distinction the framing clauses state in prose.",
+   "note": "The frame layout is the structure: `Frame` carries the extended header's octets separately from the body (lean/Spec/Frame.lean:193-213), `headerOctets`, `sizeOctets`, `doffOctets` and `channelOctets` (lean/Spec/Frame.lean:86-108) are the fixed widths, and `bodyStart doff = doff * 4` (lean/Spec/Frame.lean:216) is the arithmetic that places the body after the extended header. The REQUIRED/OPTIONAL distinction the picture draws is the one the framing clauses state in prose \u2014 the header is required, the extended header and body are optional.",
    "text_sha256": "b8112c6e9cd68e24ab3009b284427b0b058f65b1dd2153e4f7be34140e587a44"
   },
   "amqp-core-transport-v1.0-os.xml#picture.15": {
@@ -57,9 +57,9 @@
   },
   "amqp-core-transport-v1.0-os.xml#picture.16": {
    "clause_text": "[picture] AMQP Frame Layout: type: 0x00 - AMQP frame +0 +1 +2 +3 +-----------------------------------+ -. 0 | SIZE | | +-----------------------------------+ |---> Frame Header 4 | DOFF |...",
-   "disposition": "formalized:Spec.Wire.frameLayout",
+   "disposition": "formalized:SpecAMQP.Spec.Frame.Frame; formalized:SpecAMQP.Spec.Frame.FrameType",
    "kind": "picture",
-   "note": "AMQP frame layout: the fixed 8-byte header with the size, data offset, frame type 0x00 and channel fields, then the body. The frame-type octet comes from the generated table.",
+   "note": "The AMQP frame layout: the fixed eight-octet header whose fields are SIZE, DOFF, TYPE and CHANNEL (lean/Spec/Frame.lean:86-108), then the body at `bodyStart doff` (lean/Spec/Frame.lean:216). The TYPE octet is read against the generated table \u2014 `FrameType.code` and `FrameType.ofCode` (lean/Spec/Frame.lean:127-136) \u2014 so the picture's frame type 0x00 comes from the table rather than from a literal here, and the two CHANNEL octets are kept rather than interpreted (lean/Spec/Frame.lean:193-213).",
    "text_sha256": "481f0791733d5b9613401a5f7bff90e677db855480f36b53f03ea9a23bb80657"
   },
   "amqp-core-transport-v1.0-os.xml#picture.23": {
@@ -109,7 +109,7 @@
    "clause_text": "[picture] Example Composite Type: <type class=\"composite\" name=\"book\" label=\"example composite type\"> <doc> <p>An example composite type.</p> </doc> <descriptor name=\"example:book:list\" code=...",
    "disposition": "formalized:SpecAMQP.Spec.Message.fieldDeclsOf; formalized:SpecAMQP.Spec.Message.checkFieldList",
    "kind": "picture",
-   "note": "Worked example of a composite type definition: the book type in descriptor domain 0x00000003 with field multiplicities and a mandatory title. The declared fields come from the generated table through `fieldDeclsOf` (lean/Spec/Message.lean:269-271) and the rules a body must meet \u2014 mandatory present, no longer than the declaration, types as declared \u2014 are `checkFieldList` (lean/Spec/Message.lean:365-387), which is what makes this figure the model for how a described list maps onto declared fields.",
+   "note": "Worked example of a composite type definition: the book type in descriptor domain 0x00000003 with field multiplicities and a mandatory title. The declared fields come from the generated table through `fieldDeclsOf` (lean/Spec/Message.lean:269-271) and the rules a body must meet \u2014 mandatory present, no longer than the declaration, types as declared \u2014 are `checkFieldList` (lean/Spec/Message.lean:365-385), which is what makes this figure the model for how a described list maps onto declared fields.",
    "text_sha256": "6f82b0b098427cccc4b98bb35b8c24145fd2514fb8390685ffa809c4c4abd003"
   },
   "amqp-core-types-v1.0-os.xml#picture.19": {
@@ -144,7 +144,7 @@
    "clause_text": "[picture] Subcategory Formats: Subcategory Category Format ============================================================================== 0x4 Fixed Width Zero octets of data. 0x5 Fixed Wid...",
    "disposition": "formalized:SpecAMQP.Spec.Value.Constructor; formalized:SpecAMQP.Spec.Value.classify",
    "kind": "picture",
-   "note": "The subcategory table: 0x4/0x5/0x6/0x7/0x8/0x9 are fixed widths of 0/1/2/4/8/16 octets, 0xA/0xB variable with one or four size octets, 0xC/0xD compound with one or four size and count octets, 0xE/0xF array with one or four size and count octets. The widths are the `width` each `Constructor` carries (lean/Spec/Value.lean:40-55) as `classify` assigns it (lean/Spec/Value.lean:56-72), and the generated corpus exercises them: the ubyte/byte/ushort family in vectors/generated.ndjson and the uint vectors in vectors/primitives.ndjson all cite this picture.",
+   "note": "The subcategory table: 0x4/0x5/0x6/0x7/0x8/0x9 are fixed widths of 0/1/2/4/8/16 octets, 0xA/0xB variable with one or four size octets, 0xC/0xD compound with one or four size and count octets, 0xE/0xF array with one or four size and count octets. The widths are the `width` each `Constructor` carries (lean/Spec/Value.lean:40-55) as `classify` assigns it (lean/Spec/Value.lean:56-70), and the generated corpus exercises them: the ubyte/byte/ushort family in vectors/generated.ndjson and the uint vectors in vectors/primitives.ndjson all cite this picture.",
    "text_sha256": "629884a2db5f66290dc052b11fb083aae2d04c90d315193661029bfd312ab7be"
   },
   "amqp-core-types-v1.0-os.xml#picture.6": {
@@ -172,7 +172,7 @@
    "clause_text": "[picture] Layout of Array Encodings: +--= count elements =--+ | | n OCTETs n OCTETs | | +----------+----------+---------------------+-------+------+-------+ | size | count | element-constructor ...",
    "disposition": "formalized:SpecAMQP.Spec.Codec.readArrayData",
    "kind": "picture",
-   "note": "Layout of array encodings: size, count, one element constructor, then the elements in that constructor's form. `readArrayData` (lean/Spec/Codec.lean:481-500) reads exactly that, checks the declared size against the octets measured, and bounds the count by `arrayElementLimit` because a zero-width element constructor leaves the count bounded by nothing in the data; this figure is the arithmetic check that fixes the size field's scope.",
+   "note": "Layout of array encodings: size, count, one element constructor, then the elements in that constructor's form. `readArrayData` (lean/Spec/Codec.lean:481-498) reads exactly that, checks the declared size against the octets measured, and bounds the count by `arrayElementLimit` because a zero-width element constructor leaves the count bounded by nothing in the data; this figure is the arithmetic check that fixes the size field's scope.",
    "text_sha256": "837570b7af3b199888d2c3d4baec9c47cbe79879ad8925c60db4c984d478ab01"
   }
  },

@@ -1294,7 +1294,7 @@
    "clause_text": "If the next-incoming-id field of the \u00abflow\u00bb frame is not set, then remote-incoming-window is computed as follows:",
    "disposition": "formalized:SpecAMQP.Contracts.receiving_flow_computes_remote_incoming_window",
    "kind": "UNKEYED",
-   "note": "The unset branch of the remote-incoming-window formula, stated as a theorem over the constructor that computes the window so the two cannot drift (lean/Contracts/FlowControl.lean:97-102). The value named `SpecAMQP.Contracts.SessionWindows.receiving_flow_computes_remote_incoming_window`; that module was replaced by `FlowControl.lean`, whose own header records the replacement and why a corrected claim replaces the one it corrects (lean/Contracts/FlowControl.lean:5-9), so the path is corrected to the declaration that exists.",
+   "note": "The unset branch of the remote-incoming-window formula, stated as a theorem over the constructor that computes the window so the two cannot drift (lean/Contracts/FlowControl.lean:97-102). The value named `SpecAMQP.Contracts.SessionWindows.receiving_flow_computes_remote_incoming_window`; that module was replaced by `FlowControl.lean`, whose own header records the replacement and why a corrected claim replaces the one it corrects (lean/Contracts/FlowControl.lean:7-10), so the path is corrected to the declaration that exists.",
    "text_sha256": "faf73e651b78f5e317dad39d734d89330569575da0b8539d15e3cf053a24bb68"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.u1": {
