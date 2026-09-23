@@ -147,4 +147,38 @@ theorem wireAgrees_zero : WireAgrees 0 := by
       subst hf
       rfl
 
+/-- The description a body announces agrees when the bodies agree: `typeOfDescriptor` inspects only
+`ulong` and `symbol` descriptors, and both readers run `find?` over the *same* generated table, so the
+only obligation is the representational one `BodiesAgree` already carries. Stated case-driven rather
+than with a `match` prologue: the prologue abstracts the two values, and `cases` then acts on names the
+goal no longer mentions.
+
+The two payload cases are the whole content: the tables are the same object, so the goals differ only
+in the predicate's payload — `n` against `n.toNat`, a string against the same string — and rewriting
+the `BodiesAgree` payload equality *under* the `find?` predicate's binder identifies them. -/
+theorem typeOfDescriptor_agrees {d : SpecAMQP.Spec.Codec.Value} {d' : SpecAMQP.Ref.Value}
+    (h : BodiesAgree d d') :
+    SpecAMQP.Spec.Frame.typeOfDescriptor d = SpecAMQP.Ref.Frame.typeOfDescriptor d' := by
+  cases d <;> cases d' <;>
+    simp only [BodiesAgree, SpecAMQP.Spec.Frame.typeOfDescriptor,
+      SpecAMQP.Ref.Frame.typeOfDescriptor] at h ⊢
+  all_goals
+    first
+      | rfl
+      | (congr 1
+         funext entry
+         rw [h]
+         rfl)
+
+/-- **The contract's view equality, from the strengthened conjunct.** A described body's view is its
+descriptor's type; everything else views as `none`. -/
+theorem bodyView_of_BodiesAgree {body : SpecAMQP.Spec.Codec.Value} {other : SpecAMQP.Ref.Value}
+    (h : BodiesAgree body other) : specBodyView body = refBodyView other := by
+  cases body <;> cases other <;>
+    simp only [BodiesAgree, specBodyView, refBodyView] at h ⊢
+  all_goals
+    first
+      | rfl
+      | (rw [typeOfDescriptor_agrees h.1])
+
 end SpecAMQP.Proofs
