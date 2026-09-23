@@ -855,6 +855,22 @@ twelve-vector file wrote over the *generated* log and the non-vacuity check then
 carrying a refusal expectation) so a small corpus cannot pass this gate vacuously, which is the failure mode small corpora are most exposed to.
 
 
+**And a second coverage property, which generalises the first**: **all 77 zero-width vectors in the corpus carry a *matching* item** — `0x40` with `null`, `0x41`/`0x42` with a
+boolean, `0x43` uint, `0x44` ulong, `0x45` list — so a corpus of that size said nothing about the shape where a zero-width form is handed something of another kind. Together with the unassigned-constructor
+finding this is a property rather than a coincidence: **a corpus built from the artifact's grammar naturally covers the shapes the grammar admits, and the defects live in the shapes it does not.** Both
+sweeps now running attack exactly those combinations, which is why the first found three defects in one outing after 68,120 vectors had found none.
+
+**And the fix's extent was measured rather than asserted, then proved past its samples.** The zero-width family was swept exhaustively — `0x40` diverged on 8 item kinds, `0x41`/`0x42` on 7 each, and the
+zero-value arms `0x43`/`0x44`/`0x45` agree with the specification on all nine each — and then *closed* by theorems that generalise (`ref_arrayElement_null_refuses_mismatch` over every item that is not
+`null`, `zeroWidthMismatch_class_agrees` stated in the law's own form, and `ref_encode_zeroWidthMatch` showing the matching case still writes the same octets). **A fix that states what did *not* change is
+checkable in a way that a fix stating only what did is not.**
+
+**And the seventh sentence to outlive its subject was in a slice's report rather than in the plan** — a warning that the specification still writes `0x41` with `false`, raised two commits *after* the fix
+that refuses it, with the corpus carrying four vectors for those pairs and the specification refusing each by name. The instinct was right and the timing was the problem: **in a tree where four slices land
+fixes within the hour, a report should state the commit it read, not the state it read.** That is a rule for briefs and reports, not only for the plan, and it is the same rule the earlier ghost sentences
+produced.
+
+
 ## 11. Specification test vectors
 
 One shared format for everything the specification is tested against: NDJSON, schema-validated (`tests/contracts/vector.schema.json`), **logical time only** — timestamps are ordering tags, never wall-clock, so replay is deterministic on any machine.
