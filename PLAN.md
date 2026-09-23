@@ -672,6 +672,14 @@ model happens to do: the summary would have said "settlement is handled", and be
 requires the flag to equal the comparison against the `settled` choice, which the model cannot satisfy while it reads `unsettled`. A contract stated as the fix would be as good as the
 mistake.
 
+**And a contract's right-hand side can force the implementation's shape, which is worth knowing before it is discovered twice.** `SenderSettleModeIsTheChoiceTheClauseSelects` compares against the
+*settled* choice's number as the artifact states it, and that number can only be *read* — a literal is forbidden in `lean/Contracts/` and `lean/Spec/` by the rules above — so the right-hand side
+necessarily carries `choiceValue?` and `String.toNat?`. **The kernel cannot reduce those**: `String.toNat?` bottoms out in `ByteArray` primitives, so `rfl`, `decide` and `simp` all fail on them and
+`native_decide` is banned by the trust gate. The response is neither to weaken the contract nor to add trust, but to write the *implementation* in the contract's own shape — the selection becomes one
+expression whose successor field is definitionally the contract's right-hand side, the proof reduces to the do-block's case analysis, and every runtime branch is unchanged, which the slice argued branch by
+branch rather than by sample. **A contract that states a selection as an equality makes the shape of that selection part of the contract**, and that is a reason to state it deliberately rather than a
+reason to state it some other way.
+
 ## 11. Specification test vectors
 
 One shared format for everything the specification is tested against: NDJSON, schema-validated (`tests/contracts/vector.schema.json`), **logical time only** — timestamps are ordering tags, never wall-clock, so replay is deterministic on any machine.
