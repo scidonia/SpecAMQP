@@ -140,6 +140,15 @@ corrected, and it is worth the paragraph because the ledger's citations are the 
 line still points at *something*, and nothing checks whether it still points at the thing the note describes. It is the stale-claim family in its most mechanical
 form — a claim about a *location* — and the audit that found it was a reading rather than a gate, which is the honest statement of where that check sits today.
 
+**And the second sweep gives the family its numbers, which the first could not.** 419 path-bearing citations across the disposition files: **280 landing on what the note names, 137 shifted, 2
+absent, none unresolved** — and the decay is *concentrated* rather than spread, because `lean/Spec/Session.lean` is the single target that moved under its own citations and the link and performative
+ledgers carry 99 of the 137 between them. **The cause is order rather than carelessness**: those notes were written before the S-layer's `Session.lean` settled, and "the guard at `:686-689`" was true
+when it was written. A citation is a claim about a *location*, and a location is the one thing a rewrite moves for free — so the standing of this check is still read rather than run, and the sweep's own
+second-order finding says why it has to be: `vectors/isolation.md` was cited *correctly* by the ledger while itself citing the specification *incorrectly*, two grades of accuracy in one record. The
+repairs are landed for the path-bearing map and the sites the sweep verified in context; the bare `:NNN` continuations it could not verify are reported rather than assigned a file, since assigning one
+without reading the sentence is the guess that produced the drift.
+
+
 **And the two grades composed, which is a sharper finding than either grade alone.** A clause can be *implemented* while being *unstatable in the specification*:
 `version-negotiation.5`, the transport-role obligation, is carried by `Shell/Driver.runConnection` submitting the announced header before the read loop and
 `Shell/Main` deciding the role from the command line — while `Endpoint` has no transport-role field for the specification to state it with. Both halves belong
