@@ -111,30 +111,53 @@ namespace SpecAMQP.Proofs
 def CursorAgrees (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor) : Prop :=
   c.data = c'.data ∧ c.pos = c'.pos
 
-/-- **The wire readers' agreement at a given fuel**, in the contract's direction.
+/-- **The two conjuncts of the claim at one fuel**, as a proposition in its own right, so that a
+branch lemma can state what it owes without repeating them and the fuel induction can pass a whole
+branch's obligation around as one term.
 
 The success conjunct carries `BodiesAgree`, which is *stronger* than the contract's view equality and
 is what the route needs: a described body's view is `some (typeOfDescriptor descriptor)`, so the two
 descriptors must correspond, and `BodiesAgree` is exactly the relation that says so - the same one
 the corpus side uses between the two value types. `bodyView_of_BodiesAgree` below recovers the
 contract's spelling, so the claim is still the contract's own. -/
+def StepAgrees (fuel : Nat) (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor) : Prop :=
+  (∀ (other : SpecAMQP.Ref.Value) (c₂' : SpecAMQP.Ref.Cursor),
+      SpecAMQP.Ref.readValue fuel c' = .ok (other, c₂') →
+      ∃ (body : SpecAMQP.Spec.Codec.Value) (c₂ : SpecAMQP.Spec.Codec.Cursor),
+        SpecAMQP.Spec.Codec.readValue fuel c = .ok (body, c₂) ∧
+        CursorAgrees c₂ c₂' ∧ BodiesAgree body other) ∧
+  (∀ (failure : SpecAMQP.Ref.DecodeError),
+      SpecAMQP.Ref.readValue fuel c' = .error failure →
+      ∃ refusal : SpecAMQP.Spec.Codec.Refusal,
+        SpecAMQP.Spec.Codec.readValue fuel c = .error refusal ∧
+        (SpecAMQP.Ref.Frame.valueFailure failure).reasonClass = refusal.reasonClass)
+
+/-- **The wire readers' agreement at a given fuel**, in the contract's direction, for cursors that
+still hold the octets the fuel has to cover.
+
+The bound `c.data.size - c.pos ≤ fuel` is not a convenience: **without it the statement is false**,
+and the array's element loop is what refutes it. The two readers spend fuel differently on their way
+into an array's elements — the specification's `readArrayData f` consumes one fuel entering its
+element loop (`readElements (f - 1)` and then `readElementsLoop (f - 2)`) while the reference's
+`readElements f` reads its first element at `f` — so for a fuel smaller than the octets left at the
+cursor the two disagree: on `#[0xE0, 0x02, 0x00, 0x40]` at `⟨bytes, 0⟩` the reference answers `ok`
+at fuel 2 where the specification answers `truncated`. What makes them agree is exactly the relation
+the bound states, and at the entry point it holds for free: both entry points read at
+`readValue bytes.size ⟨bytes, 0⟩`, and `bytes.size - 0 ≤ bytes.size`.
+
+A fuel is only ever a bound on a reader's *recursion*, so the bound is what a reader needs: every
+descent spends at least one octet, and the two readers' descents spend the same fuel per value, per
+compound item and per array element, which is what the branch lemmas show one branch at a time. A law
+quantified over every fuel a cursor can be paired with is a *different* law from the one the contract
+asks for, and not a stronger one. -/
 def WireAgrees (fuel : Nat) : Prop :=
   ∀ (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor), CursorAgrees c c' →
-    (∀ (other : SpecAMQP.Ref.Value) (c₂' : SpecAMQP.Ref.Cursor),
-        SpecAMQP.Ref.readValue fuel c' = .ok (other, c₂') →
-        ∃ (body : SpecAMQP.Spec.Codec.Value) (c₂ : SpecAMQP.Spec.Codec.Cursor),
-          SpecAMQP.Spec.Codec.readValue fuel c = .ok (body, c₂) ∧
-          CursorAgrees c₂ c₂' ∧ BodiesAgree body other) ∧
-    (∀ (failure : SpecAMQP.Ref.DecodeError),
-        SpecAMQP.Ref.readValue fuel c' = .error failure →
-        ∃ refusal : SpecAMQP.Spec.Codec.Refusal,
-          SpecAMQP.Spec.Codec.readValue fuel c = .error refusal ∧
-          (SpecAMQP.Ref.Frame.valueFailure failure).reasonClass = refusal.reasonClass)
+    c.data.size - c.pos ≤ fuel → StepAgrees fuel c c'
 
 /-- **The base case.** At fuel 0 both readers refuse, with the same class: there is nothing to read
 before the input ends. -/
 theorem wireAgrees_zero : WireAgrees 0 := by
-  intro c c' _
+  intro c c' _ _hb
   refine ⟨?_, ?_⟩
   · intro other c₂' h
     simp only [SpecAMQP.Ref.readValue] at h
