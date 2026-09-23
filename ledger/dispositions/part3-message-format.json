@@ -1,14 +1,45 @@
 {
  "conventions": {
+  "deferred:": "A real obligation this plan carries; the suffix names the milestone whose scope in PLAN.md the clause falls in \u2014 S5, the messaging layer's. The note names the gap.",
+  "formalized:": "A Lean declaration path that carries this clause's meaning; the ledger's existence gate resolves every path here against lean/**.",
   "kind": "The clause's own keyword, read from the ledger's clause rather than inferred from the coverage class; every clause in this file is a MUST.",
-  "out-of-scope:": "Deliberately outside core AMQP 1.0 as this specification bounds it, with the reason: a node's treatment of a message, which PLAN.md \u00a73 excludes ('core defines links and termini, not what a destination does with a message'). The reason is written in every note, so the bound can be read against the plan rather than against this file's summary of it."
+  "out-of-scope:": "Deliberately outside core AMQP 1.0 as this specification bounds it, with the reason: a node's treatment of a message, which PLAN.md \u00a73 excludes ('core defines links and termini, not what a destination does with a message'). The reason is written in every note, so the bound can be read against the plan rather than against this file's summary of it.",
+  "test:": "A vector id whose verdict is the clause's observable form, resolved against vectors/**."
  },
  "design_consequences": [
-  "The eight must-class clauses of the header's `priority` field are all one rule: how an AMQP intermediary maps the message priorities it receives onto the effective levels it implements. They are bounded out rather than deferred, because the subject is a node's behaviour rather than an endpoint's: this specification formalizes links and termini and reads no `priority` value anywhere.",
-  "The same bound is already recorded in the transport section for containers and nodes (`out-of-scope:container-node-topology`), and the two agree: a rule whose subject is deployment is outside the core this repository bounds.",
-  "Three of the eight are the artifact's own repeated text, keyed twice each with one digest (.3/.4, .5/.6, .8/.9), so the file decides three statements six times and says so in each note."
+  "The header field rules of this file's first group (priority) are bounded out as a node's behaviour; the message-format rules dispositioned here are not: the annotation key rules are enforced by the message layer's reader, and the content-encoding rules are deferred to the layer that will have to relate a properties field to the body's section kind.",
+  "Two of the four annotation and encoding clauses are carried and two are deferred, and the difference is whether the model has both of the things the rule relates: an annotation key's implementation status is a policy input the reader holds, while the body's section kind and a properties field are read by different functions that never meet.",
+  "The 337 vectors citing `message-format.1` are the generator's shape citation for every message vector, not witnesses: no vector exercises an intermediary, which is why the clause is bounded rather than counted."
  ],
  "dispositions": {
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format.1": {
+   "clause_text": "If a section of the bare message is omitted, one MUST NOT be inserted by an intermediary.",
+   "disposition": "out-of-scope:intermediary-forwarding",
+   "kind": "MUST NOT",
+   "note": "out-of-scope: intermediary forwarding \u2014 The sentence constrains a *forwarder*: what may be done to a bare message on its way through an intermediary. The plan bounds that out (PLAN.md \u00a73: 'No broker or queue semantics. AMQP core defines links and termini, not what a destination does with a message'), and the model has no intermediary \u2014 message sections are decoded, re-encoded and refused by `Spec.Message` for the endpoint that holds them, and no layer relays one to a third party. Worth recording so the corpus is not read as a witness: 337 vectors cite this clause, which is the generator's blanket shape citation for every message vector, and not one of them exercises an intermediary. This clause is the omission rule: a section the sender omitted is not inserted.",
+   "text_sha256": "8034d8a619a4b8930956bb96d6f82bf43ae97fc740dc9496a5913351eb210cef"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format.2": {
+   "clause_text": "The exact encoding of sections of the bare message MUST NOT be modified.",
+   "disposition": "out-of-scope:intermediary-forwarding",
+   "kind": "MUST NOT",
+   "note": "out-of-scope: intermediary forwarding \u2014 the encoding-fidelity rule, the other half of `.1`'s sentence: the exact encoding of a section is not modified in transit. The sentence constrains a *forwarder*: what may be done to a bare message on its way through an intermediary. The plan bounds that out (PLAN.md \u00a73: 'No broker or queue semantics. AMQP core defines links and termini, not what a destination does with a message'), and the model has no intermediary \u2014 message sections are decoded, re-encoded and refused by `Spec.Message` for the endpoint that holds them, and no layer relays one to a third party. Worth recording so the corpus is not read as a witness: 337 vectors cite this clause, which is the generator's blanket shape citation for every message vector, and not one of them exercises an intermediary.",
+   "text_sha256": "d2564fc2d496fb7644a4efc8481661f0e4b53459d30a19305699203601e86f55"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:annotations.1": {
+   "clause_text": "Keys beginning with \"x-opt-\" MUST be ignored if not understood.",
+   "disposition": "formalized:SpecAMQP.Spec.Message.checkAnnotationKey; test:gen-deliveryannotations-key-x-opt-bare; test:gen-deliveryannotations-key-x-opt-one",
+   "kind": "MUST",
+   "note": "The artifact's rule has three cases and `checkAnnotationKey` is all three (lean/Spec/Message.lean:623-645, whose own comment says so): a symbolic key beginning with `x-opt` is admitted to be ignored, a key the endpoint implements is understood, and any other key is refused with the detach the sentence mandates. The two vectors pin the prefix's own boundary \u2014 a bare `x-opt` and `x-opt-` with a suffix \u2014 which is where a prefix rule is most easily wrong.",
+   "text_sha256": "155a5682238451e72caeceb5989fea4344d1cefd35d5448948f2e54f9403db7d"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:annotations.2": {
+   "clause_text": "On receiving an annotation key which is not understood, and which does not begin with \"x-opt\", the receiving AMQP container MUST detach the link with a \u00abamqp-error\u00bb error.",
+   "disposition": "formalized:SpecAMQP.Spec.Message.checkAnnotationKey; formalized:SpecAMQP.Spec.Message.notImplemented; test:gen-deliveryannotations-key-x-o-short",
+   "kind": "MUST",
+   "note": "A reserved key the endpoint does not implement is refused with `amqp:not-implemented`, which is the member of the `amqp-error` family whose definition fits 'the peer tried to use functionality that is not implemented in its partner' \u2014 read from the generated table rather than typed (lean/Spec/Message.lean:88-92) \u2014 and the mandated detach is what the message layer's refusal stands for, since the link layer is what acts (the boundary the module's documentation draws). The vector pins the near-miss of the prefix rule: `x-o` is not `x-opt`, so the key is reserved and refused.",
+   "text_sha256": "475f98f9e3c9fee9793b7b6e4c0dea4f295116718976e5ffd37290fddee5ff3e"
+  },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:priority.2": {
    "clause_text": "An AMQP intermediary implementing distinct priority levels MUST do so in the following manner:",
    "disposition": "out-of-scope:intermediary-priority-treatment",
@@ -64,6 +95,20 @@
    "kind": "MUST",
    "note": "out-of-scope: intermediary priority treatment \u2014 the same sentence as `.8`, keyed again. the sentence constrains how an *intermediary* maps message priorities onto its own effective levels, which is a node's treatment of a message rather than a protocol-visible obligation at an endpoint. The plan bounds that out (PLAN.md \u00a73: 'No broker or queue semantics. AMQP core defines links and termini, not what a destination does with a message'), the same bound the transport section's `container-node-topology` entry records for containers and nodes. The model has no intermediary, and no declaration reads the header's `priority` field at all: the value is carried as a declared field of the header section (`Spec.Message.SectionKind.header` and the generated field table) and nothing acts on it. This is a bound rather than a missing carrier, and it is recorded as one.",
    "text_sha256": "a3d7b7814f42d679c71cadbb2f7b7c9d055f7f949545b648d11d1808cf216a7a"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:properties/field:content-encoding.1": {
+   "clause_text": "The content-encoding MUST NOT be set when the application-data section is other than data.",
+   "disposition": "deferred:S5",
+   "kind": "MUST NOT",
+   "note": "deferred: S5 \u2014 uncarried: 'the content-encoding MUST NOT be set when the application-data section is other than data' relates two parts of a message \u2014 a properties field and the body's section kind \u2014 and nothing in the model relates them: the properties section is decoded and its fields checked against their declared types (`checkField`, lean/Spec/Message.lean:340-353), and the body's sections are checked for structure and order (`Assembly`, `checkStructure`), but no rule compares a field of one section with the kind of another.",
+   "text_sha256": "aeac4f086df72bad825aaf1073c755db6bb696d89f67854947c8e3c323c7b9a2"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:properties/field:content-encoding.2": {
+   "clause_text": "Implementations MUST NOT use the identity encoding.",
+   "disposition": "deferred:S5",
+   "kind": "MUST NOT",
+   "note": "deferred: S5 \u2014 uncarried: 'implementations MUST NOT use the identity encoding' is an obligation on what a sender writes, and nothing in the tree refuses the value: `content-encoding`'s declared type is the encoding choice the generated table carries, and the message layer checks that a field's value matches its declared type without consulting which member of the choice it is.",
+   "text_sha256": "811d718c8011e48ec8831c0da7f3bee59d743e2b9436e9e3989122c2f41bb80c"
   }
  },
  "schema_version": 1

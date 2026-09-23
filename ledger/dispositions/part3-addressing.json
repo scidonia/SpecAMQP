@@ -80,6 +80,41 @@
    "note": "deferred: S5 \u2014 uncarried: the mirror rule \u2014 the address must be set where the dynamic flag is set and the endpoint is the sending one. Same missing terminus, same gap as `.1`.",
    "text_sha256": "e5a97054e93ec3dc4008df0db6688c2cf8050310b3f05e5c4e718b968ee53b7f"
   },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:source/field:default-outcome.1": {
+   "clause_text": "The value MUST be a valid outcome (e.g., \u00abreleased\u00bb or \u00abrejected\u00bb).",
+   "disposition": "deferred:S5",
+   "kind": "MUST",
+   "note": "deferred: S5 \u2014 uncarried: the value must be a valid outcome \u2014 a described type providing the outcome role \u2014 and nothing reads a source's `default-outcome`. The outcome vocabulary exists in the message layer (`Spec.Message.Outcome`, decoded from the declared delivery-state types), so what is missing is not the vocabulary but the field's use: no declaration decodes a source's fields beyond the coordinator target's capabilities (lean/Spec/Transactions.lean:268-277).",
+   "text_sha256": "f55c3e5a39a26eb5583a8e20822141ac764619cf00b7a8011c553a94f116e88b"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:source/field:distribution-mode.1": {
+   "clause_text": "This field MUST be set by the sending end of the link if the endpoint supports more than one distribution-mode.",
+   "disposition": "deferred:S5",
+   "kind": "MUST",
+   "note": "deferred: S5 \u2014 uncarried: the sending end must set this field when it supports more than one distribution mode \u2014 an obligation over a terminus the model does not have. Same gap as `.default-outcome.1`, and the same reason the unkeyed sentences of this anchor are deferred to the messaging layer.",
+   "text_sha256": "5a95506ff7d7dc77e7c9a356fca803c2ed255691f3f5c524d1655e51392b50c7"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:source/field:dynamic-node-properties.1": {
+   "clause_text": "If the dynamic field is not set to true this field MUST be left unset.",
+   "disposition": "deferred:S5",
+   "kind": "MUST",
+   "note": "deferred: S5 \u2014 uncarried: node properties may be sent only when the dynamic flag is set \u2014 a condition on two fields of the same term the model does not decode. Same gap as `.dynamic.1`.",
+   "text_sha256": "c40763242a282b21b8bf3ac9046a0e81f26e37aa9f34bd2111dd756801d23000"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:source/field:dynamic.1": {
+   "clause_text": "In this case the address field MUST NOT be set.",
+   "disposition": "deferred:S5",
+   "kind": "MUST NOT",
+   "note": "deferred: S5 \u2014 uncarried: 'in this case the address field MUST NOT be set' \u2014 the dynamic terminus case for a source. The model reads no address and has no dynamic flag, which is the gap `.source/field:address.1` names from the other side; this clause is the same restriction stated on the flag rather than on the address.",
+   "text_sha256": "8b16dca6098f0446804c5f75ae78d8621c9ac180d74655815df2a2a3f7ca90dd"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:source/field:filter.1": {
+   "clause_text": "The receiving endpoint MUST check that the filter in place meets its needs and take responsibility for detaching if it does not.",
+   "disposition": "out-of-scope:node-and-filter-behaviour",
+   "kind": "MUST",
+   "note": "out-of-scope: node and filter behaviour \u2014 the clause obliges the *receiving endpoint* to check that the filter in place meets its needs and to take responsibility for deciding whether to attach, which is a filter engine's judgement over a terminus rather than a protocol-visible obligation. PLAN.md \u00a73 bounds filter expressions out and excludes what a destination does with a message; the model has no filter engine and no terminus, and the filter-set's own encoding rules (`.filter-set.1/.2`) are deferred to the messaging layer instead, because those are protocol data.",
+   "text_sha256": "075b64ad328fb32ee843a102645e26b95eae9008ad855db6f491ab8c2c1072e2"
+  },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:source/field:outcomes.2": {
    "clause_text": "This field MAY be empty, indicating that the default-outcome will be assumed for all message transfers (if the default-outcome is not set, and no outcomes are provided, then the \u00abaccepted\u00bb outcome MUST be supported by the source).",
    "disposition": "deferred:S5",
@@ -107,6 +142,20 @@
    "kind": "MUST",
    "note": "deferred: S5 \u2014 uncarried: the mirror \u2014 the address must be set where the dynamic flag is set and the endpoint is the receiving one. (The artifact's sentence says 'the address of the source' in the target's field documentation; the ledger records the text as it stands, and the disposition is about the rule either way.)",
    "text_sha256": "77c67096c28f255b20c8550c89cb931dd03b173eb78c8259d67e2790f152cb1a"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:target/field:dynamic-node-properties.1": {
+   "clause_text": "If the dynamic field is not set to true this field MUST be left unset.",
+   "disposition": "deferred:S5",
+   "kind": "MUST",
+   "note": "deferred: S5 \u2014 uncarried: the target's node-properties condition, as the source's.",
+   "text_sha256": "c40763242a282b21b8bf3ac9046a0e81f26e37aa9f34bd2111dd756801d23000"
+  },
+  "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:target/field:dynamic.1": {
+   "clause_text": "In this case the address field MUST NOT be set.",
+   "disposition": "deferred:S5",
+   "kind": "MUST NOT",
+   "note": "deferred: S5 \u2014 uncarried: the target's half of the dynamic-address rule. The model reads no target address and holds no dynamic flag, so neither half of the condition exists.",
+   "text_sha256": "8b16dca6098f0446804c5f75ae78d8621c9ac180d74655815df2a2a3f7ca90dd"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header/field:durable.1": {
    "clause_text": "Durable messages MUST NOT be lost even if an intermediary is unexpectedly terminated and restarted.",

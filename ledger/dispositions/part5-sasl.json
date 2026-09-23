@@ -1,6 +1,7 @@
 {
  "conventions": {
   "deferred:": "A real obligation this plan carries; the suffix names the milestone whose scope in PLAN.md the clause falls in \u2014 R2, the endpoint core of the implementation track, for the one clause that needs a transport role the specification's alphabet does not have. The note names the gap.",
+  "environment:": "An assumption the specification rests on, named so that a claim can state that it depends on it. Used here for the TLS boundary, which PLAN.md \u00a73 declares an environment assumption: certificate validation and the TLS session itself are inside it rather than modelled.",
   "formalized:": "A Lean declaration path that carries this clause's meaning. Every path recorded here names a declaration the module it names actually holds, and the ledger's existence gate resolves it against lean/** rather than taking the note's word for it; where a clause obliges a peer to *send* a frame and the model has no sending side, the note says which half is carried.",
   "kind": "The clause's own keyword, read from the ledger's clause rather than inferred from the coverage class; all six clauses of this anchor are MUSTs, and `.4`/`.5` are the two MUSTs of one sentence, keyed separately.",
   "test:": "A vector id whose verdict is the clause's observable form; the ledger's vector gate resolves every id recorded here against vectors/**."
@@ -51,6 +52,34 @@
    "kind": "MUST",
    "note": "deferred: R2 \u2014 uncarried: `Contracts/Sasl.lean:75-90` states the position exactly and is the record this entry defers to: `Endpoint` has no field for which end opened the socket, the SASL role is *decided* by the announcement rather than negotiated against a transport role, and a peer cannot therefore be refused for announcing when it was the TCP client, which is what the correspondence forbids. The goal is stated there verbatim \u2014 an `Endpoint` carrying the transport role it was given, an environment assumption fixing it when the socket is opened, and a guard on the announcement \u2014 and R2 is the rung whose core is that endpoint, which is why the obligation is deferred there rather than to the layer that cannot express it. The register's `sasl-dialogue-condition` names this clause among the ones it touches, and what it decides is narrower than this deferral: the *condition* a wrong-role or wrong-phase SASL frame carries (`amqp:illegal-state`), not the correspondence between the SASL roles and the transport roles.",
    "text_sha256": "c1de522af7d32b9deba7035748d5192da90af58af5fa4b7e1ab3b518a5670b20"
+  },
+  "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl/type:sasl-init/field:mechanism.1": {
+   "clause_text": "If the selected mechanism is not supported by the receiving peer, it MUST close the connection with the authentication-failure close-code.",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.stepSaslFrame; test:sasl-init-mechanism-not-offered-from-a-list; test:sasl-init-without-mechanism",
+   "kind": "MUST",
+   "note": "A mechanism the receiver does not support is refused in the dialogue: the mechanismsKnown branch checks the init's mechanism against the announced list and refuses one that is not in it (lean/Spec/Connection.lean:1107-1125). Two things are recorded as readings rather than citations, and the vectors say so themselves: the clause names a close-code that has no value in the generated choice table (the note on `exchange-sasl-mechanism-not-offered`), so the condition the refusal carries is the field-value one; and the mandated *close* is the connection layer's placement, which this layer's refusal stands for. The two vectors cite the clause \u2014 the unoffered mechanism, and an init that carries no mechanism at all, which is a different failure and is refused as one.",
+   "text_sha256": "aa3cb9febbbd12fb06fa0733ee4bb84a73127760bf73b6e009ddc355eccdebe4"
+  },
+  "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl/type:sasl-init/field:mechanism.2": {
+   "clause_text": "Each peer MUST authenticate using the highest-level security profile it can handle from the list provided by the partner.",
+   "disposition": "deferred:S7-SASL",
+   "kind": "MUST",
+   "note": "deferred: S7-SASL \u2014 uncarried, and recorded as such by the layer's own contract: `Contracts/Sasl.lean:60-72` states the position in full \u2014 'each peer MUST authenticate using the highest-level security profile it can handle from the list provided by the partner' cannot be enforced because no security profile is defined anywhere in the pinned artifacts, and a table of profiles would make *our* table the source of a normative claim the artifact does not permit us to invent. What the layer enforces is the membership rule, that the init names one of the announced mechanisms; the preference rule is recorded there and pinned as a *freedom* by `sasl-mechanism-chosen-from-a-list`, which is why no `test:` value is claimed here \u2014 the vector witnesses the partner's latitude, not the preference this clause requires.",
+   "text_sha256": "b9a1aba2e8593308e84e11bd1a67d718e7bc0fce0d661e4b265d541b0fe7ca10"
+  },
+  "amqp-core-security-v1.0-os.xml#amqp:security/section:tls.1": {
+   "clause_text": "To establish a TLS session, each peer MUST start by sending a protocol header before commencing with TLS negotiation.",
+   "disposition": "environment:tls-boundary; formalized:SpecAMQP.Spec.Connection.stepHeader",
+   "kind": "MUST",
+   "note": "The TLS session is the opaque boundary the plan names as an environment assumption (PLAN.md \u00a73: 'No TLS, no TCP/IP, no crypto. Security-layer negotiation is specified; TLS, the byte stream, and mechanism-specific cryptography are environment assumptions'), so nothing in the tree establishes one, and the assumption is recorded under its own id. The half the model does carry is the order this sentence states: the protocol header is what fixes the layer, `stepHeader` decides it from the header's own protocol id and refuses a header naming another layer (lean/Spec/Connection.lean:1015-1050), so 'sending a protocol header before commencing' is a rule the connection layer enforces for every layer it speaks \u2014 the neighbouring unkeyed sentence of this anchor is recorded as `underspecified` in the register, which is where the TLS-specific readings live.",
+   "text_sha256": "270847748f29b70b53dd07e72dfb1ec3bce992f93c9ebf9c622f3e3f5ed6559c"
+  },
+  "amqp-core-security-v1.0-os.xml#amqp:security/section:tls.3": {
+   "clause_text": "The TLS client MUST validate the certificate presented by the TLS server.",
+   "disposition": "environment:tls-boundary",
+   "kind": "MUST",
+   "note": "The TLS client's validation of the server's certificate is inside the boundary PLAN.md \u00a73 declares as an environment assumption: certificate validation, the TLS session and its cryptography are the opaque part this specification does not model, so the assumption is recorded under its own id rather than the clause being called uncarried. What the boundary does *not* cover is the order `.tls.1` states before TLS begins, which the connection layer's header step carries.",
+   "text_sha256": "c5e97b6aac3b819e2bbd9e3f86e0df988396d2f437c085a936ac9d76240512c8"
   }
  },
  "schema_version": 1
