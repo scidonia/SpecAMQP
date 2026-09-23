@@ -1528,6 +1528,7 @@ lean/{Spec/,Ref/,Harness/,Impl/,Shell/,Generated/Oasis/,Contracts/,Proofs/,lakef
 vectors/{*,recorded/}
 tests/contracts/
 scripts/
+bench/{run.py,workloads.json,results/}
 ```
 
 Directories appear with their first real file: no empty scaffolding, no build caches, no generated file without its generator.

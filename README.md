@@ -27,6 +27,7 @@ with R3 as the proof still owed — and whose framing laws are proved. What it d
 | `ledger/` | the clause ledger, its coverage and reconciliation, the dispositions, and the **ambiguity register** — every place the standard is silent and a reading was taken |
 | `vectors/` | the specification test vectors: positive, negative and recorded third-party, each authored from clauses or recordings and **never produced by the executable specification** |
 | `tests/contracts/` | the gates: what makes the claims above checkable |
+| `bench/` | timing evidence for the corpus instruments — off-gate, never a gate, with the environment, the input digests and the per-run figures in `bench/results/`; the ratio it reports is what detects a complexity regression |
 | `PLAN.md` | the programme of record, including its own rules of evidence |
 
 ## Where an implementation fits
