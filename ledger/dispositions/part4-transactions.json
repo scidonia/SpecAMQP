@@ -22,7 +22,7 @@
    "clause_text": "If a transaction is discharged at a point where a message has been transactionally acquired, but has not been fully sent (i.e., the delivery of the message will require more than one «transfer» frame and at least one, but not all, such frames have been sent), then the resource MUST interpret this to mean that the fate of the acquisition is fully decided by the discharge.",
    "disposition": "deferred:S6",
    "kind": "MUST",
-   "note": "deferred: S6 — uncarried: the acquisition and its partial sending are not modelled. `Layer` holds txn-ids and nothing about acquisitions (lean/Spec/Transactions.lean:197-209), and XXX retires an id without consulting one. The session does hold a delivery across fragmented transfers (lean/Spec/Session.lean:464, :855-866), which is the shape the sentence is about, and nothing ties that delivery to a transaction — the same missing tie as `.1` and `.16`.",
+   "note": "deferred: S6 — uncarried: the acquisition and its partial sending are not modelled. `Layer` holds txn-ids and nothing about acquisitions (lean/Spec/Transactions.lean:197-209), and XXX retires an id without consulting one. The session does hold a delivery across fragmented transfers (lean/Spec/Session.lean:474, :855-866), which is the shape the sentence is about, and nothing ties that delivery to a transaction — the same missing tie as `.1` and `.16`.",
    "text_sha256": "50f5a3d083c8297ac024db1c35baf8ff327476713aaa8673aaff8c5b90468eef"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.12": {
@@ -71,7 +71,7 @@
    "clause_text": "After a successful discharge, the state of unsettled deliveries at the resource MUST reflect the outcome that was applied.",
    "disposition": "deferred:S6",
    "kind": "MUST",
-   "note": "deferred: S6 — uncarried: the resource holds no unsettled deliveries to reflect an outcome on. `Layer.retire` (lean/Spec/Transactions.lean:230-231) marks a transaction discharged and moves nothing else, and `Contracts/Settlement.lean`'s closing section records that the sender's unsettled map is not modelled — the session holds one delivery (lean/Spec/Session.lean:464). Near-miss: `Spec.Message.recordState` (lean/Spec/Message.lean:1013) applies an outcome to a delivery when the corpus asks it to, not when a discharge succeeds.",
+   "note": "deferred: S6 — uncarried: the resource holds no unsettled deliveries to reflect an outcome on. `Layer.retire` (lean/Spec/Transactions.lean:230-231) marks a transaction discharged and moves nothing else, and `Contracts/Settlement.lean`'s closing section records that the sender's unsettled map is not modelled — the session holds one delivery (lean/Spec/Session.lean:474). Near-miss: `Spec.Message.recordState` (lean/Spec/Message.lean:1013) applies an outcome to a delivery when the corpus asks it to, not when a discharge succeeds.",
    "text_sha256": "45cb9827f421dff1fc41d8c0fcc9cab0e6fa00f0cc730da0c0435ef20e7f2629"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.2": {
@@ -92,7 +92,7 @@
    "clause_text": "Note that if delivery is split across several «transfer» frames then all frames MUST be explicitly associated with the same transaction.",
    "disposition": "deferred:S6",
    "kind": "MUST",
-   "note": "deferred: S6 — uncarried: the same association as `.2`, one frame at a time. The fragmentation state this sentence needs exists — `Session.delivery` is held across a delivery's transfers (lean/Spec/Session.lean:464) — and `transferLink` compares the three identity fields a continuation may contradict (lean/Spec/Session.lean:855-866) while the delivery state, and with it the transaction, is compared nowhere. A continuation that changes or omits the transaction its earlier frames named is admitted.",
+   "note": "deferred: S6 — uncarried: the same association as `.2`, one frame at a time. The fragmentation state this sentence needs exists — `Session.delivery` is held across a delivery's transfers (lean/Spec/Session.lean:474) — and `transferLink` compares the three identity fields a continuation may contradict (lean/Spec/Session.lean:862-876) while the delivery state, and with it the transaction, is compared nowhere. A continuation that changes or omits the transaction its earlier frames named is admitted.",
    "text_sha256": "124522050efce6fbe424dabb6e6e7addf744881c18f684ba5023534195196dcd"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.4": {
@@ -106,28 +106,28 @@
    "clause_text": "On receiving a non-settled delivery associated with a live transaction, the transactional resource MUST inform the controller of the presumptive terminal outcome before it can successfully discharge the transaction.",
    "disposition": "deferred:S6",
    "kind": "MUST",
-   "note": "deferred: S6 — uncarried: the ordering the sentence states — the presumptive terminal outcome informed before the discharge can succeed — is enforced nowhere. `discharge` (lean/Spec/Transactions.lean:313) never asks whether an outcome was communicated, and `dispositionLink` (lean/Spec/Session.lean:968-1000) requires no prior disposition, because the session holds a delivery that belongs to a link and not to a transaction. Near-miss: `Spec.Message.applyState` (lean/Spec/Message.lean:1031) is how a state is applied to a delivery at a node — the vocabulary this sentence is written in, not the obligation it states.",
+   "note": "deferred: S6 — uncarried: the ordering the sentence states — the presumptive terminal outcome informed before the discharge can succeed — is enforced nowhere. `discharge` (lean/Spec/Transactions.lean:313) never asks whether an outcome was communicated, and `dispositionLink` (lean/Spec/Session.lean:985-1019) requires no prior disposition, because the session holds a delivery that belongs to a link and not to a transaction. Near-miss: `Spec.Message.applyState` (lean/Spec/Message.lean:1031) is how a state is applied to a delivery at a node — the vocabulary this sentence is written in, not the obligation it states.",
    "text_sha256": "7d411649479539fcd24af86ed74d1bf74b919d6d9dd5d6c5c8e77683ee049c3a"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.6": {
    "clause_text": "That is, the resource MUST send a «disposition» performative which covers the posted transfer with the state of the delivery being a «transactional-state» with the correct transaction identified, and a terminal outcome.",
    "disposition": "deferred:S6",
    "kind": "MUST",
-   "note": "deferred: S6 — uncarried: the performative `.5` obliges the resource to send, and no declaration requires a sender to send one. The reading half is present — `Spec.Message.deliveryStateOfValue` (lean/Spec/Message.lean:940) recognises a `transactional-state` as a state a disposition may carry, and `Spec.Session.stepTransactionState` (lean/Spec/Session.lean:1055) routes a disposition's state to the transaction layer — but the model never builds a frame from an obligation; the corpus supplies every frame, which is the same gap `connections.5`'s entry beside `deferred:S4` records for the close frame.",
+   "note": "deferred: S6 — uncarried: the performative `.5` obliges the resource to send, and no declaration requires a sender to send one. The reading half is present — `Spec.Message.deliveryStateOfValue` (lean/Spec/Message.lean:940) recognises a `transactional-state` as a state a disposition may carry, and `Spec.Session.stepTransactionState` (lean/Spec/Session.lean:1072) routes a disposition's state to the transaction layer — but the model never builds a frame from an obligation; the corpus supplies every frame, which is the same gap `connections.5`'s entry beside `deferred:S4` records for the close frame.",
    "text_sha256": "63244955265768b7be7d039f98f0654dab05967d1ab149b7cce1fe7c4961407a"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.7": {
    "clause_text": "However, the delivery MUST NOT be associated with a different non-discharged transaction than the outcome.",
    "disposition": "deferred:S6",
    "kind": "MUST NOT",
-   "note": "deferred: S6 — uncarried: a MUST NOT over an association the model does not make. Neither the held transaction nor the held delivery carries the other's id — `Layer` holds transactions, the next id and capability lists (lean/Spec/Transactions.lean:197-209) and `Session` holds one delivery (lean/Spec/Session.lean:464) — so the prohibited pair cannot be formed and no comparison could detect it. The model's only liveness question is `Layer.live` (lean/Spec/Transactions.lean:216-217), which asks whether an id is still in use rather than which delivery an outcome belongs to.",
+   "note": "deferred: S6 — uncarried: a MUST NOT over an association the model does not make. Neither the held transaction nor the held delivery carries the other's id — `Layer` holds transactions, the next id and capability lists (lean/Spec/Transactions.lean:197-209) and `Session` holds one delivery (lean/Spec/Session.lean:474) — so the prohibited pair cannot be formed and no comparison could detect it. The model's only liveness question is `Layer.live` (lean/Spec/Transactions.lean:216-217), which asks whether an id is still in use rather than which delivery an outcome belongs to.",
    "text_sha256": "de481c15dc949fe565f7723678cf2ff0de1497e0aaf7b98b466f25060b6016f0"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.8": {
    "clause_text": "If this happens then the control link MUST be terminated with a «transaction-rollback» error.",
    "disposition": "deferred:S6",
    "kind": "MUST",
-   "note": "deferred: S6 — uncarried: the termination `.7`'s violation would mandate. The violation cannot be detected (see `.7`), and the control link's only mandated termination is the rollback of the transactions it created — `Layer.retireAll` (lean/Spec/Transactions.lean:237-238), reached through `Session.afterLinkRelease` (lean/Spec/Session.lean:589-590) — which retires ids rather than refusing the frame that broke the rule. The condition is named as the `transaction-error` family, and no member of it names this cause.",
+   "note": "deferred: S6 — uncarried: the termination `.7`'s violation would mandate. The violation cannot be detected (see `.7`), and the control link's only mandated termination is the rollback of the transactions it created — `Layer.retireAll` (lean/Spec/Transactions.lean:237-238), reached through `Session.afterLinkRelease` (lean/Spec/Session.lean:599) — which retires ids rather than refusing the frame that broke the rule. The condition is named as the `transaction-error` family, and no member of it names this cause.",
    "text_sha256": "f0fd2828322a7f166e997794c145a1696a1581be4ae8351c924c6822a28c058f"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.9": {

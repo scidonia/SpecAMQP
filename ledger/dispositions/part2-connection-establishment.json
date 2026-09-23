@@ -52,7 +52,7 @@
    "clause_text": "A peer MUST not use channel numbers outside the range that its partner can handle.",
    "disposition": "formalized:SpecAMQP.Spec.Connection.stepAmqpFrame; formalized:SpecAMQP.Spec.Connection.limitsFor; test:exchange-pipelined-channel-limit",
    "kind": "MUST",
-   "note": "A channel above the partner's bound is refused in `stepAmqpFrame` (`refuseUnless (channel \u2264 limits.channelMax)`, lean/Spec/Connection.lean:1234-1237), against the limits in force for the direction the frame travels \u2014 `limitsFor` (lean/Spec/Connection.lean:980) chooses the partner's declared limit for a send and this peer's for a receive. The artifact writes 'MUST not' here (lowercase not); the register's reading of it is unchanged by this repair.",
+   "note": "A channel above the partner's bound is refused in `stepAmqpFrame` (`refuseUnless (channel \u2264 limits.channelMax)`, lean/Spec/Connection.lean:1232-1234), against the limits in force for the direction the frame travels \u2014 `limitsFor` (lean/Spec/Connection.lean:980) chooses the partner's declared limit for a send and this peer's for a receive. The artifact writes 'MUST not' here (lowercase not); the register's reading of it is unchanged by this repair.",
    "text_sha256": "c7674d7c23f3de3d292f4fdaefb3d523666307e9e8ff2a1377e5caf7e2a7a6da"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:channel-max.2": {
@@ -185,7 +185,7 @@
    "clause_text": "A single connection MAY have multiple independent sessions active simultaneously, up to the negotiated channel limit.",
    "disposition": "formalized:SpecAMQP.Spec.Connection.stepAmqpFrame; formalized:SpecAMQP.Spec.Connection.minMaxFrameSize",
    "kind": "MAY",
-   "note": "Latitude that the channel machinery is what makes usable: a connection multiplexes sessions by channel, and the model's session layer is reached by channel \u2014 the dispatch in `step` routes every non-header submission by the channel it carries (lean/Spec/Connection.lean:1246-1270), and the channel bound the clause attaches is `stepAmqpFrame`'s (lean/Spec/Connection.lean:1234-1237) against `limitsFor`. The model holds one session endpoint, so 'up to the negotiated channel limit' is carried as the bound and not as a count of concurrent sessions, which is the model restriction the session layer's own documentation records.",
+   "note": "Latitude that the channel machinery is what makes usable: a connection multiplexes sessions by channel, and the model's session layer is reached by channel \u2014 the dispatch in `step` routes every non-header submission by the channel it carries (lean/Spec/Connection.lean:1246-1270), and the channel bound the clause attaches is `stepAmqpFrame`'s (lean/Spec/Connection.lean:1232-1234) against `limitsFor`. The model holds one session endpoint, so 'up to the negotiated channel limit' is carried as the bound and not as a count of concurrent sessions, which is the model restriction the session layer's own documentation records.",
    "text_sha256": "3ad2324126690f77cf30dea7b2b28afa2113ffb344c78d2dc71ebd43cdc61be3"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.1": {

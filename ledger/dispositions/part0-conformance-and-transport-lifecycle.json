@@ -9,7 +9,7 @@
   "test:": "A vector id whose expectation is the clause's only observable form."
  },
  "design_consequences": [
-  "A disposition can be overtaken while the pass runs: doc:doc-idle-time-out.7 was reported uncarried and written as `deferred:S4`, and by the time the entries landed the frame layer had a header-only case in both artefacts (lean/Spec/Frame.lean:264, lean/Ref/Frame.lean:213, with both connection dispatches answering it without moving the state) and vectors/frames.ndjson had `frame-decode-empty-frame` for it, so the entry names the carrier and the witness instead \u2014 the mapping is a snapshot, the tree is the record.",
+  "A disposition can be overtaken while the pass runs: doc:doc-idle-time-out.7 was reported uncarried and written as `deferred:S4`, and by the time the entries landed the frame layer had a header-only case in both artefacts (lean/Spec/Frame.lean:376, lean/Ref/Frame.lean:243, with both connection dispatches answering it without moving the state) and vectors/frames.ndjson had `frame-decode-empty-frame` for it, so the entry names the carrier and the witness instead \u2014 the mapping is a snapshot, the tree is the record.",
   "doc:session-flow-control.4 and .8 write remote-outgoing-window and nothing reads it in either artifact, so those MUSTs are carried by a declaration no test can pin; witnessing them is upstream work (something must consume the quantity), not a new vector.",
   "The ten uncarried Part 0 clauses are dispositioned informative rather than deferred because the interface that would carry them \u2014 PLAN.md \u00a710's Conformance.lean and its Conforms relation \u2014 is not in the tree; conformance.3 is the eleventh and has a real carrier.",
   "connections.11 and doc:doc-idle-time-out.9 reach channel 0 only by entailment through Limits.aPriori and limitsFor: open's channel rule is stated in stepAmqpFrame and close's is not, and ledger/ambiguities/channel-zero-layering.json is the only place the close half is written down."
@@ -180,14 +180,14 @@
    "clause_text": "If a session is locally initiated, the remote-channel MUST NOT be set.",
    "disposition": "formalized:SpecAMQP.Spec.Session.stepBegin",
    "kind": "MUST NOT",
-   "note": "A locally initiated begin that sets remote-channel is refused with amqp:invalid-field; no vector pins that refusal, and the Ref twin states the same rule at lean/Ref/Session.lean:673-677.",
+   "note": "A locally initiated begin that sets remote-channel is refused with amqp:invalid-field; no vector pins that refusal, and the Ref twin states the same rule at lean/Ref/Session.lean:811-814.",
    "text_sha256": "7fe29468c62bc3d38d18ed30536d51a57933a8303fa9a7d3fc600372c7e87d3d"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:begin/field:remote-channel.2": {
    "clause_text": "When an endpoint responds to a remotely initiated session, the remote-channel MUST be set to the channel on which the remote session sent the begin.",
    "disposition": "formalized:SpecAMQP.Spec.Session.stepBegin; test:exchange-session-begin-remotely-initiated",
    "kind": "MUST",
-   "note": "The answering begin must set remote-channel to the channel the remote session sent its begin on, refused when it is empty or names another channel (lean/Spec/Session.lean:940-942); the vector pins the conforming case with remote-channel 1.",
+   "note": "The answering begin must set remote-channel to the channel the remote session sent its begin on, refused when it is empty or names another channel (lean/Spec/Session.lean:1110-1115); the vector pins the conforming case with remote-channel 1.",
    "text_sha256": "09cd4c5372d9ade38adba1e25e14fd576a6a070c509d3839a9ee3c4a2c4d378e"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions.1": {
@@ -215,7 +215,7 @@
    "clause_text": "The remote-channel field of a \u00abbegin\u00bb frame MUST be empty for a locally initiated session, and MUST be set when announcing the endpoint created as a result of a remotely initiated session.",
    "disposition": "formalized:SpecAMQP.Spec.Session.stepBegin; test:exchange-session-begin-remotely-initiated",
    "kind": "MUST",
-   "note": "The set-half of the same sentence: the answering begin must carry the channel the remote begin arrived on, refused when empty or naming another channel (lean/Spec/Session.lean:940-942), and the vector pins the conforming case.",
+   "note": "The set-half of the same sentence: the answering begin must carry the channel the remote begin arrived on, refused when empty or naming another channel (lean/Spec/Session.lean:1110-1115), and the vector pins the conforming case.",
    "text_sha256": "233e06906c527ac2aa7a00d66ea58d93fcd99b11ec5bbb02ad6681b0f207c206"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions.5": {
@@ -243,7 +243,7 @@
    "clause_text": "This value MUST be decremented after every incoming \u00abtransfer\u00bb frame is received, and recomputed when informed of the remote session endpoint state.",
    "disposition": "formalized:SpecAMQP.Spec.Session.Windows.afterReceivingFlow; invariant:SpecAMQP.Contracts.SessionWindows.receiving_flow_adopts_remote_outgoing_window",
    "kind": "MUST",
-   "note": "Computed but never read: remote-outgoing-window is written at lean/Spec/Session.lean:252, :284, :305 and :324 and read nowhere in either artifact, so a dropped decrement would change no verdict and no vector can witness the clause \u2014 the declaration is its only bearer. The `formalized:` referent named `afterReceivingTransfer`, which is the received-transfer constructor; the clause is about a received flow, so a reader following the reference reached the wrong site. Corrected here, and the clause now also carries the window contract's law, because nothing reads the quantity and a law is the only bearer left.",
+   "note": "Computed but never read: remote-outgoing-window is written at lean/Spec/Session.lean:255, :284, :305 and :324 and read nowhere in either artifact, so a dropped decrement would change no verdict and no vector can witness the clause \u2014 the declaration is its only bearer. The `formalized:` referent named `afterReceivingTransfer`, which is the received-transfer constructor; the clause is about a received flow, so a reader following the reference reached the wrong site. Corrected here, and the clause now also carries the window contract's law, because nothing reads the quantity and a law is the only bearer left.",
    "text_sha256": "64e06c5a37d96a4b248c9c4888ccf951b1ec9f40c1ee5d60f1f0c3e1ebf566e2"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions/doc:session-flow-control.7": {

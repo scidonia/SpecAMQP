@@ -445,7 +445,7 @@
    "clause_text": "It is invalid for this list to be null or empty.",
    "disposition": "formalized:SpecAMQP.Spec.Connection.stepSaslFrame",
    "kind": "UNKEYED",
-   "note": "The list is refused when it announces nothing: `stepSaslFrame`'s awaiting-mechanisms branch reads the announced symbols and refuses an empty list with `amqp:invalid-field` and the class `malformed`, quoting the artifact's own words that the list cannot be null or empty (lean/Spec/Connection.lean:1083-1089). The value previously read `Spec.Value.MultipleMandatory`, a declaration that was never written; the general rule it stood for is not carried either — see this batch's correction of `composite-type-representation.3` — so the entry now names the declaration that does carry the clause.",
+   "note": "The list is refused when it announces nothing: `stepSaslFrame`'s awaiting-mechanisms branch reads the announced symbols and refuses an empty list with `amqp:invalid-field` and the class `malformed`, quoting the artifact's own words that the list cannot be null or empty (lean/Spec/Connection.lean:1096-1098). The value previously read `Spec.Value.MultipleMandatory`, a declaration that was never written; the general rule it stood for is not carried either — see this batch's correction of `composite-type-representation.3` — so the entry now names the declaration that does carry the clause.",
    "text_sha256": "0f2e0b8b96e5844c0e7edc274e9400230aca239e3a4f00d40e47ad5a28f02e66",
    "unkeyed_phrases": [
     "is invalid"
