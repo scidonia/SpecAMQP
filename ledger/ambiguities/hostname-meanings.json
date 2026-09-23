@@ -1,0 +1,31 @@
+{
+ "adopted": "no obligation, both readings conformant",
+ "clauses": [
+  "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl/type:sasl-init/field:hostname.u2",
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:hostname.u2"
+ ],
+ "consequences": [
+  "The specification imposes no check on a second, differing hostname value, and the reference must not either: both readings are conformant, so a differential over the corpus would be measuring latitude rather than agreement.",
+  "No vector may assert either behaviour, and no property may be stated over the difference. The latitude is excluded deliberately here rather than discovered later as flakiness.",
+  "The two clauses are one question asked in two frames \u2014 the same sentence in the SASL and transport artifacts \u2014 which is why one entry serves both."
+ ],
+ "evidence": "Both clauses say in terms that it is *undefined* what a different value means, and the keyword-free vocabulary captured them by that phrase. An obligation the artifact declines to state cannot be enforced by a reading of it, so the decision is to enforce nothing and to keep the latitude out of the corpus.",
+ "id": "hostname-meanings",
+ "open": false,
+ "question": "What does a second hostname value, differing from one already specified, mean \u2014 and may anything depend on the answer?",
+ "readings": [
+  {
+   "name": "no obligation, both readings conformant",
+   "statement": "Adopted. The artifact declines to fix the meaning, so the codec imposes no check and no assertion may depend on one reading. The latitude is recorded here so that it is excluded from assertions deliberately rather than met later as flakiness."
+  },
+  {
+   "name": "the later hostname is authoritative",
+   "statement": "Rejected: nothing in either clause says so, and adopting it would put our reading where the artifact is silent \u2014 the same reason other entries in this register decline to invent a behaviour the artifact declines to state."
+  },
+  {
+   "name": "a differing value is refused",
+   "statement": "Rejected for the same reason, and with a sharper consequence: refusing would make the corpus assert a rule the standard explicitly leaves open, and every conforming implementation that accepted it would fail our vectors."
+  }
+ ],
+ "schema_version": 1
+}

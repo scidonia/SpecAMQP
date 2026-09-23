@@ -1,0 +1,30 @@
+{
+ "adopted": "no obligation either way",
+ "clauses": [
+  "amqp-core-security-v1.0-os.xml#amqp:security/section:tls.u1"
+ ],
+ "consequences": [
+  "A connection whose TLS hostname differs from the \u00absasl-init\u00bb or \u00abopen\u00bb hostname is neither permitted nor forbidden by the clause: it states the question and declines to answer it.",
+  "The model therefore imposes no check at the TLS boundary, and no vector may pin either outcome \u2014 an entry asserting one reading would assert something the artifact leaves open.",
+  "The consequence for the transport boundary matches the codec's: silence is recorded as latitude rather than read as permission."
+ ],
+ "evidence": "The clause says *it is undefined what happens* if the two hostnames differ, which is explicit silence rather than a gap. The keyword-free vocabulary captured it by that phrase, and the register's decision is to leave it unenforced.",
+ "id": "tls-hostname-mismatch",
+ "open": false,
+ "question": "What happens when a TLS connection's hostname differs from the hostname in the SASL exchange \u2014 and may the model depend on an answer?",
+ "readings": [
+  {
+   "name": "no obligation either way",
+   "statement": "Adopted. The clause asks the question and answers it with *undefined*, so neither behaviour is enforced and no assertion is admissible on either."
+  },
+  {
+   "name": "the TLS hostname must match",
+   "statement": "Rejected: requiring a match would enforce a rule the artifact declares undefined. It is the reading most likely to be assumed, which is why the entry exists."
+  },
+  {
+   "name": "a mismatch is refused at the transport boundary",
+   "statement": "Rejected: same reason, and it would put an invented condition on the wire where the standard has none."
+  }
+ ],
+ "schema_version": 1
+}
