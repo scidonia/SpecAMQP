@@ -497,4 +497,235 @@ theorem carrier_clause_uuid (fuel : Nat) (json : Json)
     subst hb
     exact ⟨.uuid bytes, rfl, by simp only [BodiesAgree]⟩
 
+/-! ## The signed clauses: a bound-checked read and a bitvector round trip -/
+
+/-- `n` read back from its `Int8` spelling, for `n` in range: the reference's carrier is width
+carrying where the specification's value is not. -/
+theorem i8_toInt (n : Int) (h₁ : -(2 ^ 7) ≤ n) (h₂ : n ≤ 2 ^ 7 - 1) :
+    (Int8.ofBitVec (BitVec.ofNat 8 (n % 256).toNat)).toInt = n := by
+  show (BitVec.ofNat 8 (n % 256).toNat).toInt = n
+  rw [BitVec.toInt_ofNat']
+  rw [Int.bmod_eq_iff (by decide : (0 : Nat) < 256)]
+  refine ⟨by omega, by omega, ?_⟩
+  have hnn : (0 : Int) ≤ n % 256 := Int.emod_nonneg n (by decide)
+  have hcast : (((n % 256).toNat : Nat) : Int) = n % 256 := Int.toNat_of_nonneg hnn
+  rw [hcast]
+  refine ⟨n / 256, ?_⟩
+  have hsplit : n % 256 + 256 * (n / 256) = n := Int.emod_add_mul_ediv n 256
+  omega
+
+theorem i16_toInt (n : Int) (h₁ : -(2 ^ 15) ≤ n) (h₂ : n ≤ 2 ^ 15 - 1) :
+    (Int16.ofBitVec (BitVec.ofNat 16 (n % 65536).toNat)).toInt = n := by
+  show (BitVec.ofNat 16 (n % 65536).toNat).toInt = n
+  rw [BitVec.toInt_ofNat']
+  rw [Int.bmod_eq_iff (by decide : (0 : Nat) < 65536)]
+  refine ⟨by omega, by omega, ?_⟩
+  have hnn : (0 : Int) ≤ n % 65536 := Int.emod_nonneg n (by decide)
+  have hcast : (((n % 65536).toNat : Nat) : Int) = n % 65536 := Int.toNat_of_nonneg hnn
+  rw [hcast]
+  refine ⟨n / 65536, ?_⟩
+  have hsplit : n % 65536 + 65536 * (n / 65536) = n := Int.emod_add_mul_ediv n 65536
+  omega
+
+theorem i32_toInt (n : Int) (h₁ : -(2 ^ 31) ≤ n) (h₂ : n ≤ 2 ^ 31 - 1) :
+    (Int32.ofBitVec (BitVec.ofNat 32 (n % 4294967296).toNat)).toInt = n := by
+  show (BitVec.ofNat 32 (n % 4294967296).toNat).toInt = n
+  rw [BitVec.toInt_ofNat']
+  rw [Int.bmod_eq_iff (by decide : (0 : Nat) < 4294967296)]
+  refine ⟨by omega, by omega, ?_⟩
+  have hnn : (0 : Int) ≤ n % 4294967296 := Int.emod_nonneg n (by decide)
+  have hcast : (((n % 4294967296).toNat : Nat) : Int) = n % 4294967296 :=
+    Int.toNat_of_nonneg hnn
+  rw [hcast]
+  refine ⟨n / 4294967296, ?_⟩
+  have hsplit : n % 4294967296 + 4294967296 * (n / 4294967296) = n :=
+    Int.emod_add_mul_ediv n 4294967296
+  omega
+
+theorem i64_toInt (n : Int) (h₁ : -(2 ^ 63) ≤ n) (h₂ : n ≤ 2 ^ 63 - 1) :
+    (Int64.ofBitVec (BitVec.ofNat 64 (n % 18446744073709551616).toNat)).toInt = n := by
+  show (BitVec.ofNat 64 (n % 18446744073709551616).toNat).toInt = n
+  rw [BitVec.toInt_ofNat']
+  rw [Int.bmod_eq_iff (by decide : (0 : Nat) < 18446744073709551616)]
+  refine ⟨by omega, by omega, ?_⟩
+  have hnn : (0 : Int) ≤ n % 18446744073709551616 := Int.emod_nonneg n (by decide)
+  have hcast : (((n % 18446744073709551616).toNat : Nat) : Int) = n % 18446744073709551616 :=
+    Int.toNat_of_nonneg hnn
+  rw [hcast]
+  refine ⟨n / 18446744073709551616, ?_⟩
+  have hsplit : n % 18446744073709551616 + 18446744073709551616 * (n / 18446744073709551616) = n :=
+    Int.emod_add_mul_ediv n 18446744073709551616
+  omega
+
+/-- The signed range the reference's `signedOf` enforces, read off its own success. -/
+theorem signedOf_range (json : Json) (width : Nat) (n : Int)
+    (h : SpecAMQP.Ref.Vectors.signedOf json width = .ok n) :
+    -((2 : Int) ^ (width - 1)) ≤ n ∧ n ≤ (2 : Int) ^ (width - 1) - 1 := by
+  unfold SpecAMQP.Ref.Vectors.signedOf at h
+  simp only [Bind.bind, Except.bind] at h
+  cases hv : json.getObjValAs? Int "value" with
+  | error err => simp [hv] at h
+  | ok v =>
+    simp only [hv] at h
+    split at h
+    · rename_i hcond
+      injection h with hb
+      subst hb
+      simp only [Bool.and_eq_true, decide_eq_true_eq] at hcond
+      exact hcond
+    · simp at h
+
+/-- A successful bounded read is a read of the same key giving the same value: the timestamp
+clause needs it, because the specification's reader does not range-check `"milliseconds"` where
+the reference's does. -/
+theorem boundedField_ok_getObjValAs (json : Json) (key : String) (lo hi n : Int)
+    (h : SpecAMQP.Ref.Vectors.boundedField json key lo hi = .ok n) :
+    json.getObjValAs? Int key = .ok n := by
+  unfold SpecAMQP.Ref.Vectors.boundedField at h
+  simp only [Bind.bind, Except.bind] at h
+  cases hv : json.getObjValAs? Int key with
+  | error err => simp [hv] at h
+  | ok v =>
+    simp only [hv] at h
+    split at h
+    · rename_i hcond
+      injection h with hb
+      subst hb
+      first | rfl | exact hv
+    · simp at h
+
+/-- The bounds a successful bounded read enforces. -/
+theorem boundedField_range (json : Json) (key : String) (lo hi n : Int)
+    (h : SpecAMQP.Ref.Vectors.boundedField json key lo hi = .ok n) : lo ≤ n ∧ n ≤ hi := by
+  unfold SpecAMQP.Ref.Vectors.boundedField at h
+  simp only [Bind.bind, Except.bind] at h
+  cases hv : json.getObjValAs? Int key with
+  | error err => simp [hv] at h
+  | ok v =>
+    simp only [hv] at h
+    split at h
+    · rename_i hcond
+      injection h with hb
+      subst hb
+      simp only [Bool.and_eq_true, decide_eq_true_eq] at hcond
+      exact hcond
+    · simp at h
+
+/-- **The `"byte"` clause.** One shared bound-checked read, and the reference's width-carrying
+carrier read back to the specification's `Int` through the bitvector round trip. -/
+theorem carrier_clause_byte (fuel : Nat) (json : Json)
+    (hk : json.getObjValAs? String "type" = .ok "byte") (other : SpecAMQP.Ref.Value)
+    (h : SpecAMQP.Ref.Vectors.valueOfJson (fuel + 1) json = .ok other) :
+    ∃ body : SpecAMQP.Spec.Codec.Value,
+      SpecAMQP.Spec.Codec.valueOfJson (fuel + 1) json = .ok body ∧ BodiesAgree body other := by
+  unfold SpecAMQP.Ref.Vectors.valueOfJson at h
+  unfold SpecAMQP.Spec.Codec.valueOfJson
+  simp only [Bind.bind, Except.bind] at h ⊢
+  simp only [hk] at h ⊢
+  rw [← signedOf_eq] at ⊢
+  cases hu : SpecAMQP.Ref.Vectors.signedOf json 8 with
+  | error err => simp [hu] at h
+  | ok n =>
+    simp only [hu] at h ⊢
+    injection h with hb
+    subst hb
+    have hrange := signedOf_range json 8 n hu
+    exact ⟨.byte n, rfl, by
+      simp only [BodiesAgree]
+      exact (i8_toInt n (by omega) (by omega)).symm⟩
+
+/-- **The `"short"` clause.** One shared bound-checked read, and the reference's width-carrying
+carrier read back to the specification's `Int` through the bitvector round trip. -/
+theorem carrier_clause_short (fuel : Nat) (json : Json)
+    (hk : json.getObjValAs? String "type" = .ok "short") (other : SpecAMQP.Ref.Value)
+    (h : SpecAMQP.Ref.Vectors.valueOfJson (fuel + 1) json = .ok other) :
+    ∃ body : SpecAMQP.Spec.Codec.Value,
+      SpecAMQP.Spec.Codec.valueOfJson (fuel + 1) json = .ok body ∧ BodiesAgree body other := by
+  unfold SpecAMQP.Ref.Vectors.valueOfJson at h
+  unfold SpecAMQP.Spec.Codec.valueOfJson
+  simp only [Bind.bind, Except.bind] at h ⊢
+  simp only [hk] at h ⊢
+  rw [← signedOf_eq] at ⊢
+  cases hu : SpecAMQP.Ref.Vectors.signedOf json 16 with
+  | error err => simp [hu] at h
+  | ok n =>
+    simp only [hu] at h ⊢
+    injection h with hb
+    subst hb
+    have hrange := signedOf_range json 16 n hu
+    exact ⟨.short n, rfl, by
+      simp only [BodiesAgree]
+      exact (i16_toInt n (by omega) (by omega)).symm⟩
+
+/-- **The `"int"` clause.** One shared bound-checked read, and the reference's width-carrying
+carrier read back to the specification's `Int` through the bitvector round trip. -/
+theorem carrier_clause_int (fuel : Nat) (json : Json)
+    (hk : json.getObjValAs? String "type" = .ok "int") (other : SpecAMQP.Ref.Value)
+    (h : SpecAMQP.Ref.Vectors.valueOfJson (fuel + 1) json = .ok other) :
+    ∃ body : SpecAMQP.Spec.Codec.Value,
+      SpecAMQP.Spec.Codec.valueOfJson (fuel + 1) json = .ok body ∧ BodiesAgree body other := by
+  unfold SpecAMQP.Ref.Vectors.valueOfJson at h
+  unfold SpecAMQP.Spec.Codec.valueOfJson
+  simp only [Bind.bind, Except.bind] at h ⊢
+  simp only [hk] at h ⊢
+  rw [← signedOf_eq] at ⊢
+  cases hu : SpecAMQP.Ref.Vectors.signedOf json 32 with
+  | error err => simp [hu] at h
+  | ok n =>
+    simp only [hu] at h ⊢
+    injection h with hb
+    subst hb
+    have hrange := signedOf_range json 32 n hu
+    exact ⟨.int n, rfl, by
+      simp only [BodiesAgree]
+      exact (i32_toInt n (by omega) (by omega)).symm⟩
+
+/-- **The `"long"` clause.** One shared bound-checked read, and the reference's width-carrying
+carrier read back to the specification's `Int` through the bitvector round trip. -/
+theorem carrier_clause_long (fuel : Nat) (json : Json)
+    (hk : json.getObjValAs? String "type" = .ok "long") (other : SpecAMQP.Ref.Value)
+    (h : SpecAMQP.Ref.Vectors.valueOfJson (fuel + 1) json = .ok other) :
+    ∃ body : SpecAMQP.Spec.Codec.Value,
+      SpecAMQP.Spec.Codec.valueOfJson (fuel + 1) json = .ok body ∧ BodiesAgree body other := by
+  unfold SpecAMQP.Ref.Vectors.valueOfJson at h
+  unfold SpecAMQP.Spec.Codec.valueOfJson
+  simp only [Bind.bind, Except.bind] at h ⊢
+  simp only [hk] at h ⊢
+  rw [← signedOf_eq] at ⊢
+  cases hu : SpecAMQP.Ref.Vectors.signedOf json 64 with
+  | error err => simp [hu] at h
+  | ok n =>
+    simp only [hu] at h ⊢
+    injection h with hb
+    subst hb
+    have hrange := signedOf_range json 64 n hu
+    exact ⟨.long n, rfl, by
+      simp only [BodiesAgree]
+      exact (i64_toInt n (by omega) (by omega)).symm⟩
+
+/-- **The `"timestamp"` clause.** The reference range-checks `"milliseconds"` where the
+specification reads it bare, so the clause carries the read agreement (`boundedField` reads the
+key it read) as well as the range and the round trip. -/
+theorem carrier_clause_timestamp (fuel : Nat) (json : Json)
+    (hk : json.getObjValAs? String "type" = .ok "timestamp") (other : SpecAMQP.Ref.Value)
+    (h : SpecAMQP.Ref.Vectors.valueOfJson (fuel + 1) json = .ok other) :
+    ∃ body : SpecAMQP.Spec.Codec.Value,
+      SpecAMQP.Spec.Codec.valueOfJson (fuel + 1) json = .ok body ∧ BodiesAgree body other := by
+  unfold SpecAMQP.Ref.Vectors.valueOfJson at h
+  unfold SpecAMQP.Spec.Codec.valueOfJson
+  simp only [Bind.bind, Except.bind] at h ⊢
+  simp only [hk] at h ⊢
+  cases hb : SpecAMQP.Ref.Vectors.boundedField json "milliseconds" (-(2 ^ 63)) (2 ^ 63 - 1) with
+  | error err => simp_all
+  | ok n =>
+    have hread : json.getObjValAs? Int "milliseconds" = .ok n :=
+      boundedField_ok_getObjValAs json "milliseconds" (-(2 ^ 63)) (2 ^ 63 - 1) n hb
+    simp only [hb, hread] at h ⊢
+    injection h with hb'
+    subst hb'
+    have hrange := boundedField_range json "milliseconds" (-(2 ^ 63)) (2 ^ 63 - 1) n hb
+    exact ⟨.timestamp n, rfl, by
+      simp only [BodiesAgree]
+      exact (i64_toInt n (by omega) (by omega)).symm⟩
+
 end SpecAMQP.Proofs
