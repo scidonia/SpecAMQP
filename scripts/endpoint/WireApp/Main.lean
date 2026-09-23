@@ -29,6 +29,13 @@ Two properties are deliberate and load-bearing:
 * **A state that matches no step sends nothing, and the differential reports that.** Silence here is a
   divergence with a name — "the vector expects the endpoint to write *n* octets and nothing arrived" — not
   a quiet success, which is why the observer is the differential rather than this module.
+* **It is asked only after a read, and that is the shell's loop rather than this application's choice.**
+  `Shell.Driver.pump` calls the application once per read, so a vector asking for two `send` steps in a
+  row — with nothing arriving between them — has its second send never prompted: the endpoint sits in the
+  state the first send left it in. Measured on `slice-open-missing-container-id` and
+  `slice-open-channel-max-wrong-type`, each at step 2. It is a property of the seam rather than a defect
+  in either artefact, and it becomes a finding the moment a corpus family needs two sends in a row —
+  which is why it is written here rather than left to be rediscovered.
 -/
 
 import Shell.Driver
