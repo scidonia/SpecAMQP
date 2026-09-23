@@ -2,7 +2,8 @@
  "conventions": {
   "deferred:": "A real obligation this plan carries later; the suffix names the milestone. Used for pictures whose content is normative but whose milestone has not run: the picture is reviewed now so that its exclusion or its deferral is a decision, and the disposition moves to a `formalized:` declaration when the milestone lands.",
   "formalized:": "A Lean declaration path that carries this picture's meaning (the same commitment form as for clauses).",
-  "informative": "The picture illustrates clauses that are formalized elsewhere, and adds no obligation of its own."
+  "informative": "The picture illustrates clauses that are formalized elsewhere, and adds no obligation of its own.",
+  "test:": "A vector id whose expectation is the picture's observable form: the worked examples carry exact octets, so the vectors that replay them are the witness, and every id recorded here is resolved against vectors/** by the same gate that resolves a clause's."
  },
  "dispositions": {
   "amqp-core-messaging-v1.0-os.xml#picture.4": {
@@ -99,30 +100,30 @@
   },
   "amqp-core-types-v1.0-os.xml#picture.1": {
    "clause_text": "[picture] Primitive Format Code (String): constructor untyped bytes | | +--+ +-----------------+-----------------+ | | | | ... 0xA1 0x1E \"Hello Glorious Messaging World\" ... | | | | | | | | utf8 byte...",
-   "disposition": "formalized:Spec.Value.Writer",
+   "disposition": "formalized:SpecAMQP.Spec.Codec.writeVariableData; test:str8-hello-encode; test:str8-hello-decode",
    "kind": "picture",
-   "note": "Worked example of the str8-utf8 encoding: 0xA1 0x1E followed by 30 octets. Every byte is exact, and the encoding is exercised by vector str8-hello.",
+   "note": "Worked example of the str8-utf8 encoding: 0xA1 0x1E followed by 30 octets, every byte exact. The writer is `writeVariableData` (lean/Spec/Codec.lean:771-785) \u2014 a size field of the subcategory width, then that many octets \u2014 and the reader's half is `readVariable` (`.7`); the three vectors pin the encoded octets, the round trip, and the refusal of a string whose octets run short. The two vector ids this note used to name (`str8-hello`, `described-url`) were never in the corpus, which no gate could see because a note's citations are resolved only when the note names a corpus file \u2014 they are recorded as `test:` values now, where the vector gate resolves them.",
    "text_sha256": "b4c8b5795fc08f7fcc8c4eed5eb115731393b77d402924190e17e775659f67e0"
   },
   "amqp-core-types-v1.0-os.xml#picture.18": {
    "clause_text": "[picture] Example Composite Type: <type class=\"composite\" name=\"book\" label=\"example composite type\"> <doc> <p>An example composite type.</p> </doc> <descriptor name=\"example:book:list\" code=...",
-   "disposition": "formalized:Spec.Value.CompositeType",
+   "disposition": "formalized:SpecAMQP.Spec.Message.fieldDeclsOf; formalized:SpecAMQP.Spec.Message.checkFieldList",
    "kind": "picture",
-   "note": "Worked example of a composite type definition: the book type in descriptor domain 0x00000003 with field multiplicities and a mandatory title. It is the model for how a described list maps onto declared fields.",
+   "note": "Worked example of a composite type definition: the book type in descriptor domain 0x00000003 with field multiplicities and a mandatory title. The declared fields come from the generated table through `fieldDeclsOf` (lean/Spec/Message.lean:269-271) and the rules a body must meet \u2014 mandatory present, no longer than the declaration, types as declared \u2014 are `checkFieldList` (lean/Spec/Message.lean:365-387), which is what makes this figure the model for how a described list maps onto declared fields.",
    "text_sha256": "6f82b0b098427cccc4b98bb35b8c24145fd2514fb8390685ffa809c4c4abd003"
   },
   "amqp-core-types-v1.0-os.xml#picture.19": {
    "clause_text": "[picture] Example Composite Value: constructor list representation of a book | | +-----------------+-------------------+ +-------------+---------------+ | | | | 0x00 0xA3 0x11 \"example:book:li...",
-   "disposition": "formalized:Spec.Value.CompositeValue",
+   "disposition": "formalized:SpecAMQP.Spec.Codec.readCompound; test:book-composite-decode; test:book-composite-encode; test:book-composite-wrong-size-rejected",
    "kind": "picture",
-   "note": "Worked example of a composite value, and the reference for the size field's scope: its list8 size 0x40 counts the count octet, the title, the authors array (39 octets on the wire) and the null isbn. Exercised by vectors book-composite-decode, book-composite-encode and book-composite-wrong-size-rejected.",
+   "note": "Worked example of a composite value, and the reference for the size field's scope: its list8 size 0x40 counts the count octet, the title, the authors array (39 octets on the wire) and the null isbn. That arithmetic is `readCompound`'s check (lean/Spec/Codec.lean:448-480), and the three vectors pin the decode, the encode and the refusal of a size that disagrees with the octets measured.",
    "text_sha256": "018b99a7a27a05ca75a066ef7e3fa959c1178dba0d5b56aa0ea0bb91be475648"
   },
   "amqp-core-types-v1.0-os.xml#picture.2": {
    "clause_text": "[picture] Described Format Code (URL): constructor untyped bytes | | +-----------+-----------+ +-----------------+-----------------+ | | | | ... 0x00 0xA1 0x03 \"URL\" 0xA1 0x1E \"http://example.org/...",
-   "disposition": "formalized:Spec.Value.Described",
+   "disposition": "formalized:SpecAMQP.Spec.Codec.readValue; test:described-url-decode; test:described-url-encode",
    "kind": "picture",
-   "note": "Worked example of a described value: 0x00, a str8 descriptor \"URL\", then the value. The picture states that a string-typed descriptor is reserved, which is why symbolic descriptors are the modelled case; exercised by vector described-url.",
+   "note": "Worked example of a described value: 0x00, a descriptor, then the value. That is `readValue`'s descriptor branch (lean/Spec/Codec.lean:425-435), which reads a value, then a value, and returns the pair as a described value; the picture's own claim \u2014 that a string-typed descriptor is reserved, which is why symbolic descriptors are the modelled case \u2014 is a statement about the artifact's descriptor domain rather than a rule this layer enforces, and the two vectors pin the described example in both directions.",
    "text_sha256": "45d67576a0d879fe73ebf49a8536b010156ed1bb2504746db525acb0d4b19898"
   },
   "amqp-core-types-v1.0-os.xml#picture.3": {
@@ -141,37 +142,37 @@
   },
   "amqp-core-types-v1.0-os.xml#picture.5": {
    "clause_text": "[picture] Subcategory Formats: Subcategory Category Format ============================================================================== 0x4 Fixed Width Zero octets of data. 0x5 Fixed Wid...",
-   "disposition": "formalized:Spec.Value.categoryWidths",
+   "disposition": "formalized:SpecAMQP.Spec.Value.Constructor; formalized:SpecAMQP.Spec.Value.classify",
    "kind": "picture",
-   "note": "The subcategory table: 0x4/0x5/0x6/0x7/0x8/0x9 are fixed widths of 0/1/2/4/8/16 octets, 0xA/0xB variable with one or four size octets, 0xC/0xD compound with one or four size and count octets, 0xE/0xF array with one or four size and count octets. This is the tabular source of the widths that `classify` assigns, and the widths agree numerically.",
+   "note": "The subcategory table: 0x4/0x5/0x6/0x7/0x8/0x9 are fixed widths of 0/1/2/4/8/16 octets, 0xA/0xB variable with one or four size octets, 0xC/0xD compound with one or four size and count octets, 0xE/0xF array with one or four size and count octets. The widths are the `width` each `Constructor` carries (lean/Spec/Value.lean:40-55) as `classify` assigns it (lean/Spec/Value.lean:56-72), and the generated corpus exercises them: the ubyte/byte/ushort family in vectors/generated.ndjson and the uint vectors in vectors/primitives.ndjson all cite this picture.",
    "text_sha256": "629884a2db5f66290dc052b11fb083aae2d04c90d315193661029bfd312ab7be"
   },
   "amqp-core-types-v1.0-os.xml#picture.6": {
    "clause_text": "[picture] Layout of Fixed Width Data Encodings: n OCTETs +----------+ | data | +----------+ Subcategory n ================= 0x4 0 0x5 1 0x6 2 0x7 4 0x8 8 0x9 16",
-   "disposition": "formalized:Spec.Value.FixedLayout",
+   "disposition": "formalized:SpecAMQP.Spec.Codec.readFixed",
    "kind": "picture",
-   "note": "Layout of fixed-width encodings: the constructor determines the data size, with no length field.",
+   "note": "Layout of fixed-width encodings: the constructor determines the data size, with no length field. `readFixed` (lean/Spec/Codec.lean:347-383) reads a value of the declared width and consumes nothing else, which is the sentence as code.",
    "text_sha256": "ecf99229787968ad229390143915c16447123b0a73d7cf32e887c0c33b3f212a"
   },
   "amqp-core-types-v1.0-os.xml#picture.7": {
    "clause_text": "[picture] Layout of Variable Width Data Encodings: n OCTETs size OCTETs +----------+-------------+ | size | value | +----------+-------------+ Subcategory n ================= 0xA 1 0xB 4",
-   "disposition": "formalized:Spec.Value.VariableLayout",
+   "disposition": "formalized:SpecAMQP.Spec.Codec.readVariable",
    "kind": "picture",
-   "note": "Layout of variable-width encodings: a size field of the subcategory width, then that many octets.",
+   "note": "Layout of variable-width encodings: a size field of the subcategory width, then that many octets. `readVariable` (lean/Spec/Codec.lean:384-397) reads the size at the declared width and then that many octets, and the width itself is `classify`'s (`.5`).",
    "text_sha256": "1b805cdc9ebcac1bab881081d5797ecee3618d132ede6638791c35c9c7482be2"
   },
   "amqp-core-types-v1.0-os.xml#picture.8": {
    "clause_text": "[picture] Layout of Compound Data Encodings: +----------= count items =----------+ | | n OCTETs n OCTETs | | +----------+----------+--------------+------------+-------+ | size | count | ... /| item |\\ ....",
-   "disposition": "formalized:Spec.Value.CompoundLayout",
+   "disposition": "formalized:SpecAMQP.Spec.Codec.readCompound",
    "kind": "picture",
-   "note": "Layout of compound encodings: size, count, then count constructed items. The scope of the size field is decided in ledger/ambiguities/compound-size-field.json.",
+   "note": "Layout of compound encodings: size, count, then count constructed items. `readCompound` (lean/Spec/Codec.lean:448-480) reads the size, then the count, then the items, and checks the size against the octets it measured; the scope of the size field is decided in ledger/ambiguities/compound-size-field.json, which this picture is the source for.",
    "text_sha256": "5268f8d82ade3d7c2b122ee20674a935b6d483e77fb81fd5a762a5425ffe9a86"
   },
   "amqp-core-types-v1.0-os.xml#picture.9": {
    "clause_text": "[picture] Layout of Array Encodings: +--= count elements =--+ | | n OCTETs n OCTETs | | +----------+----------+---------------------+-------+------+-------+ | size | count | element-constructor ...",
-   "disposition": "formalized:Spec.Value.ArrayLayout",
+   "disposition": "formalized:SpecAMQP.Spec.Codec.readArrayData",
    "kind": "picture",
-   "note": "Layout of array encodings: size, count, one element constructor, then the elements in that constructor's form. This figure is the arithmetic check that fixes the size field's scope.",
+   "note": "Layout of array encodings: size, count, one element constructor, then the elements in that constructor's form. `readArrayData` (lean/Spec/Codec.lean:481-500) reads exactly that, checks the declared size against the octets measured, and bounds the count by `arrayElementLimit` because a zero-width element constructor leaves the count bounded by nothing in the data; this figure is the arithmetic check that fixes the size field's scope.",
    "text_sha256": "837570b7af3b199888d2c3d4baec9c47cbe79879ad8925c60db4c984d478ab01"
   }
  },

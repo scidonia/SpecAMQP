@@ -279,6 +279,12 @@ LEAN_DECLARATION_PATTERN = re.compile(
 )
 LEAN_CONSTRUCTOR_PATTERN = re.compile(r"^\s*\|\s*([A-Za-z_][\w.']*)")
 LEAN_NAMESPACE_PATTERN = re.compile(r"^\s*namespace\s+([A-Za-z_][\w.']*)")
+# `mutual ... end` is a block, and its `end` closes that block rather than whatever
+# encloses it. Read as a frame of its own because the alternative is not a cosmetic
+# error: without it the `end` pops the namespace, and every declaration after the
+# module's first `mutual` block is registered under a bare name — so the gate would
+# reject the correct qualified path and accept a name that resolves to nothing.
+LEAN_MUTUAL_PATTERN = re.compile(r"^\s*mutual\s*$")
 LEAN_SECTION_PATTERN = re.compile(r"^\s*section(?:\s+([A-Za-z_][\w.']*))?\s*$")
 LEAN_END_PATTERN = re.compile(r"^\s*end(?:\s+([A-Za-z_][\w.']*))?\s*(?:--.*)?$")
 
@@ -1011,6 +1017,9 @@ def lean_declarations(root: Path) -> dict[Path, set[str]]:
             if section:
                 stack.append(("section", [section.group(1)] if section.group(1) else []))
                 continue
+            if LEAN_MUTUAL_PATTERN.match(code):
+                stack.append(("mutual", []))
+                continue
             end = LEAN_END_PATTERN.match(code)
             if end:
                 closing = end.group(1)
@@ -1081,8 +1090,11 @@ def unresolved_declaration(
         return None
     return (
         f"names no declaration under {root.name}/**: no def, theorem, structure, "
-        "inductive or constructor declares it — correct the path, or declare the "
-        "file's formalized: values commitments in its conventions block"
+        "inductive or constructor declares it — correct the path to the declaration that "
+        "carries the clause, or record the clause as deferred with the gap named. A "
+        "conventions block declaring its values promises does not exempt this one: the "
+        "exemption reaches a module the plan names and the tree lacks, and this module is "
+        "not both"
     )
 
 
@@ -1098,47 +1110,164 @@ def formalized_conventions(directory: Path) -> dict[str, str]:
     return statements
 
 
+# The plan's own record of the modules it promises. `planned_modules` reads every
+# module path PLAN.md writes down: the §9 architecture block names the S0-era set, and
+# the milestone amendments name the modules that replaced them. The exemption's second
+# half is read from this, so a module nobody planned cannot be promised.
+PLAN_MODULE_PATTERN = re.compile(
+    r"(?:lean/)?((?:Spec|Ref|Harness|Impl|Shell|Contracts|Proofs|Generated)/[\w.-]+\.lean)"
+)
+
+
+def planned_modules(root: Path) -> set[str]:
+    """The module paths the plan names, relative to `lean/`, read as the tree it is.
+
+    The plan writes its architecture as a tree — a directory line (`lean/Spec/`) and
+    then a bare `Name.lean` per module — and elsewhere as a path. Both are read, the
+    bare form bound to the directory line above it, because a reader of that block
+    takes `Endpoint.lean` to mean `lean/Spec/Endpoint.lean`; a reader that ignored the
+    block would find no module planned at all and would resolve every promise in the
+    ledger against a tree those names do not occur in.
+    """
+    plan = root / "PLAN.md"
+    if not plan.is_file():
+        return set()
+    named: set[str] = set()
+    directory = ""
+    fenced = False
+    for line in plan.read_text(encoding="utf-8").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            fenced = not fenced
+            directory = ""
+            continue
+        if not fenced:
+            named.update(match.group(1).removeprefix("lean/") for match in PLAN_MODULE_PATTERN.finditer(line))
+            continue
+        header = re.fullmatch(r"(?:lean/)?([A-Za-z0-9_./-]+)/", stripped)
+        if header is not None:
+            directory = header.group(1)
+            continue
+        entry = re.match(r"([A-Za-z][\w]*\.lean)\b", stripped)
+        if entry is not None:
+            named.add(f"{directory}/{entry.group(1)}" if directory else entry.group(1))
+    return named
+
+
+def existing_modules(lean_root: Path) -> set[str]:
+    """The module paths the tree holds, relative to `lean/`."""
+    return {
+        path.relative_to(lean_root).as_posix()
+        for path in sorted(lean_root.rglob("*.lean"))
+        if ".lake" not in path.parts
+    }
+
+
+def module_of_value(value: str, existing: set[str], planned: set[str]) -> tuple[str, str]:
+    """The module a `formalized:` value names, and which record names it.
+
+    Returns `(module, record)` where the record is `tree`, `plan` or `none`. A
+    module-spelled value (`lean/Spec/Session.lean#step`) carries its module in the path.
+    A dotted one is read against the records, longest candidate first: the segments
+    before the declaration, taken as module paths from the longest down, so
+    `Spec.Value.MapOrdering` names `Spec/Value.lean` and
+    `SpecAMQP.Spec.Transactions.Layer.retireAll` names `Spec/Transactions.lean` even
+    though `Layer` is a namespace inside it. A value whose segments name nothing in
+    either record is reported as `none` — the honest answer for a path like
+    `SpecAMQP.Contracts.<name>`, where the spelling names a namespace rather than the
+    module that holds the declaration. Both records are read because both are records:
+    the tree says what exists to resolve against, the plan says what was promised
+    before it did.
+    """
+    match = LEAN_MODULE_PATTERN.match(value)
+    if match is not None:
+        module = match.group(1).removeprefix("lean/")
+        record = "tree" if module in existing else ("plan" if module in planned else "none")
+        return module, record
+    segments = value.split(".")
+    if len(segments) > 1 and segments[0] == "SpecAMQP":
+        segments = segments[1:]
+    candidates = ["/".join(segments[:index]) + ".lean" for index in range(len(segments) - 1, 0, -1)]
+    for module in candidates:
+        if module in existing:
+            return module, "tree"
+    for module in candidates:
+        if module in planned:
+            return module, "plan"
+    return (candidates[0] if candidates else f"{value}.lean"), "none"
+
+
 def formalized_claims(
-    dispositions: dict[str, dict], directory: Path
+    dispositions: dict[str, dict], directory: Path, root: Path
 ) -> list[tuple[str, str, str, str]]:
     """Every `formalized:` claim, with the standing its own file gives it.
 
-    Returns `(standing, file, ref, value)`. The standing is read from the file's own
-    conventions block: `commitment` when it declares the values promises the plan
-    lands later (nothing in the tree to resolve against), `present` when it documents
-    the vocabulary without such a declaration — that is the existence claim this gate
-    resolves — and `undeclared` when the file carries `formalized:` values while
-    documenting no `formalized:` convention at all, which the check output reports by
-    name rather than assuming either way.
+    Returns `(standing, file, ref, value)`. The standings are `present` when a file
+    documents the vocabulary without declaring its values promises, `undeclared` when
+    it carries `formalized:` values while documenting no convention at all — which the
+    check output reports by name rather than assuming either way — and, for a file that
+    does declare its values promises, three standings the two records below decide
+    between: `commitment` (exempt), `demoted` (the exemption no longer applies, so the
+    value is resolved like any other) and `unplanned` (a promise no record names,
+    resolved because resolving it is the only way to find out whether it means
+    anything).
+
+    **The exemption is scoped by the record rather than by the word.** A conventions
+    block declares its values promises the plan lands later, and the justification is
+    in its own parenthesis: nothing in the tree to resolve against. That is checkable,
+    so it is checked. A value is exempt only while the module it names is absent from
+    the tree, and only if the plan names that module. A module the tree holds means
+    there *is* something to resolve against, and the value must resolve like any other
+    — a declaration that module never declared is a false claim however the file's
+    conventions read, which is the shape this rule was written after finding: a
+    disposition whose note asserted a picture's rule was carried by
+    `formalized:Spec.Message.resumedTransfer`, a declaration no commit ever created,
+    exempt because its file's conventions used the word.
+
+    What the scope does not reach is stated rather than implied: a module the plan
+    names and the tree lacks is still exempt, because a planned module has no
+    declaration yet by definition — so a value whose module was planned under one name
+    and built under another stays exempt until the plan's own record is corrected.
     """
     conventions = formalized_conventions(directory)
+    plan = planned_modules(root)
+    existing = existing_modules(root / "lean")
     claims: list[tuple[str, str, str, str]] = []
     for ref, entry in sorted(dispositions.items()):
         declared = conventions.get(entry["file"], "")
-        if any(marker in declared for marker in FORWARD_COMMITMENT_MARKERS):
-            standing = "commitment"
-        elif declared:
-            standing = "present"
-        else:
-            standing = "undeclared"
+        promises = any(marker in declared for marker in FORWARD_COMMITMENT_MARKERS)
         for value in disposition_values(entry, FORMALIZED_PREFIX):
+            module, record = module_of_value(value, existing, plan)
+            if not declared:
+                standing = "undeclared"
+            elif not promises:
+                standing = "present"
+            elif record == "tree":
+                standing = "demoted"
+            elif record == "plan":
+                standing = "commitment"
+            else:
+                standing = "unplanned"
             claims.append((standing, entry["file"], ref, value))
     return claims
 
 
 def formalized_census(
-    dispositions: dict[str, dict], directory: Path
-) -> tuple[int, int, dict[str, int]]:
+    dispositions: dict[str, dict], directory: Path, root: Path
+) -> tuple[int, int, dict[str, int], int, int]:
     """What the gate resolves, what the record exempts, and what declares nothing.
 
-    Returns `(checked, commitments, undeclared)`: the number of values the gate
-    resolves, the number exempt as commitments, and the count per file of values in a
-    file that documents no `formalized:` convention. A commitment is a property of the
-    claim rather than of the file it sits in, so the declaration counts wherever the
-    value is written. The counts are printed by `check`, because an exemption nobody
-    can see is the failure this file exists to remove.
+    Returns `(checked, commitments, undeclared, demoted, unplanned)`: the number of
+    values the gate resolves, the number still exempt as commitments, the count per
+    file of values in a file that documents no `formalized:` convention, the number
+    whose exemption was withdrawn because the module they name is in the tree, and the
+    number that name a module no record names. A commitment is a property of the claim
+    rather than of the file it sits in, so the declaration counts wherever the value is
+    written. The counts are printed by `check`, because an exemption nobody can see is
+    the failure this file exists to remove — and an exemption with a scope nobody can
+    see is the same failure one level out.
     """
-    claims = formalized_claims(dispositions, directory)
+    claims = formalized_claims(dispositions, directory, root)
     committed = {value for standing, _, _, value in claims if standing == "commitment"}
     checked = sum(
         1
@@ -1150,11 +1279,13 @@ def formalized_census(
     for standing, file, _, value in claims:
         if standing == "undeclared":
             undeclared[file] = undeclared.get(file, 0) + 1
-    return checked, commitments, undeclared
+    demoted = sum(1 for standing, _, _, value in claims if standing == "demoted")
+    unplanned = sum(1 for standing, _, _, value in claims if standing == "unplanned")
+    return checked, commitments, undeclared, demoted, unplanned
 
 
 def check_resolves(
-    dispositions: dict[str, dict], directory: Path, lean_root: Path, required: bool
+    dispositions: dict[str, dict], directory: Path, root: Path, required: bool
 ) -> list[str]:
     """Every `formalized:` value declared present must name a declaration that exists.
 
@@ -1166,11 +1297,12 @@ def check_resolves(
     """
     if not required:
         return []
+    lean_root = root / "lean"
     if not lean_root.is_dir():
         return [f"{lean_root}: the module tree every formalized: value claims is missing"]
     modules = lean_declarations(lean_root)
     declared = set().union(*modules.values()) if modules else set()
-    claims = formalized_claims(dispositions, directory)
+    claims = formalized_claims(dispositions, directory, root)
     committed = {value for standing, _, _, value in claims if standing == "commitment"}
     problems: list[str] = []
     for standing, file, ref, value in claims:
@@ -1217,6 +1349,7 @@ def check_carries(dispositions: dict[str, dict], vectors_dir: Path, required: bo
 
 CORPUS_REFERENCE_PATTERN = re.compile(r"vectors/[\w./-]+\.ndjson")
 BACKTICKED_TOKEN_PATTERN = re.compile(r"`([^`]+)`")
+WORD_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_']*")
 
 # The words a note may quote as vocabulary rather than as a name. The prefixes are the
 # disposition values' own forms — `deferred:S4` names a milestone, `test:` is a prefix
@@ -1282,7 +1415,29 @@ def corpus_named_strings(root: Path) -> list[tuple[str, str]]:
     ]
 
 
-def check_note_names(root: Path, vectors_dir: Path, report: dict) -> list[str]:
+def lean_words(root: Path) -> set[str]:
+    """Every whole word under `lean/**`: the vocabulary a note may quote as a name.
+
+    A note discussing the code it is about names things that no corpus holds and no disposition
+    defines: `position.deliveryCount` is a field of `position`, `hdrExch` is a constructor, and a
+    check that knows only corpus ids and ledger names reports the repository's own identifiers as
+    broken citations — 34 of them when this was measured, every one a false positive.
+
+    The vocabulary is therefore read from the tree rather than listed, and the last dotted segment of
+    a token is what gets looked up, so a qualified name resolves by the name it ends in. The build
+    directory is skipped exactly as `lean_declarations` skips it, and it matters more here than there:
+    a dependency's words would resolve anything, because `resumedTransfer` and `hdrExch` alike would
+    have a namesake in mathlib.
+    """
+    words: set[str] = set()
+    for path in sorted(root.rglob("*.lean")):
+        if ".lake" in path.parts:
+            continue
+        words.update(WORD_PATTERN.findall(path.read_text(encoding="utf-8")))
+    return words
+
+
+def check_note_names(root: Path, vectors_dir: Path, lean_root: Path, report: dict) -> list[str]:
     """Every vector a ledger note names must be a vector that exists.
 
     A note is evidence, and evidence that names an artifact is only evidence if the
@@ -1304,6 +1459,14 @@ def check_note_names(root: Path, vectors_dir: Path, report: dict) -> list[str]:
     *not* re-validated here: that value's own check owns it, and duplicating the rule
     would give a rename two places to fail.
 
+    A note may also quote the repository's own vocabulary, which is not a citation failure but the
+    opposite: the vocabulary is every whole word under `lean/**`, and a token resolves when its last
+    dotted segment is one of them, so `position.deliveryCount` is read as the field it names. A token
+    beginning with a dot is a fragment of an id the note is discussing, and is not a name at all.
+    Measured against the ledger as it stood, the literal reading flagged 34 tokens of this shape, every
+    one a false positive; the vocabulary rule drops all of them and keeps the catch this check exists
+    for — `Spec.Message.resumedTransfer` resolves nowhere, because that declaration was never created.
+
     Unlike the existence gates, this one is not restricted to the repository's ledger: it
     compares a ledger's prose with a corpus on disk, and both are readable from a fixture
     directory, so a planted note in a fixture exercises it. That is deliberate — a check
@@ -1316,6 +1479,7 @@ def check_note_names(root: Path, vectors_dir: Path, report: dict) -> list[str]:
     register = root / "ambiguities"
     if register.is_dir():
         known.update(path.stem for path in register.glob("*.json"))
+    vocabulary = lean_words(lean_root)
 
     problems: list[str] = []
     for where, text in corpus_named_strings(root):
@@ -1327,6 +1491,10 @@ def check_note_names(root: Path, vectors_dir: Path, report: dict) -> list[str]:
             # which is worse than no check: the failure is real and it points at the wrong thing.
             if any(c.isspace() for c in token):
                 continue
+            # A token that begins with a dot is a *fragment* — `.3`, `.1` — the tail of a clause id the
+            # note is discussing, not a name in its own right.
+            if token.startswith("."):
+                continue
             if CORPUS_REFERENCE_PATTERN.fullmatch(token):
                 continue  # a corpus named in backticks is a file, not a vector
             if token in known or token in LEDGER_VOCABULARY:
@@ -1334,6 +1502,12 @@ def check_note_names(root: Path, vectors_dir: Path, report: dict) -> list[str]:
             if any(token.startswith(prefix) for prefix in DISPOSITION_PREFIXES):
                 continue
             if any(token in corpora.get(name, set()) for name in named):
+                continue
+            # The vocabulary a note may quote is the repository's own, and the last dotted segment is
+            # the name: `position.deliveryCount` is a field of `position`, which the Lean tree declares.
+            # This is what keeps the check's real catch while dropping its false ones — a note citing
+            # `Spec.Message.resumedTransfer` still fails, because that declaration is nowhere in the tree.
+            if token.rsplit(".", 1)[-1] in vocabulary:
                 continue
             problems.append(
                 f"{where}: names {', '.join(sorted(named))} but cites {token!r}, which is "
@@ -1479,16 +1653,14 @@ def command_check(args: argparse.Namespace) -> int:
     repository_dispositions = (repository / "ledger" / "dispositions").resolve()
     dispositions_required = Path(args.dispositions).resolve() == repository_dispositions
     problems.extend(
-        check_resolves(
-            dispositions, Path(args.dispositions), repository / "lean", dispositions_required
-        )
+        check_resolves(dispositions, Path(args.dispositions), repository, dispositions_required)
     )
     problems.extend(check_carries(dispositions, repository / "vectors", dispositions_required))
     # The note check compares the ledger's prose with the corpus on disk, and both are
     # readable from any ledger directory, so it is deliberately not restricted to the
     # repository's own ledger: a planted note in a fixture exercises it, which is what
     # keeps a name-resolving check from only ever seeing the passing direction.
-    problems.extend(check_note_names(Path(args.out), repository / "vectors", report))
+    problems.extend(check_note_names(Path(args.out), repository / "vectors", repository / "lean", report))
 
     for name, entry in sorted(report["per_artifact"].items()):
         audit = entry["audit"]
@@ -1511,11 +1683,23 @@ def command_check(args: argparse.Namespace) -> int:
         for anchor, refs in list(summary["must_class_undispositioned_by_anchor"].items())[:12]:
             print(f"  {len(refs):>3}  {anchor}")
     if dispositions_required:
-        checked, commitments, undeclared = formalized_census(dispositions, Path(args.dispositions))
+        checked, commitments, undeclared, demoted, unplanned = formalized_census(
+            dispositions, Path(args.dispositions), repository
+        )
         print(
             f"formalized: {checked} checked against lean/**, "
             f"{commitments} forward commitment(s) exempt by the record"
         )
+        if demoted:
+            print(
+                f"formalized: {demoted} value(s) whose module the tree holds: the exemption "
+                "no longer reaches them, and they are resolved above"
+            )
+        if unplanned:
+            print(
+                f"formalized: {unplanned} value(s) name a module no record names: resolved, "
+                "not exempt"
+            )
         for name, count in sorted(undeclared.items()):
             print(
                 f"formalized: {name}: {count} value(s) in a file documenting no "

@@ -443,9 +443,9 @@
   },
   "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl/type:sasl-mechanisms/field:sasl-server-mechanisms.u1": {
    "clause_text": "It is invalid for this list to be null or empty.",
-   "disposition": "formalized:Spec.Value.MultipleMandatory",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.stepSaslFrame",
    "kind": "UNKEYED",
-   "note": "Not a specifier: this sentence is an instance of Part 1's multiple-and-mandatory rule, which `Spec.Value.MultipleMandatory` is owed by the S1 value laws and will carry. The field is declared multiple=\"true\" mandatory=\"true\" in the artifact, so the generated field table holds the obligation and this sentence adds no separate check. Verified against the artifact's field element.",
+   "note": "The list is refused when it announces nothing: `stepSaslFrame`'s awaiting-mechanisms branch reads the announced symbols and refuses an empty list with `amqp:invalid-field` and the class `malformed`, quoting the artifact's own words that the list cannot be null or empty (lean/Spec/Connection.lean:1083-1089). The value previously read `Spec.Value.MultipleMandatory`, a declaration that was never written; the general rule it stood for is not carried either \u2014 see this batch's correction of `composite-type-representation.3` \u2014 so the entry now names the declaration that does carry the clause.",
    "text_sha256": "0f2e0b8b96e5844c0e7edc274e9400230aca239e3a4f00d40e47ad5a28f02e66",
    "unkeyed_phrases": [
     "is invalid"
@@ -470,9 +470,9 @@
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:coordination/type:discharge/field:fail.u1": {
    "clause_text": "If the transaction is a local transaction, then this flag controls whether the transaction is committed or aborted when it is discharged.",
-   "disposition": "formalized:SpecAMQP.Spec.Transactions",
+   "disposition": "formalized:SpecAMQP.Spec.Transactions.discharge",
    "kind": "UNKEYED",
-   "note": "The discharge machine reads this flag and decides committed against aborted; the module is the carrier and a symbol will name it when the machine is next touched.",
+   "note": "The discharge machine reads this flag and decides committed against aborted: a discharge whose flag is set retires the id without consulting liveness, and one without it refuses an id that is not live (lean/Spec/Transactions.lean:313-324). The value named the module rather than a declaration in it, which no gate can resolve; it now names the one that reads the flag.",
    "text_sha256": "9738e9dfd0270813f81f0a062e8b2c1794c0a5a0a4290384788b762a22cfb5a2"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:coordination/type:transaction-error/choice:transaction-rollback.u1": {
@@ -1292,9 +1292,9 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions/doc:session-flow-control.u1": {
    "clause_text": "If the next-incoming-id field of the \u00abflow\u00bb frame is not set, then remote-incoming-window is computed as follows:",
-   "disposition": "formalized:SpecAMQP.Contracts.SessionWindows.receiving_flow_computes_remote_incoming_window",
+   "disposition": "formalized:SpecAMQP.Contracts.receiving_flow_computes_remote_incoming_window",
    "kind": "UNKEYED",
-   "note": "The unset branch of the remote-incoming-window formula, which the window contract states as a law over the constructor that computes it. Carried as a law rather than as a rule: the declaration is a theorem over the constructor that computes the window, because nothing in the arithmetic can be witnessed by a vector.",
+   "note": "The unset branch of the remote-incoming-window formula, stated as a theorem over the constructor that computes the window so the two cannot drift (lean/Contracts/FlowControl.lean:97-102). The value named `SpecAMQP.Contracts.SessionWindows.receiving_flow_computes_remote_incoming_window`; that module was replaced by `FlowControl.lean`, whose own header records the replacement and why a corrected claim replaces the one it corrects (lean/Contracts/FlowControl.lean:5-9), so the path is corrected to the declaration that exists.",
    "text_sha256": "faf73e651b78f5e317dad39d734d89330569575da0b8539d15e3cf053a24bb68"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.u1": {
