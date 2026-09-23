@@ -238,7 +238,8 @@ note "no sorry, admit, native_decide, partial, axiom, constant, opaque, unsafe o
     Contracts.FrameCodecAcceptance Contracts.TypeSystem Proofs.CodecFrameLaws \
     Proofs.CodecRoundTrip Proofs.CodecRoundTripCompound Proofs.CodecRoundTripDescribed \
     Proofs.CodecRoundTripNarrowest Proofs.CodecRoundTripVariable Spec.ReadLaws Spec.Message \
-    Contracts.SaslAcceptance Proofs.SaslDialogue Contracts.FrameConformance ) >"$tmp/axiombuild.log" 2>&1 ||
+    Contracts.SaslAcceptance Proofs.SaslDialogue Contracts.FrameConformance \
+    Contracts.ConnectionConformance Proofs.ConnectionConformance ) >"$tmp/axiombuild.log" 2>&1 ||
   die "building the modules the axiom probe reads failed: $(tail -3 "$tmp/axiombuild.log")"
 
 cat >"$tmp/Axioms.lean" <<'AXIOMS'
@@ -253,6 +254,7 @@ import Proofs.CodecRoundTripNarrowest
 import Proofs.CodecRoundTripVariable
 import Spec.ReadLaws
 import Contracts.FrameConformance
+import Contracts.ConnectionConformance
 import Contracts.SaslAcceptance
 import Proofs.SaslDialogue
 
@@ -324,6 +326,13 @@ import Spec.Message
 #print axioms SpecAMQP.Proofs.only_an_ok_outcome_establishes_the_layer
 #print axioms SpecAMQP.Proofs.dialogue_state_initial
 #print axioms SpecAMQP.Proofs.dialogue_state_step
+-- The connection layer's instance, and the acceptance that binds it: the first instance above the
+-- frame layer, so its inventory is asked alongside the other two rather than folded into them.
+#print axioms SpecAMQP.Contracts.connection_conformance_public
+#print axioms SpecAMQP.Proofs.ref_connection_conforms
+#print axioms SpecAMQP.Proofs.ref_connection_conforms_existential
+#print axioms SpecAMQP.Proofs.stepAgrees
+#print axioms SpecAMQP.Proofs.arriving_matched
 #print axioms SpecAMQP.Proofs.lengthPrefixed_ok
 #print axioms SpecAMQP.Proofs.takeBe_beOctets
 #print axioms SpecAMQP.Spec.ReadLaws.extract_toList_eq_drop_take

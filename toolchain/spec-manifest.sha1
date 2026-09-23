@@ -12,6 +12,7 @@ d196467009441b90ba700953415355a5ee002a0a  lean/Spec/Frame.lean
 d4de8144b2390024ff98ef4bb5a6ddc34ad5d2d4  lean/Spec/Value.lean
 f5eabce0d6dcbec66bdaf79152a0b5a0e171c12d  lean/Contracts/Codec.lean
 cb61d366aa72347b772dd32399e4e0dfe8a04a42  lean/Contracts/Conformance.lean
+3991f01e4ed79499e9a9a39de90747cc160abfd4  lean/Contracts/ConnectionConformance.lean
 75e98c72e8d523cfc61503f709736ec8872b2bf8  lean/Contracts/ConnectionLifecycle.lean
 4ac495317e0ba4e7ebfcc9a39843204b98427f77  lean/Contracts/FlowControl.lean
 ac372f4848586250e81968f3ead62410d598b57c  lean/Contracts/FrameCodec.lean
