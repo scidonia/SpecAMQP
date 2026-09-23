@@ -1219,6 +1219,126 @@ def check_carries(dispositions: dict[str, dict], vectors_dir: Path, required: bo
     return problems
 
 
+CORPUS_REFERENCE_PATTERN = re.compile(r"vectors/[\w./-]+\.ndjson")
+BACKTICKED_TOKEN_PATTERN = re.compile(r"`([^`]+)`")
+
+# The words a note may quote as vocabulary rather than as a name. The prefixes are the
+# disposition values' own forms — `deferred:S4` names a milestone, `test:` is a prefix
+# quoted for what it is — and `informative` is the one value with no prefix. A token
+# that resolves against these is read as vocabulary and not as a cited vector.
+LEDGER_VOCABULARY = (*DISPOSITION_PREFIXES, "informative")
+
+
+def ledger_strings(root: Path):
+    """Every string in every JSON document under `root`, with file and JSON path.
+
+    The ledger's documents have several shapes — a list of clauses, a mapping of refs, a
+    document with a file-level conventions block — and the record that started this check
+    lived in two of them at once: a per-clause `note` and a file-level
+    `design_consequences`. Walking the documents rather than a schema is what lets the
+    check see all of a ledger's prose, and the trail it carries is what a report quotes.
+    """
+    for path in sorted(root.rglob("*.json")):
+        try:
+            document = json.loads(path.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            continue  # a malformed file is another check's problem
+
+        def walk(node, trail: tuple[str, ...]):
+            if isinstance(node, str):
+                yield trail, node
+            elif isinstance(node, list):
+                for index, item in enumerate(node):
+                    yield from walk(item, (*trail, str(index)))
+            elif isinstance(node, dict):
+                for key, item in node.items():
+                    yield from walk(item, (*trail, str(key)))
+
+        for trail, text in walk(document, (str(path),)):
+            yield "/".join(trail), text
+
+
+def corpus_ids(vectors_dir: Path) -> dict[str, set[str]]:
+    """Every vector id, by the corpus file that holds it, for every corpus under the tree.
+
+    This is deliberately wider than `vector_ids`, which reads the top level alone: a note
+    may name a corpus in a subdirectory, and a check that cannot see those would report a
+    correct note as citing something absent.
+    """
+    corpora: dict[str, set[str]] = {}
+    for path in sorted(vectors_dir.rglob("*.ndjson")):
+        relative = str(path.relative_to(vectors_dir.parent))
+        corpora[relative] = {
+            json.loads(line).get("vector")
+            for line in path.read_text(encoding="utf-8").splitlines()
+            if line.strip()
+        }
+    return corpora
+
+
+def corpus_named_strings(root: Path) -> list[tuple[str, str]]:
+    """Every ledger string that names a corpus file, with where it sits."""
+    return [
+        (where, text)
+        for where, text in ledger_strings(root)
+        if CORPUS_REFERENCE_PATTERN.search(text)
+    ]
+
+
+def check_note_names(root: Path, vectors_dir: Path, report: dict) -> list[str]:
+    """Every vector a ledger note names must be a vector that exists.
+
+    A note is evidence, and evidence that names an artifact is only evidence if the
+    artifact is there: a disposition saying two vectors carry a clause is read by whoever
+    audits that clause, and if the ids do not exist they find nothing while the note still
+    reads as a witness. `check_carries` resolves the `test:` a disposition *claims*; the
+    citation gate resolves the clauses a *vector* cites; this is the third direction — what
+    a note says beside a corpus — and it was invisible until a disposition named two ids
+    that had never existed, in prose, where no check was reading.
+
+    The rule is not "anything vector-shaped", because that would guess at the boundary and
+    fail on the ledger's own vocabulary. A backticked token is resolved against the
+    namespaces that are already here: the ids of the corpus the note names, the ledger's
+    clause and picture refs, the ambiguity register's ids, and the disposition values'
+    forms. Measured against the ledger as it stood, the literal reading — every token must
+    be an id in the named corpus — flagged `test:` and `deferred:S4`, both vocabulary, and
+    nothing else; resolving them as vocabulary is what fixed this shape, and a note that
+    cites a clause or quotes a value form is read as what it is. A `test:<id>` token is
+    *not* re-validated here: that value's own check owns it, and duplicating the rule
+    would give a rename two places to fail.
+
+    Unlike the existence gates, this one is not restricted to the repository's ledger: it
+    compares a ledger's prose with a corpus on disk, and both are readable from a fixture
+    directory, so a planted note in a fixture exercises it. That is deliberate — a check
+    that can only ever see the passing direction is the failure this repository keeps
+    finding.
+    """
+    corpora = corpus_ids(vectors_dir)
+    known = {clause["ref"] for clause in report["clauses"]}
+    known.update(picture["ref"] for picture in report.get("pictures", []))
+    register = root / "ambiguities"
+    if register.is_dir():
+        known.update(path.stem for path in register.glob("*.json"))
+
+    problems: list[str] = []
+    for where, text in corpus_named_strings(root):
+        named = set(CORPUS_REFERENCE_PATTERN.findall(text))
+        for token in BACKTICKED_TOKEN_PATTERN.findall(text):
+            if CORPUS_REFERENCE_PATTERN.fullmatch(token):
+                continue  # a corpus named in backticks is a file, not a vector
+            if token in known or token in LEDGER_VOCABULARY:
+                continue
+            if any(token.startswith(prefix) for prefix in DISPOSITION_PREFIXES):
+                continue
+            if any(token in corpora.get(name, set()) for name in named):
+                continue
+            problems.append(
+                f"{where}: names {', '.join(sorted(named))} but cites {token!r}, which is "
+                f"no vector id in it and no name this ledger defines"
+            )
+    return problems
+
+
 def check_ambiguities(report: dict, dispositions: dict[str, dict], path: Path) -> list[str]:
     """Validate the ambiguity register against the ledger it cites.
 
@@ -1361,6 +1481,11 @@ def command_check(args: argparse.Namespace) -> int:
         )
     )
     problems.extend(check_carries(dispositions, repository / "vectors", dispositions_required))
+    # The note check compares the ledger's prose with the corpus on disk, and both are
+    # readable from any ledger directory, so it is deliberately not restricted to the
+    # repository's own ledger: a planted note in a fixture exercises it, which is what
+    # keeps a name-resolving check from only ever seeing the passing direction.
+    problems.extend(check_note_names(Path(args.out), repository / "vectors", report))
 
     for name, entry in sorted(report["per_artifact"].items()):
         audit = entry["audit"]
@@ -1395,6 +1520,19 @@ def command_check(args: argparse.Namespace) -> int:
             )
         tests = sum(len(disposition_values(entry, TEST_PREFIX)) for entry in dispositions.values())
         print(f"test: {tests} vector id(s) checked against vectors/*.ndjson")
+        named = corpus_named_strings(Path(args.out))
+        tokens = sum(
+            len([
+                token
+                for token in BACKTICKED_TOKEN_PATTERN.findall(text)
+                if not CORPUS_REFERENCE_PATTERN.fullmatch(token)
+            ])
+            for _, text in named
+        )
+        print(
+            f"notes: {len(named)} ledger string(s) name a corpus, {tokens} backticked "
+            f"token(s) besides the paths resolved in them"
+        )
 
     if problems:
         print("")
