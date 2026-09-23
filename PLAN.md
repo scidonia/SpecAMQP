@@ -1607,6 +1607,13 @@ the peer's own `SPECAMQP_WIRE_COALESCE=1`. **A control chosen by reasoning about
 pre-fix runs that made the mechanism visible: at `read-octets=8` the refused challenge was attempted five times, at 4096 twice, and with the peer's steps 2 and 3 in one `sendall` the refusals land
 after the second `took HDR_EXCH` rather than before it. That is the flap the review predicted, measured rather than argued — and the same runs are what refuted the control I had endorsed.
 
+**And a generated artefact and its generator have to land together or neither.** The rule sounds obvious and it failed twice in one hour in opposite directions: first the regenerated
+`ledger/clauses.json` lagged the renderer that produced it, which the manifest caught as a mover; then the renderer itself lagged the ledger it produces, which **nothing** would have caught —
+ClauseRender reported its slice complete without a commit id, its outputs were committed, and HEAD held the *old* tool beside the *new* record. The consequence is not cosmetic and the check is
+not hypothetical: running HEAD's tool against HEAD's ledger reproduced `check FAILED: 18 problem(s)`, so a clean checkout would have failed its own gate while every working tree looked green.
+**The working tree is the one place the inconsistency is invisible**, because there the pair is whole; both times the defect was in what a *checkout* would do rather than in what the tree did. It is
+worth naming as the third face of a rule this plan already carries twice — a generated table must equal what its generator produces, and a check that can read the generator should — because neither of
+those says anything about *when* the two land.
 ## 17. Verification gates and their negative controls
 
 | Gate | Mechanism | Negative control |
