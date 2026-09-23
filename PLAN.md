@@ -729,9 +729,19 @@ over a 26-octet alphabet, and up to length 6 over a 12-octet alphabet chosen for
 for every success, in the body view. That is the target's own evidence that the bound is the true statement at the fuel the contract uses, and the two pieces of evidence do different jobs: the witness
 says the law as written was *false*, the differential says the law as fixed is the one this contract *needed*.
 
-**What remains is mapped by cost, which is what makes the next sitting mechanical.** Twenty-three arms are cheap — the remaining zero-width and width-one rows, the unsigned and opaque widths, and six
-variable rows needing only a one-directional success-and-class bridge of the same shape the corpus side already uses — and seven are signed, each needing a `signedOfOctets` round trip for which
-`Proofs/ValueCarrierAgreement` already holds `i8_toInt`…`i64_toInt`. Then three loop relations, the `split at H` dispatch, the `Nat.rec` induction and an entry point the slice reports as free.
+**What remains is mapped by cost, which is what makes the next sitting mechanical — and the map was acted on.** The cheap group is **twenty-four** rows, not the twenty-three this section first
+said: the union it enumerated double-counted `0x52`/`0x53` and never mentioned `0x56`, and the slice that implemented it landed the list rather than the numeral and reported the discrepancy instead of
+resolving it silently. Those twenty-four and the seven signed rows are now **proved — 34 of 40 arms** — with the sign extension needing `Proofs.ValueCarrierAgreement`'s `i32_toInt`/`i64_toInt`, a
+dependency the plan anticipated in substance but not in form. What is owed is one coherent unit rather than a list: the **six recursive arms** (`0xC0`, `0xC1`, `0xD0`, `0xD1`, `0xE0`, `0xF0`), the
+**three loop relations** they share, the `split at H` dispatch, the `Nat.rec` induction and the entry point. The slice stopped at the arm boundary rather than landing the loop relations unattached,
+on the ground that a relation with no arm using it is a declaration with no caller.
+
+**And the arms proved a shape lesson worth carrying rather than rediscovering.** Two iterations were lost in one sitting to the same fact: **state a lemma at the shape the consumer has, not one step away
+from it.** The two text families' bridge had to be stated at the *reader* level rather than as a step, because a step agreement hands its intermediate back as a component of a pair and re-pairing that
+component produces a term equal to the reader's own only through `>>=`'s associativity — which is not a definitional equality, so no hypothesis can be checked against it. And the step stems take their
+arguments as (steps, values, shapes, relations) rather than the obvious (step, relation, shapes), because a relation hypothesis whose right-hand side mentions the inner step through a projection cannot
+be used to *infer* that step: it is not a higher-order pattern, so the shape has to be given first. Both are the same rule from different sides, and the module now records them where the next reader will
+meet them.
 
 ## 11. Specification test vectors
 
