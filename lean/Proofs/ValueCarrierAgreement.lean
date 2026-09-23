@@ -8,8 +8,8 @@ open Lean (Json)
 
 `FrameSendConformance.ValueCarrierAgree` is the value layer's claim in the corpus vocabulary: a
 value the reference's carrier reads is one the specification's also reads, and the two readings
-agree as values. This module is its proof, one clause at a time, and it is **in progress**: twenty-
-four of the twenty-five clauses are proved, in six families —
+agree as values. This module is its proof, one clause at a time: **all twenty-five clauses are
+proved**, in seven families —
 
 * the structured scalars `null`, `boolean`, `string`, `symbol`;
 * the octet payloads `binary`, `float`, `double`, `decimal32`, `decimal64`, `decimal128`, `uuid`;
@@ -18,9 +18,10 @@ four of the twenty-five clauses are proved, in six families —
 * the compounds `list`, `array` and `described`, which take the claim one fuel down as a parameter;
 * `char`, whose two readers do not share an accessor, and which is put back on one value by the JSON
   bridge below;
+* `map`, whose reference reads the same array one step less far, and which `mapM_getArr?_collapse`
+  brings back into the specification's two-stage shape.
 
-and the remaining one is `map`, blocked on a JSON-layer bridge of its own named at the end of this
-header rather than on any AMQP content.
+What remains is the join described below, not a clause.
 The route to each is named at the end of this header. What is *not* yet done is the join: the
 statement is at fuel 64 (`Ref.Vectors.valueOfJson 64 json = .ok other → ∃ body, …`), while every
 clause here is at `valueOfJson (fuel + 1)` with the discriminant as a hypothesis, so discharging it
@@ -1322,5 +1323,174 @@ theorem carrier_clause_char (fuel : Nat) (json : Json)
     exact ⟨.char n.toNat, rfl, by
       simp only [BodiesAgree]
       exact (u32_toNat n.toNat (by omega)).symm⟩
+
+/-- The three `Except` laws the core does not carry, which the collapse needs. -/
+theorem Except.pure_bind' {α β : Type} (x : α) (f : α → Except String β) :
+    ((pure x : Except String α) >>= f) = f x := rfl
+
+/-- The same law in the `.ok` spelling the `do` blocks elaborate to. -/
+theorem Except.ok_bind' {α β : Type} (x : α) (f : α → Except String β) :
+    ((Except.ok x : Except String α) >>= f) = f x := rfl
+
+/-- The reference's pair body after the collapse: the parsed pair, read as two values. -/
+def refPairBody (fuel : Nat) (pair : Array Json) :
+    Except String (SpecAMQP.Ref.Value × SpecAMQP.Ref.Value) := do
+  match Array.toList pair with
+  | [key, value] => do
+    let key' ← SpecAMQP.Ref.Vectors.valueOfJson fuel key
+    let value' ← SpecAMQP.Ref.Vectors.valueOfJson fuel value
+    return (key', value')
+  | _ => .error "a map pair is exactly two values"
+
+/-- The specification's split of a parsed pair into its two values. -/
+def specPairSplit (pair : Array Json) : Except String (Json × Json) :=
+  match Array.toList pair with
+  | [key, value] => .ok (key, value)
+  | _ => .error "a map pair is two values"
+
+/-- The specification's read of a split pair, one stage. -/
+def specPairRead (fuel : Nat) (kv : Json × Json) :
+    Except String (SpecAMQP.Spec.Codec.Value × SpecAMQP.Spec.Codec.Value) := do
+  let key' ← SpecAMQP.Spec.Codec.valueOfJson fuel kv.1
+  let value' ← SpecAMQP.Spec.Codec.valueOfJson fuel kv.2
+  return (key', value')
+
+/-- **The first stage, extracted from the reference's read**: a successful reference read of the
+parsed pairs splits them the specification's way, with the same key and value JSON for each pair. -/
+theorem split_of_refPairs (fuel : Nat) :
+    ∀ (pairs : List (Array Json)) (others : List (SpecAMQP.Ref.Value × SpecAMQP.Ref.Value)),
+      pairs.mapM (refPairBody fuel) = .ok others →
+      ∃ kvs : List (Json × Json),
+        pairs.mapM specPairSplit = .ok kvs ∧
+        kvs.mapM (fun kv => do
+          let key' ← SpecAMQP.Ref.Vectors.valueOfJson fuel kv.1
+          let value' ← SpecAMQP.Ref.Vectors.valueOfJson fuel kv.2
+          return (key', value')) = .ok others := by
+  intro pairs
+  induction pairs with
+  | nil =>
+    intro others h
+    simp only [List.mapM_nil] at h
+    injection h with hb
+    subst hb
+    exact ⟨[], rfl, rfl⟩
+  | cons pair rest ihrest =>
+    intro others h
+    simp only [List.mapM_cons] at h
+    rw [Except.bind_ok_iff] at h
+    obtain ⟨other, hbody, htail⟩ := h
+    obtain ⟨key, value, key', value', hpl, hkey, hvalue, hother⟩ :=
+      pairBody_decomp fuel pair other hbody
+    subst hother
+    rw [Except.bind_ok_iff] at htail
+    obtain ⟨others', hmap, hend⟩ := htail
+    injection hend with hothers
+    subst hothers
+    obtain ⟨kvs', hsplit', hreads'⟩ := ihrest others' hmap
+    refine ⟨(key, value) :: kvs', ?_, ?_⟩
+    · simp only [specPairSplit, hpl, List.mapM_cons, hsplit']
+      rfl
+    · simp only [List.mapM_cons, hkey, hvalue, hreads']
+      rfl
+
+/-- **The second stage**: reading the split pairs on both sides, with the item-level agreement from
+the fuel beneath. -/
+theorem reads_of_splits (fuel : Nat) (ih : ValueCarrierAgrees fuel) :
+    ∀ (kvs : List (Json × Json)) (others : List (SpecAMQP.Ref.Value × SpecAMQP.Ref.Value)),
+      kvs.mapM (fun kv => do
+        let key' ← SpecAMQP.Ref.Vectors.valueOfJson fuel kv.1
+        let value' ← SpecAMQP.Ref.Vectors.valueOfJson fuel kv.2
+        return (key', value')) = .ok others →
+      ∃ bodies : List (SpecAMQP.Spec.Codec.Value × SpecAMQP.Spec.Codec.Value),
+        kvs.mapM (specPairRead fuel) = .ok bodies ∧ BodiesAgreePairs bodies others := by
+  intro kvs
+  induction kvs with
+  | nil =>
+    intro others h
+    simp only [List.mapM_nil] at h
+    injection h with hb
+    subst hb
+    exact ⟨[], rfl, by simp only [BodiesAgreePairs]⟩
+  | cons kv rest ihrest =>
+    intro others h
+    simp only [List.mapM_cons] at h
+    rw [Except.bind_ok_iff] at h
+    obtain ⟨other, hbody, htail⟩ := h
+    rw [Except.bind_ok_iff] at hbody
+    obtain ⟨key', hkey, hbody2⟩ := hbody
+    rw [Except.bind_ok_iff] at hbody2
+    obtain ⟨value', hvalue, hend⟩ := hbody2
+    injection hend with hother
+    subst hother
+    rw [Except.bind_ok_iff] at htail
+    obtain ⟨others', hmap, hend'⟩ := htail
+    injection hend' with hothers
+    subst hothers
+    obtain ⟨bodies', hbodies', hlist'⟩ := ihrest others' hmap
+    obtain ⟨bodyKey, hbodyKey, hagreeKey⟩ := ih kv.1 key' hkey
+    obtain ⟨bodyValue, hbodyValue, hagreeValue⟩ := ih kv.2 value' hvalue
+    have hhead : specPairRead fuel kv = .ok (bodyKey, bodyValue) := by
+      unfold specPairRead
+      simp only [Bind.bind, Except.bind, hbodyKey, hbodyValue]
+      rfl
+    refine ⟨(bodyKey, bodyValue) :: bodies', ?_, ?_⟩
+    · simp only [List.mapM_cons]
+      rw [hhead, Except.ok_bind', hbodies', Except.ok_bind']
+      rfl
+    · simp only [BodiesAgreePairs]
+      exact ⟨hagreeKey, hagreeValue, hlist'⟩
+
+/-- **The map clause.** The reference reads the pairs as a raw array and parses each pair at the point
+of use; the specification parses each element as an array and splits it. `mapM_getArr?_collapse`
+turns the reference's read into the same two-stage shape, `mapM_fromJson?_of_mapM_getArr?` recovers
+the specification's element parse from it, and the pair accord carries the values. -/
+theorem carrier_clause_map (fuel : Nat) (json : Json)
+    (hk : json.getObjValAs? String "type" = .ok "map") (other : SpecAMQP.Ref.Value)
+    (h : SpecAMQP.Ref.Vectors.valueOfJson (fuel + 1) json = .ok other)
+    (ih : ValueCarrierAgrees fuel) :
+    ∃ body : SpecAMQP.Spec.Codec.Value,
+      SpecAMQP.Spec.Codec.valueOfJson (fuel + 1) json = .ok body ∧ BodiesAgree body other := by
+  unfold SpecAMQP.Ref.Vectors.valueOfJson at h
+  unfold SpecAMQP.Spec.Codec.valueOfJson
+  -- the dispatch, with the binds left as binds: `Except.ok_bind'` collapses the read the discriminant
+  -- hypothesis fixes, and the `match` on the literal reduces against it
+  simp only [hk, Except.ok_bind'] at h ⊢
+  -- peel the reference's read rather than casing on it: `cases` does not reach an occurrence that
+  -- lives only in a hypothesis
+  rw [Except.bind_ok_iff] at h
+  obtain ⟨raw, hraw, h1⟩ := h
+  rw [Except.bind_ok_iff] at h1
+  obtain ⟨pairs, hmap, h2⟩ := h1
+  injection h2 with hother
+  subst hother
+  -- the payload is the array the reference read, and the specification reads the same payload
+  have hpayload : json.getObjValD "pairs" = Json.arr raw := by
+    have := hraw
+    unfold Json.getObjValAs? at this
+    exact eq_arr_of_fromJson?_json (json.getObjValD "pairs") raw this
+  obtain ⟨pairsJson, hparse, hread⟩ := mapM_getArr?_collapse fuel raw.toList pairs hmap
+  have hspecParse : (raw.toList.mapM (Array.fromJson? (α := Json)) :
+      Except String (List (Array Json))) = .ok pairsJson :=
+    mapM_fromJson?_of_mapM_getArr? raw.toList pairsJson hparse
+  have hspecRead : json.getObjValAs? (Array (Array Json)) "pairs" = .ok pairsJson.toArray := by
+    unfold Json.getObjValAs?
+    rw [hpayload]
+    rw [show (Lean.fromJson? (α := Array (Array Json)) (Json.arr raw) :
+        Except String (Array (Array Json))) = raw.mapM (Array.fromJson? (α := Json)) from
+      arrayFromJson?_array raw]
+    rw [Array.mapM_eq_mapM_toList, hspecParse]
+    rfl
+  obtain ⟨kvs, hsplit, hrefread⟩ := split_of_refPairs fuel pairsJson pairs hread
+  obtain ⟨bodies, hbodies, hagree⟩ := reads_of_splits fuel ih kvs pairs hrefread
+  rw [hspecRead] at ⊢
+  refine ⟨.map bodies, ?_, ?_⟩
+  · show (do
+        let ps ← List.mapM specPairSplit pairsJson
+        let vs ← List.mapM (specPairRead fuel) ps
+        pure (SpecAMQP.Spec.Codec.Value.map vs)) = Except.ok (.map bodies)
+    rw [hsplit, Except.ok_bind', hbodies]
+    rfl
+  · simp only [BodiesAgree]
+    exact hagree
 
 end SpecAMQP.Proofs
