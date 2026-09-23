@@ -112,6 +112,22 @@ output rather than only in a diff. Right now that count is six.
 - A coder may commit its own slice's files and must report the commit id; a
   planner pass that rewrites planner-owned files commits those files only.
 
+- **Quote a commit message, or the shell edits it.** `git commit -m "…"` with a
+  backticked identifier or a `$` in a double-quoted message runs command
+  substitution: commit `1540777`'s body lost `settled`, `aborted`, `more.u1`,
+  `aborted.1`, `links.33` and every other name it cited, leaving gaps that a
+  reader cannot reconstruct from the log. It could not be repaired either,
+  because three commits had landed on top by the time it was noticed and the
+  records cite commit ids, so rewriting them breaks the citations. Use single
+  quotes or a heredoc for any message that names an identifier.
+
+- **A promotion carries its manifest line.** Promoting a staged vector into the
+  corpus regenerates `vectors/generated-exchanges.ndjson`, which is
+  planner-owned, so the coder must not edit `toolchain/spec-manifest.sha1` and
+  the planner must regenerate it in the same movement. The first promotion
+  (`61c0430`) left the line stale and the manifest gate caught it two commits
+  later — which is the gate working, not the slice overstepping.
+
 ## Test forms
 
 - **Specification properties and invariants** are theorem or
