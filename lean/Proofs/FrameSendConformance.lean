@@ -72,7 +72,23 @@ than a workaround:
 2. `ValueWriterAgree` — bodies that agree as values are written to the same octets, or
    refused with the same class. **This is the writer law the reference does not expose.** It
    is a claim about the value layer, and the value layer's own instance is where it is
-   proved.
+   proved. It is quantified over the **carrier-reachable** values (`CarrierReachable`), and
+   `PLAN.md` §10 states why: this instance's bodies arrive through its own carrier
+   (`frameOfJson` → `valueOfJson`), a body the carrier cannot produce is a body this endpoint
+   cannot send, and the endpoint proof supplies the reachability from `frameOfJson`'s own
+   construction. **The domain's two boundaries are named here because a boundary explained
+   only where it excludes something is half-explained.** It excludes the ill-width family: the
+   reference's writer emits a raw payload at whatever width the value carries, so
+   `Ref.encode (.float #[]) = .ok #[0x72]` where the specification refuses — a permissive
+   writer's property over values no protocol path constructs, since `hexPayloadOf` fixes a
+   float's payload at four octets on the way in. And carrier-reachability does **not** imply
+   the wire reader's reachability (`ReaderReachable`, which is the domain of the wire-level
+   claims, including `ValueLayersAgree`): bridging the two would need a reference writer–reader
+   round trip that `Ref` does not expose, which is the same absence that makes this law a
+   hypothesis at all. An earlier statement of this law was quantified over every related pair
+   and was refuted by that ill-width witness; `Proofs.ValueLayerLaws.not_valueWriterAgree`
+   recorded the refutation and was withdrawn in the commit that narrowed the domain, with the
+   two artefacts' answers kept there as the witness.
 
 Assuming a frame-level writer agreement instead would be assuming this direction's
 conclusion, so the module states the value-layer law and proves the frame layer's part of it.
@@ -191,16 +207,34 @@ def ValueCarrierAgree : Prop :=
     ∃ body : SpecAMQP.Spec.Codec.Value,
       SpecAMQP.Spec.Codec.valueOfJson 64 json = .ok body ∧ BodiesAgree body other
 
-/-- **The value layer writes related bodies the same way.** Bodies that agree as values are
-written to the same octets, or refused with the same reason class.
+/-- **The values this instance's carrier can produce.** A reference value is carrier-reachable
+when the corpus reader this instance's own carrier is built on yields it. `PLAN.md` §10 fixes
+this as the domain of the writer law below, and the two notions of reachability are not
+interchangeable: `FrameConformance.ReaderReachable` is reachability through the *wire* reader
+and is the domain of the wire-level claims, while this one is reachability through the
+carrier, which is the path this instance's bodies actually arrive by. Bridging the two would
+need a reference writer–reader round trip that `Ref` does not expose. -/
+def CarrierReachable (v : SpecAMQP.Ref.Value) : Prop :=
+  ∃ json : Json, SpecAMQP.Ref.Vectors.valueOfJson 64 json = .ok v
+
+/-- A carrier-reachable value reached by the corpus reader directly. -/
+theorem carrierReachable_of_valueOfJson {json : Json} {v : SpecAMQP.Ref.Value}
+    (h : SpecAMQP.Ref.Vectors.valueOfJson 64 json = .ok v) : CarrierReachable v :=
+  ⟨json, h⟩
+
+/-- **The value layer writes related bodies the same way**, over the values this instance's
+carrier can produce: bodies that agree as values are written to the same octets, or refused
+with the same reason class.
 
 This is the writer law the reference exposes nowhere and the specification exposes only
 against itself (`Contracts.FrameCodec.FrameRoundTripOnEncodedFrames` is the *frame* layer's
 own round trip, and it says nothing about another artefact's writer). It is a value-layer
 claim, and the value layer's own instance is where it belongs; naming it here is what keeps
-this instance from assuming its own conclusion. -/
+this instance from assuming its own conclusion. The domain is `CarrierReachable`, and this
+module's head states both of its boundaries with their reasons. -/
 def ValueWriterAgree : Prop :=
   ∀ (body : SpecAMQP.Spec.Codec.Value) (other : SpecAMQP.Ref.Value),
+    CarrierReachable other →
     BodiesAgree body other →
     (∀ octets : Octets, SpecAMQP.Ref.encode other = .ok octets →
       SpecAMQP.Spec.Codec.encodeValue body = .ok octets) ∧
@@ -618,18 +652,87 @@ theorem writeAgrees_error (reasonClass specMessage refMessage : String) :
 
 /-! ## The writer: the same octets from related frames -/
 
-/-- Whatever the reference's writer writes for a frame, the specification's writer writes for
-a frame related to it — the same octets, or a refusal of the same class.
+/-- **A frame the carrier built holds a carrier-reachable body.** `frameOfJson` reads its body
+with `valueOfJson`, so whatever value it puts in the frame is one the corpus reader produced —
+which is the reachability `writers_matched` takes as a parameter. The walk is the carrier's own
+do-block, read forward the way `carriers_matched` reads it: each shared read is one case split,
+and each failing branch is closed by the bind's own propagation. -/
+theorem carrierReachable_body_of_frameOfJson {json : Json} {other : SpecAMQP.Ref.Frame.Frame}
+    (h : SpecAMQP.Ref.Vectors.frameOfJson json = .ok other)
+    {obody : SpecAMQP.Ref.Value} (hb : other.body = some obody) : CarrierReachable obody := by
+  unfold SpecAMQP.Ref.Vectors.frameOfJson at h
+  simp only [Bind.bind, Except.bind] at h
+  cases hdoff : json.getObjValAs? Nat "doff" with
+  | error err => simp [hdoff] at h
+  | ok doff =>
+    simp only [hdoff] at h
+    cases hchan : json.getObjValAs? Nat "channel" with
+    | error err => simp [hchan] at h
+    | ok channel =>
+      simp only [hchan] at h
+      cases hty : SpecAMQP.Harness.ofHex
+          ((json.getObjValAs? String "type").toOption.getD "") with
+      | error err => simp [hty] at h
+      | ok typeOctets =>
+        simp only [hty] at h
+        cases hlist : typeOctets.toList with
+        | nil => simp [hlist] at h
+        | cons code rest =>
+          simp only [hlist] at h
+          cases hrest : rest with
+          | cons extra rest' => simp [hrest] at h
+          | nil =>
+            simp only [hrest] at h
+            cases hkind : SpecAMQP.Ref.Frame.Kind.ofCode code.toNat with
+            | none => simp [hkind] at h
+            | some kind =>
+              simp only [hkind] at h
+              cases hext : SpecAMQP.Harness.ofHex
+                  ((json.getObjValAs? String "extended").toOption.getD "") with
+              | error err => simp [hext] at h
+              | ok extended =>
+                simp only [hext] at h
+                cases hpay : SpecAMQP.Harness.ofHex
+                    ((json.getObjValAs? String "payload").toOption.getD "") with
+                | error err => simp [hpay] at h
+                | ok payload =>
+                  simp only [hpay] at h
+                  cases hbody : json.getObjValAs? (Array Json) "body" with
+                  | error err => simp [hbody] at h
+                  | ok bodyOctets =>
+                    simp only [hbody] at h
+                    cases hblist : bodyOctets.toList with
+                    | nil =>
+                      -- a bodyless frame: the reachability claim has no value to be about
+                      simp only [hblist] at h
+                      simp only [Except.ok.injEq] at h
+                      subst h
+                      cases hb
+                    | cons valueJson brest =>
+                      simp only [hblist] at h
+                      cases hbrest : brest with
+                      | cons extra rest' => simp [hbrest] at h
+                      | nil =>
+                        -- one body value: the corpus reader produced it, so it is reachable
+                        simp only [hbrest] at h
+                        cases hval : SpecAMQP.Ref.Vectors.valueOfJson 64 valueJson with
+                        | error err => simp [hval] at h
+                        | ok value =>
+                          simp only [hval] at h
+                          simp only [Except.ok.injEq] at h
+                          subst h
+                          simp only [Option.some.injEq] at hb
+                          subst hb
+                          exact carrierReachable_of_valueOfJson hval
 
-The walk is the layout's own arithmetic, branch by branch: every condition one layer tests,
-the other tests on the same value, because `FramesWriteAgree` carries the field equalities and
-the two layers' transcriptions of the layout are the same constants. The one place the two
-layers genuinely differ is the body, where the value layer's writer law (`ValueWriterAgree`)
-supplies the octets — and where the descriptor's declared type, which both layers' role test
-reads, is related by `typeOfDescriptor_agree`. -/
+/-- The writer law, applied to two frames: the reachability of whatever body the reference frame
+holds is a parameter, because this lemma relates *arbitrary* related frames and cannot derive it
+for them. The caller — the endpoint proof, where the frame came from `frameOfJson` — supplies it
+through `carrierReachable_body_of_frameOfJson`. -/
 theorem writers_matched (writers : ValueWriterAgree)
     (frame : SpecAMQP.Spec.Frame.Frame) (other : SpecAMQP.Ref.Frame.Frame)
-    (hrel : FramesWriteAgree frame other) :
+    (hrel : FramesWriteAgree frame other)
+    (reach : ∀ (obody : SpecAMQP.Ref.Value), other.body = some obody → CarrierReachable obody) :
     WriteAgrees (SpecAMQP.Spec.Frame.writeFrame frame)
       (SpecAMQP.Ref.Frame.writeFrame other) := by
   obtain ⟨hdoff, hkind, hchan, hext, hpay, hbodies⟩ := hrel
@@ -706,7 +809,7 @@ theorem writers_matched (writers : ValueWriterAgree)
                     -- the role test passes: the bodies are written by the value layer's law
                     obtain ⟨hwok, hwerr⟩ :=
                       writers (.described descriptor value) (.described oDescriptor oValue)
-                        hbodies
+                        (reach _ rfl) hbodies
                     cases henc : SpecAMQP.Ref.encode (.described oDescriptor oValue) with
                     | error message =>
                       obtain ⟨specMessage, hspecEnc, hclass⟩ := hwerr message henc
@@ -772,6 +875,7 @@ theorem ref_frame_send_conforms (carriers : ValueCarrierAgree) (writers : ValueW
           -- agreement gives it the same answer
           obtain ⟨frame, hspecFrame, hfrel⟩ := carriers_matched carriers json refFrame href
           have hwrite := writers_matched writers frame refFrame hfrel
+            (fun obody hb => carrierReachable_body_of_frameOfJson href hb)
           cases hw : SpecAMQP.Ref.Frame.writeFrame refFrame with
           | ok octets =>
             simp only [hw, Option.some.injEq, Prod.mk.injEq] at hanswer

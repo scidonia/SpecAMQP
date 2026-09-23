@@ -287,16 +287,6 @@ theorem spec_encodeValue_floatEmpty :
   try (first | rfl | (split <;> first | rfl | simp_all))
   try decide
 
-/-- **`ValueWriterAgree` is false.** Its first conjunct demands that wherever the reference's writer
-succeeds, the specification's writer produces the same octets; for the empty-payload `float` the
-reference writes one octet and the specification refuses. -/
-theorem not_valueWriterAgree : ¬ ValueWriterAgree := by
-  intro h
-  obtain ⟨hok, _⟩ := h (.float #[]) (.float #[]) bodiesAgree_floatEmpty
-  have hspec := hok #[0x72] ref_encode_floatEmpty
-  rw [spec_encodeValue_floatEmpty] at hspec
-  cases hspec
-
 /-! ## The reachable writer divergence, at the answers
 
 Both writers are asked for an array whose declared element constructor is `%x57` — an octet inside
