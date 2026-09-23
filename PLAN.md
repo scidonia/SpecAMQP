@@ -1181,6 +1181,21 @@ That makes the finding a statement rather than a defect: the vectors are written
 says AMQP, and the difference is a policy the application owns. It also closes the app-seam question in the direction the design already had — the
 gap was never in the transport, which is parameterised for exactly this, but in the absence of an application to exercise it.
 
+**R4's state, and the policy it settled.** The corpus-driven application is in the tree (`scripts/endpoint/WireApp/`, `scripts/endpoint/wire_peer.py`,
+`scripts/run-endpoint-wire-differential.sh`, committed as one movement with its `lakefile` registration). It announces the vector's own header octets, so the
+layer on the wire is the corpus's; **`slice-sasl-challenge-from-client` agrees end to end including its refused step 4**, which is the SASL layer exercised
+through the core, and that agreement survives ImplCore's layer seam unchanged — a regression check as much as an agreement. Two of six playable vectors agree
+and four diverge, **each named with its step**: two because the shell prompts the application only *after* a read, so two consecutive sends with nothing
+arriving between cannot be played; one because the pre-state is `START` and the shell's own header announcement has already left it; and one endpoint state
+after a refusal, not yet attributed to core or vector.
+
+**The policy ruling, with its condition**: the shipped binary keeps the conservative AMQP default — the corpus is written for a peer that offers SASL first, but
+a product's default is a different decision from a differential's needs, and the app supplies the vector's header. **Revisit only when R4 grows a rung whose
+evidence is about the *shipped* binary offering SASL**, which is the condition that would change the answer rather than an open question left standing.
+
+**And a finding held for when it matters**: the shell prompting the application only after a read is a statement about the loop rather than about either
+artefact. It becomes a finding the moment a corpus family needs two sends in a row, and it is recorded here rather than rediscovered as a mystery.
+
 
 ## 23.2 The concurrent server: what is settled, what is proposed, and what must be proved
 
