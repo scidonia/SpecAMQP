@@ -2907,7 +2907,6 @@ theorem stepAmqpFrame_matched
     try simp only []
     rw (config := { transparency := .default }) [if_pos h1]
     rw (config := { transparency := .default }) [if_neg hr1]
-    try simp only []
     have hb2 : (if outbound = true then
           SpecAMQP.Ref.Connection.maySend (refPeerOf s).state
             (SpecAMQP.Ref.Connection.kindOfBody rbody)
@@ -3187,7 +3186,6 @@ theorem stepAmqpFrame_matched
     try simp only []
     rw (config := { transparency := .default }) [if_neg h1]
     rw (config := { transparency := .default }) [if_pos hr1]
-    try simp only []
     constructor
     · intro out hout
       cases hout
@@ -3776,7 +3774,6 @@ private theorem hdrPeer_recv_eq (s : Spec.Connection.Endpoint) (l : Spec.Connect
   rw [afterHeaderExchange_agree, refPeerOf_update]
   try simp only []
   rw [refState_recv]
-  try simp only []
   rfl
 
 private theorem stepHeader_matched_aux (s : Spec.Connection.Endpoint) (i : Ref.Connection.Peer)
@@ -3798,7 +3795,6 @@ private theorem stepHeader_matched_aux (s : Spec.Connection.Endpoint) (i : Ref.C
   cases hlp : sh.protocolId.layer?
   · have hsp := not_speaks_of_no_layer sh.protocolId hlp
     try simp only [bind, Except.bind, pure, Except.pure]
-    try simp only []
     rw [hsp]
     refine ⟨?_, rfl⟩
     constructor
@@ -3811,7 +3807,6 @@ private theorem stepHeader_matched_aux (s : Spec.Connection.Endpoint) (i : Ref.C
     obtain ⟨hsp, hlay⟩ := speaks_of_layer sh.protocolId l hlp
     have hlay' : refLayer l = sh.protocolId.code := hlay.trans (refProtoId_code sh.protocolId)
     try simp only [bind, Except.bind, pure, Except.pure]
-    try simp only []
     rw [hsp]
     by_cases hout : outbound = true
     · rw [hout]
@@ -3977,7 +3972,6 @@ theorem stepAmqpFrame_shapes (s : SpecAMQP.Spec.Connection.Endpoint)
     try simp only []
     rw (config := { transparency := .default }) [if_pos h1]
     rw (config := { transparency := .default }) [if_neg hr1]
-    try simp only []
     have hb2 : (if outbound = true then
           SpecAMQP.Ref.Connection.maySend (refPeerOf s).state
             (SpecAMQP.Ref.Connection.kindOfBody rbody)
@@ -4343,7 +4337,6 @@ theorem stepSaslFrame_pair (s : Spec.Connection.Endpoint) (i : Ref.Connection.Pe
   unfold Spec.Connection.stepSaslFrame Spec.Connection.refuseUnlessComplete
     Ref.Connection.takeSasl Ref.Connection.refuseUnlessComplete
   simp only [Spec.Connection.refuseUnless]
-  try dsimp only []
   by_cases hsz : size ≤ Spec.Connection.minMaxFrameSize
   · have hszd : decide (size ≤ Spec.Connection.minMaxFrameSize) = true := decide_eq_true hsz
     have hszr : ¬ (size > Ref.Connection.minMaxFrameSize) := Nat.not_lt.mpr hsz
@@ -5287,7 +5280,6 @@ theorem arriving_answers (h : ReadersAgree) (s : Spec.Connection.Endpoint)
     have hfalse : ¬ (false = true) := by decide
     have htrue : (true = true) := rfl
     simp only [hh, if_neg hfalse, if_pos htrue]
-    try dsimp only []
     cases hread : Ref.Connection.readHeader bytes with
     | ok rh =>
       obtain ⟨sh, hsh, hpid, hmaj, hmin, hrev, _⟩ := (refHeader_matched bytes).1 rh hread
@@ -5329,7 +5321,6 @@ theorem arriving_answers (h : ReadersAgree) (s : Spec.Connection.Endpoint)
       rfl
     have hfalse : ¬ (false = true) := by decide
     simp only [hh, if_neg hfalse]
-    try dsimp only []
     by_cases hshape : Spec.Connection.headerShaped bytes = true
     · have hshapeR : Ref.Connection.looksLikeHeader bytes = true := hshape
       rw [if_pos hshape, if_pos hshapeR]
@@ -5346,7 +5337,6 @@ theorem arriving_answers (h : ReadersAgree) (s : Spec.Connection.Endpoint)
       rfl
     have hfalse : ¬ (false = true) := by decide
     simp only [hh, if_neg hfalse]
-    try dsimp only []
     by_cases hshape : Spec.Connection.headerShaped bytes = true
     · have hshapeR : Ref.Connection.looksLikeHeader bytes = true := hshape
       rw [if_pos hshape, if_pos hshapeR]
@@ -5363,7 +5353,6 @@ theorem arriving_answers (h : ReadersAgree) (s : Spec.Connection.Endpoint)
       rfl
     have hfalse : ¬ (false = true) := by decide
     simp only [hh, if_neg hfalse]
-    try dsimp only []
     by_cases hshape : Spec.Connection.headerShaped bytes = true
     · have hshapeR : Ref.Connection.looksLikeHeader bytes = true := hshape
       rw [if_pos hshape, if_pos hshapeR]
