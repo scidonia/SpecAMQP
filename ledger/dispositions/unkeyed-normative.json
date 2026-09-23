@@ -1193,7 +1193,7 @@
    "clause_text": "If the value is not set, then the sender does not have an idle time-out.",
    "disposition": "deferred:S3-connection",
    "kind": "UNKEYED",
-   "note": "An unset idle-time-out means the sender has none: the timeout work already treats the unset value, and this names the declaration to cite when that slice is next dispositioned.",
+   "note": "Timing is a named assumption with nothing behind it in either tree, read from the code rather than assumed: Submission has no tick constructor, step dispatches on header/frame/arriving only, and no field the artifact's timer clauses hang off is read anywhere in either connection layer. The conformance alphabet has the tick channel and the layers hold no timer, threshold or expected-peer behaviour, so an endpoint gets no answer for a tick \u2014 which is its actual behaviour and not a modelling choice. A proof's doc comment is where this would be lost, so it is recorded here and in the plan as one of the obligations a simulation cannot check.",
    "text_sha256": "41026e18bfc29fb56c9f8ac59cc7458ee248ed733bae93001209f2c7d3067d46"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:incoming-locales.u1": {
