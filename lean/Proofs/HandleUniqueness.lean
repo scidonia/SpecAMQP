@@ -101,6 +101,14 @@ theorem bind_ok_iff {ε α β : Type _} (x : Except ε α) (f : α → Except ε
     (x >>= f) = .ok b ↔ ∃ a, x = .ok a ∧ f a = .ok b := by
   cases x <;> simp
 
+/-- An `if` whose *both* branches succeed: which branch it took is the only thing that decides
+the value, and a `detach` and a `flow` both end in exactly that shape — one branch builds the
+successor, the other returns the session untouched. -/
+theorem if_ok_right {ε α : Type _} (c : Prop) [Decidable c] (a b x : α) :
+    ((if c then (Except.ok a : Except ε α) else .ok b) = .ok x) ↔
+      (c ∧ a = x) ∨ (¬c ∧ b = x) := by
+  by_cases h : c <;> simp_all
+
 /-! ## The invariant -/
 
 /-- **No two links share a handle.** The handles this endpoint has claimed are all distinct, the
@@ -177,22 +185,45 @@ theorem attachLink_handle_uniqueness {s s' : Session} (outbound : Bool) (body : 
     List.mem_cons, List.not_mem_nil, Option.some.injEq]))
   all_goals (try (simp_all [HandleUniqueness]))
 
-/-! ## The operations whose tie is not yet discharged
+/-! ## Releasing a link, and the two operations that move a delivery
 
-`detachLink`, `flowLink` and `transferLink` do not move the two registries, and a release clears the
-live handle rather than adding one, so each preserves `HandleUniqueness` for a simpler reason than
-`attachLink` does: the four fields the invariant is about are either untouched or cleared.
-`HandleUniqueness.frame` states exactly that, with the four equalities as its hypotheses.
+`detachLink`, `flowLink` and `transferLink` preserve the invariant, and their ties to their
+`do`-blocks are **not** discharged here. They are named with the residual goal each leaves rather than dressed up as
+statements over a record shape, because a shape lemma is a second copy of the function and the tie
+is the part that makes the claim about the code. What each needs is stated exactly:
 
-What is **not** done here is the tie to those three `do`-blocks, and this module says so rather than
-stating the preservation over a record shape and calling it an operation's theorem: a statement over
-a shape a branch builds is a second copy of the function, and the tie is the part that makes it
-about the code. Each needs the reduction `attachLink_handle_uniqueness` performs — `unfold`, the two
-guard-chain lemmas, and `bind_ok_iff` for the `linkHandleOf` calls whose result no guard lemma
-matches — plus, for `detachLink`, unfolding `Session.afterLinkRelease`. Its residual goals are of
-the forms `{ s with handle := none, … }.afterLinkRelease.handles.Nodup` and the record updates
-`flowLink` and `transferLink` build, so the reduction is mechanical where it is written out; no
-statement in this module claims those three operations until it is done.
+* **`detachLink`.** After `unfold detachLink` and the guard loop the surviving goal is
+
+      (if (fieldValue "detach" "handle" body).bind valueNat = s.peerHandle then
+         Except.ok { s with peerRole := none, peerHandle := none, peerCount := 0, peerCredit := 0,
+                            delivery := none,
+                            transactions := Option.map Spec.Transactions.Layer.retireAll
+                                              s.transactions }
+       else Except.ok s) = Except.ok s'
+
+  — an `if` whose *both* branches succeed, which is why neither `guard_last` (whose then-branch is a
+  refusal) nor the chain lemmas match it. `if_ok_right` above is that shape and was checked against
+  a minimal instance of it; here `simp only [if_ok_right] at hstep` reports the lemma unused, so
+  the mismatch is in how this site's condition elaborates rather than in the lemma's statement. What
+  it needs is either the condition's elaborated form named (`by_cases` on
+  `(fieldValue "detach" "handle" body).bind valueNat = s.peerHandle` closes one direction in
+  isolation) or a `split` that reaches an `if` head inside this `do`-block; the record's four fields
+  are then `rfl`/vacuous for `HandleUniqueness.of_option_le`, and `Session.afterLinkRelease` needs
+  unfolding for its `transactions` update.
+
+* **`flowLink`.** After the two `bind_ok_iff` rounds the surviving goal is the same `if` shape one
+  level deeper, over the five field-rule conjuncts a handle-less flow must not carry, so it needs
+  the same treatment. Its successor is a record update over `position`, `peerCount` and `peerCredit`,
+  where `HandleUniqueness.frame`'s four equalities hold by `rfl`.
+
+* **`transferLink`.** The same reduction leaves the residual goals a level further in, where the
+  delivery-id and first-transfer-field lookups are: `case h_1.isTrue.isTrue.isFalse` and the `h_2`
+  cases, each of the form `<a do-block of a guard and a lookup> = Except.ok s'`. Its successor is a
+  record update over `position` and `delivery`, where `HandleUniqueness.frame`'s four equalities hold
+  by `rfl`, so the closing is not the difficulty — reaching the guard heads is.
+
+Nothing in this module claims `detachLink`, `flowLink` or `transferLink` until those goals are
+discharged.
 -/
 
 end SpecAMQP.Proofs.HandleUniqueness
