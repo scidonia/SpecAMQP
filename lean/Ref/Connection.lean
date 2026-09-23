@@ -379,7 +379,15 @@ def bodyType (body : Value) : Option TypeDecl :=
       types.find? (fun t => match t.descriptor with
         | some d => d.domain * 2 ^ 32 + d.code == code.toNat
         | none => false)
-    | .symbol name => types.find? (fun t => t.name == name)
+    | .symbol name =>
+      -- The artifact gives a descriptor two forms — a code and a declared name — and a peer that
+      -- does not know the code can still name the type, so a describe-by-name body is well formed.
+      -- The name to match is the *descriptor's* declared name (`amqp:open:list`), which is what the
+      -- declared surface records in `descriptor.name`; a bare type name is not a descriptor name and
+      -- matching it resolves only bodies no conforming writer produces.
+      types.find? (fun t => match t.descriptor with
+        | some d => d.name == name
+        | none => false)
     | _ => none
   | _ => none
 

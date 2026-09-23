@@ -1032,12 +1032,15 @@ def stepSaslFrame (endpoint : Endpoint) (outbound : Bool) (size : Nat) (body : V
         { endpoint with state := .start, layer := .amqp, phase := .absent, role := none,
                         mechanisms := [], localLimits := Limits.aPriori,
                         remoteLimits := Limits.aPriori }
-      return ⟨established, []⟩
+      -- Answering through `reporting`, as the mechanisms, init, challenge and response arms do:
+      -- the octets an outbound frame is written with are the caller's, and an arm that dropped
+      -- them would say this one performative puts nothing on the wire where the other four do.
+      return reporting established
     else
       -- Authentication did not succeed. The artifact obliges the peer to close the
       -- connection and names a close-code for it that the choice table does not define,
       -- so the close is recorded as the state it leaves and no condition is invented.
-      return ⟨{ endpoint with state := .end }, []⟩
+      return reporting { endpoint with state := .end }
   | .absent =>
     .error (stateRefusal "illegalState" s!"the SASL layer is not in a place for a SASL \
       performative: the dialogue is {endpoint.phase.name}")
