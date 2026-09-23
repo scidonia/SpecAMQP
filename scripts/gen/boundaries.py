@@ -36,17 +36,29 @@ vector. The rules this family probes, and the reading each expectation follows:
   width. A buffer that gives them more is asking the reader to consume octets no
   encoding accounts for.
 
-## Two readings of the size field, and the boundary they cross
+## Two rules at once, and the order they are checked in
 
 The artifact's published example settles the accounting for *legal* buffers, but it
-cannot settle what a reader should say about an *illegal* one. Two faults can coexist:
-a compound may declare a size that disagrees with its content **and** an odd item count.
-The rules are then in an order the artifact does not state, and the family therefore
-carries each such buffer **under both size accountings**, with the class the framing
-rule implies stated on the vector and a note recording that the reading is pending. That
-is the shape that localises a divergence instead of merely finding one: the vectors that
-differ from the expectation by *class* name the rule pair whose order is unstated, and
-the vectors that differ by neither are the controls that show the sweep is not vacuous.
+cannot settle what a reader should say about an *illegal* one. Two faults can coexist: a
+compound may declare a size that disagrees with its content **and** an odd item count. The
+rules are then in an order the artifact does not state, and this family carries each such
+buffer **under both size accountings** so that the order is what the vectors probe rather
+than something they assume.
+
+That order is now settled, and the vectors state it: **form checks first, then the size
+comparison.** So a buffer that breaks both draws the parity class — `malformed` — while
+`sizeMismatch` is for a buffer whose size is the *only* thing wrong. The decision is the
+plan's, in the ambiguity register's `check-precedence-unspecified` entry, which was
+extended from the frame layer to this one rather than duplicated: the frame layer had
+already adopted form-first, the reference's array path was already checking its count-based
+rule before reading elements and before the size — so its map path was the outlier inside
+itself — and the parity rule is decidable from the count field alone, before any element
+octet is touched. What this family contributes is the buffers that made the question
+concrete, and the record of what the two artefacts said before the order was written down.
+
+The rows in that record were: the reference answered `sizeMismatch` and the specification
+`malformed` on the two-rule buffers, each internally consistent, which is why the question
+could not be settled from either artefact alone.
 
 ## Why the class is pinned rather than the verdict
 
@@ -60,13 +72,31 @@ So a corpus that asserts reject-or-admit can pass while two artefacts report dif
 conditions for the same buffer, and one that compares detail strings fails on wording
 that no clause governs. That is why every refusal here names `expectError.reason` — the
 schema's class — and why the class is stated from the clause rather than copied from a
-run: the divergence this family exists to show is unreachable from a verdict.
+run: the divergence this family exists to show is unreachable from a verdict. The runner
+had to be changed to compare the field before any of this was visible at all; until it
+did, a vector naming one class and an artefact reporting another still passed.
 
 The same probe settled the arithmetic, which is worth recording because a simpler reading
 of it was believed first: **the accounting is shared**. Both artefacts count the count
 octet inside the size the artifact's examples use, and a buffer breaking only the size
-rule draws the same class from both. What differs is *precedence* — which of two broken
-rules a reader reports — and that is what the two-rule vectors below localise.
+rule draws the same class from both. What differed was *precedence* — which of two broken
+rules a reader reports — and that is the question the two-rule vectors below put to the
+register.
+
+## Why there are no trailing-octet vectors here
+
+A first draft of this family carried seven refusals built from a value followed by an
+octet that no encoding accounts for — `40 00`, `41 00`, `43 00`, `50 01 02` and the rest —
+on the reading that a decode must consume *all* the octets it is handed. Both artefacts
+decoded the value and ignored the octet, and both are right: **a value's octets are a
+prefix of whatever carries them.** A frame body holds several values in sequence, so
+requiring a value to consume its whole carrier is a property of the *carrier*, not of the
+value, and the contract "consuming all of them" is a frame-level one. The vectors are
+withdrawn rather than re-stated, because the value vocabulary here cannot express the case
+without claiming a defect that belongs to the carrier; and the place for it is a
+frame-level family, where consuming the whole body is the contract being tested. The
+behaviour is recorded here so that the next reader does not re-derive it and re-file it as
+a value-layer defect, which is what this draft did.
 
 ## Nothing here is produced by running an artefact
 
@@ -372,48 +402,74 @@ def boundary_negative_corpus() -> list[dict]:
         "One element declared as the one-octet smalluint form with two octets of element "
         "data: the second octet is data no element of this constructor accounts for. The "
         "artifact constrains the constructor's *grammar* and its own example uses a "
-        "variable-width constructor, so what a receiver does with data that does not fit "
-        "the declared constructor is not stated anywhere; the class here is the framing "
-        "rule's and the reading is pending rather than adopted."))
+        "variable-width constructor, so it states no class for data that does not fit the "
+        "declared constructor; both artefacts report the framing class, and the vector "
+        "states that with the artifact's silence recorded rather than filled."))
 
-    # --- one fault: payloads the encoding does not carry ------------------------------
-    for name, octet in [("null", 0x40), ("true", 0x41), ("false", 0x42),
-                        ("uint0", 0x43), ("ulong0", 0x44), ("list0", 0x45)]:
-        vectors.append(reject(
-            f"boundary-negative-{name}-trailing-octet", bytes([octet, 0x00]),
-            [WIDTHS_ANCHOR], "malformed",
-            f"{name} carries no payload, so a trailing octet is data its encoding cannot "
-            f"account for. A reader that decodes the value and ignores the rest has not "
-            f"read the buffer the corpus handed it."))
-    vectors.append(reject(
-        "boundary-negative-ubyte-trailing-octet", bytes([0x50, 0x01, 0x02]),
-        [FIXED_ANCHOR], "malformed",
-        "A fixed-width value followed by an octet: the value is complete at one octet, so "
-        "the second octet is unaccounted for."))
+    # --- withheld: the trailing-octet case belongs to the carrier, not the value -------
+    # A first draft carried seven refusals here — a zero-width or fixed-width value
+    # followed by an octet its encoding does not account for. They are withdrawn rather
+    # than re-stated. Both artefacts decode the value and ignore the octet, and both are
+    # right: a value's octets are a *prefix* of whatever carries them, since a frame body
+    # holds several values in sequence, so "consuming all of them" is a property of the
+    # carrier and not of the value. The value vocabulary cannot express the case without
+    # claiming a defect that belongs elsewhere, and the place for it is a frame-level
+    # family. See the header section "Why there are no trailing-octet vectors here".
 
-    # --- two faults at once: the rules' order is unstated -----------------------------
+    # --- two faults at once: the order the register settles ---------------------------
     # These are the vectors this family exists for. Each breaks the framing rule *and*
     # the parity rule, under one of the two size accountings, so a reader that checks
-    # either first is refusing the same buffer and reporting a different condition. The
-    # class stated is the framing rule's, on the argument that a reader cannot locate the
-    # items to count them without first trusting the size that delimits them; the note
-    # records that the plan has not settled the order, so the reading is pending rather
-    # than adopted here.
+    # either first refuses the same buffer and reports a different condition. The class is
+    # the parity one, on the register's settled order — form checks before the size
+    # comparison, `check-precedence-unspecified`, extended from the frame layer — and the
+    # history is on the vector because these two buffers are what made the question
+    # concrete: the reference answered `sizeMismatch` and the specification `malformed`
+    # until the order was written down, and both were internally consistent.
     vectors.append(reject(
         "boundary-negative-map-odd-and-size-small", map8(bytes([0x40, 0x40, 0x40]), 3, count_in_size=False),
-        [MAP_CLAUSE, ENCODINGS_CLAUSE], "sizeMismatch",
+        [MAP_CLAUSE, ENCODINGS_CLAUSE], "malformed",
         "Odd item count on a size that counts the item octets alone: 3 declared, 4 "
-        "measured. Two rules broken at once, and the artifact does not say which a reader "
-        "reports. The class here follows the framing rule; the order is a pending "
-        "reading, and an artefact reporting the parity class instead is reporting the "
-        "same refusal through the other rule."))
+        "measured. Two rules broken at once, so the class is the one the settled order "
+        "gives the first check — parity is decidable from the count field alone, before "
+        "any element octet is read — and the size disagreement is not reported because "
+        "the value is already not a map."))
     vectors.append(reject(
         "boundary-negative-map-odd-and-size-large", bytes([0xC1, 0x08, 0x03, 0x40, 0x40, 0x40]),
-        [MAP_CLAUSE, ENCODINGS_CLAUSE], "sizeMismatch",
+        [MAP_CLAUSE, ENCODINGS_CLAUSE], "malformed",
         "Odd item count with a size of 8 where the content measures 4. The same two-rule "
-        "overlap as the vector above, with the size disagreement large rather than one "
-        "octet, so a reader that reports the parity class is reporting it for a buffer "
-        "whose framing is wrong by four octets."))
+        "overlap as the vector above with the size disagreement four octets rather than "
+        "one, so that a reader reporting the class settles the *order* rather than the "
+        "size of the discrepancy."))
+    vectors.append(reject(
+        "boundary-negative-map-odd-and-size-smallest", map8(bytes([0x40]), 1, count_in_size=False),
+        [MAP_CLAUSE, ENCODINGS_CLAUSE], "malformed",
+        "The smallest buffer that breaks both rules: one item, so parity is broken by the "
+        "least it can be, on a size that counts the item octet alone (1 declared, 2 "
+        "measured). This is the witness the two readers disagreed on — the reference "
+        "reported `sizeMismatch` and the specification `malformed` until the order was "
+        "settled — and `Proofs.ValueLayerLaws.mapWitness` is the same octets as a theorem."))
+    vectors.append(reject(
+        "boundary-negative-map-odd-and-truncated", map8_declaring(4, 3, bytes([0x40, 0x40])),
+        [MAP_CLAUSE, ENCODINGS_CLAUSE], "malformed",
+        "Odd count 3 with only two item octets present and a size of 4. Three checks "
+        "would give three classes on this buffer — parity `malformed`, the declared size "
+        "`sizeMismatch`, the items `truncated` — so it separates the settled order from "
+        "both alternatives rather than only from the size-first one."))
+    vectors.append(reject(
+        "boundary-negative-map32-odd-and-size-large",
+        bytes([0xD1, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x00, 0x03, 0x40, 0x40, 0x40]),
+        [MAP_CLAUSE, ENCODINGS_CLAUSE], "malformed",
+        "The four-octet-width twin of the size-large two-rule vector: same two rules, "
+        "same class, so the settled order is a property of the check rather than of the "
+        "width field that carries the count."))
+    vectors.append(reject(
+        "boundary-negative-list-holding-odd-map", bytes([0xC0, 0x05, 0x01, 0xC1, 0x08, 0x03, 0x40]),
+        [MAP_CLAUSE, ENCODINGS_CLAUSE], "malformed",
+        "A well-formed list8 whose one item is a map8 with an odd count and a size of 8 "
+        "that nothing supports. The outer framing is sound and the outer size is exact, "
+        "so the refusal can only come from the inner map's own rule: the two-rule case is "
+        "not a property of a buffer's first octet, and a reader that reports it from the "
+        "inner value is the one that reports it from the outer one too."))
 
     return vectors
 
@@ -450,5 +506,5 @@ def report(boundary: list[dict], negatives: list[dict]) -> None:
     two_rule = [v for v in negatives if len(v["clauses"]) > 1]
     print(f"  rule boundaries: {len(boundary)} admitted ({admitted_count} decode) "
           f"and {len(negatives)} refused")
-    print(f"  of the refusals, {len(two_rule)} break two rules at once, so their class "
-          f"is the ordering question rather than a settled reading")
+    print(f"  of the refusals, {len(two_rule)} break two rules at once, so they state the "
+          f"settled check order rather than a single rule's class")
