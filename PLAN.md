@@ -1543,6 +1543,22 @@ thing a pin must not do. What it pinned instead is the property that actually re
 `references`. It then ran the assertion against a reverted copy of the tool and observed six problems before the fix and none after, which is the failure-first evidence the literal request
 would have made impossible to produce.
 
+**And a control that repeats a run twice proves stability only when the mechanism is not deterministic in the same way both times.** The wire differential's author reported two consecutive
+runs "identical line for line" as evidence that a scheduler-dependent comparator had been fixed; the reviewer refuted the general claim by tracing the surviving path instead — a `recv()`
+that captures two of the peer's frames yields only the *final* state to the application, so a step keyed to the intermediate state is *never played*, which is a difference in what went on the
+wire rather than in the harness's bookkeeping. **Back-to-back loopback writes coalesce the same way run after run**, which is exactly why the original flap went unnoticed for as long as it did:
+a two-run control is evidence about the *variance the runs happen to sample*, and it cannot detect a dependence whose two outcomes are selected by a condition no run here varies. Varying the
+condition — or stating that it cannot be varied — is the control; repeating the same condition is a sample, and calling it a control is how a green run becomes a fact it never was.
+
+**And "the named instance is fixed" is not "the class is fixed", a distinction the same review kept without dressing it up.** The patched branch really was broken and really is repaired; the
+claim built on top of it was about the comparator as a whole. A slice reporting "this instance is fixed, the class is open, here is the trace" gives its reviewer something to refute or confirm;
+one reporting "the comparator is stable" asserts what no trace supports, and the cost lands on whoever next reads a green run as a settled fact.
+
+**And a root cause that lives only in a commit message is not a record.** The same review found that all three of the slice's handed-over findings were attributed in commit messages and Lean
+docstrings, while the tool's own printed divergence text was generically worded for every cause — so a maintainer reading the run's output could not tell a known seam limitation from a
+regression without git archaeology. **A cause belongs in the artefact that will be read when the cause matters**, which is the run's output rather than the history that produced it, and the
+same rule applies to this plan: a finding recorded only in a message is a finding that will be rediscovered as a surprise.
+
 ## 17. Verification gates and their negative controls
 
 | Gate | Mechanism | Negative control |
