@@ -1,5 +1,6 @@
 import Contracts.Conformance
 import Proofs.FrameConformance
+import Proofs.FrameSendConformance
 import Spec.Codec
 import Ref.Value
 
@@ -87,14 +88,20 @@ namespace SpecAMQP.Proofs
 def CursorAgrees (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor) : Prop :=
   c.data = c'.data ∧ c.pos = c'.pos
 
-/-- **The wire readers' agreement at a given fuel**, in the contract's direction. -/
+/-- **The wire readers' agreement at a given fuel**, in the contract's direction.
+
+The success conjunct carries `BodiesAgree`, which is *stronger* than the contract's view equality and
+is what the route needs: a described body's view is `some (typeOfDescriptor descriptor)`, so the two
+descriptors must correspond, and `BodiesAgree` is exactly the relation that says so - the same one
+the corpus side uses between the two value types. `bodyView_of_BodiesAgree` below recovers the
+contract's spelling, so the claim is still the contract's own. -/
 def WireAgrees (fuel : Nat) : Prop :=
   ∀ (c : SpecAMQP.Spec.Codec.Cursor) (c' : SpecAMQP.Ref.Cursor), CursorAgrees c c' →
     (∀ (other : SpecAMQP.Ref.Value) (c₂' : SpecAMQP.Ref.Cursor),
         SpecAMQP.Ref.readValue fuel c' = .ok (other, c₂') →
         ∃ (body : SpecAMQP.Spec.Codec.Value) (c₂ : SpecAMQP.Spec.Codec.Cursor),
           SpecAMQP.Spec.Codec.readValue fuel c = .ok (body, c₂) ∧
-          CursorAgrees c₂ c₂' ∧ specBodyView body = refBodyView other) ∧
+          CursorAgrees c₂ c₂' ∧ BodiesAgree body other) ∧
     (∀ (failure : SpecAMQP.Ref.DecodeError),
         SpecAMQP.Ref.readValue fuel c' = .error failure →
         ∃ refusal : SpecAMQP.Spec.Codec.Refusal,
