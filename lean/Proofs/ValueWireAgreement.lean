@@ -32,14 +32,30 @@ is far weaker than body equality: the same consumed octets, and the same descrip
 body is described. Proving agreement *through* those views rather than through the values is what
 makes the claim tractable, and it is what the contract asks for.
 
-## The branches, and the bridge they need
+## The branches, and the bridge that turns out to be them
 
 The specification dispatches on `classify code.toNat` and then on generated tables (`dataDecl`,
 `elementDecl?`, the declared category), while the reference matches the constructor octet as a
-literal. The per-branch lemmas therefore need the same bridge the frame layer's proofs used - that
-the two dispatches assign the same octets - before any branch can be proved, and then each branch is
-its own lemma over the same three things: the constructor octet, the declared form, and the
-recursion at the fuel beneath.
+*literal* — inline in its own `readValue`, with no table object to compare against. So there is no
+separate bridge to build ahead of the branches: the two dispatches meet at the branch, and the
+per-octet correspondence *is* the branch lemma. What the tables do offer is cheap resolution of
+their own side, which is what a branch needs first:
+
+```lean
+example : (SpecAMQP.Spec.Codec.dataDecl 0x40).map (fun d => (d.width, d.owner)) =
+    .ok (0, "null") := by decide
+example : (SpecAMQP.Spec.Codec.dataDecl 0x01).isOk = false := by decide
+example : (SpecAMQP.Spec.Value.classify 0x40 : SpecAMQP.Spec.Value.Constructor) = .fixed 0 := by
+  decide
+```
+
+Ordinary `decide`, not `native_decide`: the lookups are computable and finite, so the trust base is
+unchanged. Each branch then owes three things — the constructor octet, the declared form, and the
+recursion at the fuel beneath — with `CursorAgrees` carried through the descent, and the branches
+group by form: described (`0x00`), the four scalar categories (fixed widths 0/1/2/4/8/16, variable
+1/4), compound (`list`, `map`), and array. `wireDescribed` and the compound ones are the only
+branches that consume the induction hypothesis; the scalars and the refusals close against the
+literal alone.
 -/
 
 open Lean (Json)
