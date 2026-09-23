@@ -147,6 +147,62 @@ theorem wireAgrees_zero : WireAgrees 0 := by
       subst hf
       rfl
 
+/-- **One octet, taken by two cursors that agree.** The same octet comes off the same buffer and the
+cursors advance together — a cursor with nothing left fails on both sides with the same class — so every
+branch of the induction begins here.
+
+The cursors are destructured before the equalities are used, because `c.data[c.pos]` is a dependent
+lookup: rewriting `c.data` under it is not type-correct, while `cases` on the equalities of the
+destructured fields substitutes and leaves the lookup well-typed. -/
+theorem takeU8_agrees {c : SpecAMQP.Spec.Codec.Cursor} {c' : SpecAMQP.Ref.Cursor}
+    (hc : CursorAgrees c c') (b : UInt8) (d' : SpecAMQP.Ref.Cursor)
+    (h : SpecAMQP.Ref.takeU8 c' = .ok (b, d')) :
+    ∃ d : SpecAMQP.Spec.Codec.Cursor,
+      SpecAMQP.Spec.Codec.takeU8 c = .ok (b, d) ∧ CursorAgrees d d' := by
+  cases c with | mk data pos =>
+  cases c' with | mk data' pos' =>
+  obtain ⟨hd, hp⟩ := hc
+  cases hd
+  cases hp
+  by_cases hlt : pos < data.size
+  · have hlt' : pos < data.size := hlt
+    rw [SpecAMQP.Spec.Codec.takeU8, dif_pos hlt]
+    rw [SpecAMQP.Ref.takeU8, dif_pos hlt'] at h
+    simp only [Except.ok.injEq, Prod.mk.injEq] at h
+    obtain ⟨hb, hc'⟩ := h
+    subst hb
+    refine ⟨⟨data, pos + 1⟩, rfl, ?_⟩
+    rw [← hc']
+    exact ⟨rfl, rfl⟩
+  · have hlt' : ¬ (pos < data.size) := hlt
+    rw [SpecAMQP.Ref.takeU8, dif_neg hlt'] at h
+    exact absurd h (by simp)
+
+/-- The failure half of the same step: a cursor that has run out refuses on both sides, with the same
+class. -/
+theorem takeU8_fails {c : SpecAMQP.Spec.Codec.Cursor} {c' : SpecAMQP.Ref.Cursor}
+    (hc : CursorAgrees c c') (failure : SpecAMQP.Ref.DecodeError)
+    (h : SpecAMQP.Ref.takeU8 c' = .error failure) :
+    ∃ refusal : SpecAMQP.Spec.Codec.Refusal,
+      SpecAMQP.Spec.Codec.takeU8 c = .error refusal ∧
+      (SpecAMQP.Ref.Frame.valueFailure failure).reasonClass = refusal.reasonClass := by
+  cases c with | mk data pos =>
+  cases c' with | mk data' pos' =>
+  obtain ⟨hd, hp⟩ := hc
+  cases hd
+  cases hp
+  by_cases hlt : pos < data.size
+  · have hlt' : pos < data.size := hlt
+    rw [SpecAMQP.Ref.takeU8, dif_pos hlt'] at h
+    exact absurd h (by simp)
+  · have hlt' : ¬ (pos < data.size) := hlt
+    rw [SpecAMQP.Ref.takeU8, dif_neg hlt'] at h
+    rw [SpecAMQP.Spec.Codec.takeU8, dif_neg hlt]
+    simp only [Except.error.injEq] at h
+    subst h
+    exact ⟨SpecAMQP.Spec.Codec.refusal "truncated"
+      s!"no octet at offset {pos} of {data.size}", rfl, rfl⟩
+
 /-- The description a body announces agrees when the bodies agree: `typeOfDescriptor` inspects only
 `ulong` and `symbol` descriptors, and both readers run `find?` over the *same* generated table, so the
 only obligation is the representational one `BodiesAgree` already carries. Stated case-driven rather
