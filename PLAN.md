@@ -858,6 +858,21 @@ Test forms:
 - **No test may call a network service, a model, a real clock, or randomness.** Third-party capture is manual, off-gate, and its *outputs* are committed; replay is offline. Any generated input uses a committed seed.
 - **Failure-first**: every new contract is run and observed failing before its implementation, with the exact command and diagnostic recorded. A test never observed to fail protects nothing.
 
+**Ownership is what makes a window possible, and this session bought that rule three times.** A slice editing a file
+another slice needs must say so, and say when the file is buildable again. `ImplCore`'s one line — "frame is green at the
+current working tree, holding it still" — cost its author nothing and was worth half an hour to two other slices, which had
+spent that half hour unable to verify anything: `ValueLayer` stopped building rather than report a transient as evidence,
+and `CodecRefusals` could not run the differential at all. Two of the three collisions here were the same event wearing
+different filenames: a proof module repaired by one slice and claimed by another on the strength of a reading taken before
+the repair, and a `Spec/` type change whose proof fallout belonged to a third slice that had already claimed those five
+statements. The third was a `Spec/**` edit that left the package unbuildable while two slices built against it.
+
+The rule that came out of them: **one window at a time in a shared tree, announced before it opens and closed with a
+one-line "green at <state>", and a change to a `Spec/` type together with its proof fallout is one change, so it gets one
+window rather than one per file.** The corollary is the conductor's rather than a slice's: naming the file's owner is what
+lets anyone declare a window at all, and where ownership was unstated the collision happened — the announcement is what
+turned each of these into a message instead of a merge.
+
 ## 17. Verification gates and their negative controls
 
 | Gate | Mechanism | Negative control |
