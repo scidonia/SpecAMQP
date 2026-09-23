@@ -173,17 +173,26 @@ Adopting a reading is a decision *with evidence*, recorded in the ledger as a `s
 
 ```
 lean/Spec/
-  Value.lean        AMQP type system: the value domain and all 39 encodings
-  Wire.lean         frame header, extended header, frame types 0x00/0x01, channel,
-                    protocol header and version negotiation, frame-size limits
-  Performative.lean the 14 frame-level performatives as one inductive, bound to the generated descriptors (forty descriptors exist across the declared types; fourteen are dispatchable performatives)
-  Message.lean      Part 3: sections, annotations, fragmentation, outcomes
-  Endpoint.lean     connection/session/link state machines, error taxonomy
-  Flow.lean         windows, credit, delivery numbers, drain/echo, handles
-  Transaction.lean  Part 4: coordinator, declare, discharge, transactional state
-  Sasl.lean         Part 5: SASL framing, mechanism negotiation, layers
-  Conformance.lean  the interface alphabet and the definition of conformance (§10)
-  Exec.lean         executable driver: vectors in, verdicts out
+  Value.lean         AMQP type system: the value domain and all 39 encodings
+  Codec.lean         the value codec: readers, writers, refusals, and the class vocabulary
+  Frame.lean         frame header, extended header, frame types 0x00/0x01, channel, and the framing
+  FrameCodec.lean    the fourteen frame-level performatives, bound to the generated descriptors
+  Message.lean       Part 3: sections, annotations, fragmentation, outcomes
+  Connection.lean    the connection and session state machines, error taxonomy, SASL framing, and the layers
+  ConnectionCodec.lean  the connection's own codec: header negotiation and the performatives' bodies
+  Session.lean       links, flow, credit, delivery numbers, drain and echo, handles
+  SessionCodec.lean  the session layer's codec
+  Transactions.lean  Part 4: coordinator, declare, discharge, transactional state
+  ReadLaws.lean      the laws the readers obey: progress, consumption, prefix behaviour
+  Main.lean          executable driver: vectors in, verdicts out
+
+*These are the modules the tree holds. Earlier versions of this section named `Wire.lean`, `Performative.lean`,
+`Endpoint.lean`, `Flow.lean`, `Sasl.lean`, `Exec.lean` and a `Spec/Conformance.lean`; the implementation settled them
+elsewhere — the header and framing into `Frame.lean`, the performatives into `FrameCodec.lean`, the state machines into
+`Connection.lean` and `Session.lean`, SASL into `Connection.lean`, the driver into `Main.lean`, and the conformance
+interface into `Contracts/Conformance.lean` where it belongs. **The exemption rule for forward-promised `formalized:`
+values reads this list, so a name kept here that the tree will never hold protects values that nothing checks** — which
+is why the earlier names are recorded as folded rather than left as plans.*
 ```
 
 Requirements:
