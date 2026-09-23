@@ -60,16 +60,15 @@ with both readers refusing the same 77,124 of them. So the sentence this paragra
 that `Conforms specFrame refFrame` is false as an unconditional statement, has no witness left, and
 therefore:
 
-* `frame_conformance_public` is *true and vacuous*: its hypothesis is false, so the theorem says
-  nothing about the two artefacts. It is not withdrawn — the proof is real, the relation is
-  load-bearing under both mutation controls, and the composition is honest — but a reader must not
-  take it as the frame layer's agreement established.
 * `ValueLayersAgree` is **proved**, by `Proofs.ValueWireAgreement`'s `valueLayersAgree` — no
-  hypotheses, axioms within `[propext, Classical.choice, Quot.sound]` — so `frame_conformance_public`
-  is **discharged** rather than conditional, and `frame_receive_conformance` below states the frame
-  layer's receive instance with no hypothesis standing in for the value layer. It was *undecided* for
-  as long as it was, which is the third state this section has had to distinguish: refuted, unproved,
-  and now proved. What the discharge rests on is the wire-agreement module's forty arms, the fuel
+  hypotheses, axioms within `[propext, Classical.choice, Quot.sound]`. **`frame_conformance_public` is
+  therefore discharged and unconditional**, and `frame_receive_conformance` below states the frame
+  layer's receive instance with no hypothesis standing in for the value layer. The theorem was
+  *vacuous* while the hypothesis was refuted and *conditional* while the value layer was unproved; it is
+  neither now, and this section has had to distinguish three states here — refuted, unproved, proved. A
+  reader who met the earlier bullets is owed the correction explicitly: the frame layer's receive half
+  **is** established, and the sentence that said it was not has been removed rather than left beside its
+  replacement. What the discharge rests on is the wire-agreement module's forty arms, the fuel
   irrelevance that aligns its loops, and the readers' position invariance — each of which had to be
   *found* rather than assumed.
 * **The send direction is a different shape, and worse — `Conforms specFrameSend refFrameSend` is

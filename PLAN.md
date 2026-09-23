@@ -325,6 +325,14 @@ rather than vacuous" is now a statement about these two endpoints rather than ab
 declaration, and its being unconditional is the difference the section insisted on. **Four instances are now landed** — frame receive, frame send (conditional on the writer law, with its consequent
 separately recorded as false for a reachable array body), connection, and the value layer's.
 
+**And the discharge survived an independent review that was looking for exactly the failure modes this repository has produced before.** The reviewer measured both axiom sets itself rather than reading them
+from a report, found the contract's `ValueLayersAgree` declared exactly once with no narrower copy anywhere in the tree, traced the joint induction and confirmed **no circularity** — every recursive use
+consumes strictly lower fuel than the level being established, with `wireAgrees_succ`'s `ElementsDecideBelow K` supplied from the induction hypothesis at `K` rather than forwarded — checked that both
+sweeps cover exactly the forty octets the reference's own literal dispatch accepts (by proving, in a fresh scratch file, that every entry satisfies `assignedConstructor` and `elementDecl?`, that both lists
+have length forty, and that they are equal), and confirmed the dispatch consumes each arm one level below the conclusion. It also independently reproduced the *historic refutation* — `#eval` at fuel 2 on
+`#[0xE0,0x02,0x00,0x40]` gives the reference `ok` and the specification `truncated` — which is the measurement that the bound in `WireAgrees` is load-bearing rather than decorative. Its one finding was
+against my prose, and it is recorded above.
+
 **How it closed is worth recording because the shape was not the one planned.** The plan's order was rows, then array arms, then dispatch, then induction — and it was wrong: four of the forty element rows
 are *container* rows, so the element decision cannot be discharged before the value law, and the two are one mutual induction. The sitting proved `wireInvariant : ∀ n, WireAgreesUpTo n ∧ ElementsDecideBelow n`
 by `Nat.rec` and read three corollaries off it, so **every named hypothesis about the readers is discharged rather than carried** — which is the distinction the acceptance turned on. The dispatch is by
@@ -1688,6 +1696,14 @@ modules; what it costs is the discipline of moving a file before the build is tr
 correctly. That direction is harmless — the failure is loud. **The other direction is not**: a probe against a stale olean would report *success* for a claim whose source has since been broken, because the
 imported module is the one that was last built rather than the one on disk. The gates are safe from this by construction — every contract script builds with `LAKE_NO_CACHE=1` before it checks anything — but a
 scratch verification is not, and the rule is therefore: **build the module before probing it, and treat a probe's silence as evidence about the olean until the build has run.**
+
+**And a correction has to reach every sentence that asserts the old state, which means searching for the claim's own words rather than reading forward from the sentence you came to fix.** This is the
+same shape as the `r2` contract paragraph that described landed work as owed and the ledger note that said the model was keyed wrongly — and this time it was against my own commit: I rewrote the bullet
+stating `ValueLayersAgree`'s status and left the bullet **immediately above** it, which still said `frame_conformance_public` was "true and vacuous: its hypothesis is false, so the theorem says nothing
+about the two artefacts". Two adjacent bullets asserting opposite facts about the same theorem, in the module whose acceptance declaration the commit was landing. **The history is worse than one miss**:
+an earlier commit had corrected the same pair once before, editing the adjacent slot rather than the stale one, so **four prose passes over one paragraph each read forward from the sentence they came to
+fix**. The remedy is mechanical and was not used — grep for the claim's own words (`vacuous`, `owed`, `is not modelled`) across the paragraph *and* the file, and fix every hit — because a correction that
+lands beside its predecessor reads as two facts rather than as one fact and its ghost.
 
 ## 17. Verification gates and their negative controls
 
