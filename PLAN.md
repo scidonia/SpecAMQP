@@ -975,6 +975,15 @@ those went stale while the same fact was being corrected in another file. A disp
 sentence rather than from the file they were supposed to cite. And a paragraph I wrote myself was falsified by patch 3 inside the
 hour, because the fix landed after the sentence and before anyone read it.
 
+**And a claim can be repeated in *different words*, which no grep finds.** Two of the eleven stale claims this session survived every
+search for their phrases and were caught only by reading a whole artefact: the README's table called `lean/Shell/` a recv/feed/write
+loop "over the proved core" four lines below the row saying that core's conformance is R3 and undischarged — the same table
+contradicting itself, in a paraphrase no search for "proved to conform" would match — and a handoff command block still said a contract
+did not exist long after it landed, where the stale part is a recipe rather than a sentence. So the rule has two halves and the second
+needs a reader: **grep for the words, and read the artefact whole when it is a table, a list or a recipe**, because a second copy is
+often a paraphrase rather than a repetition. Eleven instances of this defect in one session, two shapes of remedy, and the second one
+found nothing the first could.
+
 The mechanical form is the one that works: **after changing a claim, grep the repository for its words.** The finding is a pointer
 at one copy — it is the copy someone happened to read — and the words are all of them. The words that moved most in this repository
 are "refuted", "vacuous", "as a theorem", "not started", and "vacuous" again; each of them was true somewhere and false in a
