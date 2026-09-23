@@ -1315,7 +1315,7 @@
    "clause_text": "A map in which there exist two identical key values is invalid.",
    "disposition": "deferred:map-duplicate-keys",
    "kind": "UNKEYED",
-   "note": "A map with two identical key values is invalid. This is the sentence that forced the ledger to capture unkeyed statements: it shares a paragraph with two MUST clauses and carries no keyword of its own, so the keyword scan lost it entirely while reporting completeness. The reference reader accepts such a map today and no vector covers it \u2014 a tracked gap, not an oversight. Follow-up: a corpus family of duplicate-key maps (reject) and implementation in both artefacts. The check needs equality of keys, which for compound keys is structural, so it belongs with the value-equality work rather than bolted onto the pair loop.",
+   "note": "Both artefacts decode a map whose keys repeat and admit it, so the rule is not enforced; `vectors/value-boundary-negatives.ndjson` carries two vectors for it (`boundary-negative-map-duplicate-keys-string` and `-null`) with a differing-keys control beside them, so the gap is recorded by vectors rather than by this note alone. Left deferred rather than dispositioned by test: a `test:` names a vector that pins the behaviour, and these pin a rejection neither artefact gives.",
    "text_sha256": "9b2b112f06fbceb126af8f873361d7e623832a136d936d5814d7c502544132d6",
    "unkeyed_phrases": [
     "is invalid"

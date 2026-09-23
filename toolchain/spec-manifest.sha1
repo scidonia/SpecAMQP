@@ -48,7 +48,7 @@ c876f69bb22065b406c11b423b5ffb93d4d18426  vectors/message/sections.ndjson
 5016bfabb395b8ff29564fb6c95208622dd6d652  vectors/txn-negative.ndjson
 ecac919aaaf979c4765bc027729f1934278582cf  vectors/txn.ndjson
 f51ef1e616215fd42bcfc9c7e0839f3ba9cf8db0  vectors/value-boundaries.ndjson
-139f658cfbb242a926477db7adb37345a845b2c6  vectors/value-boundary-negatives.ndjson
+5d5dcf93ed8ab4de1b25795a095cc4d730b0d45f  vectors/value-boundary-negatives.ndjson
 c80948aad7c0afaa70330570dd2624f60982d0b6  ledger/ambiguities/attach-retains-link-flow-state.json
 973e66b7a1143546319dedc4b165a4f508747c78  ledger/ambiguities/channel-zero-layering.json
 b5f824512d926a5475306134bb61ee8c215ae2d2  ledger/ambiguities/check-precedence-unspecified.json
@@ -70,6 +70,7 @@ f1df18bddd8ad6dfa626560dfcf70419598c73dd  ledger/ambiguities/session-state-descr
 6565db734b7b3fe11c1e75c0175fd1a97295984f  ledger/ambiguities/transport-close-not-an-input.json
 c661a0341ee5572bd716861459bcfbedbae36a7f  ledger/ambiguities/unmapped-begin.json
 59045518f02b945530ce6c86810ea0d79bcf1cae  ledger/ambiguities/unmapped-channel-refusal.json
+69182b1732c04cb750dd8bc37ac373fee96f7e38  ledger/ambiguities/value-octets-are-a-prefix.json
 2dd54d7eeae541a3df93bd52a17aae4d8cff5a6e  ledger/ambiguities/version-mismatch-condition.json
 003cbf78615e5a2c39ff63ce21b19ef4ab0b6b68  ledger/ambiguities/zero-width-array-count.json
 7280ec69526349247e0dabbe081cbbcd3c2193e2  ledger/clauses.json
@@ -78,7 +79,7 @@ c661a0341ee5572bd716861459bcfbedbae36a7f  ledger/ambiguities/unmapped-begin.json
 b9adec25fda0261806d98c5ab248e8ea25beb310  ledger/dispositions/part1-types.json
 622542fe3d74b1a5fc091e3f6d021cf3fac9f12d  ledger/dispositions/part2-connection-establishment.json
 360149c9ca009a25aa8976b63ecf81e9a6137eca  ledger/dispositions/picture-review.json
-02fe6b6066365359dc7ba3707e3f295532a383f7  ledger/dispositions/unkeyed-normative.json
+cdbfc59d3d5c69dbaff4ffdd9e031cc7f24d6470  ledger/dispositions/unkeyed-normative.json
 fd83990fdb34dca23fc732e566fa109c98af71b5  ledger/lowercase-keywords.json
 bade00376950e4a224326e89498494519b4c5452  ledger/pictures.json
 745a82ff70e5e9eaa0a4f0a944d56ac4acb99119  ledger/reconciliation.json

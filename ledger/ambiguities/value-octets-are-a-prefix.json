@@ -1,0 +1,24 @@
+{
+ "adopted": "a value owns a prefix; trailing octets belong to the carrier",
+ "clauses": [],
+ "consequences": [
+  "A value-level `reject` vector's bytes are exactly the value's octets. A trailing-octet case belongs to a family whose subject is the carrier \u2014 a frame body, which holds several values in sequence and for which consuming all of the body *is* the contract.",
+  "The `decode` kind still requires consuming the whole buffer, because its vector states the value *and* the octets it came from, so the two coincide there. The `reject` kind has no such shape: it states a refusal and nothing about extent, which is why a boundary family cannot express a trailing-octet defect in it at all.",
+  "Both artefacts decode `40 00` as the null value and ignore the octet after it, and that is correct rather than a shared leniency: the octet is not part of the value."
+ ],
+ "evidence": "A boundary family was drafted with seven `reject` vectors asserting that a value followed by extra octets must be refused, and both artefacts admitted all seven. The drafting error was in the family's own vocabulary rather than in either artefact: the assignment that produced it said a decode consumes all of the octets, which is true of a frame body and false of a value. The vectors are withdrawn rather than kept as expectation-less records, because the value vocabulary has no shape that can hold one \u2014 `reject` requires an `expectError` and `decode` requires consuming the buffer, so any form available would have claimed the defect again. Recorded here so the next reader does not re-derive the case and re-file it as a value-layer defect.",
+ "id": "value-octets-are-a-prefix",
+ "open": false,
+ "question": "Does a decoded value own its whole buffer, or only a prefix of it, when the buffer holds more than the value?",
+ "readings": [
+  {
+   "name": "a value owns a prefix; trailing octets belong to the carrier",
+   "statement": "Adopted. A value's extent is what its own encoding consumes, and what follows is the next value's or the carrier's. A `reject` vector therefore states exactly the value's octets, and any claim about trailing octets is made one level up where the carrier's contract lives."
+  },
+  {
+   "name": "a value-level decode must consume the whole buffer",
+   "statement": "Rejected: it would make the value vocabulary assert a property of frames. It is the reading the withdrawn family was drafted under, and it manufactured seven defects out of a definition."
+  }
+ ],
+ "schema_version": 1
+}
