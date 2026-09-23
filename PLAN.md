@@ -1708,11 +1708,13 @@ lands beside its predecessor reads as two facts rather than as one fact and its 
 **And an import edge can turn a latent name collision live, which is a failure mode with no owner until it has one.** `Proofs.ConnectionConformance` declares a nullary `SpecAMQP.Proofs.StepAgrees` and
 `Proofs.ValueWireAgreement` declares a parameterised one — two different relations sharing a fully-qualified name in a shared namespace, neither module importing the other, so neither had any reason to
 notice and neither was wrong. **The discharge of the value layer's instance added `import Proofs.ValueWireAgreement` to `Contracts/FrameConformance.lean`**, which put both modules in one environment for
-the first time (the trust gate's axiom probe imports the accepted-theorem modules together), and the whole-package build failed with `environment already contains 'SpecAMQP.Proofs.StepAgrees' from
-Proofs.ValueWireAgreement`. **The class is enumerable in one command, from artefacts the repository already builds** — the `.ilean` declaration tables `lake` writes per module are a per-module inventory, so
+the first time (the trust gate's axiom probe imports the accepted-theorem modules together), and **the trust gate's probe** failed with `import Proofs.ConnectionConformance failed, environment already contains
+'SpecAMQP.Proofs.StepAgrees' from Proofs.ValueWireAgreement` — the *package build* at that same commit is green, which is the distinction the next paragraph turns on. **The class is enumerable in one command, from artefacts the repository already builds** — the `.ilean` declaration tables `lake` writes per module are a per-module inventory, so
 `jq -r '.decls|keys[]' .lake/build/lib/lean/*/*.ilean | sort | uniq -d` names every fully-qualified name two modules share. **It is recorded as a check rather than wired as a gate**, for two
-reasons: a stale ilean for a module that has been deleted makes it over-report (the safe direction, but a false-positive mode a gate must not have), and **a live collision is already caught by the right
-gate** — the whole-package build fails inside `s1_proof_integrity`, which is what happened with both names. What the command adds is early warning about a *latent* collision, which is worth having in the
+reasons: a stale ilean for a module that has been deleted makes it over-report (the safe direction, but a false-positive mode a gate must not have), and **a live collision is caught by the probe that exists for exactly this, not by the build**: `lake build` is *green* with a collision present (measured at the pre-fix HEAD — 594 jobs,
+success), because **no module imports both trees** and each compiles in its own environment. What fails is the gate's `Axioms.lean`, whose import list is the only place the two meet, and the gate stops there
+under `set -euo pipefail` before it can note that the package builds. **So the detector is the probe, and its coverage is defined by the probe's import list**: a collision between two modules that only a
+*future* target imports together stays latent in the tree and invisible to `lake build` until something merges the environments the two trees live in. What the command adds is early warning about a *latent* collision, which is worth having in the
 plan and not worth a twentieth contract that can cry wolf. **And the order that matters when fixing one is "who else names this" before "who declares this"**: a name can be pinned from outside — one of
 these two was, by a planner-owned contract stating its public theorem over the fully-qualified name — and the compiler points at that break only *after* the annotation has been applied.
 
@@ -1722,7 +1724,7 @@ slice that fixed it went to the built `.ilean` declaration tables and enumerated
 handed over from a gate's output is a sample of a class. **And the name was pinned from outside**: `Contracts/ConnectionConformance.lean` states `connection_conformance_public (readers : SpecAMQP.Proofs.ReadersAgree)`,
 so for that one the *wire* side had to move and the connection side could not — checked before the annotation was applied rather than after, which is the difference between a local fix and a contract broken three
 directories away. The cost of finding out was an import three modules away from either declaration. Lean has no module-private declarations by default; `private` is the annotation that makes
-a helper local, and a name only ever used inside one file should carry it — the alternative is a name that is global by accident and a build that fails when two such accidents meet.
+a helper local, and a name only ever used inside one file should carry it — the alternative is a name that is global by accident and a collision that fires wherever two such accidents are first imported together.
 
 ## 17. Verification gates and their negative controls
 
