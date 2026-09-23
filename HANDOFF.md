@@ -561,10 +561,10 @@ socket, compared per vector against `amqp-spec` with the same verdict-and-reason
 **Outstanding, and in flight elsewhere in the tree** (`git status --porcelain`):
 
 - **one corpus family** — the link layer's fragmentation adequacy sweep, one message at every
-  permitted split point. The generator support is written and uncommitted
+  permitted split point. The generator support is written and committed
   (`scripts/gen/flows.py`, dispatched by `--flow` / `--flow-negative` in the modified
   `scripts/gen-value-vectors.py`); no committed corpus file or gate clause carries it yet.
-- **one contract draft** — `lean/Contracts/Settlement.lean`, uncommitted: the settlement
+- **one contract draft** — `lean/Contracts/Settlement.lean`, committed: the settlement
   declaration for the `disposition` exchange and the delivery-state bookkeeping. Its own header
   records that a rule about the delivery range or the settled flag cannot be cited to a clause,
   because the fields carrying settlement's mechanics have no keyed clause in the ledger.
