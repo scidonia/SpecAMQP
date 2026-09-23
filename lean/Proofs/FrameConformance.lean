@@ -403,7 +403,7 @@ theorem ofCode_none_iff (code : Nat) :
   by_cases h₀ : code = 0
   · simp [h₀]
   · by_cases h₁ : code = 1
-    · simp [h₀, h₁]
+    · simp [h₁]
     · simp [h₀, h₁]
 
 /-- A buffer shorter than a frame header: the specification refuses it, with the class the
@@ -524,7 +524,7 @@ theorem spec_refuses_truncated_body (bytes : Octets) (e : SpecAMQP.Spec.Codec.Re
   simp only [SpecAMQP.Spec.Frame.declaredSize, SpecAMQP.Spec.Frame.declaredDoff,
     SpecAMQP.Spec.Frame.doffOctets, SpecAMQP.Spec.Frame.headerOctets, SpecAMQP.Spec.Frame.sizeOctets,
     SpecAMQP.Spec.Frame.minDoff, SpecAMQP.Spec.Frame.doffWord, SpecAMQP.Spec.Frame.bodyStart,
-    SpecAMQP.Spec.Frame.channelOctets, beAt_eq, SpecAMQP.Ref.Frame.wordOctets, hτ]
+    SpecAMQP.Spec.Frame.channelOctets, beAt_eq, hτ]
   rw [if_neg h₁, if_neg h₂, if_neg h₃, if_neg h₄, if_neg h₅, if_neg hne, hdec]
   dsimp only []
   rw [if_pos htrunc]
@@ -549,7 +549,7 @@ theorem spec_refuses_body (bytes : Octets) (e : SpecAMQP.Spec.Codec.Refusal)
   simp only [SpecAMQP.Spec.Frame.declaredSize, SpecAMQP.Spec.Frame.declaredDoff,
     SpecAMQP.Spec.Frame.doffOctets, SpecAMQP.Spec.Frame.headerOctets, SpecAMQP.Spec.Frame.sizeOctets,
     SpecAMQP.Spec.Frame.minDoff, SpecAMQP.Spec.Frame.doffWord, SpecAMQP.Spec.Frame.bodyStart,
-    SpecAMQP.Spec.Frame.channelOctets, beAt_eq, SpecAMQP.Ref.Frame.wordOctets, hτ]
+    SpecAMQP.Spec.Frame.channelOctets, beAt_eq, hτ]
   rw [if_neg h₁, if_neg h₂, if_neg h₃, if_neg h₄, if_neg h₅, if_neg hne, hdec]
   dsimp only []
   rw [if_neg hpass]
@@ -574,7 +574,7 @@ theorem spec_refuses_performative_past_size (bytes : Octets) (body : SpecAMQP.Sp
   simp only [SpecAMQP.Spec.Frame.declaredSize, SpecAMQP.Spec.Frame.declaredDoff,
     SpecAMQP.Spec.Frame.doffOctets, SpecAMQP.Spec.Frame.headerOctets, SpecAMQP.Spec.Frame.sizeOctets,
     SpecAMQP.Spec.Frame.minDoff, SpecAMQP.Spec.Frame.doffWord, SpecAMQP.Spec.Frame.bodyStart,
-    SpecAMQP.Spec.Frame.channelOctets, beAt_eq, SpecAMQP.Ref.Frame.wordOctets, hτ]
+    SpecAMQP.Spec.Frame.channelOctets, beAt_eq, hτ]
   rw [if_neg h₁, if_neg h₂, if_neg h₃, if_neg h₄, if_neg h₅, if_neg hne, hdec]
   dsimp only []
   rw [if_pos hpast]
@@ -601,7 +601,7 @@ theorem spec_refuses_malformed_body (bytes : Octets) (body : SpecAMQP.Spec.Codec
   simp only [SpecAMQP.Spec.Frame.declaredSize, SpecAMQP.Spec.Frame.declaredDoff,
     SpecAMQP.Spec.Frame.doffOctets, SpecAMQP.Spec.Frame.headerOctets, SpecAMQP.Spec.Frame.sizeOctets,
     SpecAMQP.Spec.Frame.minDoff, SpecAMQP.Spec.Frame.doffWord, SpecAMQP.Spec.Frame.bodyStart,
-    SpecAMQP.Spec.Frame.channelOctets, beAt_eq, SpecAMQP.Ref.Frame.wordOctets, hτ, hdec]
+    SpecAMQP.Spec.Frame.channelOctets, beAt_eq, hτ, hdec]
   rw [if_neg h₁, if_neg h₂, if_neg h₃, if_neg h₄, if_neg h₅, if_neg hne, if_neg hpast]
   exact ⟨_, rfl, rfl⟩
 
@@ -625,7 +625,7 @@ theorem spec_refuses_unresolved_descriptor (bytes : Octets)
   simp only [SpecAMQP.Spec.Frame.declaredSize, SpecAMQP.Spec.Frame.declaredDoff,
     SpecAMQP.Spec.Frame.doffOctets, SpecAMQP.Spec.Frame.headerOctets, SpecAMQP.Spec.Frame.sizeOctets,
     SpecAMQP.Spec.Frame.minDoff, SpecAMQP.Spec.Frame.doffWord, SpecAMQP.Spec.Frame.bodyStart,
-    SpecAMQP.Spec.Frame.channelOctets, beAt_eq, SpecAMQP.Ref.Frame.wordOctets, hτ, hdec, hdecl]
+    SpecAMQP.Spec.Frame.channelOctets, beAt_eq, hτ, hdec, hdecl]
   rw [if_neg h₁, if_neg h₂, if_neg h₃, if_neg h₄, if_neg h₅, if_neg hne, if_neg hpast]
   exact ⟨_, rfl, rfl⟩
 
@@ -651,7 +651,7 @@ theorem spec_refuses_role_mismatch (bytes : Octets)
   simp only [SpecAMQP.Spec.Frame.declaredSize, SpecAMQP.Spec.Frame.declaredDoff,
     SpecAMQP.Spec.Frame.doffOctets, SpecAMQP.Spec.Frame.headerOctets, SpecAMQP.Spec.Frame.sizeOctets,
     SpecAMQP.Spec.Frame.minDoff, SpecAMQP.Spec.Frame.doffWord, SpecAMQP.Spec.Frame.bodyStart,
-    SpecAMQP.Spec.Frame.channelOctets, beAt_eq, SpecAMQP.Ref.Frame.wordOctets, hτ, hdec, hdecl]
+    SpecAMQP.Spec.Frame.channelOctets, beAt_eq, hτ, hdec, hdecl]
   rw [if_neg h₁, if_neg h₂, if_neg h₃, if_neg h₄, if_neg h₅, if_neg hne, if_neg hpast, hrole]
   exact ⟨_, rfl, rfl⟩
 
@@ -845,11 +845,11 @@ theorem ref_answer_matched (valueAgreement : ValueLayersAgree) (bytes : Octets) 
                                 h₁ h₂ h₃ h₄ h₅ hτ h₇ hspecDec hpast hdecl' hrole', rfl, ?_⟩
                             unfold FrameAgrees
                             refine ⟨rfl, hkind', rfl, ?_, ?_, rfl⟩
-                            · simp only [SpecAMQP.Ref.Frame.headerOctets,
-                                SpecAMQP.Ref.Frame.wordOctets,
-                                SpecAMQP.Spec.Frame.headerOctets,
-                                SpecAMQP.Spec.Frame.doffWord,
-                                SpecAMQP.Spec.Frame.bodyStart]
+                            · simp
+
+
+
+
                             · simp only [specBodyView, refBodyView, Option.map_some,
                                 Option.some.injEq]
                               exact hview'
@@ -1067,7 +1067,7 @@ theorem ref_frame_conforms (valueAgreement : ValueLayersAgree) :
         rw [show specAnswer bytes = .read frame consumed by simp [specAnswer, hread]]
       · simp only [refAnswer, href]
         exact ⟨hagrees, hcount⟩
-      · simp only [refAnswer, href, specAnswer, hread, refOutput, specOutput]
+      · simp only [refAnswer, href, refOutput, specOutput]
         rw [← hagrees.2.1, ← refKind_name frame.frameType]
     | error failure =>
       obtain ⟨refusal, hread, hclass⟩ := (ref_answer_matched valueAgreement bytes.data).2 failure href
@@ -1079,7 +1079,7 @@ theorem ref_frame_conforms (valueAgreement : ValueLayersAgree) :
         rw [show specAnswer bytes = .refused refusal.reasonClass by simp [specAnswer, hread]]
       · simp only [refAnswer, href]
         exact hclass
-      · simp only [refAnswer, href, specAnswer, hread, refOutput, specOutput]
+      · simp only [refAnswer, href, refOutput, specOutput]
         rw [hclass]
 
 /-- The same claim in the existential form `Conforms` states, built through the interface's own

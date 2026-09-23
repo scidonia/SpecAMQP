@@ -838,8 +838,8 @@ theorem writers_matched (writers : ValueWriterAgree)
               | _ =>
                 -- the specification refuses a body that is not a described value, and the
                 -- relation says the reference's body has the same shape
-                cases obody <;> simp only [BodiesAgree] at hbodies ⊢ <;>
-                  exact writeAgrees_error _ _ _
+                cases obody <;> simp only [BodiesAgree] at hbodies ⊢
+                exact writeAgrees_error _ _ _
 
 /-! ## The instance -/
 
