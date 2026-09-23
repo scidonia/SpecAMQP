@@ -2,6 +2,7 @@ import Contracts.Conformance
 import Proofs.FrameConformance
 import Proofs.FrameSendConformance
 import Proofs.ValueCarrierAgreement
+import Proofs.ValueWireAgreement
 
 /-!
 # Acceptance: the frame layer conforms
@@ -63,12 +64,14 @@ therefore:
   nothing about the two artefacts. It is not withdrawn — the proof is real, the relation is
   load-bearing under both mutation controls, and the composition is honest — but a reader must not
   take it as the frame layer's agreement established.
-* `ValueLayersAgree` is **undecided**: no divergence is known — forty-five value-layer buffers, ten
-  frame-level and the eight odd-map corpus vectors agree in class on both artefacts — and no proof
-  exists, because discharging its two conjuncts needs the value layer's own `Conforms` instance.
-  Refuted and unproved are different states, and this one is the second. `frame_conformance_public`
-  is therefore conditional and undischarged rather than vacuous: its hypothesis is named rather than
-  assumed, and calling it vacuous now would be an assertion about a conjecture.
+* `ValueLayersAgree` is **proved**, by `Proofs.ValueWireAgreement`'s `valueLayersAgree` — no
+  hypotheses, axioms within `[propext, Classical.choice, Quot.sound]` — so `frame_conformance_public`
+  is **discharged** rather than conditional, and `frame_receive_conformance` below states the frame
+  layer's receive instance with no hypothesis standing in for the value layer. It was *undecided* for
+  as long as it was, which is the third state this section has had to distinguish: refuted, unproved,
+  and now proved. What the discharge rests on is the wire-agreement module's forty arms, the fuel
+  irrelevance that aligns its loops, and the readers' position invariance — each of which had to be
+  *found* rather than assumed.
 * **The send direction is a different shape, and worse — `Conforms specFrameSend refFrameSend` is
   false.** Not its hypothesis: its consequent. `.array 0x00 [null]` and `.array 0xE0 [null]` are
   accepted by `frameOfJson`, the specification names the refusal `malformed:` because the element is
@@ -123,5 +126,19 @@ theorem frame_send_conformance_public (writers : SpecAMQP.Proofs.ValueWriterAgre
     Conforms SpecAMQP.Proofs.specFrameSend SpecAMQP.Proofs.refFrameSend :=
   conforms_of_conforms_via SpecAMQP.Proofs.specFrameSend SpecAMQP.Proofs.refFrameSend _
     (SpecAMQP.Proofs.ref_frame_send_conforms SpecAMQP.Proofs.valueCarrierAgree_all writers)
+
+/-- **The frame layer's receive direction conforms, discharged.**
+
+`frame_conformance_public` with its hypothesis supplied rather than named: the value layer's agreement
+is a theorem in this tree, so nothing stands between this statement and the two artefacts. It is the
+acceptance declaration for the frame layer's receive half, and its being unconditional is the
+difference between a claim about what would follow and a claim about these two endpoints.
+
+The send half stays conditional on the writer law, and its consequent is separately recorded as false
+for a reachable array body — so this theorem is half of a layer's conformance rather than the whole of
+it, and the section above says which half and why. -/
+theorem frame_receive_conformance :
+    Conforms SpecAMQP.Proofs.specFrame SpecAMQP.Proofs.refFrame :=
+  frame_conformance_public SpecAMQP.Proofs.valueLayersAgree
 
 end SpecAMQP.Contracts

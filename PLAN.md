@@ -1683,6 +1683,12 @@ in that directory sits inside the library's glob and is therefore compiled, scan
 findings were readings, and this is the case where the rule and the gate agree and the only problem was a tree left in a working state. The rule costs a mover nothing, since `/tmp` imports the project's
 modules; what it costs is the discipline of moving a file before the build is treated as evidence, and the second occurrence says that discipline is the part worth stating.
 
+**And an ad-hoc probe tests the built artefact, not the source — which cuts both ways and caught me once.** Verifying the new `frame_receive_conformance` used `lake env lean` on a scratch file that
+*imported* `Contracts.FrameConformance`; the import resolved against the `.olean` from before the edit, so the probe reported `unknown constant` for a theorem that was in the source and elaborating
+correctly. That direction is harmless — the failure is loud. **The other direction is not**: a probe against a stale olean would report *success* for a claim whose source has since been broken, because the
+imported module is the one that was last built rather than the one on disk. The gates are safe from this by construction — every contract script builds with `LAKE_NO_CACHE=1` before it checks anything — but a
+scratch verification is not, and the rule is therefore: **build the module before probing it, and treat a probe's silence as evidence about the olean until the build has run.**
+
 ## 17. Verification gates and their negative controls
 
 | Gate | Mechanism | Negative control |
