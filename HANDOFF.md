@@ -26,7 +26,7 @@ the `grep` that re-locates it; the line numbers are as of the tree at the time o
 Lean 4; a clause-level ledger with dispositions and a coverage report; a vector corpus; the
 gates that check all three; and — since `PLAN.md` §23.1 — an implementation track: a Lean
 endpoint compiled natively, its transport boundary landed, its protocol core being written, and
-that core to be a proved instance of the conformance relation (§8).
+that core to carry a stated instance of the conformance relation (§8), with its proof owed.
 
 **Is not.** There is no Rust here, no Charon/Aeneas extraction, and no performance claim
 (`git grep -n "There is no Rust here" -- AGENTS.md`). There is no *verified binary*: Lean's
@@ -469,7 +469,7 @@ but not exercised by the loopback run; a stale README claim that the pinned stdl
 and the absence of a planner-owned R1 contract under `tests/contracts/`, so the mutant controls
 were not independently reviewable. What has moved since: the response commit `5945434` fixes the
 disclosure and the path and commits the controls, the README text is corrected in the current
-tree, and the missing contract now exists — uncommitted — at
+tree, and the missing contract now exists, committed, at
 `tests/contracts/r1_transport_shell.sh`. **The verdict has not been re-run**: the review artifact
 still reads `changes_requested`, and there is no in-tree record of the verdict anywhere — it is
 session state, not repository state.
@@ -538,7 +538,7 @@ git log --oneline -1 -- lean/Impl     # R2's core, committed
 ls lean/Impl
 ```
 
-**R3 — the conformance theorem: not started, and its declaration is not written either.** The statement is frozen in
+**R3 — the conformance theorem: the statement is frozen and the proof is not written.** The statement is frozen in
 `Contracts/EndpointConformance.lean` and the proof is what remains, so the "not started" this entry carried all
 session now applies to the proof alone. What exists: `lean/Impl/Core.lean:311`
 already defines `specCore : Endpoint State`, so the specification's side of the interface is wrapped by the
@@ -592,18 +592,13 @@ socket, compared per vector against `amqp-spec` with the same verdict-and-reason
   print(sum(1 for f in glob.glob('vectors/**/*.ndjson',recursive=True) for l in open(f) if l.strip() and json.loads(l)['kind']=='recorded'))"
   ```
 
-**Two records that disagree about this section, stated so neither is trusted blindly.** `PLAN.md`
-§23's opening sentence describes the endpoint as one "whose protocol core is proved to conform to
-the frozen interface, with its socket layer as the one named unproved dependency". The second
-half of that is true and R1 landed it; the first is not yet — R2's core is committed but its review
-is not closed: the second transcription is gone and the shipped shell now has a gate, while the
-fragmentation property remains unproved and has moved inside the value layer's carrier development,
-since the two lemmas it needs are the two that development needs. R3 has not started and has no
-declaration, so what `lean/Impl/` holds today is the transport boundary plus a landed core whose
-conformance is owed (`grep -n "whose protocol core is proved" PLAN.md`; `git status --porcelain lean/Impl`).
-`README.md`'s "What is here" table carries the same reading — "the shipped endpoint: a pure
-protocol core proved to conform" — with the same qualification
-(`grep -n "shipped endpoint" README.md`). Everything else in §23's and §23.1's account of what
+**Two records that disagreed about this section, and the disagreement is resolved.** `PLAN.md` §23's opening sentence and
+`README.md`'s prose and "What is here" table all said the endpoint's protocol core was *proved* to conform. None of them says
+it now: §23 and the README both carry the *frozen statement* with the proof owed, and the statement itself lives in
+`Contracts/EndpointConformance.lean`. What R2's review left open has also closed — the second transcription is gone, the shipped
+shell has a gate, and the fragmentation property has moved inside the value layer's carrier development, since the two lemmas it
+needs are the two that development needs. **R3's proof is what remains.** The three copies of the overstatement are the reason
+this section is kept: one was found by a review and two by grepping for the claim rather than for the finding. Everything else in §23's and §23.1's account of what
 exists matches the tree as checked above: the interface is frozen and landed, the ledger and
 corpus exist, `lake exe amqp-spec` exists, the pin agreement is checked, the six-operation
 surface is real, and the three instances are landed — but they prove the *layers*, not the

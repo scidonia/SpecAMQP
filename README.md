@@ -6,7 +6,8 @@ with a clause-level ledger that makes completeness and fidelity *measurable* rat
 **This repository holds a specification, and a reference implementation of it.** It defines what a
 conforming AMQP 1.0 endpoint must do, states that as mathematics a machine can run, records for every clause
 of the standard how — and to what extent — the specification accounts for it, and ships an endpoint written
-in Lean whose protocol core is proved to conform to the specification it states. What it does not ship is a
+in Lean whose protocol core carries the specification's conformance statement — frozen in `Contracts/EndpointConformance.lean`,
+with R3 as the proof still owed — and whose framing laws are proved. What it does not ship is a
 *verified binary*: Lean's compiler is trusted, the socket boundary and the Lean shell that drives it are the unproved parts, and
 `PLAN.md` §23.1 names both rather than leaving them to be inferred.
 
@@ -40,7 +41,8 @@ instance of that same conformance relation. TemperMint's Rust programme, its ext
 Aeneas, and the proofs about it remain TemperMint's work and are not replaced by it: the endpoint here is a
 second instance of the relation, and the corpus is what the two are compared over.
 
-**How far the endpoint's evidence reaches.** Its protocol core is proved to conform, under the same gates as
+**How far the endpoint's evidence reaches.** Its protocol core's conformance is *stated* rather than proved — the claim is frozen in
+`Contracts/EndpointConformance.lean` and R3 is the proof — so what is proved about its parts today is the framing laws, under the same gates as
 every other proof in this repository. Its compiled form is a *trusted* step rather than a proved one — Lean's
 compiler and runtime are not verified — and its socket layer is a small, separately named unproved
 dependency: **a choice rather than a necessity**, because the pinned stdlib does have TCP (`Std.Async/TCP`,
