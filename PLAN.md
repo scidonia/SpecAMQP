@@ -756,6 +756,16 @@ established four statement-level facts that are conditions on the *statement* ra
 reader's is false at fuel zero for a width-zero declaration the declared surface has no row for, every clause must carry the *buffer invariance* of its read because a loop's tail is read at a cursor the
 item read advanced, and the specification's readers are one `mutual` block, so their unfoldings are the compiler's equations rather than iota — `unfold` or `cases` reduces them, not `rfl`.
 
+**And the irrelevance is proved, so the fuel offset is closed at the level it was found** — `FuelIrrelevant`/`FuelIrrelevantUpTo` with `fuelIrrelevant_all`, and a corollary per reader
+(`readValue_irrel`, `readItems_irrel`, `readCompound_irrel`, `readArrayData_irrel`, `specElementData_irrel`, `readElementsLoop_irrel`), resting on a six-clause buffer-invariance cluster
+(`readRows_data`, the companion of `readValue_progress`) and on `AnswerAgrees`, which is the relation shape the loops need: an agreement on answers *and* classes, with its own `bind` composition
+lemmas. The item loop then landed at one fuel on both sides (`ItemsAgree`, `readItems_loop`), and the compound body on the list rows (`readCompound_list_body`) — so four of the six recursive arms are
+reduced to their octet step, their classify/table resolution and a call to that body. **The entry point is still not reached**, and the sitting recorded the two relations still outstanding — the map rows
+and the array element loop's one-fuel offset — rather than reporting progress as proximity.
+
+**And it declined to inherit a claim it could not check**: the previous sitting described the entry point as free once the loops compose, and this one says plainly that it did not verify that. **A handover
+that carries an unverified claim forward is how a plan acquires facts nobody measured** — the same rule as the docstring that said the two readers spend the same fuel, one sitting later.
+
 **And one finding refuted a second claim, in a docstring rather than a law.** `WireAgrees`'s own rationale said the two readers "spend the same fuel per value, per compound item and per array element", which
 the compound rows refute; the docstring now carries the witness beside the bound it explains. **A rationale is a claim like any other and decays the same way** — this is the same lesson as the plan text
 that described landed work as owed and the note that said the model was keyed wrongly, arriving this time inside a proof module, where the temptation is to read prose as commentary rather than assertion.
