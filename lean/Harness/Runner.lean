@@ -250,9 +250,26 @@ def runVectorWith (codec : Codec) (frames : FrameCodec) (json : Json) : Except S
     -- (`truncated: …`, `limit: …`): the *implementation's* reason is the observable
     -- the differential contract compares, and a harness that replaced it with the
     -- vector's protocol condition would make every refusal look alike.
+    --
+    -- And when the vector *pins* a class, only that class is a pass. That comparison
+    -- was missing here until a boundary corpus needed it: the field was stated in the
+    -- corpus and dropped by the runner, so two artefacts refusing the same buffer with
+    -- different classes both reported `pass` and the divergence the field exists to
+    -- expose read as agreement. The `encode` path above has compared it since it was
+    -- written; this one now does too, so a pinned class means what it says.
     let bytes ← octetsOf json
+    let pinned : Option String :=
+      match json.getObjVal? "expectError" with
+      | .ok expectation => (expectation.getObjValAs? String "reason").toOption
+      | .error _ => none
     match codec.decode bytes with
-    | .error reason => return ⟨id, kind, true, reason⟩
+    | .error reason =>
+      if pinned.isNone || reasonClassOf reason == pinned then
+        return ⟨id, kind, true, reason⟩
+      else
+        return ⟨id, kind, false,
+          s!"refused as {reasonClassOf reason |>.getD "no class"}, and the vector names \
+            {pinned.getD ""}: {reason}"⟩
     | .ok (value, _) =>
       return ⟨id, kind, false, s!"expected rejection, decoded {value.compress}"⟩
   | "property" =>
