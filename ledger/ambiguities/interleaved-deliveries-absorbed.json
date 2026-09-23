@@ -1,0 +1,30 @@
+{
+ "adopted": "the restriction is accepted and its consequence recorded: a second delivery's first transfer is absorbed as a continuation and keeps the first delivery's id",
+ "clauses": [
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.31"
+ ],
+ "consequences": [
+  "A peer that interleaves two deliveries on one link is admitted, and the second delivery's first transfer is treated as a continuation of the delivery already in progress. The session keeps the *first* delivery's id, so the second delivery never exists as a delivery at all.",
+  "`links.31` is not enforced against the peer, and that is deliberate rather than missing: the clause constrains the *sender*. The artifact does not say what a receiver does when a non-conforming peer interleaves, so refusing loudly would be inventing a receiver behaviour.",
+  "The transfer fields a continuation carries are not compared to the first transfer's either, which is a *separate* finding and a defect rather than a reading: `delivery-tag.u1` says \"It is an error if X on a continuation transfer differs\", and the probe that found this one showed the differing-tag case admitted by both artefacts."
+ ],
+ "evidence": "Probed rather than reasoned: three transfers on one link, delivery 0's first, delivery 1's first, then delivery 0's continuation, all with `more` set, are admitted step-for-step by both artefacts over 21 verdicts with no refusals. The model holds one delivery (`Session.delivery`), which is the restriction `ledger/ambiguities/link-uniqueness-vacuous.json` records; what that probe adds is what the restriction costs. A model that represented interleaving would need a map from delivery-tags to states, which is the same widening that register entry already names, so this entry records the consequence rather than proposing the change.",
+ "id": "interleaved-deliveries-absorbed",
+ "open": false,
+ "question": "What does the model do when a peer interleaves two deliveries on one link, given that it holds a single delivery?",
+ "readings": [
+  {
+   "name": "absorbed as a continuation of the delivery in progress",
+   "statement": "Adopted, as the consequence of a restriction already recorded rather than as a new decision. The second delivery's first transfer is read as a continuation, the held delivery keeps its id, and nothing refuses. The register entry exists so that a reader who finds the restriction vacuous learns what it actually costs."
+  },
+  {
+   "name": "refuse the interleaving loudly",
+   "statement": "Rejected: the artifact constrains the sender and says nothing about a receiver's answer, so a refusal would be our invention standing where the artifact is silent \u2014 the same reason `transport-close-not-an-input` declines to reuse a condition that means something else."
+  },
+  {
+   "name": "model a map from delivery-tags to states so interleaving is representable",
+   "statement": "Not adopted here: it is the widening `link-uniqueness-vacuous.json` already names, and it is a model change rather than a reading. Recorded as the shape of the slice that would make the restriction observable."
+  }
+ ],
+ "schema_version": 1
+}
