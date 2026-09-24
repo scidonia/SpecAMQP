@@ -18,9 +18,7 @@ by step: where they disagree, one of them has misread the standard.
   is proved to conform to the specification.
 
 
-The specification is meant to be a target, not a description: conformance is defined as a state machine over
-a fixed interface alphabet, and implementations prove their own instances of it. `PLAN.md` is the programme
-of record.
+Conformance is defined as a state machine over a fixed interface alphabet, so any implementation can be checked against the specification directly. `PLAN.md` is the programme of record.
 
 ## What is here
 
@@ -34,7 +32,7 @@ of record.
 | `lean/Shell/` | the shipped process: the recv/feed/write loop and the socket lifecycle |
 | `lean/Harness/`, `lean/Contracts/`, `lean/Proofs/` | the runner and its reason-class vocabulary; the acceptance declarations; their proofs |
 | `ledger/` | the clause ledger, its coverage and reconciliation, and the **ambiguity register** — every place the standard is silent and a reading was taken |
-| `vectors/` | the test vectors: authored from clauses or recordings, **never produced by the executable specification** |
+| `vectors/` | the test vectors, each authored from a clause or recorded from a third-party implementation |
 | `tests/contracts/` | the gates |
 | `bench/` | off-gate timing evidence for the corpus instruments |
 | `PLAN.md` | the programme of record, including its own rules of evidence |
