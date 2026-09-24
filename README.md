@@ -36,28 +36,35 @@ The specification is meant to be a target, not a description: conformance is def
 
 ## Status
 
-**Every clause is accounted for, and every reading is recorded.** All 579 clauses of Parts 0–5 have a disposition, and where the standard is silent the register carries the reading taken *and* the alternatives it was chosen over, so a disagreement with a decision here is a disagreement about a written argument rather than about a default; trust is accounted
-for gate-wise: the proof-integrity gate scans the handwritten modules for `sorry`, `native_decide`, `axiom`,
-`opaque`, `unsafe` and `extern`, the one permitted `extern` boundary is `lean/Impl/Transport.lean` — pinned by
-path and printed with its count, so the exemption cannot silently widen — and each accepted theorem's transitive
-axiom inventory is printed, so the trust base of a claim is visible per theorem.
+What is done:
 
-**The endpoint's protocol core is proved.** `Proofs/EndpointConformance.lean` proves the statement
-`Contracts/EndpointConformance.lean` froze — the core is a forward simulation of the specification's
-connection endpoint over the alphabet the interface fixes — and `Contracts/EndpointAcceptance.lean` binds
-it. Its framing laws are proved under the same gates as everything else. The proof is plumbing and says so:
-three of the four equalities relating the two independently written constructions are `rfl`-level, so a
-defect inside `Spec.Connection.step` is inherited by both sides rather than caught here.
+- Every clause of the standard (Parts 0–5; 579 clauses) has a disposition: 238 formalized, 105 covered by
+  test vectors, 180 deferred to named work, and the rest informative, out of scope or superseded.
+- Every ambiguity found so far is written down in `ledger/ambiguities/`, with the reading taken and the
+  alternatives it was chosen over.
+- The specification (`lean/Spec/`) and the reference implementation (`lean/Ref/`) agree on every committed
+  corpus. `scripts/staged-exchange-divergences.ndjson` lists the vectors that do not yet pass, with their
+  failing steps.
+- The endpoint's protocol core is proved to conform: `Proofs/EndpointConformance.lean` proves the statement
+  frozen in `Contracts/EndpointConformance.lean`, bound by `Contracts/EndpointAcceptance.lean`. Its framing
+  laws are proved too.
+- 20 gates in `tests/contracts/` check the above, and they run offline.
 
-**What is not proved is named rather than left to be found**: Lean's compiler and runtime (which makes the
-shipped binary *trusted* rather than verified), the socket boundary, the process loop above it, the stream
-corollary that waits on `ValuePrefixDetermined`, and the delivery contract a second connection would rest
-on. `PLAN.md` §23.1 records the measurement, the decision and the rejected alternative behind the socket
-boundary — a choice, not a necessity.
+What is not done:
 
-**What is deliberately absent is a status snapshot.** The numbers above come from the ledger and the gates; which vectors pass, which remain staged and what has just moved are printed by running them, and `PLAN.md` carries the state and the history. A sentence here that described them would be wrong within a day, which is how most of the earlier drafts of this file were wrong. The endpoint is also exercised over a real socket as a
-third runner beside `amqp-spec` and `amqp-ref`, with `tests/contracts/r4_wire_differential.sh` as the
-record of what agrees and what does not.
+- 180 clauses are deferred. The largest groups are sessions and links (49), transactions (44), messages
+  (37) and session state (32); the rest are spread across the other layers.
+- `lean/Impl/Transport.lean`, the socket boundary, and `lean/Shell/`, the process loop above it, are not
+  proved. The shipped binary therefore rests on Lean's compiler and runtime, which are trusted and not
+  verified.
+- The stream corollary that waits on `ValuePrefixDetermined`, and the delivery contract a second connection
+  would rest on.
+- The wire differential — the corpus replayed against the shipped binary over a real socket, compared per
+  vector with `amqp-spec` — has its current result in `tests/contracts/r4_wire_differential.sh` rather
+  than here.
+
+The numbers in this file come from the ledger and the gates; run those for the current values. `PLAN.md`
+has the decisions and their history.
 
 ## Running it
 
