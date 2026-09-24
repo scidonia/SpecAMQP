@@ -43,17 +43,22 @@ that guard needs. Two consequences of the model's shape are worth stating rather
   it is the property `handle.2`'s mandated close is a response to, and the corpus's
   `exchange-link-handle-in-use` pins exactly that refusal.
 
-## Why `attachLink`'s proof uses guard lemmas
+## Two routes over the same join points
 
 `attachLink` is a `do`-block whose guards are `refuseUnless (condition) (refusal …)`, and Lean
 elaborates each into an `if` whose condition is `decide condition = true` and whose branches build
 a `Unit` or a refusal. Such an `if` sits inside the block's `>>=` chain, where the `let`-bindings
-the elaborator introduces as join points stand between `split` and it, so this proof states the
-chain shapes as lemmas — `guard_last`, `guard_chain1`, `guard_chain2` and `guard_chain2_tail` —
-and rewrites the hypothesis with them. The conditions are `Prop`-valued in the lemmas, so each
-applies to a call site's `decide`-formed condition; nothing in them mentions this layer. The three
-ties at the end of this module take the other route over the same obstacle — `dsimp only` reduces
-those bindings and `split` then cases the `if` — and the section there records what that turned on.
+the elaborator introduces as join points stand between `split` and it, so a proof that wants to
+case the guards has to get those bindings out of the way first.
+
+Two routes do that, and this module once used one for `attachLink` and the other for the three ties
+at its end. The reducing route — `dsimp only`, then `split` — is now what all four ties use,
+`attachLink` included, because it needs no lemma per chain shape and survives a guard being added
+to the block; the section below records what each one needed. The route kept here is the
+one for call sites that *rewrite a hypothesis* rather than reduce it: `guard_last` and
+`guard_chain2_tail` state the shapes a `refuseUnless` chain takes, so an equality can be inverted
+into the guards that justified it. `Proofs/Settlement.lean` uses both. They are `Prop`-valued, so
+each applies to a call site's `decide`-formed condition, and nothing in them mentions this layer.
 -/
 
 namespace SpecAMQP.Proofs.HandleUniqueness
@@ -65,9 +70,9 @@ open SpecAMQP.Spec.Connection (fieldValue valueNat)
 /-! ## The guard-chain lemmas
 
 Each is the monadic fact a `do`-block of guards takes: if such a chain *succeeded*, then every
-guard passed and the value it built is the one the equality reports. They are stated once here
-because four operations in this layer share the shape, and their proofs are the case analysis the
-`if` would have had if `split` could reach it. -/
+guard passed and the value it built is the one the equality reports. `Proofs/Settlement.lean` is
+the call site that inverts a hypothesis with them; the four ties in this module reach the same
+facts by reducing the block instead, which is why the family is two members rather than four. -/
 
 /-- A final guarded value: the chain succeeded exactly when its guard did not fire and the value
 it built is the one the equality reports. -/
@@ -75,23 +80,8 @@ theorem guard_last {ε α : Type _} (c : Prop) [Decidable c] (r : ε) (rec a : �
     ((if c then .error r else (Except.ok rec : Except ε α)) = .ok a) ↔ ¬c ∧ rec = a := by
   by_cases h : c <;> simp_all
 
-/-- One `refuseUnless` guard followed by any computation. -/
-theorem guard_chain1 {ε α : Type _} (c1 : Prop) [Decidable c1] (r1 : ε) (k : Except ε α)
-    (a : α) :
-    (((if c1 then (Except.ok () : Except ε Unit) else .error r1) >>= fun _ => k) = .ok a) ↔
-      c1 ∧ k = .ok a := by
-  by_cases h1 : c1 <;> simp_all
-
-/-- Two guards followed by a value the block builds. -/
-theorem guard_chain2 {ε α : Type _} (c1 c2 : Prop) [Decidable c1] [Decidable c2]
-    (r1 r2 : ε) (rec a : α) :
-    (((if c1 then (Except.ok () : Except ε Unit) else .error r1) >>= fun _ =>
-      (if c2 then .error r2 else (Except.ok () : Except ε Unit)) >>= fun _ =>
-      (Except.ok rec : Except ε α)) = .ok a) ↔ c1 ∧ ¬c2 ∧ rec = a := by
-  by_cases h1 : c1 <;> by_cases h2 : c2 <;> simp_all
-
-/-- Two guards followed by any computation: the same facts, for the chains a later `match`
-continues. -/
+/-- Two guards followed by any computation: the shapes a `refuseUnless` chain takes, so the
+equality can be inverted into the guards that justified it. -/
 theorem guard_chain2_tail {ε α : Type _} (c1 c2 : Prop) [Decidable c1] [Decidable c2]
     (r1 r2 : ε) (k : Except ε α) (a : α) :
     (((if c1 then (Except.ok () : Except ε Unit) else .error r1) >>= fun _ =>
@@ -165,29 +155,24 @@ state rather than as a branch somebody wrote. -/
 theorem attachLink_handle_uniqueness {s s' : Session} (outbound : Bool) (body : Value)
     (h : HandleUniqueness s) (hstep : attachLink s outbound body = .ok s') :
     HandleUniqueness s' := by
-  -- The `do`-block's guards are `if decide c = true` chains, which `split` cannot case from
-  -- inside the `>>=`, and its three lookups are `Option.bind` applications, which `split` cannot
-  -- case either. The lookups are named first, then the guards rewritten by the chain lemmas.
-  unfold attachLink refuseUnless at hstep
-  repeat (first | split at hstep | simp at hstep)
-  all_goals (try (cases hv : (fieldValue "attach" "role" body).bind LinkRole.ofValue))
-  all_goals (try (cases hw : (fieldValue "attach" "handle" body).bind valueNat))
-  all_goals (try (simp only [guard_chain2, guard_chain2_tail, guard_chain1, guard_last] at hstep))
-  all_goals (try (cases hv2 : (fieldValue "attach" "role" body).bind LinkRole.ofValue
-    <;> simp_all))
-  all_goals (try (cases hw2 : (fieldValue "attach" "handle" body).bind valueNat <;> simp_all))
-  all_goals (try (cases hcount : (fieldValue "attach" "initial-delivery-count" body).bind valueNat
-    <;> simp_all))
-  all_goals (try (simp only [guard_chain2, guard_chain2_tail, guard_chain1, guard_last] at hstep))
-  all_goals (try (rw [Except.ok.injEq] at hstep))
-  all_goals (first
-    | (obtain ⟨_, _, hrec⟩ := hstep)
-    | (obtain ⟨_, hrec⟩ := hstep))
-  all_goals (try (obtain ⟨_, hrec⟩ := hrec))
-  all_goals (try (cases hrec))
-  all_goals (try (refine ⟨?_, ?_, ?_, ?_⟩ <;> simp_all [HandleUniqueness, List.nodup_cons,
-    List.mem_cons, List.not_mem_nil, Option.some.injEq]))
-  all_goals (try (simp_all [HandleUniqueness]))
+  -- The reduction `flowLink`'s tie uses, over a block that also *writes* a handle. `dsimp only`
+  -- reduces the join points the elaborator puts around the `let`-bindings, `pure_bind` turns each
+  -- `let x ← pure x` into the value it carries, and the loop cases every conditional it reaches —
+  -- the two handle guards, the three `Option` lookups and the two terminus guards — closing a
+  -- refused branch against the successor equality as soon as it is reached. What survives is the
+  -- branch's record together with the guards that justified it, which is what the four conjuncts
+  -- are then proved from; the fresh-handle conjunct turns on the inverted `handle.1` guard, which
+  -- is in context as `¬ handle ∈ s.handles`.
+  unfold attachLink refuseUnless terminusRefusalOf at hstep
+  dsimp only at hstep
+  simp only [pure_bind] at hstep
+  repeat' (first
+    | cases hstep
+    | split at hstep
+    | simp only [pure_bind] at hstep
+    | simp only [Except.ok.injEq] at hstep)
+  all_goals (refine ⟨?_, ?_, ?_, ?_⟩ <;> simp_all [HandleUniqueness, List.nodup_cons,
+    List.mem_cons])
 
 /-! ## Releasing a link, and the two operations that move a delivery
 
@@ -216,6 +201,13 @@ built from.
 
 ## What each tie needed
 
+* **`attachLink`** — the same reduction, and the one block that *writes* a handle: `unfold
+  attachLink refuseUnless terminusRefusalOf`, `dsimp only`, `simp only [pure_bind]`, then the
+  `repeat'` loop, which cases the two handle guards, the three `Option` lookups and the two
+  terminus guards, closing every refusing branch against the successor equality. What survives is
+  the branch's record with the guards in context — `¬ handle ∈ s.handles` among them — so the
+  fresh-handle conjunct is `List.nodup_cons` against that guard rather than a frame lemma. No
+  `by_cases`, no helper lemma, no rearrangement of the block.
 * **`detachLink`** — `unfold`, `dsimp only`, two `split` rounds (the release condition, then the
   direction the detach travels) and `cases` on the successor equality. It closes with
   `HandleUniqueness.of_option_le`, which was already here: a detach releases the handle of its own
@@ -235,7 +227,7 @@ built from.
   one the expensive case. Then `cases` and `HandleUniqueness.frame` again, over `position`,
   `delivery`, `deliveryTag` and `deliveryFormat`. No `by_cases`, no new helper, no rearrangement.
 
-No `by_cases` on a named condition, and no helper lemma, was needed by any of the three: with the
+No `by_cases` on a named condition, and no helper lemma, was needed by any of the four: with the
 join points reduced the conditionals are reached by `split`, and each successor's four facts are
 `rfl` for a record update over fields its operation never writes. Nothing here changed how the
 invariant is stated — the same four conjuncts, both registries duplicate-free with each live handle
@@ -289,13 +281,18 @@ theorem flowLink_handle_uniqueness {s s' : Session} (outbound : Bool) (body : Va
   all_goals (try exact h)
   all_goals (try exact HandleUniqueness.frame h rfl rfl rfl rfl)
 
-set_option maxHeartbeats 1600000 in
+set_option maxHeartbeats 3200000 in
 /-- **A transfer preserves handle uniqueness.** The successor is a record update over `position`,
 `delivery`, `deliveryTag` and `deliveryFormat`; like a flow, no branch of the exchange writes a
 handle or a registry, so the frame lemma's four equalities are `rfl`. This is the reduction that
 needs `cases` inside the loop rather than after it: the guards a transfer refuses on are what makes
 its `do`-block the largest of the four, and a refused branch closes against the successor equality
-as soon as `split` reaches it. -/
+as soon as `split` reaches it.
+
+The budget is twice the other ties' because the block gained one more guard — the
+`delivery-tag` bound `transferLink` now enforces — and every guard costs the loop a `split` level
+over a hypothesis the size of the whole remaining chain. At 1,600,000 the loop exhausts the budget
+before it reaches the record; the reduction completes, and this is the budget it completes under. -/
 theorem transferLink_handle_uniqueness {s s' : Session} (outbound : Bool) (body : Value)
     (h : HandleUniqueness s) (hstep : transferLink s outbound body = .ok s') :
     HandleUniqueness s' := by

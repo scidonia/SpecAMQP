@@ -56,7 +56,7 @@ open SpecAMQP.Harness (Octets)
 open SpecAMQP.Spec.Codec (Value)
 open SpecAMQP.Spec.Connection (fieldValue valueNat valueOctets)
 open SpecAMQP.Proofs.HandleUniqueness
-  (guard_last guard_chain1 guard_chain2 guard_chain2_tail bind_ok_iff if_ok_right)
+  (guard_last guard_chain2_tail bind_ok_iff if_ok_right)
 
 /-! ## The invariant -/
 

@@ -143,6 +143,16 @@ FLOW_FIELDS_REQUIRE_HANDLE = [
     for field in ("available", "delivery-count", "drain", "link-credit", "properties")
 ]
 
+# The fields a flow carries only when it names a link: the handle, and the two quantities
+# the two ends hold between them. A vector about the session's own windows — the frame-size
+# bound, the window arithmetic — leaves them unset, and `Corpus.flow_body`'s `absent` and
+# `null` say which of the two unset encodings the vector is about.
+FLOW_LINK_FIELDS = ("handle", "delivery-count", "link-credit")
+# The two of them the count rules read: `.2` makes the sender's flow carry one, `.3` makes
+# the receiver's echo the other, and a vector that leaves both off states a presence the
+# rule forbids.
+FLOW_COUNT_FIELDS = ("delivery-count", "link-credit")
+
 WINDOW_REMOTE_INCOMING = f"{TRANSPORT}#amqp:transport/section:sessions/doc:session-flow-control.3"
 WINDOW_INCOMING = f"{TRANSPORT}#amqp:transport/section:sessions/doc:session-flow-control.5"
 WINDOW_AFTER_SENDING = f"{TRANSPORT}#amqp:transport/section:sessions/doc:session-flow-control.5"
@@ -622,19 +632,54 @@ class Corpus:
                          closed={"type": "boolean", "value": closed})
 
     def flow_body(self, handle: int = 0, delivery_count: int = 0, link_credit: int = 0,
-                  next_incoming: int | None = 0, next_outgoing: int = 0,
-                  incoming: int = 1000, outgoing: int = 1000) -> dict:
+                  next_incoming: int = 0, next_outgoing: int = 0,
+                  incoming: int = 1000, outgoing: int = 1000,
+                  absent: tuple[str, ...] = (), null: tuple[str, ...] = (),
+                  **extra: dict) -> dict:
         """A `flow` for one link: the handle it names, the delivery-count the doc's
-        `flow-control` defines, and the credit the receiver grants."""
-        return self.body("flow", **{
-            "next-incoming-id": ({"type": "uint", "value": next_incoming}
-                                 if next_incoming is not None else {"type": "null"}),
+        `flow-control` defines, and the credit the receiver grants.
+
+        A flow's count rules are about a field's *presence*, and a field absent from the
+        field list and one present as the type system's null are different encodings of
+        "unset" — the corpus carries both for `delivery-count`, because the clause reads
+        them alike. `absent` names the fields left off the list and `null` the fields
+        written as null; a field list is positional, so `absent` applies only to a suffix
+        and `null` only where a field the vector sets follows, and naming one in the
+        wrong form raises rather than silently becoming the other.
+
+        `extra` carries fields the parameters above do not name — `available`,
+        `properties` — as field values, exactly as `body` takes them, so a vector that
+        sets one of them still builds its flow here rather than assembling the
+        performative under a second writer."""
+        names = self.fields["flow"]
+        values: dict[str, dict] = {
+            "next-incoming-id": {"type": "uint", "value": next_incoming},
             "incoming-window": {"type": "uint", "value": incoming},
             "next-outgoing-id": {"type": "uint", "value": next_outgoing},
             "outgoing-window": {"type": "uint", "value": outgoing},
             "handle": {"type": "uint", "value": handle},
             "delivery-count": {"type": "uint", "value": delivery_count},
-            "link-credit": {"type": "uint", "value": link_credit}})
+            "link-credit": {"type": "uint", "value": link_credit},
+            **extra}
+        absent, null = set(absent), set(null)
+        for name in absent | null:
+            if name not in values:
+                raise SystemExit(f"gen-exchange-vectors: flow declares no field {name}")
+            values[name] = {"type": "null"}
+        written = [index for index, name in enumerate(names)
+                   if name in values and name not in absent | null]
+        last = max(written) if written else -1
+        for name in absent:
+            if names.index(name) < last:
+                raise SystemExit(
+                    f"gen-exchange-vectors: flow's {name} is named absent with a set "
+                    f"field after it — a field list is positional, so it is written null")
+        for name in null:
+            if names.index(name) >= last:
+                raise SystemExit(
+                    f"gen-exchange-vectors: flow's {name} is named null with nothing set "
+                    f"after it — the encoder drops trailing nulls, which is its absent form")
+        return self.body("flow", **values)
 
     def fragment_body(self, index: int, count: int, delivery_id: int = 0,
                       handle: int = 0, settled: bool | None = None) -> dict:
@@ -1213,13 +1258,6 @@ def corpus(tables: Corpus) -> list[dict]:
 
     # The two frames below are the same flow — the session's windows, which is a body
     # every layer reads and no link rule constrains — padded to a total the vector states.
-    def window_flow() -> dict:
-        return t.body("flow", **{
-            "next-incoming-id": {"type": "uint", "value": 0},
-            "incoming-window": {"type": "uint", "value": 1000},
-            "next-outgoing-id": {"type": "uint", "value": 0},
-            "outgoing-window": {"type": "uint", "value": 1000}})
-
     def sized_receive(body: dict, total: int, *, state: str, channel: int = 1) -> dict:
         return {"direction": "receive",
                 "bytes": frame_octets(AMQP_FRAME, body, channel=channel,
@@ -1239,10 +1277,12 @@ def corpus(tables: Corpus) -> list[dict]:
                t.send_frame(AMQP_FRAME, t.begin_body(), state=s("BEGIN_SENT"), channel=1),
                t.receive_frame(AMQP_FRAME, t.begin_body(remote_channel=1),
                                state=s("MAPPED"), channel=1),
-               sized_receive(window_flow(), t.min_max_frame_size, state=s("MAPPED")),
+               sized_receive(t.flow_body(absent=FLOW_LINK_FIELDS), t.min_max_frame_size,
+                             state=s("MAPPED")),
                t.refused("receive", reason="limit", state=c("DISCARDING"),
-                         body=window_flow(), channel=1,
-                         payload=payload_to_total(AMQP_FRAME, window_flow(),
+                         body=t.flow_body(absent=FLOW_LINK_FIELDS), channel=1,
+                         payload=payload_to_total(AMQP_FRAME,
+                                                  t.flow_body(absent=FLOW_LINK_FIELDS),
                                                   t.min_max_frame_size + 1),
                          note="one octet more than the maximum frame size this peer "
                               "announced in its own open, which the clause makes the "
@@ -1369,8 +1409,9 @@ def session_corpus(tables: Corpus) -> list[dict]:
     attach_clauses = [SESSION_STATES, ATTACH_MANDATORY, ATTACH_DEFAULTS]
 
     def windows(next_outgoing: int = 0, incoming: int = 1000, outgoing: int = 1000) -> dict:
-        """The three window fields begin and flow both make mandatory, as field values a
-        body builder fills in."""
+        """The three window fields a `begin` makes mandatory, as field values its body
+        builder fills in. A `flow` names these three and `next-incoming-id` as well, and
+        its body comes from `flow_body`, which writes all four."""
         return {"next-outgoing-id": {"type": "uint", "value": next_outgoing},
                 "incoming-window": {"type": "uint", "value": incoming},
                 "outgoing-window": {"type": "uint", "value": outgoing}}
@@ -1378,19 +1419,24 @@ def session_corpus(tables: Corpus) -> list[dict]:
     def transfer(**kwargs) -> dict:
         return t.transfer_body(**kwargs)
 
-    def link_flow(handle: int = 0, **fields: dict) -> dict:
-        """A flow that names the link, carrying the four session windows and whichever of
-        the link's own fields the vector sets. `flow_body` writes all three of those, and
-        the count and credit vectors are about the ones a flow leaves off, so this writes
-        the windows and the handle and nothing else unless it is asked.
+    def link_flow(handle: int = 0, delivery_count: int | None = None,
+                  link_credit: int | None = None) -> dict:
+        """A flow that names the link: the four session windows, the handle, and whichever
+        of the two count fields the vector sets. The count and credit vectors are about
+        the fields a flow leaves off, so both are absent unless the vector names a value —
+        and the body itself is `flow_body`'s, so a vector that leaves one off asks there
+        rather than assembling the performative itself.
 
-        `windows()` is the begin's three fields — a flow names `next-incoming-id` as well,
-        and the session rules require it once the peer's begin has arrived, so a flow built
-        from them alone is a frame refused for the wrong reason."""
-        return t.body("flow", **windows(),
-                      **{"next-incoming-id": {"type": "uint", "value": 0},
-                         "handle": {"type": "uint", "value": handle}},
-                      **fields)
+        The four windows are the session's rather than the link's: a flow names
+        `next-incoming-id` as well as the begin's three, and the session rules require it
+        once the peer's begin has arrived, so a flow built from the begin's fields alone
+        is a frame refused for the wrong reason."""
+        return t.flow_body(
+            handle=handle, delivery_count=delivery_count or 0,
+            link_credit=link_credit or 0,
+            absent=tuple(name for name, value in
+                         zip(FLOW_COUNT_FIELDS, (delivery_count, link_credit))
+                         if value is None))
 
     def link_up(role_sender: bool = False, handle: int = 0, peer_handle: int = 0,
                 credit: int = 1000, peer_settle: int | None = None,
@@ -1518,7 +1564,8 @@ def session_corpus(tables: Corpus) -> list[dict]:
         clauses=[FLOW_NEXT_INCOMING_ID, SESSION_ERRORS],
         steps=[t.refused("receive", reason="malformed", state=s("DISCARDING"),
                          condition=INVALID_FIELD,
-                         body=t.body("flow", **windows()), channel=1,
+                         body=t.flow_body(absent=FLOW_LINK_FIELDS,
+                                          null=("next-incoming-id",)), channel=1,
                          note="the begin has been received, so a flow's next-incoming-id "
                               "MUST be set, and this one is not"),
                t.receive_frame(AMQP_FRAME, t.body("end"), state=s("UNMAPPED"), channel=1)],
@@ -1558,10 +1605,10 @@ def session_corpus(tables: Corpus) -> list[dict]:
         "exchange-session-incoming-id-must-be-set", start=s("MAPPED"),
         clauses=[FLOW_NEXT_INCOMING_ID, IDLE_DISCARDS],
         steps=[t.receive_frame(AMQP_FRAME,
-                               t.body("flow", **windows(), **{"next-incoming-id": {"type": "uint", "value": 0}}),
+                               t.flow_body(absent=FLOW_LINK_FIELDS),
                                state=None, channel=1),
                t.send_frame(AMQP_FRAME,
-                            t.body("flow", **windows(), **{"next-incoming-id": {"type": "uint", "value": 0}}),
+                            t.flow_body(absent=FLOW_LINK_FIELDS),
                             state=None, channel=1)],
         note="the same field, set: the rule is that next-incoming-id MUST be set "
              "once the peer has received the begin frame, and it has, so both "
@@ -1569,19 +1616,13 @@ def session_corpus(tables: Corpus) -> list[dict]:
 
     # -- the session's flow-control arithmetic ---------------------------------- #
 
-    def flow_frame(next_outgoing=0, incoming=1000, outgoing=1000, next_incoming=0) -> dict:
-        return t.body("flow", **{"next-incoming-id": ({"type": "uint", "value": next_incoming}
-                                                      if next_incoming is not None
-                                                      else {"type": "null"}),
-                                 "incoming-window": {"type": "uint", "value": incoming},
-                                 "next-outgoing-id": {"type": "uint", "value": next_outgoing},
-                                 "outgoing-window": {"type": "uint", "value": outgoing}})
-
     vectors.append(exchange(
         "exchange-session-window-remote-incoming", start=s("MAPPED"),
         clauses=[WINDOW_REMOTE_INCOMING, WINDOW_AFTER_FLOW, WINDOW_AFTER_SENDING],
         steps=link_up(role_sender=True) + [
-               t.receive_frame(AMQP_FRAME, flow_frame(incoming=1), state=None, channel=1),
+               t.receive_frame(AMQP_FRAME,
+                               t.flow_body(absent=FLOW_LINK_FIELDS, incoming=1),
+                               state=None, channel=1),
                t.send_frame(AMQP_FRAME, transfer(), state=None, channel=1),
                t.refused("send", reason="limit", state=s("MAPPED"), condition=WINDOW_VIOLATION,
                          body=transfer(), channel=1,
@@ -1597,11 +1638,11 @@ def session_corpus(tables: Corpus) -> list[dict]:
         "exchange-session-window-recomputed", start=s("MAPPED"),
         clauses=[WINDOW_AFTER_FLOW, WINDOW_AFTER_SENDING],
         steps=link_up(role_sender=True) + [
-               t.receive_frame(AMQP_FRAME, flow_frame(incoming=0), state=None, channel=1),
+               t.receive_frame(AMQP_FRAME, t.flow_body(absent=FLOW_LINK_FIELDS, incoming=0), state=None, channel=1),
                t.refused("send", reason="limit", state=s("MAPPED"), condition=WINDOW_VIOLATION,
                          body=transfer(), channel=1,
                          note="a flow that leaves the window empty"),
-               t.receive_frame(AMQP_FRAME, flow_frame(incoming=5), state=None, channel=1),
+               t.receive_frame(AMQP_FRAME, t.flow_body(absent=FLOW_LINK_FIELDS, incoming=5), state=None, channel=1),
                t.send_frame(AMQP_FRAME, transfer(), state=None, channel=1)],
         note="the doc says the endpoint MUST update the remote windows \'directly from\' the "
              "frame, so a later flow replaces an earlier one: the window is empty, then "
@@ -1978,8 +2019,7 @@ def session_corpus(tables: Corpus) -> list[dict]:
                                state=s("MAPPED"), channel=1),
                t.refused("send", reason="malformed", condition=INVALID_FIELD,
                          state=s("MAPPED"),
-                         body=link_flow(**{"delivery-count": {"type": "uint", "value": 0},
-                                           "link-credit": {"type": "uint", "value": 5}}),
+                         body=link_flow(delivery_count=0, link_credit=5),
                          channel=1)],
         note="the conservation law in the direction this endpoint owns: the receiver chose "
              "three, and the flow we write as the link's sender names five, so the step is "
@@ -1998,8 +2038,7 @@ def session_corpus(tables: Corpus) -> list[dict]:
                                t.flow_body(handle=0, delivery_count=0, link_credit=3),
                                state=s("MAPPED"), channel=1),
                t.send_frame(AMQP_FRAME,
-                            link_flow(**{"delivery-count": {"type": "uint", "value": 0},
-                                         "link-credit": {"type": "uint", "value": 3}}),
+                            link_flow(delivery_count=0, link_credit=3),
                             state=s("MAPPED"), channel=1)],
         note="the conforming form of the same quantity: the sender's flow echoes the three "
              "the receiver last indicated, and every step is admitted. It is the "
@@ -2051,7 +2090,7 @@ def session_corpus(tables: Corpus) -> list[dict]:
     vectors.append(exchange(
         "exchange-session-receive-in-end-sent", start=s("END_SENT"),
         clauses=[SESSION_STATES, WINDOW_AFTER_FLOW],
-        steps=[t.receive_frame(AMQP_FRAME, flow_frame(next_incoming=0),
+        steps=[t.receive_frame(AMQP_FRAME, t.flow_body(absent=FLOW_LINK_FIELDS),
                                state=s("END_SENT"), channel=1),
                t.receive_frame(AMQP_FRAME, t.body("end"), state=s("UNMAPPED"), channel=1)],
         note="END_SENT keeps the incoming channel map, so a flow arriving on it is this "
@@ -2061,7 +2100,7 @@ def session_corpus(tables: Corpus) -> list[dict]:
     vectors.append(exchange(
         "exchange-session-send-in-end-rcvd", start=s("END_RCVD"),
         clauses=[SESSION_STATES, WINDOW_AFTER_FLOW],
-        steps=[t.send_frame(AMQP_FRAME, flow_frame(next_incoming=0),
+        steps=[t.send_frame(AMQP_FRAME, t.flow_body(absent=FLOW_LINK_FIELDS),
                             state=s("END_RCVD"), channel=1),
                t.send_frame(AMQP_FRAME, t.body("end"), state=s("UNMAPPED"), channel=1)],
         note="END_RCVD keeps its outgoing channel number with no incoming entry, so a flow "
@@ -2390,8 +2429,7 @@ def session_corpus(tables: Corpus) -> list[dict]:
                             channel=1),
                t.refused("send", reason="malformed", condition=INVALID_FIELD,
                          state=s("MAPPED"),
-                         body=link_flow(**{"delivery-count": {"type": "uint", "value": 5},
-                                           "link-credit": {"type": "uint", "value": 0}}),
+                         body=link_flow(delivery_count=5, link_credit=0),
                          channel=1)],
         note="the value half in the same direction: the count we write has to be this "
              "endpoint's own current one, and five is not the count of a sender that has "
@@ -2446,8 +2484,7 @@ def session_corpus(tables: Corpus) -> list[dict]:
         steps=[peer_receiver_only,
                t.refused("receive", reason="malformed", condition=INVALID_FIELD,
                          state=s("DISCARDING"),
-                         body=link_flow(**{"delivery-count": {"type": "uint", "value": 0},
-                                           "link-credit": {"type": "uint", "value": 0}}),
+                         body=link_flow(delivery_count=0, link_credit=0),
                          channel=1)],
         note="the count a receiver may not name yet: the peer attached as the link's "
              "receiver and this endpoint has not attached, so it has seen no sender to "

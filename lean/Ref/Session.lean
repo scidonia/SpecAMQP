@@ -575,9 +575,40 @@ def readHandle (endpoint : Endpoint) (outbound : Bool) (typeName : String) (body
       .error (refuse unattachedHandleCondition "illegalState"
         s!"the {typeName} names handle {handle}, and this endpoint's link is {mine}")
 
+/-- A message-layer refusal as this layer's. The message layer's refusal is the corpus's
+shape — a condition and a detail whose leading token is the class — and this layer spells the
+class as a field, so the condition travels across, the detail is split where the two shapes
+meet, and the state is left where it is. The class is read back out of the detail rather than
+guessed: the message layer keeps no separate field for it. -/
+def ofMessageRefusal (reason : SpecAMQP.Harness.Refusal) : Refusal :=
+  match reason.detail.splitOn ": " with
+  | className :: rest =>
+    { condition := reason.condition, reasonClass := className,
+      text := String.intercalate ": " rest, place := none, closes := false }
+  | [] =>
+    { condition := reason.condition, reasonClass := "malformed", text := reason.detail,
+      place := none, closes := false }
+
+/-- The refusal a terminus the attach carries earns, or `none` where the frame carries no
+such field. Part 3's `source` and `target` are field records whose documentation states rules
+about them, and which endpoint sent the frame is an input to those rules — the attach's own
+`role` field names the link endpoint its sender is. A null or absent field is not read: the
+four `attach/source` and `attach/target` clauses that speak of a null terminus describe the
+link endpoint a peer declined to create, and a value that is not there is not a terminus to
+check. -/
+def terminusRefusalOf (sentBy : Message.SentBy) (field : String) (body : Value) :
+    Option Refusal :=
+  match valueOfField "attach" field body with
+  | none | some .null => none
+  | some value =>
+    match Message.terminusOfValue sentBy value with
+    | .ok _ => none
+    | .error reason => some (ofMessageRefusal reason)
+
 /-- One side of the attach exchange: the handle rules of `attach/field:handle` and
-`begin/field:handle-max`, the delivery-count a sender's attach must carry, and the flow
-state the doc's `flow-control` gives a fresh link. -/
+`begin/field:handle-max`, the delivery-count a sender's attach must carry, the terminus
+either of the frame's `source` and `target` fields carries, and the flow state the doc's
+`flow-control` gives a fresh link. -/
 def attachLink (endpoint : Endpoint) (outbound : Bool) (body : Value) :
     Except Refusal Endpoint := do
   let role ←
@@ -607,6 +638,18 @@ def attachLink (endpoint : Endpoint) (outbound : Bool) (body : Value) :
         .error (refuse invalidFieldCondition "malformed"
           "a sender's attach MUST carry its initial delivery-count")
       else pure 0
+  -- `attach/source` and `attach/target`: a terminus the frame carries is read as one, with
+  -- the endpoint that sent the frame taken from the attach's own role field, which is the
+  -- input Part 3's address rules are conditioned on. A null or absent field is not read —
+  -- the four `attach/source` and `attach/target` clauses about a null terminus — so a link
+  -- endpoint the peer declined to create is not handed to the reader as a value.
+  let sentBy := if role == Role.sender then Message.SentBy.sender else Message.SentBy.receiver
+  match terminusRefusalOf sentBy "source" body with
+  | some reason => .error reason
+  | none => pure ()
+  match terminusRefusalOf sentBy "target" body with
+  | some reason => .error reason
+  | none => pure ()
   let settle :=
     -- the choice, not the element: `settled.4`'s antecedent is the `settled` value of
     -- `sender-settle-mode`, read from the generated choice table rather than typed
@@ -791,6 +834,22 @@ def negotiatedSettleRefusal? (endpoint : Endpoint) (body : Value) (settled abort
   | some reason => some reason
   | none => unsettledSettleRefusal? endpoint settled aborted
 
+/-- The largest binary `delivery-tag` the type's documentation allows:
+`definitions/type:delivery-tag.u1` — "A delivery-tag can be up to 32 octets of binary data."
+The bound is prose in the artifact and has no generated table, so it is handwritten here the
+way this layer handwrites its own frame layout limits. -/
+def maxDeliveryTagOctets : Nat := 32
+
+/-- Whether a transfer's `delivery-tag` is within the bound the type's documentation states. The
+clause names no condition for a tag over it, so the refusal that reads this is a **reading**:
+`amqp:invalid-field` with the `malformed` class, which is the family the clause ledger uses for a
+field that violates its declared bound. A condition is observable, so it is named here rather
+than left for a reader to infer. A frame carrying no binary tag has nothing to bound, so absence
+reads as within it. -/
+def deliveryTagInBounds (body : Value) : Bool :=
+  ((valueOfField "transfer" "delivery-tag" body).bind octetsOf).map
+    (fun tag => decide (tag.length ≤ maxDeliveryTagOctets)) |>.getD true
+
 /-- The link's half of a transfer: the role its direction requires, the credit a sender
 spends, the fields a first transfer must carry, the `settled` interpretation with
 `settled.4`'s obligation at the end of a delivery, and `aborted`'s discard — which voids
@@ -814,6 +873,12 @@ def transferLink (endpoint : Endpoint) (outbound : Bool) (body : Value) :
   let carriedId := (valueOfField "transfer" "delivery-id" body).bind numberOf
   let carriedTag := (valueOfField "transfer" "delivery-tag" body).bind octetsOf
   let carriedFormat := (valueOfField "transfer" "message-format" body).bind numberOf
+  -- `definitions/type:delivery-tag.u1`'s bound, as `deliveryTagInBounds` reads it: see that
+  -- declaration's docstring for the condition this refusal is a reading of.
+  if !deliveryTagInBounds body then
+    .error (refuse invalidFieldCondition "malformed"
+      "the transfer's delivery-tag carries more than the 32 octets of binary data the type \
+        allows")
   let id ←
     match carriedId with
     | some id => pure id

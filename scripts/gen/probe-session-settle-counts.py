@@ -42,11 +42,6 @@ def s(state: str) -> str:
     return f"session:{state}"
 
 
-def windows() -> dict:
-    return {"next-incoming-id": {"type": "uint", "value": 0},
-            "incoming-window": {"type": "uint", "value": 1000},
-            "next-outgoing-id": {"type": "uint", "value": 0},
-            "outgoing-window": {"type": "uint", "value": 1000}}
 
 
 def main() -> int:
@@ -63,9 +58,7 @@ def main() -> int:
         clauses=[FLOW_COUNT_4, END_ON_ERROR, SESSION_ERRORS],
         steps=[peer_receiver,
                t.refused("receive", reason="malformed", condition=INVALID, state=s("DISCARDING"),
-                         body=t.body("flow", **windows(), handle={"type": "uint", "value": 0},
-                                     **{"delivery-count": {"type": "uint", "value": 0},
-                                        "link-credit": {"type": "uint", "value": 0}}),
+                         body=t.flow_body(delivery_count=0, link_credit=0),
                          channel=1)],
         note="`delivery-count.4`: the receiving link endpoint has not yet seen the sender's attach, "
              "so its flow MUST NOT set the field — it carries the field it must omit"))
@@ -75,7 +68,7 @@ def main() -> int:
         clauses=[FLOW_COUNT_4, FLOW_COUNT_3],
         steps=[peer_receiver,
                t.receive_frame(AMQP_FRAME,
-                               t.body("flow", **windows(), handle={"type": "uint", "value": 0}),
+                               t.flow_body(absent=("delivery-count", "link-credit")),
                                state=s("MAPPED"), channel=1)],
         note="`delivery-count.4`'s conforming form: the same receiver's flow with the field omitted "
              "is what the clause requires before the sender's attach is seen"))
@@ -89,7 +82,7 @@ def main() -> int:
         clauses=[FLOW_COUNT_2, FLOW_COUNT_3, END_ON_ERROR, SESSION_ERRORS],
         steps=[own_sender,
                t.refused("send", reason="malformed", condition=INVALID, state=s("MAPPED"),
-                         body=t.body("flow", **windows(), handle={"type": "uint", "value": 0}),
+                         body=t.flow_body(absent=("delivery-count", "link-credit")),
                          channel=1)],
         note="`delivery-count.2`/`.3`'s presence half, in the direction the corpus never reaches: a "
              "flow this endpoint writes that names the link MUST set the field"))
@@ -99,9 +92,7 @@ def main() -> int:
         clauses=[FLOW_COUNT_2, FLOW_COUNT_3, END_ON_ERROR, SESSION_ERRORS],
         steps=[own_sender,
                t.refused("send", reason="malformed", condition=INVALID, state=s("MAPPED"),
-                         body=t.body("flow", **windows(), handle={"type": "uint", "value": 0},
-                                     **{"delivery-count": {"type": "uint", "value": 5},
-                                        "link-credit": {"type": "uint", "value": 0}}),
+                         body=t.flow_body(delivery_count=5, link_credit=0),
                          channel=1)],
         note="`delivery-count.2`/`.3`'s value half, same direction: the field MUST be this "
              "endpoint's current count, and five is not it"))
@@ -150,9 +141,7 @@ def main() -> int:
                                t.flow_body(handle=0, delivery_count=0, link_credit=3),
                                state=s("MAPPED"), channel=1),
                t.refused("send", reason="malformed", condition=INVALID, state=s("MAPPED"),
-                         body=t.body("flow", **windows(), handle={"type": "uint", "value": 0},
-                                     **{"delivery-count": {"type": "uint", "value": 0},
-                                        "link-credit": {"type": "uint", "value": 5}}),
+                         body=t.flow_body(delivery_count=0, link_credit=5),
                          channel=1)],
         note="link-credit's ownership in the sending direction: the sender's value is always the "
              "last known value indicated by the receiver, and five is not the three it was sent"))
@@ -168,9 +157,7 @@ def main() -> int:
                                t.flow_body(handle=0, delivery_count=0, link_credit=3),
                                state=s("MAPPED"), channel=1),
                t.send_frame(AMQP_FRAME,
-                            t.body("flow", **windows(), handle={"type": "uint", "value": 0},
-                                   **{"delivery-count": {"type": "uint", "value": 0},
-                                      "link-credit": {"type": "uint", "value": 3}}),
+                            t.flow_body(delivery_count=0, link_credit=3),
                             state=s("MAPPED"), channel=1)],
         note="the same sentence's conforming form: the sender's flow echoes the three the receiver "
              "last indicated"))

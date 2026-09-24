@@ -736,11 +736,35 @@ def flowCreditEchoRefusal? (session : Session) (outbound : Bool) (body : Value) 
             known value for it is {current.credit}")
       | _, _ => none
 
+/-- The refusal a terminus the attach carries earns, or `none` where the frame carries no
+such field. Part 3's `source` and `target` are field records whose documentation states rules
+about them, and which endpoint sent the frame is an input to those rules — the attach's own
+`role` field names the link endpoint its sender is. A null or absent field is not read: the
+four `attach/source` and `attach/target` clauses that speak of a null terminus describe the
+link endpoint a peer declined to create, and a value that is not there is not a terminus to
+check.
+
+The message layer's refusal is the corpus shape — a condition and a class-led detail — and
+this layer's refusal is the session's, so the condition and the detail travel across
+unchanged and the state is left where it is, which is how `stepTransaction` places the
+transaction layer's refusal too. -/
+def terminusRefusalOf (sentBy : Message.SendingEndpoint) (field : String) (body : Value) :
+    Option Refusal :=
+  match fieldValue "attach" field body with
+  | none | some .null => none
+  | some value =>
+    match Message.terminusOfValue sentBy value with
+    | .ok _ => none
+    | .error reason =>
+      some { condition := reason.condition, detail := reason.detail, state := none,
+             closesConnection := false }
+
 /-- The attach exchange: the handle rules (`attach/field:handle.1` — "The handle MUST NOT
 be used for other open links" — with `.2`'s mandated close, and `begin/field:handle-max`
 in both directions), the delivery-count the sender's attach must carry
 (`attach/field:initial-delivery-count.1` — "This MUST NOT be null if role is sender"),
-and the flow state the doc's `flow-control` defines for a fresh link. -/
+the terminus either of the frame's `source` and `target` fields carries, and the flow state
+the doc's `flow-control` defines for a fresh link. -/
 def attachLink (session : Session) (outbound : Bool) (body : Value) :
     Except Refusal Session := do
   let role ←
@@ -783,6 +807,19 @@ def attachLink (session : Session) (outbound : Bool) (body : Value) :
         .error (refusal invalidField "malformed"
           "a sender's attach MUST carry its initial delivery-count")
       else pure 0
+  -- `attach/source` and `attach/target`: a terminus the frame carries is read as one, with
+  -- the endpoint that sent the frame taken from the attach's own role field, which is the
+  -- input Part 3's address rules are conditioned on. A null or absent field is not read —
+  -- the four `attach/source` and `attach/target` clauses about a null terminus — so a link
+  -- endpoint the peer declined to create is not handed to the reader as a value.
+  let sentBy := if role == LinkRole.sender then Message.SendingEndpoint.sender
+                else Message.SendingEndpoint.receiver
+  refuseUnless ((terminusRefusalOf sentBy "source" body).isNone)
+    ((terminusRefusalOf sentBy "source" body).getD
+      (refusal invalidField "malformed" "the attach's source is not a valid terminus"))
+  refuseUnless ((terminusRefusalOf sentBy "target" body).isNone)
+    ((terminusRefusalOf sentBy "target" body).getD
+      (refusal invalidField "malformed" "the attach's target is not a valid terminus"))
   let senderSettle :=
     -- `transfer/field:settled.4`'s antecedent is the *choice* `<xref name="sender-settle-mode"
     -- choice="settled"/>` of `attach`'s `snd-settle-mode` field, not the field's declared
@@ -959,6 +996,22 @@ def negotiatedSettleRefusal? (session : Session) (body : Value) (settled aborted
   | some reason => some reason
   | none => unsettledSettleRefusal? session settled aborted
 
+/-- The largest binary `delivery-tag` the type's documentation allows:
+`definitions/type:delivery-tag.u1` — "A delivery-tag can be up to 32 octets of binary data."
+The bound is prose in the artifact and has no generated table, so it is handwritten here the
+way the frame layer handwrites its own layout limits. -/
+def maxDeliveryTagOctets : Nat := 32
+
+/-- Whether a transfer's `delivery-tag` is within the bound the type's documentation states. The
+clause names no condition for a tag over it, so the refusal that reads this is a **reading**:
+`amqp:invalid-field` with the `malformed` class, which is the family the clause ledger uses for a
+field that violates its declared bound. A condition is observable, so it is named here rather
+than left for a reader to infer. A frame carrying no binary tag has nothing to bound, so absence
+reads as within it. -/
+def deliveryTagInBounds (body : Value) : Bool :=
+  ((fieldValue "transfer" "delivery-tag" body).bind valueOctets).map
+    (fun tag => decide (tag.size ≤ maxDeliveryTagOctets)) |>.getD true
+
 /-- The transfer exchange. What is here is what the transfer clauses and the doc's
 `flow-control` make checkable per frame: the role the direction requires, the credit a
 sender spends, the first-transfer fields `delivery-id`, `delivery-tag` and
@@ -982,6 +1035,12 @@ def transferLink (session : Session) (outbound : Bool) (body : Value) :
   let carriedId := (fieldValue "transfer" "delivery-id" body).bind valueNat
   let carriedTag := (fieldValue "transfer" "delivery-tag" body).bind valueOctets
   let carriedFormat := (fieldValue "transfer" "message-format" body).bind valueNat
+  -- `definitions/type:delivery-tag.u1`'s bound, as `deliveryTagInBounds` reads it: see that
+  -- declaration's docstring for the condition this refusal is a reading of.
+  refuseUnless (deliveryTagInBounds body)
+    (refusal invalidField "malformed"
+      "the transfer's delivery-tag carries more than the 32 octets of binary data the type \
+        allows")
   let id ←
     match carriedId with
     | some id => pure id
