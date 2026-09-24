@@ -31,6 +31,7 @@ c80948aad7c0afaa70330570dd2624f60982d0b6  ledger/ambiguities/attach-retains-link
 973e66b7a1143546319dedc4b165a4f508747c78  ledger/ambiguities/channel-zero-layering.json
 b5f824512d926a5475306134bb61ee8c215ae2d2  ledger/ambiguities/check-precedence-unspecified.json
 6292292dc07ef18bb452326358be8c2e0a711c77  ledger/ambiguities/compound-size-field.json
+f0a5a536ee5fa80d7edb54ebba12e6c02e428432  ledger/ambiguities/empty-sasl-frame-refusal.json
 20131c9f40d375af402d2dea11e7fa6efac6acbf  ledger/ambiguities/fail-true-against-an-unknown-id.json
 9cb58a5caf168e43340942811352ca89b5c978cd  ledger/ambiguities/flow-link-field-without-handle.json
 1e4244761b674c05d55c077b5eb729c296911b75  ledger/ambiguities/head-only-payload-admitted.json
