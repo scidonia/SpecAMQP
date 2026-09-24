@@ -15,9 +15,11 @@ This module proves that property as a **preserved invariant**, in the idiom
 `Proofs/SessionCredit.lean` established: the initial state, a generic step for every operation
 that leaves the four fields alone, and one theorem per operation that moves them. Where the credit
 module's three moving cases are stated over the branch records and *not* tied to their `do`-blocks,
-this one is tied: `attachLink_handle_uniqueness` is stated over `attachLink` itself and discharges
-the guards the function runs, which is what makes "allocation is fresh against the live handle set"
-a theorem about the operation rather than about a shape somebody transcribed.
+this one is tied: `attachLink_handle_uniqueness`, `detachLink_handle_uniqueness`,
+`flowLink_handle_uniqueness` and `transferLink_handle_uniqueness` are each stated over their own
+operation and discharge the guards it runs, which is what makes "allocation is fresh against the
+live handle set" — and its preservation by the three operations that share the state — a theorem
+about the code rather than about a shape somebody transcribed.
 
 ## What the invariant is, and why the registry suffices
 
@@ -41,15 +43,17 @@ that guard needs. Two consequences of the model's shape are worth stating rather
   it is the property `handle.2`'s mandated close is a response to, and the corpus's
   `exchange-link-handle-in-use` pins exactly that refusal.
 
-## Why the proof needs guard lemmas
+## Why `attachLink`'s proof uses guard lemmas
 
 `attachLink` is a `do`-block whose guards are `refuseUnless (condition) (refusal …)`, and Lean
 elaborates each into an `if` whose condition is `decide condition = true` and whose branches build
-a `Unit` or a refusal. A `split` cannot case such an `if` when it sits inside the block's `>>=`
-chain, which is where all four live, so the module states the chain shapes as lemmas —
-`guard_last`, `guard_chain1`, `guard_chain2` and `guard_chain2_tail` — and rewrites the hypothesis
-with them. The conditions are `Prop`-valued in the lemmas, so each applies to a call site's
-`decide`-formed condition; nothing in them mentions this layer.
+a `Unit` or a refusal. Such an `if` sits inside the block's `>>=` chain, where the `let`-bindings
+the elaborator introduces as join points stand between `split` and it, so this proof states the
+chain shapes as lemmas — `guard_last`, `guard_chain1`, `guard_chain2` and `guard_chain2_tail` —
+and rewrites the hypothesis with them. The conditions are `Prop`-valued in the lemmas, so each
+applies to a call site's `decide`-formed condition; nothing in them mentions this layer. The three
+ties at the end of this module take the other route over the same obstacle — `dsimp only` reduces
+those bindings and `split` then cases the `if` — and the section there records what that turned on.
 -/
 
 namespace SpecAMQP.Proofs.HandleUniqueness
@@ -187,43 +191,112 @@ theorem attachLink_handle_uniqueness {s s' : Session} (outbound : Bool) (body : 
 
 /-! ## Releasing a link, and the two operations that move a delivery
 
-`detachLink`, `flowLink` and `transferLink` preserve the invariant, and their ties to their
-`do`-blocks are **not** discharged here. They are named with the residual goal each leaves rather than dressed up as
-statements over a record shape, because a shape lemma is a second copy of the function and the tie
-is the part that makes the claim about the code. What each needs is stated exactly:
+`detachLink`, `flowLink` and `transferLink` preserve the invariant, and each is tied here to its
+own `do`-block: the successor hypothesis is inverted, so the guards the function runs are
+discharged rather than assumed, and each tie is a theorem about the operation rather than about a
+record shape somebody transcribed from it.
 
-* **`detachLink`.** After `unfold detachLink` and the guard loop the surviving goal is
+## The join points, and the one step that exposes them
 
-      (if (fieldValue "detach" "handle" body).bind valueNat = s.peerHandle then
-         Except.ok { s with peerRole := none, peerHandle := none, peerCount := 0, peerCredit := 0,
-                            delivery := none,
-                            transactions := Option.map Spec.Transactions.Layer.retireAll
-                                              s.transactions }
-       else Except.ok s) = Except.ok s'
+The elaborator rewrites a `do`-block's early `return` and its `let x ← e` bindings into *join
+points* — a `let`-bound lambda that the step's value is applied to — and an `if` beneath one is
+invisible to `split`: `findSplit?` refuses an `ite` whose condition has loose bound variables, and
+a condition written in terms of a join point's binding is exactly that. Every reduction below
+therefore begins with `dsimp only at hstep`, which zeta-reduces those bindings and hands `split` an
+`if` it will case. This is the reducer limitation `Proofs/DeliveryIdentity` records; it is real,
+and it is one `dsimp` away from being out of the way.
 
-  — an `if` whose *both* branches succeed, which is why neither `guard_last` (whose then-branch is a
-  refusal) nor the chain lemmas match it. `if_ok_right` above is that shape and was checked against
-  a minimal instance of it; here `simp only [if_ok_right] at hstep` reports the lemma unused, so
-  the mismatch is in how this site's condition elaborates rather than in the lemma's statement. What
-  it needs is either the condition's elaborated form named (`by_cases` on
-  `(fieldValue "detach" "handle" body).bind valueNat = s.peerHandle` closes one direction in
-  isolation) or a `split` that reaches an `if` head inside this `do`-block; the record's four fields
-  are then `rfl`/vacuous for `HandleUniqueness.of_option_le`, and `Session.afterLinkRelease` needs
-  unfolding for its `transactions` update.
+It also corrects what this module first recorded about `if_ok_right` at `detachLink`'s site. The
+*condition* is not the obstacle — `dsimp only` leaves a plain `ite` on `(!releasable) = true`, and
+`split at hstep` cases it on the first try. The lemma is stated for branches that are `Except.ok a`
+and `Except.ok b`, and neither branch at that site is one: the then-branch is `pure s`, the
+else-branch is the join point's application, and a detach's two directions are a second `if`
+inside it. `split` asks the *condition*, and is therefore not blocked by what the branches are
+built from.
 
-* **`flowLink`.** After the two `bind_ok_iff` rounds the surviving goal is the same `if` shape one
-  level deeper, over the five field-rule conjuncts a handle-less flow must not carry, so it needs
-  the same treatment. Its successor is a record update over `position`, `peerCount` and `peerCredit`,
-  where `HandleUniqueness.frame`'s four equalities hold by `rfl`.
+## What each tie needed
 
-* **`transferLink`.** The same reduction leaves the residual goals a level further in, where the
-  delivery-id and first-transfer-field lookups are: `case h_1.isTrue.isTrue.isFalse` and the `h_2`
-  cases, each of the form `<a do-block of a guard and a lookup> = Except.ok s'`. Its successor is a
-  record update over `position` and `delivery`, where `HandleUniqueness.frame`'s four equalities hold
-  by `rfl`, so the closing is not the difficulty — reaching the guard heads is.
+* **`detachLink`** — `unfold`, `dsimp only`, two `split` rounds (the release condition, then the
+  direction the detach travels) and `cases` on the successor equality. It closes with
+  `HandleUniqueness.of_option_le`, which was already here: a detach releases the handle of its own
+  direction only, leaving both registries and the other direction's handle alone, and a detach
+  naming a handle this endpoint has not attached returns the session itself. No `by_cases`, no new
+  helper, no rearrangement of the block.
+* **`flowLink`** — `unfold flowLink linkHandleOf refuseUnless`, `dsimp only`, then
+  `repeat' (first | split at hstep | simp only [pure_bind] at hstep)`: the five field-rule
+  conjuncts a handle-less flow must not carry, `linkHandleOf`'s match on the handle field, the
+  delivery-count guard and the two credit lookups. Then `cases` and `HandleUniqueness.frame`, whose
+  four equalities are `rfl` because no branch of a flow writes a handle or a registry — the most a
+  flow sets is `position`, `peerCount` and `peerCredit`. No `by_cases`, no new helper, no
+  rearrangement.
+* **`transferLink`** — the same reduction over a longer block, with `cases hstep` in the loop as
+  well: a branch a guard refuses reduces to `Except.error … = .ok s'`, which `cases` discharges the
+  moment it is reached, and carrying those branches to the end of the reduction is what makes this
+  one the expensive case. Then `cases` and `HandleUniqueness.frame` again, over `position`,
+  `delivery`, `deliveryTag` and `deliveryFormat`. No `by_cases`, no new helper, no rearrangement.
 
-Nothing in this module claims `detachLink`, `flowLink` or `transferLink` until those goals are
-discharged.
--/
+No `by_cases` on a named condition, and no helper lemma, was needed by any of the three: with the
+join points reduced the conditionals are reached by `split`, and each successor's four facts are
+`rfl` for a record update over fields its operation never writes. Nothing here changed how the
+invariant is stated — the same four conjuncts, both registries duplicate-free with each live handle
+present in its own registry. -/
+
+/-- **A detach preserves handle uniqueness.** The successor is either the session itself — a detach
+naming a handle this endpoint has not attached is admitted, "other than a detach" — or the record a
+release builds, which clears the live handle of the direction the detach travelled and leaves both
+registries and the other direction's handle where they were. `of_option_le` is the shape that
+needs: each of its two implications is vacuous in the cleared direction and the identity in the
+other. -/
+theorem detachLink_handle_uniqueness {s s' : Session} (outbound : Bool) (body : Value)
+    (h : HandleUniqueness s) (hstep : detachLink s outbound body = .ok s') :
+    HandleUniqueness s' := by
+  unfold detachLink at hstep
+  dsimp only at hstep
+  split at hstep <;> try split at hstep
+  all_goals (cases hstep)
+  all_goals (first
+    | exact h
+    | (apply h.of_option_le
+       · rfl
+       · rfl
+       · intro x hx
+         first | exact hx | cases hx
+       · intro x hx
+         first | exact hx | cases hx))
+
+set_option maxHeartbeats 800000 in
+/-- **A flow preserves handle uniqueness.** The successor is the session itself, or a record update
+over `position`, `peerCount` and `peerCredit`; no branch of the exchange writes a handle or a
+registry, so the frame lemma's four equalities are `rfl` and the invariant is carried across the
+step unchanged. -/
+theorem flowLink_handle_uniqueness {s s' : Session} (outbound : Bool) (body : Value)
+    (h : HandleUniqueness s) (hstep : flowLink s outbound body = .ok s') :
+    HandleUniqueness s' := by
+  unfold flowLink linkHandleOf refuseUnless at hstep
+  dsimp only at hstep
+  repeat' (first | split at hstep | simp only [pure_bind] at hstep)
+  all_goals (try cases hstep)
+  all_goals (first | exact h | exact HandleUniqueness.frame h rfl rfl rfl rfl)
+
+set_option maxHeartbeats 1600000 in
+/-- **A transfer preserves handle uniqueness.** The successor is a record update over `position`,
+`delivery`, `deliveryTag` and `deliveryFormat`; like a flow, no branch of the exchange writes a
+handle or a registry, so the frame lemma's four equalities are `rfl`. This is the reduction that
+needs `cases` inside the loop rather than after it: the guards a transfer refuses on are what makes
+its `do`-block the largest of the four, and a refused branch closes against the successor equality
+as soon as `split` reaches it. -/
+theorem transferLink_handle_uniqueness {s s' : Session} (outbound : Bool) (body : Value)
+    (h : HandleUniqueness s) (hstep : transferLink s outbound body = .ok s') :
+    HandleUniqueness s' := by
+  unfold transferLink linkHandleOf refuseUnless at hstep
+  dsimp only at hstep
+  simp only [pure_bind] at hstep
+  repeat' (first
+    | cases hstep
+    | split at hstep
+    | simp only [pure_bind] at hstep
+    | simp only [Except.ok.injEq] at hstep)
+  all_goals (try exact h)
+  all_goals (try exact HandleUniqueness.frame h rfl rfl rfl rfl)
 
 end SpecAMQP.Proofs.HandleUniqueness
