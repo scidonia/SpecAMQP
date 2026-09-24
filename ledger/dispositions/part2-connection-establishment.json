@@ -52,7 +52,7 @@
    "clause_text": "A peer MUST not use channel numbers outside the range that its partner can handle.",
    "disposition": "formalized:SpecAMQP.Spec.Connection.stepAmqpFrame; formalized:SpecAMQP.Spec.Connection.limitsFor; test:exchange-pipelined-channel-limit",
    "kind": "MUST",
-   "note": "A channel above the partner's bound is refused in `stepAmqpFrame` (`refuseUnless (channel ≤ limits.channelMax)`, lean/Spec/Connection.lean:1232-1234), against the limits in force for the direction the frame travels — `limitsFor` (lean/Spec/Connection.lean:980) chooses the partner's declared limit for a send and this peer's for a receive. The artifact writes 'MUST not' here (lowercase not); the register's reading of it is unchanged by this repair.",
+   "note": "A channel above the partner's bound is refused in `stepAmqpFrame` (`refuseUnless (channel ≤ limits.channelMax)`, lean/Spec/Connection.lean:1232-1234), against the limits in force for the direction the frame travels — `limitsFor` (lean/Spec/Connection.lean:1053-1069) chooses the partner's declared limit for a send and this peer's for a receive. The artifact writes 'MUST not' here (lowercase not); the register's reading of it is unchanged by this repair.",
    "text_sha256": "c7674d7c23f3de3d292f4fdaefb3d523666307e9e8ff2a1377e5caf7e2a7a6da"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:channel-max.2": {
@@ -150,7 +150,7 @@
    "clause_text": "Both peers MUST accept frames of up to 512 octets.",
    "disposition": "formalized:SpecAMQP.Spec.Connection.minMaxFrameSize; formalized:SpecAMQP.Spec.Connection.Limits.aPriori",
    "kind": "MUST",
-   "note": "The constant is read from the generated table rather than typed (`minMaxFrameSize`, lean/Spec/Connection.lean:677, which is 512 through «MIN-MAX-FRAME-SIZE»), and the limits in force before any negotiation are `Limits.aPriori` (lean/Spec/Connection.lean:683), whose documentation quotes the artifact's rule that the maximum frame size is MIN-MAX-FRAME-SIZE until an `open` says otherwise. The boundary is enforced on every received frame in `stepAmqpFrame` (lean/Spec/Connection.lean:1228, `refuseUnless (size ≤ limits.maxFrameSize)`), so the ledger's rendering of the constant as 512 is what the refusal compares against.",
+   "note": "The constant is read from the generated table rather than typed (`minMaxFrameSize`, lean/Spec/Connection.lean:750-755, which is 512 through «MIN-MAX-FRAME-SIZE»), and the limits in force before any negotiation are `Limits.aPriori` (lean/Spec/Connection.lean:756-758), whose documentation quotes the artifact's rule that the maximum frame size is MIN-MAX-FRAME-SIZE until an `open` says otherwise. The boundary is enforced on every received frame in `stepAmqpFrame` (lean/Spec/Connection.lean:1288-1369, `refuseUnless (size ≤ limits.maxFrameSize)`), so the ledger's rendering of the constant as 512 is what the refusal compares against.",
    "text_sha256": "3f3fe60800a169856dcfd89d5ef85a88118f9d9a9c8966c6d0ccec1576813f7d"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:offered-capabilities.1": {
@@ -192,7 +192,7 @@
    "clause_text": "Prior to sending any frames on a connection, each peer MUST start by sending a protocol header that indicates the protocol version used on the connection.",
    "disposition": "formalized:SpecAMQP.Spec.Connection.ProtocolHeader; formalized:SpecAMQP.Spec.Connection.State.sendClass",
    "kind": "MUST",
-   "note": "The header's shape is `ProtocolHeader` — the four-octet protocol name, the protocol id, the version triple (lean/Spec/Connection.lean:156-164, with the magic at :148) — and 'prior to sending any frames' is the state table's first row: `State.sendClass` sends a header in START and nothing else (lean/Spec/Connection.lean:272-274), so no frame is legal before one. `stepHeader` (lean/Spec/Connection.lean:1015) is the step that accepts it and fixes the layer.",
+   "note": "The header's shape is `ProtocolHeader` — the four-octet protocol name, the protocol id, the version triple (lean/Spec/Connection.lean:156-164, with the magic at :148) — and 'prior to sending any frames' is the state table's first row: `State.sendClass` sends a header in START and nothing else (lean/Spec/Connection.lean:272-274), so no frame is legal before one. `stepHeader` (lean/Spec/Connection.lean:1088-1157) is the step that accepts it and fixes the layer.",
    "text_sha256": "407a874a85162f5a3c3b841b3dc51b8c1b585d974ae9edfc61bfbbd3d641b67d"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.10": {

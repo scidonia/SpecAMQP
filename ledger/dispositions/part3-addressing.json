@@ -7,7 +7,7 @@
  },
  "design_consequences": [
   "The addressing family splits into two kinds and the split is PLAN.md \u00a73's: the clauses that constrain what a *node* does \u2014 a source that resends, a copy link that retains state, a filter whose answer is stable, a target that survives its own restart \u2014 are bounded out with that citation; the clauses that constrain the *encoding* of a source's or target's fields are deferred to the messaging layer, which owns the field sets and has not been written.",
-  "The model reads a terminus exactly once, for the coordinator target (`coordinatorCapabilities`, lean/Spec/Transactions.lean:268-280). Everything else about source and target \u2014 addresses, dynamic flags, node properties, filter sets, announced outcomes \u2014 is unimplemented by either layer, which is why eleven clauses here are one gap rather than eleven findings.",
+  "The model reads a terminus exactly once, for the coordinator target (`coordinatorCapabilities`, lean/Spec/Transactions.lean:306-323). Everything else about source and target \u2014 addresses, dynamic flags, node properties, filter sets, announced outcomes \u2014 is unimplemented by either layer, which is why eleven clauses here are one gap rather than eleven findings.",
   "Three of these sentences carry both a MUST and a MUST NOT and are keyed twice by the ledger (`node-properties.2/.3`, `filter-set.1/.2`, `durable.2/.4`): the pairs are one statement each, and every note says so rather than leaving a reader to wonder which is stale."
  ],
  "dispositions": {
@@ -36,7 +36,7 @@
    "clause_text": "Every key in the map MUST be of type \u00absymbol\u00bb, every value MUST be either \u00abnull\u00bb or of a described type which provides the archetype filter.",
    "disposition": "out-of-scope: node-and-filter-behaviour",
    "kind": "MUST",
-   "note": "deferred: S5 \u2014 uncarried: the entry rules of a filter set \u2014 every key a symbol, every value null or a described type providing the filter's archetype. Nothing in the tree validates a filter set: `source`/`target` are decoded only as far as the coordinator target's capabilities (`coordinatorCapabilities`, lean/Spec/Transactions.lean:268-277), and the map-shape checks the message layer does have are for the sections it reads (`checkStringKeyPairs` for `application-properties`, `checkAnnotationPairs` for the annotations), neither of which is a symbol-keyed filter map. **Re-dispositioned to an exclusion on the planner's ruling**: section 3 excludes what a destination does with a message while keeping `source`/`target` as protocol-visible field sets, and each of these describes node state or node action \u2014 a node's properties, its filters, how it distributes, when it deletes. The field-set sentences of the same sections are carried; these are the half the standard leaves to the node.",
+   "note": "deferred: S5 \u2014 uncarried: the entry rules of a filter set \u2014 every key a symbol, every value null or a described type providing the filter's archetype. Nothing in the tree validates a filter set: `source`/`target` are decoded only as far as the coordinator target's capabilities (`coordinatorCapabilities`, lean/Spec/Transactions.lean:306-323), and the map-shape checks the message layer does have are for the sections it reads (`checkStringKeyPairs` for `application-properties`, `checkAnnotationPairs` for the annotations), neither of which is a symbol-keyed filter map. **Re-dispositioned to an exclusion on the planner's ruling**: section 3 excludes what a destination does with a message while keeping `source`/`target` as protocol-visible field sets, and each of these describes node state or node action \u2014 a node's properties, its filters, how it distributes, when it deletes. The field-set sentences of the same sections are carried; these are the half the standard leaves to the node.",
    "text_sha256": "9f5f873d741b23c9ab2c7557044e194d03e0332b0620f380397d99a43e053f02"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:filter-set.2": {
@@ -69,14 +69,14 @@
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:source/field:address.1": {
    "clause_text": "The address of the source MUST NOT be set when sent on a \u00abattach\u00bb frame sent by the receiving link endpoint where the dynamic flag is set to true (that is where the receiver is requesting the sender to create an addressable node).",
-   "disposition": "formalized:SpecAMQP.Spec.Message.checkTerminus; formalized:SpecAMQP.Ref.Message.check",
+   "disposition": "formalized:SpecAMQP.Spec.Message.checkTerminus; formalized:SpecAMQP.Ref.Message.Terminus.check",
    "kind": "MUST NOT",
    "note": "Spec.Message.checkTerminus carries it — lean/Spec/Message.lean line 1551 declares SpecAMQP.Spec.Message.checkTerminus, and the sentence's own words appear beside the code. lean/Spec/Message.lean line 1541 def checkTerminus; :1545-1546 the creator test; :1551-1554 the refusing branch (dynamic, sent by the endpoint that did not create the node, address set). Reached: lean/Spec/Session.lean line 751 terminusRefusalOf -> :756 Message.terminusOfValue -> lean/Spec/Message.lean line 1598 terminusOfValue -> :1606 checkTerminus; called from lean/Spec/Session.lean line 768 attachLink at :817-818. Reference: lean/Ref/Message.lean line 1253 def check (branches :1261-1263) reached from lean/Ref/Session.lean line 647-648.",
    "text_sha256": "60b0f9e84b6170d997b83929856b27a061eb879da6cbe919c4e6b0190afa7dfc"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:source/field:address.2": {
    "clause_text": "The address of the source MUST be set when sent on a \u00abattach\u00bb frame sent by the sending link endpoint where the dynamic flag is set to true (that is where the sender has created an addressable node at the request of the receiver and is now communicating the address of that created node).",
-   "disposition": "formalized:SpecAMQP.Spec.Message.checkTerminus; formalized:SpecAMQP.Ref.Message.check",
+   "disposition": "formalized:SpecAMQP.Spec.Message.checkTerminus; formalized:SpecAMQP.Ref.Message.Terminus.check",
    "kind": "MUST",
    "note": "Spec.Message.checkTerminus carries it — lean/Spec/Message.lean line 1547 declares SpecAMQP.Spec.Message.checkTerminus, and the sentence's own words appear beside the code. lean/Spec/Message.lean line 1547-1550 the refusing branch for a dynamic terminus whose creator sent no address; reached as for `.1` above (Session.terminusRefusalOf :751 -> attachLink :817). Reference twin lean/Ref/Message.lean line 1258-1260.",
    "text_sha256": "e5a97054e93ec3dc4008df0db6688c2cf8050310b3f05e5c4e718b968ee53b7f"
@@ -104,7 +104,7 @@
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:source/field:dynamic.1": {
    "clause_text": "In this case the address field MUST NOT be set.",
-   "disposition": "formalized:SpecAMQP.Spec.Message.checkTerminus; formalized:SpecAMQP.Ref.Message.check",
+   "disposition": "formalized:SpecAMQP.Spec.Message.checkTerminus; formalized:SpecAMQP.Ref.Message.Terminus.check",
    "kind": "MUST NOT",
    "note": "Spec.Message.checkTerminus carries it — lean/Spec/Message.lean line 1551 declares SpecAMQP.Spec.Message.checkTerminus, and the sentence's own words appear beside the code. lean/Spec/Message.lean line 1551-1554, the same branch as `source/field:address.1` seen from the flag: dynamic + the requesting endpoint + an address set is refused. Reached through attachLink :817. Reference twin lean/Ref/Message.lean line 1261-1263.",
    "text_sha256": "8b16dca6098f0446804c5f75ae78d8621c9ac180d74655815df2a2a3f7ca90dd"
@@ -132,14 +132,14 @@
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:target/field:address.1": {
    "clause_text": "The address of the target MUST NOT be set when sent on a \u00abattach\u00bb frame sent by the sending link endpoint where the dynamic flag is set to true (that is where the sender is requesting the receiver to create an addressable node).",
-   "disposition": "formalized:SpecAMQP.Spec.Message.checkTerminus; formalized:SpecAMQP.Ref.Message.check",
+   "disposition": "formalized:SpecAMQP.Spec.Message.checkTerminus; formalized:SpecAMQP.Ref.Message.Terminus.check",
    "kind": "MUST NOT",
    "note": "Spec.Message.checkTerminus carries it — lean/Spec/Message.lean line 1551 declares SpecAMQP.Spec.Message.checkTerminus, and the sentence's own words appear beside the code. lean/Spec/Message.lean line 1545-1546 (for a target, creator = receiver, so the refused case is a dynamic target sent by the sender, which is exactly this clause); :1551-1554 the branch. Reached through attachLink :820-821.",
    "text_sha256": "cd34068ffda81449c06275dee431bc7c116cb3cb9812337a8918fa5c9943b2b3"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:target/field:address.2": {
    "clause_text": "The address of the source MUST be set when sent on a \u00abattach\u00bb frame sent by the receiving link endpoint where the dynamic flag is set to true (that is where the receiver has created an addressable node at the request of the sender and is now communicating the address of that created node).",
-   "disposition": "formalized:SpecAMQP.Spec.Message.checkTerminus; formalized:SpecAMQP.Ref.Message.check",
+   "disposition": "formalized:SpecAMQP.Spec.Message.checkTerminus; formalized:SpecAMQP.Ref.Message.Terminus.check",
    "kind": "MUST",
    "note": "Spec.Message.checkTerminus carries it — lean/Spec/Message.lean line 1547 declares SpecAMQP.Spec.Message.checkTerminus, and the sentence's own words appear beside the code. lean/Spec/Message.lean line 1547-1550 (for a target the creating endpoint is the receiver, so the refused case is a dynamic target sent by the receiver with no address). Reached through attachLink :820-821. Reference twin lean/Ref/Message.lean line 1258-1260.",
    "text_sha256": "77c67096c28f255b20c8550c89cb931dd03b173eb78c8259d67e2790f152cb1a"
@@ -153,7 +153,7 @@
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:target/field:dynamic.1": {
    "clause_text": "In this case the address field MUST NOT be set.",
-   "disposition": "formalized:SpecAMQP.Spec.Message.checkTerminus; formalized:SpecAMQP.Ref.Message.check",
+   "disposition": "formalized:SpecAMQP.Spec.Message.checkTerminus; formalized:SpecAMQP.Ref.Message.Terminus.check",
    "kind": "MUST NOT",
    "note": "Spec.Message.checkTerminus carries it — lean/Spec/Message.lean line 1551 declares SpecAMQP.Spec.Message.checkTerminus, and the sentence's own words appear beside the code. lean/Spec/Message.lean line 1551-1554 for a dynamic target sent by the sender. Reached through attachLink :820-821. Reference twin lean/Ref/Message.lean line 1261-1263.",
    "text_sha256": "8b16dca6098f0446804c5f75ae78d8621c9ac180d74655815df2a2a3f7ca90dd"

@@ -109,7 +109,7 @@
    "clause_text": "[picture] Example Composite Type: <type class=\"composite\" name=\"book\" label=\"example composite type\"> <doc> <p>An example composite type.</p> </doc> <descriptor name=\"example:book:list\" code=...",
    "disposition": "formalized:SpecAMQP.Spec.Message.fieldDeclsOf; formalized:SpecAMQP.Spec.Message.checkFieldList",
    "kind": "picture",
-   "note": "Worked example of a composite type definition: the book type in descriptor domain 0x00000003 with field multiplicities and a mandatory title. The declared fields come from the generated table through `fieldDeclsOf` (lean/Spec/Message.lean:269-271) and the rules a body must meet \u2014 mandatory present, no longer than the declaration, types as declared \u2014 are `checkFieldList` (lean/Spec/Message.lean:365-385), which is what makes this figure the model for how a described list maps onto declared fields.",
+   "note": "Worked example of a composite type definition: the book type in descriptor domain 0x00000003 with field multiplicities and a mandatory title. The declared fields come from the generated table through `fieldDeclsOf` (lean/Spec/Message.lean:278-284) and the rules a body must meet \u2014 mandatory present, no longer than the declaration, types as declared \u2014 are `checkFieldList` (lean/Spec/Message.lean:491-522), which is what makes this figure the model for how a described list maps onto declared fields.",
    "text_sha256": "6f82b0b098427cccc4b98bb35b8c24145fd2514fb8390685ffa809c4c4abd003"
   },
   "amqp-core-types-v1.0-os.xml#picture.19": {

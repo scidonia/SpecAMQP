@@ -506,35 +506,35 @@
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:coordination/type:txn-capability/choice:distributed-transactions.u1": {
    "clause_text": "Support AMQP Distributed Transactions.",
-   "disposition": "generated-declared-surface",
+   "disposition": "formalized:SpecAMQP.Generated.Oasis.choices",
    "kind": "UNKEYED",
    "note": "lean/Generated/Oasis/Choices.lean line 36 `{ ownerPath := \"amqp:transactions/section:coordination/type:txn-capability\", name := \"distributed-transactions\", value := \"amqp:distributed-transactions\" ...}`",
    "text_sha256": "fd8923ca21a89503e204db8098988d6b3f453d17920a125687c2bb50faf4ec56"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:coordination/type:txn-capability/choice:local-transactions.u1": {
    "clause_text": "Support local transactions.",
-   "disposition": "generated-declared-surface",
+   "disposition": "formalized:SpecAMQP.Generated.Oasis.choices",
    "kind": "UNKEYED",
    "note": "lean/Generated/Oasis/Choices.lean line 37",
    "text_sha256": "6481bb1d706588a15ac5e00da73fca63c2fa3c25cd0314f1f55295840bbbad00"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:coordination/type:txn-capability/choice:multi-ssns-per-txn.u1": {
    "clause_text": "Support transactions whose txn-id is used across sessions on one connection.",
-   "disposition": "generated-declared-surface",
+   "disposition": "formalized:SpecAMQP.Generated.Oasis.choices",
    "kind": "UNKEYED",
    "note": "lean/Generated/Oasis/Choices.lean line 38",
    "text_sha256": "5a77282f75301db78d3b4998716c2a402abc0ebd31213ea8ba5c913a352d4a8e"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:coordination/type:txn-capability/choice:multi-txns-per-ssn.u1": {
    "clause_text": "Support multiple active transactions on a single session.",
-   "disposition": "generated-declared-surface",
+   "disposition": "formalized:SpecAMQP.Generated.Oasis.choices",
    "kind": "UNKEYED",
    "note": "lean/Generated/Oasis/Choices.lean line 39",
    "text_sha256": "8e9395a8fd295af18886011c7aaebf0777fa3d47d9262d71eccea1920496e85b"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:coordination/type:txn-capability/choice:promotable-transactions.u1": {
    "clause_text": "Support AMQP Promotable Transactions.",
-   "disposition": "generated-declared-surface",
+   "disposition": "formalized:SpecAMQP.Generated.Oasis.choices",
    "kind": "UNKEYED",
    "note": "lean/Generated/Oasis/Choices.lean line 40",
    "text_sha256": "8a1d9a88d49e6d2a3c975555c253cafc62921ee9e06ca2d77e7df90b27585593"
@@ -933,14 +933,14 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/type:receiver-settle-mode/choice:first.u1": {
    "clause_text": "The receiver will spontaneously settle all incoming transfers.",
-   "disposition": "generated-declared-surface",
+   "disposition": "formalized:SpecAMQP.Generated.Oasis.choices",
    "kind": "UNKEYED",
    "note": "lean/Generated/Oasis/Choices.lean declares the `receiver-settle-mode` choices `first`/`second`, which is what fixes the name and value (the S4 triage's disposition for a declared choice's meaning is `formalized:SpecAMQP.Generated.Oasis.choices`); category 3 rather than 1 only because the carrier is under lean/Generated",
    "text_sha256": "1332b58fb0e661ae8dda8494acacd9f85da3c2657e7bb6e96c3adaee8bd7bf12"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/type:receiver-settle-mode/choice:second.u1": {
    "clause_text": "The receiver will only settle after sending the «disposition» to the sender and receiving a «disposition» indicating settlement of the delivery from the sender.",
-   "disposition": "generated-declared-surface",
+   "disposition": "formalized:SpecAMQP.Generated.Oasis.choices",
    "kind": "UNKEYED",
    "note": "lean/Generated/Oasis/Choices.lean (the `receiver-settle-mode` choices)",
    "text_sha256": "8048345ac44b423deec1f98f48e3fefb2e358fdb1bb5e630d5c8a6d458a3ae81"

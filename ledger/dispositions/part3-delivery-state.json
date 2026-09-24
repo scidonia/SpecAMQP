@@ -92,14 +92,14 @@
    "clause_text": "If the delivery-failed flag is set, any messages modified MUST have their delivery-count incremented.",
    "disposition": "formalized:SpecAMQP.Spec.Message.incrementOf; test:delivery-modified-delivery-failed-increments",
    "kind": "MUST",
-   "note": "The delivery-count's counting rule for `modified` is `incrementOf` (lean/Spec/Message.lean:995-998): a rejected outcome counts the attempt, a modified one counts it exactly when the peer said the delivery failed, and the other two outcomes state the opposite and are the reason this is a rule rather than a default. The vector cites the clause and pins the increment.",
+   "note": "The delivery-count's counting rule for `modified` is `incrementOf` (lean/Spec/Message.lean:1273-1280): a rejected outcome counts the attempt, a modified one counts it exactly when the peer said the delivery failed, and the other two outcomes state the opposite and are the reason this is a rule rather than a default. The vector cites the clause and pins the increment.",
    "text_sha256": "4ce2235f4cc2dd14effb24da4970429fe4cabfcaac68a2b2ce7c32bc417f635b"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/type:modified/field:undeliverable-here.1": {
    "clause_text": "If the undeliverable-here is set, then any messages released MUST NOT be redelivered to the modifying link endpoint.",
    "disposition": "formalized:SpecAMQP.Spec.Message.allowedOf; test:delivery-modified-undeliverable-here",
    "kind": "MUST NOT",
-   "note": "The redelivery rule is `allowedOf` (lean/Spec/Message.lean:1003-1007): `accepted` retires the message, `rejected` makes it unprocessable, `released` makes it available again, and `modified` answers by its own `undeliverable-here` field \u2014 which is this sentence for the link it was modified at. The vector cites the clause.",
+   "note": "The redelivery rule is `allowedOf` (lean/Spec/Message.lean:1281-1292): `accepted` retires the message, `rejected` makes it unprocessable, `released` makes it available again, and `modified` answers by its own `undeliverable-here` field \u2014 which is this sentence for the link it was modified at. The vector cites the clause.",
    "text_sha256": "573ae8f187eea457eecdd71d5b3f5be5f710fb0bde26654cdf2623f204794b01"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/type:received.1": {
@@ -113,7 +113,7 @@
    "clause_text": "The message is unchanged at the node (i.e., the delivery-count of the header of the released message MUST NOT be incremented).",
    "disposition": "formalized:SpecAMQP.Spec.Message.incrementOf; test:delivery-released-does-not-increment-delivery-count",
    "kind": "MUST NOT",
-   "note": "A released message does not increment the delivery-count, which is the third of the outcomes' counting rules in `incrementOf` (lean/Spec/Message.lean:995-998); the vector cites the clause and pins it against the `rejected` vector that does increment.",
+   "note": "A released message does not increment the delivery-count, which is the third of the outcomes' counting rules in `incrementOf` (lean/Spec/Message.lean:1273-1280); the vector cites the clause and pins it against the `rejected` vector that does increment.",
    "text_sha256": "06ade9e3a021afe62bfc2bdc0057f3900c759d56e0172aa26fa08e776e493325"
   }
  },
