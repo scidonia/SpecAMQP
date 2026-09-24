@@ -881,8 +881,9 @@ and **eleven shared gaps**, where a shared gap is a clause neither artefact enfo
 
 **Six of those fifteen have since been promoted, which empties the divergence class.** Two moved at `61c0430` once the reference's field list gained `properties` and its count reader learned that a present-and-null `delivery-count` is not an integer, and the
 last four at `1a21b0a` once both artefacts read the transfer flags by value and the aborted delivery reached the credit spend — taking the corpus to **98 vectors / 383 step verdicts** with **no pre-existing verdict moved** and the refusals moving only where the
-new vectors refuse (`limit` 12→14, `malformed` 18→20). Nine remain staged, all of them shared gaps, so the corpus is still the only instrument that can see any of them. **What the nine are is classified two paragraphs below by disposition rather than by
-count**, because a count here moves every time a milestone lands and the classification does not.
+new vectors refuse (`limit` 12→14, `malformed` 18→20). **Four remain, thirteen steps between them and five of those steps failing in both artefacts.** The count and the classification are both in the file rather than here, and **these two sentences are the reason**: this passage said nine and that all of them
+were shared gaps, and the promotion emptied five while the artefacts began agreeing on some of the steps of what stayed. What *fails* is still shared in both — that is what makes a staged step a blind spot — while the vectors themselves are no longer uniformly
+so, and a staged file's docstring claiming every vector in it was one was found by the security window and corrected by the promotion that emptied five. **Counts and classifications move every time a milestone lands; the obligation does not.**
 
 **And the sweep's own inference about two of those four divergences was wrong, in a way that earned a rule.** It staged the credit an aborted delivery spends as *undecided* — "the register is silent, which is why this is staged rather
 than decided" — and the register is indeed silent about it, because the reading does not live in the register. `flow-control.5` ("whenever the sender increases delivery-count, it MUST decrease link-credit by the same amount"),
@@ -910,12 +911,13 @@ three**: the reference's `disposition`'s `settled` and the `settled` the transac
 rather than a deferral, and the field's *declaration* (`type="boolean" default="false"`, "If true, indicates that the referenced deliveries are considered settled") is the authority the clause list does not carry. **Five sites, one reading, and
 no committed verdict moved** (`d50abc1`, `1540777`).
 
-**And what remains staged is not a backlog of defects — it is the deferred obligations made visible, which is worth stating because the two look identical from the corpus's side.** After the four are promoted, the nine that remain are
-dispositioned `deferred:S4` (`flow/field:delivery-count.3`'s receiver echo, `field:delivery-count.2`'s presence half, `transfer/field:settled.6` in both directions, `resume.2`, `resume.3`, `attach/field:unsettled.5`) or `deferred:S3-session`
+**And what remains staged is not a backlog of defects — it is the deferred obligations made visible, which is worth stating because the two look identical from the corpus's side.** the counts here are the promotion's and the classification is in the file, and what is stable is the *kind* of thing that remains: largely `deferred:S4` (`flow/field:delivery-count.3`'s receiver echo, `field:delivery-count.2`'s presence half, `transfer/field:settled.6` in both directions, `resume.2`, `resume.3`, `attach/field:unsettled.5`) or `deferred:S3-session`
 (`transfer/field:rcv-settle-mode.u1`) or `deferred:S3` (`picture.24`'s `-` column). **Every one of the nine is a clause the plan already carries later**, which is why they fail in *both* artefacts and why the differential cannot see any of them: the
-staged set is now **shared-gaps-only**, and the corpus is the only instrument that can. So the staged file's job is not to be emptied; it is to hold, per milestone, the obligations a gate cannot yet require.
+staged set's *failing steps* are shared in both artefacts, so the corpus is the only instrument that can see them, while the set as a whole is no longer uniform. So the staged file's job is not to be emptied; it is to hold, per milestone, the obligations a gate cannot yet require.
 
-**Three of them are additionally blocked by a decision rather than a milestone**, and the distinction matters to anyone picking this up: `resume.2`, `resume.3` and `attach/field:unsettled.5` each name the local unsettled map or a resumed
+**The three that were blocked by a decision rather than a milestone are no longer blocked, and the distinction is the one that governs whether a queue of them moves at all.** `resume.2` and `resume.3` are placeable under the natural readings their
+dispositions already name — the resume flag is consulted where it is read, on a continuation arriving at the same session — and `attach/field:unsettled.5` is pinned by an exemption vector whose note says it is the exemption and that it admits, which is weaker
+evidence than a refusal and is labelled as such. A clause blocked by a decision is not waiting on work; it is waiting on somebody choosing between readings that resolve differently against the corpus, and these three were unblocked by choosing. The distinction matters to anyone picking this up: `resume.2`, `resume.3` and `attach/field:unsettled.5` each name the local unsettled map or a resumed
 delivery, and `MODEL RESTRICTION: the S4 slice contains at most one link per session` (§13's D4 record) means the model has no link identity to resume and no map to consult. They are the server-side obligations §23.3 lists — resumption is what a
 broker needs most — and they move only when D4's named triggers fire, not when a milestone arrives.
 
@@ -937,7 +939,10 @@ artifact's grammar covers the shapes the grammar admits and the members someone 
 **And the sweep stated what it could not test, which is the part a later reader needs most**: four rules that could not become vectors at all — `max-frame-size.3`'s 512-octet floor (the clause constrains the
 *declaring* peer and no clause says what a receiver does, so the floor has no observable at this boundary); the **handle direction**, whose sentence is an unnumbered doc paragraph so no citation can carry it,
 which is why the corpus uses handle 0 on both ends everywhere and the direction stays untested; `delivery-count.4`, unreachable because a flow naming a handle needs an attached link at that end; and five
-clauses needing a link *identity* neither model has. **An untestable rule named is worth more than a test that looks like it covers one.**
+clauses needing a link *identity* neither model has. **An untestable rule named is worth more than a test that looks like it covers one.** **And a fifth joined them from the security layer's work, found by the promotion rather than by a search**: an empty frame *offered* by the endpoint cannot be pinned in the
+corpus at all. The shape looks available — a `send` step may carry raw octets — but both artefacts' step builders refuse to *write* one, and refuse it in prose a reader can act on: "the frame carries no body: an empty frame is how a peer with nothing to send
+defeats an idle timeout, and this writer does not send one". That refusal is a MAY the writer is entitled to take, so the rule's send half has no observable at this boundary; its receive half is pinned by the SASL probes, and the send half's evidence stays the
+theorem `frame_none_answers`. The promotion named it a **vocabulary gap rather than a missing vector**, which is the right name: nothing is absent from the corpus that could be added to it.
 
 ## 11. Specification test vectors
 
