@@ -208,9 +208,16 @@ def SenderSettleModeIsTheChoiceTheClauseSelects : Prop :=
   `SpecAMQP.Spec.Message` and declared in `Contracts/MessageFormat.lean`. What a disposition's
   `state` field carries is a value of that machine; this file is about the frame's other fields and
   the bookkeeping they move.
-* **`rcv-settle-mode` is not modelled.** The attach field negotiates when the *receiver* settles,
-  and the session records only the sender's side of that negotiation, so a rule about the
-  receiver's settlement has no subject here.
+* **`rcv-settle-mode` is modelled, and this bullet said otherwise until the flow work landed.** The
+  attach field negotiates when the *receiver* settles: `Spec.Session.receiverSettleSecond` records the
+  choice the attach names (defaulting to `first`), and `Spec.Session.rcvSettleRefusal?` refuses a
+  transfer that names the second choice under a first negotiation — with `rcv-settle-mode.u2`'s
+  exemption, since a transfer carrying `settled` true makes the field ignored. **The claim is corrected
+  rather than deleted**, because a section headed "what this file deliberately does not claim" is where a
+  stale sentence reads as a decision: a reader who found this bullet would conclude the receiver's side
+  is unmodelled *by choice*, and the ledger now dispositions `rcv-settle-mode.u1` and `.u2` to those
+  declarations. Both were true at different times in one session, which is the shape this repository
+  keeps finding: the work moved and the prose did not.
 * **The sender's unsettled map is not modelled.** The session holds one delivery
   (`Session.delivery`), not a map from delivery-tags to states, which is the model restriction the
   register records at `ledger/ambiguities/link-uniqueness-vacuous.json` and which the fragmentation

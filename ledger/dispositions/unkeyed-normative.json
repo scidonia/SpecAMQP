@@ -59,9 +59,9 @@
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:source/field:durable.u1": {
    "clause_text": "Indicates what state of the terminus will be retained durably: the state of durable messages, only existence and configuration of the terminus, or no state at all.",
-   "disposition": "formalized:SpecAMQP.Spec.Message.checkDurability",
+   "disposition": "deferred:S5",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier. **And its carrier is defined but not reached, which is why this entry reads `deferred` rather than `formalized`**: `SpecAMQP.Spec.Message.checkDurability` implements the sentence and nothing in the step function calls it \u2014 `terminusOfValue`'s docstring says `attach` is the only caller they would ever have, and `attachLink` does not read the field. A `formalized:` must name a declaration the step function **reaches**, and a declaration with no caller carries nothing, so the values these entries carried for half a day were the shape the ledger's conventions forbid: a missing carrier covered by naming a declaration. The wiring is designed, attempted and queued rather than open \u2014 read `source` and `target` where present, convert the two refusal types, and repair `attachLink_handle_uniqueness`, which the added guards break (dependent elimination fails at its own guard).",
    "text_sha256": "6e8b4553685e3fb082c7218e636007238cda0fe0ec053ef3b5e050c145a49626"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:std-dist-mode/choice:copy.u1": {
@@ -80,9 +80,9 @@
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:target/field:durable.u1": {
    "clause_text": "Indicates what state of the terminus will be retained durably: the state of durable messages, only existence and configuration of the terminus, or no state at all.",
-   "disposition": "formalized:SpecAMQP.Spec.Message.checkDurability",
+   "disposition": "deferred:S5",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier. **And its carrier is defined but not reached, which is why this entry reads `deferred` rather than `formalized`**: `SpecAMQP.Spec.Message.checkDurability` implements the sentence and nothing in the step function calls it \u2014 `terminusOfValue`'s docstring says `attach` is the only caller they would ever have, and `attachLink` does not read the field. A `formalized:` must name a declaration the step function **reaches**, and a declaration with no caller carries nothing, so the values these entries carried for half a day were the shape the ledger's conventions forbid: a missing carrier covered by naming a declaration. The wiring is designed, attempted and queued rather than open \u2014 read `source` and `target` where present, convert the two refusal types, and repair `attachLink_handle_uniqueness`, which the added guards break (dependent elimination fails at its own guard).",
    "text_sha256": "6e8b4553685e3fb082c7218e636007238cda0fe0ec053ef3b5e050c145a49626"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:terminus-durability/choice:configuration.u1": {
