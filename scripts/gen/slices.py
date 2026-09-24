@@ -2721,14 +2721,15 @@ def staged_corpus(tables: Corpus) -> list[dict]:
     ledger's deferred obligations made visible rather than a backlog of defects for one side
     to fix.
 
-    Seven members have left since the family was first written — the aborted-credit pair,
-    and the five settlement and count readings `5624f16` carried — and the four that remain
-    fall into two subjects rather than one. Three are resumption readings the model
-    restriction puts out of reach: `transfer/field:resume.2`, `.3` and
-    `attach/field:unsettled.5` each name the local unsettled map or a resumed delivery, and
-    one link per session is the whole of the model's link state. The fourth needs no link
-    at all — a frame whose header is all there is, arriving in a connection that is over,
-    where `picture.24`'s column for both directions is `-`.
+    Eleven members have left since the family was first written — the two `61c0430` aligned,
+    the four the transfer-flag reading settled at `1a21b0a`, and the five settlement and count
+    readings `5624f16` carried — and the four that remain fall into two subjects rather than
+    one. Three are resumption readings the model restriction puts out of reach:
+    `transfer/field:resume.2`, `.3` and `attach/field:unsettled.5` each name the local
+    unsettled map or a resumed delivery, and one link per session is the whole of the model's
+    link state. The fourth needs no link at all — a frame whose header is all there is,
+    arriving in a connection that is over, where `picture.24`'s column for both directions
+    is `-`.
     """
     t = tables
     message = b"a message whose split points are the vector's business"
