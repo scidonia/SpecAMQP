@@ -40,7 +40,7 @@ b5f824512d926a5475306134bb61ee8c215ae2d2  ledger/ambiguities/check-precedence-un
 49aa74044fcaedbbd43858b42022b11e8860ccde  ledger/ambiguities/map-ordering.json
 d7cf7735d5765392d594e61138d761c141ef77a2  ledger/ambiguities/rejected-discharge-leaves-the-id-dischargeable.json
 25af84ed4ed482efc59e0b427637320bc3546eda  ledger/ambiguities/sasl-code-distinguishable.json
-05b506d10898cb78be78b095f0588947cfcf513f  ledger/ambiguities/sasl-dialogue-condition.json
+1cf6854a030f629cbc0bbd7d5d32e9777bf940d5  ledger/ambiguities/sasl-dialogue-condition.json
 f834d005c183ad1c14946c3ce9f7ff40a0005d05  ledger/ambiguities/sasl-mechanism-profiles.json
 a78b2bcfe68699fc78794f1bc156a90b6214fdbe  ledger/ambiguities/second-open-refusal.json
 f1df18bddd8ad6dfa626560dfcf70419598c73dd  ledger/ambiguities/session-state-description-route.json
@@ -54,8 +54,8 @@ c661a0341ee5572bd716861459bcfbedbae36a7f  ledger/ambiguities/unmapped-begin.json
 2dd54d7eeae541a3df93bd52a17aae4d8cff5a6e  ledger/ambiguities/version-mismatch-condition.json
 003cbf78615e5a2c39ff63ce21b19ef4ab0b6b68  ledger/ambiguities/zero-width-array-count.json
 5f651a63266b6a944c3db9748c868787bd2e07e6  ledger/clauses.json
-4e7e5905bf4bead26d2c302284c5b4c44fa6ebeb  ledger/coverage.json
-488a1f07e99b47a49e013dc61ac1d89908d55f1e  ledger/dispositions/part0-conformance-and-transport-lifecycle.json
+059e2a02b5cd1318d5aa6aacc1ff014ca298f278  ledger/coverage.json
+b929301beea8db3509a392840563a35946f76b30  ledger/dispositions/part0-conformance-and-transport-lifecycle.json
 98c5aaeed8df4602af776bb77f6d3be75975c9b0  ledger/dispositions/part1-types.json
 fb65f4047b683315bf859f5b7cda00fc48027c17  ledger/dispositions/part2-connection-establishment.json
 300a02a0c9d2f653d9f26f1f0eea7b6ad87ae760  ledger/dispositions/part2-links.json
@@ -68,10 +68,10 @@ b3394a9076715246a32d155c6e527ba7e4488085  ledger/dispositions/part2-performative
 9ee7903608fb7c0248714ee2e5d82f4699a23a8a  ledger/dispositions/part3-message-sections.json
 3563ff44acb7168de1aa707e1367b7c6a1e1bea5  ledger/dispositions/part4-transaction-outcomes.json
 134d568213e2f57865b87d85ed4f6ed89c2d7d97  ledger/dispositions/part4-transactions.json
-382ce2d12d45cce83d1f14ae982a76b5244795f6  ledger/dispositions/part5-sasl.json
+cadc4e9d66322682d315568b134ff709c73cd7c2  ledger/dispositions/part5-sasl.json
 c36967feb16eedb417605418dbcd8fb455785e36  ledger/dispositions/part5-security-layers.json
-b2e65846e948fe2e5ff3d59044be9c8315fd3487  ledger/dispositions/picture-review.json
-106e674d4f1a46db2483eaeb7499b0984832b50e  ledger/dispositions/unkeyed-normative.json
+9a61482a177c99cac9d0c4926a55bcbc2ffa3097  ledger/dispositions/picture-review.json
+9eb481aced08d8ee16ad5684bbdc214b37bf1a89  ledger/dispositions/unkeyed-normative.json
 fd83990fdb34dca23fc732e566fa109c98af71b5  ledger/lowercase-keywords.json
 bade00376950e4a224326e89498494519b4c5452  ledger/pictures.json
 745a82ff70e5e9eaa0a4f0a944d56ac4acb99119  ledger/reconciliation.json
