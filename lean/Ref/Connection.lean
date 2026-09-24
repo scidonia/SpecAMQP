@@ -370,6 +370,15 @@ rather than typed. -/
 def invalidFieldCondition : String :=
   (declaredChoice "amqp-error" "invalid-field").getD "no invalid-field in the choice table"
 
+/-- The condition for data that could not be decoded: a value whose own shape the declared
+surface does not admit. It is the condition the message layer's declared-type refusals carry,
+and it is here for the same violation read at a different site: a `multiple` field carried in
+a container Part 1 does not give it is a decoding failure wherever the field is read, so the
+security layer refuses it under the same condition and the same class the terminus path
+refuses it under rather than under a condition of its own. -/
+def decodeErrorCondition : String :=
+  (declaredChoice "amqp-error" "decode-error").getD "no decode-error in the amqp-error choice"
+
 /-- The type a described value carries, by its descriptor. -/
 def bodyType (body : Value) : Option TypeDecl :=
   match body with
@@ -484,7 +493,11 @@ def octetsOf : Value → Option (List UInt8)
   | .binary b => some b
   | _ => none
 
-/-- The symbols a `multiple` field carries: one symbol is the one-element wire form. -/
+/-- The symbols a `multiple` field carries: one symbol, or the elements of an array.
+
+This reads only the *elements* of whatever container it is handed, so it is not by itself a
+reading of the field: the container's shape is the declaration's (`fieldShapeAdmitted`), and a
+caller that skipped that check would admit a list, which Part 1 gives no `multiple` field. -/
 def symbolList : Value → List String
   | .symbol s => [s]
   | .list items =>
@@ -518,6 +531,37 @@ def primitiveName : Value → String
   | .decimal32 _ => "decimal32" | .decimal64 _ => "decimal64" | .decimal128 _ => "decimal128"
   | .uuid _ => "uuid" | .binary _ => "binary" | .string _ => "string" | .symbol _ => "symbol"
   | .list _ => "list" | .map _ => "map" | .array _ _ => "array" | .described _ _ => "described"
+
+/-- Whether a value found at a field's index is a shape the declaration admits: one element of
+the declared primitive type, or — where the artifact marks the field `multiple` — an **array**
+of them.
+
+Part 1's types section gives a `multiple` field exactly those two shapes — its own worked
+example encodes `book.authors` as the array constructor `0xE0`. A *list* of values is neither of
+them: it is what `symbolList` above takes its elements out of, and reading only the elements is
+how a field comes to be "read" without its declaration ever being consulted.
+
+The null that stands for an absent field is admitted here, so that a frame carrying one is
+judged by the null-or-empty rule (`sasl-server-mechanisms.u1`) rather than refused as a shape. -/
+def shapeAdmits (declared : String) (multiple : Bool) : Value → Bool
+  | .null => true
+  | .array _ items => multiple && items.all (fun item => primitiveName item == declared)
+  | value => primitiveName value == declared
+
+/-- Whether a field's wire value is one the field's own declaration admits. The declaration's
+`multiple` attribute and its declared type are read from the generated table, and the value is
+then asked of `shapeAdmits`; an absent field is admitted here and left to the rules that speak
+about absence. -/
+def fieldShapeAdmitted (owner fieldName : String) (body : Value) : Bool :=
+  match declaredField owner fieldName with
+  | none => true
+  | some decl =>
+    match primitiveOfDeclared decl.typeName with
+    | none => true
+    | some declared =>
+      match valueOfField owner fieldName body with
+      | none => true
+      | some value => shapeAdmits declared decl.multiple value
 
 /-- An integer field, refusing a value whose type is not the declared one — the check that
 stops a `channel-max` declared a `ushort` from being installed when it arrives as a
@@ -705,6 +749,14 @@ def takeSasl (peer : Peer) (outbound : Bool) (size : Nat) (body : Value) :
       .error (refuseWith stateCondition "illegalState" "the SASL dialogue is waiting for the partner's \
         sasl-mechanisms frame")
     refuseUnlessComplete "sasl-mechanisms" body
+    -- The field's own declaration before its elements: a `multiple` field is one element of its
+    -- type or an array of them, and a list is neither, so a list is refused here as the message
+    -- layer's terminus path refuses one.
+    if !(fieldShapeAdmitted "sasl-mechanisms" "sasl-server-mechanisms" body) then
+      .error (refuseWith decodeErrorCondition "malformed"
+        s!"sasl-mechanisms.sasl-server-mechanisms is declared a multiple symbol and the \
+          section carries a \
+          {primitiveName ((valueOfField "sasl-mechanisms" "sasl-server-mechanisms" body).getD .null)}")
     let offered :=
       symbolList ((valueOfField "sasl-mechanisms" "sasl-server-mechanisms" body).getD .null)
     if offered.length == 0 then

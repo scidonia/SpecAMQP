@@ -393,6 +393,23 @@ own `illegal-state` condition. -/
 def stateRefusal (reasonClass prose : String) : Refusal :=
   ⟨illegalState, reasonClass, s!"{reasonClass}: {prose}", none, []⟩
 
+/-- The condition the artifact uses for data that could not be decoded: a value whose own
+shape the declared surface does not admit.
+
+It is the condition the message layer's declared-type refusals carry (`decodeRefusal`
+there), and it is here for the same violation read at a different site: a `multiple` field
+carried in a container Part 1 does not give it is a decoding failure wherever the field is
+read, so the security layer refuses it under the same condition and the same class the
+terminus path refuses it under rather than under a condition of its own. -/
+def decodeError : String :=
+  match (errorConditionsOf "amqp-error").find? (fun choice => choice.name == "decode-error") with
+  | some choice => choice.value
+  | none => "the amqp-error choice declares no decode-error"
+
+/-- A refusal whose cause is the shape of a value rather than the wire or the moment. -/
+def decodeRefusal (reasonClass prose : String) : Refusal :=
+  ⟨decodeError, reasonClass, s!"{reasonClass}: {prose}", none, []⟩
+
 /-- Refuse unless a condition holds: the guards below are all of this shape, and
 spelling them out keeps each one's diagnostic at the check that raised it. -/
 def refuseUnless (condition : Bool) (reason : Refusal) : Except Refusal Unit :=
@@ -571,8 +588,12 @@ def valueBool : Value → Option Bool
   | .boolean b => some b
   | _ => none
 
-/-- A `multiple` field's symbols as the strings they are: a single symbol is the wire
-form of a one-element list, and the corpus's own frames are written that way. -/
+/-- A `multiple` field's symbols as the strings they are: a single symbol, or the elements of
+an array.
+
+This reads only the *elements* of whatever container it is handed, so it is not by itself a
+reading of the field: the container's shape is the declaration's (`fieldShapeAdmitted`), and a
+caller that skipped that check would admit a list, which Part 1 gives no `multiple` field. -/
 def symbolsOf : Value → List String
   | .symbol text => [text]
   | .list items => items.filterMap (fun item =>
@@ -638,6 +659,39 @@ def primitiveOf (typeName : String) : Option String :=
         | .restricted, some source => follow source fuel
         | _, _ => some declaration.name
   follow typeName 8
+
+/-- Whether a value found at a field's index is a shape the declaration admits: one element of
+the declared primitive type, or — where the artifact marks the field `multiple` — an **array**
+of them.
+
+Part 1's types section gives a `multiple` field exactly those two shapes — its own worked
+example encodes `book.authors` as the array constructor `0xE0` — which is the same sentence the
+message layer's `multipleAccepts` reads for the terminus path. A *list* of values is neither of
+them: it is what `symbolsOf` above takes its elements out of, and reading only the elements is
+how a field comes to be "read" without its declaration ever being consulted.
+
+The null that stands for an absent field is admitted here, so that a frame carrying one is
+judged by the null-or-empty rule (`sasl-server-mechanisms.u1`) rather than refused as a shape. -/
+def shapeAdmits (declared : String) (multiple : Bool) : Value → Bool
+  | .null => true
+  | .array _ items =>
+    multiple && items.all (fun item => SpecAMQP.Spec.Codec.typeName item == declared)
+  | value => SpecAMQP.Spec.Codec.typeName value == declared
+
+/-- Whether a field's wire value is one the field's own declaration admits. The declaration's
+`multiple` attribute and its declared type are read from the generated table, and the value is
+then asked of `shapeAdmits`; an absent field is admitted here and left to the rules that speak
+about absence. -/
+def fieldShapeAdmitted (owner fieldName : String) (body : Value) : Bool :=
+  match fieldOf owner fieldName with
+  | none => true
+  | some decl =>
+    match primitiveOf decl.typeName with
+    | none => true
+    | some declared =>
+      match fieldValue owner fieldName body with
+      | none => true
+      | some value => shapeAdmits declared decl.multiple value
 
 /-- The refusal a field earns when the wire carries a value of a type other than the one
 the declared surface gives it, or `none` where the two agree or the field is unset.
@@ -1115,6 +1169,12 @@ def stepSaslFrame (endpoint : Endpoint) (outbound : Bool) (size : Nat) (body : V
       (stateRefusal "illegalState" "the SASL dialogue is waiting for the partner's \
         sasl-mechanisms frame")
     refuseUnlessComplete "sasl-mechanisms" body
+    -- The field's own declaration before its elements: a `multiple` field is one element of its
+    -- type or an array of them, and a list is neither, so a list is refused here as the message
+    -- layer's terminus path refuses one. Reading the elements first is what admitted it before.
+    refuseUnless (fieldShapeAdmitted "sasl-mechanisms" "sasl-server-mechanisms" body)
+      (decodeRefusal "malformed"
+        s!"sasl-mechanisms.sasl-server-mechanisms is declared a multiple symbol and the section carries a {SpecAMQP.Spec.Codec.typeName ((fieldValue "sasl-mechanisms" "sasl-server-mechanisms" body).getD .null)}")
     let announced :=
       symbolsOf (fieldValue "sasl-mechanisms" "sasl-server-mechanisms" body |>.getD .null)
     refuseUnless (!announced.isEmpty)

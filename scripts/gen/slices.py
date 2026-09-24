@@ -379,7 +379,36 @@ def encode(value: dict) -> bytes:
         return b"\xD1" + be(size + 3, 4) + be(count, 4) + entries
     if kind == "described":
         return b"\x00" + encode(value["descriptor"]) + encode(value["value"])
+    if kind == "array":
+        ctor = int(value["constructor"], 16)
+        elements = b"".join(element_octets(ctor, item) for item in value["items"])
+        count = len(value["items"])
+        if 2 + len(elements) <= 0xFF and count <= 0xFF:
+            return bytes([0xE0, 2 + len(elements), count, ctor]) + elements
+        return (bytes([0xF0]) + be(5 + len(elements), 4) + be(count, 4)
+                + bytes([ctor]) + elements)
     raise SystemExit(f"gen-exchange-vectors: cannot encode a {kind!r}")
+
+
+def element_octets(constructor: int, value: dict) -> bytes:
+    """One element of an array, in the array's declared constructor form.
+
+    An array states its element constructor once, so an element carries its data and no
+    constructor of its own. The corpus writes exactly one array — the `sasl-server-mechanisms`
+    field, whose declared type is `symbol` — so the one constructor the table assigns it is
+    written here and anything else is refused rather than written in another form.
+    """
+    if constructor == 0xA3:
+        if value["type"] != "symbol":
+            raise SystemExit(f"gen-exchange-vectors: a symbol array carries symbols, not "
+                             f"{value['type']!r}")
+        payload = value["text"].encode("utf-8")
+        if len(payload) > 0xFF:
+            raise SystemExit("gen-exchange-vectors: a symbol8 array element is at most 255 "
+                             "octets; this corpus writes the narrowest form")
+        return bytes([len(payload)]) + payload
+    raise SystemExit(f"gen-exchange-vectors: element constructor {constructor:#04x} is not "
+                     f"one this corpus writes")
 
 
 def described(code: int, items: list[dict]) -> dict:
@@ -709,8 +738,19 @@ class Corpus:
         return encode(described(self.data_code, [{"type": "binary", "hex": payload.hex()}]))
 
     def mechanisms_body(self, mechanisms: list[str]) -> dict:
+        """A `sasl-mechanisms` frame's body.
+
+        `sasl-server-mechanisms` is declared a `multiple` symbol, and Part 1's types section
+        gives a `multiple` field one element of the type or an **array** of them — its own
+        worked example encodes `book.authors` as the array constructor `0xE0`. So the field is
+        written as that array. Writing its symbols straight into the body's field list is the
+        shape both artefacts refuse, because one list cannot be both the composite's field
+        list and the field's own elements.
+        """
         return described(self.sasl_mechanisms_code,
-                         [{"type": "symbol", "text": name} for name in mechanisms])
+                         [{"type": "array", "constructor": "a3",
+                           "items": [{"type": "symbol", "text": name}
+                                     for name in mechanisms]}])
 
     def init_body(self, mechanism: str) -> dict:
         values: dict[str, dict] = {"mechanism": {"type": "symbol", "text": mechanism},

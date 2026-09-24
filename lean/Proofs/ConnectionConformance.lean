@@ -1688,6 +1688,12 @@ structure SaslCorresponds (s : Spec.Connection.Endpoint) (i : Ref.Connection.Pee
     Ref.Connection.symbolList
       ((Ref.Connection.valueOfField "sasl-mechanisms" "sasl-server-mechanisms" rbody).getD
         .null)
+  /-- the declared surface's shape check on the mechanisms field, which the arm asks before it
+  reads the field's elements: a `multiple` field's value is one element or an array, and a list
+  is refused -/
+  mechanismsShape :
+    Spec.Connection.fieldShapeAdmitted "sasl-mechanisms" "sasl-server-mechanisms" sbody =
+      Ref.Connection.fieldShapeAdmitted "sasl-mechanisms" "sasl-server-mechanisms" rbody
   chosen : (match Spec.Connection.fieldValue "sasl-init" "mechanism" sbody with
       | some (.symbol t) => t
       | _ => "") =
@@ -1977,6 +1983,62 @@ theorem ValuesAgree.fieldValue_eq {a : SpecAMQP.Spec.Codec.Value} {b : SpecAMQP.
   rcases hd : SpecAMQP.Ref.Connection.declaredField owner field with _ | fld
   · exact .none
   · exact optionAgree_index_ite fld.index (optionAgree_get? (items_forall₂ h) (fld.index - 1))
+
+/-- `List.all` of two elementwise-related lists, for two predicates that agree on related
+elements. This is what turns elementwise agreement of an array's elements into the shape a
+declared field judges, as `filterMap_forall₂` does for the symbol list a `multiple` field
+carries. -/
+private theorem all_forall₂ {α β : Type} {R : α → β → Prop} {f : α → Bool} {g : β → Bool}
+    {xs : List α} {ys : List β} (h : List.Forall₂ R xs ys)
+    (hp : ∀ x y, R x y → f x = g y) : xs.all f = ys.all g := by
+  induction h with
+  | nil => rfl
+  | cons hr ht ih => rw [List.all_cons, List.all_cons, hp _ _ hr, ih]
+
+/-- Agreement of the declared-shape test on two agreeing values: an array's elements agree
+elementwise, and every other constructor is a primitive name the two layers spell the same, so
+the two tests answer together on every kind of value a field can carry. -/
+theorem ValuesAgree.shapeAdmits_eq {a : SpecAMQP.Spec.Codec.Value} {b : SpecAMQP.Ref.Value}
+    (h : ValuesAgree a b) (declared : String) (multiple : Bool) :
+    SpecAMQP.Spec.Connection.shapeAdmits declared multiple a =
+      SpecAMQP.Ref.Connection.shapeAdmits declared multiple b := by
+  cases h
+  case array heq hfa =>
+    exact congrArg (fun t => multiple && t)
+      (all_forall₂ hfa (fun x y hxy =>
+        congrArg (fun t => t == declared) (ValuesAgree.typeName_eq hxy)))
+  all_goals rfl
+
+/-- Agreement of the two layers' declaration check on one field of two agreeing bodies.
+
+Both sides look the same declaration up in the same generated table — `fieldOf` is
+`declaredField` and `primitiveOf` is `primitiveOfDeclared`, both by `rfl` — and the value they
+ask of is the same value at the same declared index (`fieldValue_eq`), so the two checks answer
+together: a field the security layer reads through its declaration is admitted or refused by
+both artefacts for the same reason. -/
+theorem ValuesAgree.fieldShapeAdmitted_eq {a : SpecAMQP.Spec.Codec.Value} {b : SpecAMQP.Ref.Value}
+    (h : ValuesAgree a b) (owner field : String) :
+    SpecAMQP.Spec.Connection.fieldShapeAdmitted owner field a =
+      SpecAMQP.Ref.Connection.fieldShapeAdmitted owner field b := by
+  have hpd : ∀ t, SpecAMQP.Spec.Connection.primitiveOf t =
+      SpecAMQP.Ref.Connection.primitiveOfDeclared t := fun _ => rfl
+  have hfv := ValuesAgree.fieldValue_eq h owner field
+  simp only [SpecAMQP.Spec.Connection.fieldShapeAdmitted,
+    SpecAMQP.Ref.Connection.fieldShapeAdmitted,
+    show SpecAMQP.Spec.Connection.fieldOf owner field =
+      SpecAMQP.Ref.Connection.declaredField owner field from rfl, hpd]
+  rcases hd : SpecAMQP.Ref.Connection.declaredField owner field with _ | fld
+  · rfl
+  · dsimp only
+    rcases hp : SpecAMQP.Ref.Connection.primitiveOfDeclared fld.typeName with _ | declared
+    · rfl
+    · dsimp only
+      generalize hP : SpecAMQP.Spec.Connection.fieldValue owner field a = P
+      generalize hQ : SpecAMQP.Ref.Connection.valueOfField owner field b = Q
+      have hPQ : OptionAgree P Q := by rw [← hP, ← hQ]; exact hfv
+      cases hPQ with
+      | none => rfl
+      | some hxy => exact ValuesAgree.shapeAdmits_eq hxy declared fld.multiple
 
 /-- Whether a field lookup found a value that is not null, on the specification's side:
 `false` for an absent field and for a null one, which is the rule `fieldSet` spells out. -/
@@ -4370,19 +4432,32 @@ theorem stepSaslFrame_pair (s : Spec.Connection.Endpoint) (i : Ref.Connection.Pe
         · rw (config := { transparency := .default }) [if_pos h2]
           try rw (config := { transparency := .default }) [if_pos h2]
           try simp only [bind, Except.bind, pure, Except.pure]
-          rw (config := { transparency := .default }) [announced_guard hc.declared]
-          by_cases h3 : ((Ref.Connection.symbolList
-                ((Ref.Connection.valueOfField "sasl-mechanisms" "sasl-server-mechanisms"
-                  rbody).getD Ref.Value.null)).length == 0) = true
-          · rw (config := { transparency := .default }) [if_neg (not_not_true h3)]
-            rw (config := { transparency := .default }) [if_pos h3]
+          -- the declared shape of the field, which the arm asks before it reads the elements:
+          -- the two guards are one question by `hc.mechanismsShape`, so both sides refuse the
+          -- list together and admit the array together
+          rw (config := { transparency := .default }) [hc.mechanismsShape]
+          by_cases h4 : (Ref.Connection.fieldShapeAdmitted "sasl-mechanisms"
+                "sasl-server-mechanisms" rbody) = true
+          · rw (config := { transparency := .default }) [if_pos h4]
+            rw (config := { transparency := .default }) [if_neg (not_not_true h4)]
+            try simp only [bind, Except.bind, pure, Except.pure]
+            rw (config := { transparency := .default }) [announced_guard hc.declared]
+            by_cases h3 : ((Ref.Connection.symbolList
+                  ((Ref.Connection.valueOfField "sasl-mechanisms" "sasl-server-mechanisms"
+                    rbody).getD Ref.Value.null)).length == 0) = true
+            · rw (config := { transparency := .default }) [if_neg (not_not_true h3)]
+              rw (config := { transparency := .default }) [if_pos h3]
+              try simp only [bind, Except.bind, pure, Except.pure]
+              exact ⟨answers_of_error rfl rfl rfl rfl, rfl⟩
+            · rw (config := { transparency := .default }) [if_pos (not_true_of_not h3)]
+              rw (config := { transparency := .default }) [if_neg h3]
+              try simp only [bind, Except.bind, pure, Except.pure]
+              refine ⟨answers_of_ok ?_, rfl⟩
+              simp only [refPeerOf, refPhase, refRole_ofBool, hc.declared]
+          · rw (config := { transparency := .default }) [if_neg h4]
+            rw (config := { transparency := .default }) [if_pos (not_true_of_not h4)]
             try simp only [bind, Except.bind, pure, Except.pure]
             exact ⟨answers_of_error rfl rfl rfl rfl, rfl⟩
-          · rw (config := { transparency := .default }) [if_pos (not_true_of_not h3)]
-            rw (config := { transparency := .default }) [if_neg h3]
-            try simp only [bind, Except.bind, pure, Except.pure]
-            refine ⟨answers_of_ok ?_, rfl⟩
-            simp only [refPeerOf, refPhase, refRole_ofBool, hc.declared]
         · rw (config := { transparency := .default }) [if_neg h2]
           try rw (config := { transparency := .default }) [if_neg h2]
           try simp only [bind, Except.bind, pure, Except.pure]
@@ -4910,6 +4985,7 @@ theorem saslCorresponds_of_valuesAgree (s : Spec.Connection.Endpoint) (i : Ref.C
   response := ValuesAgree.sasl_response_iff h
   outcome := ValuesAgree.sasl_outcome_iff h
   declared := ValuesAgree.mechanisms_eq h
+  mechanismsShape := ValuesAgree.fieldShapeAdmitted_eq h "sasl-mechanisms" "sasl-server-mechanisms"
   chosen := ValuesAgree.mechanism_eq h
   mandatoryMechanisms := ValuesAgree.mandatory_eq h "sasl-mechanisms"
   mandatoryInit := ValuesAgree.mandatory_eq h "sasl-init"
