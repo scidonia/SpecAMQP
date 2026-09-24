@@ -290,6 +290,8 @@ import Proofs.SaslDialogue
 
 import Proofs.ReadProgress
 import Proofs.CodecNarrowestAssembly
+import Proofs.EndpointConformance
+import Contracts.EndpointAcceptance
 -- S5: the message layer's theorems, so their axiom inventories are disclosed per theorem
 import Spec.Message
 #print axioms SpecAMQP.Contracts.constructor_grammar_public
@@ -369,6 +371,17 @@ import Spec.Message
 -- keep true, so their inventories are asked alongside the composition they explain.
 #print axioms SpecAMQP.Proofs.answersMatch_of_spec_refuses
 #print axioms SpecAMQP.Proofs.not_answersMatch_of_ref_refuses
+-- R3: the endpoint core's instance, and the acceptance that binds it. The four plumbing equalities
+-- are asked alongside it because the acceptance's prose cites them by name as what the instance rests
+-- on: an instance whose own dependence is only described is the shape this gate exists to refuse.
+#print axioms SpecAMQP.Contracts.endpoint_conformance_public
+#print axioms SpecAMQP.Proofs.endpoint_conforms
+#print axioms SpecAMQP.Proofs.arriving_agrees
+#print axioms SpecAMQP.Proofs.sending_agrees
+#print axioms SpecAMQP.Proofs.answerOf_agrees
+#print axioms SpecAMQP.Proofs.submissionOf_agrees
+#print axioms SpecAMQP.Proofs.toOctets_agrees
+#print axioms SpecAMQP.Proofs.callOctets_agrees
 #print axioms SpecAMQP.Proofs.lengthPrefixed_ok
 #print axioms SpecAMQP.Proofs.takeBe_beOctets
 #print axioms SpecAMQP.Spec.ReadLaws.extract_toList_eq_drop_take
@@ -392,7 +405,9 @@ grep -q "sorryAx" "$tmp/axioms.log" &&
 grep -q "ofReduceBool" "$tmp/axioms.log" &&
   { cat "$tmp/axioms.log"; problem "the accepted theorem depends on native_decide's ofReduceBool"; }
 grep -q "sorryAx" "$tmp/scan.log" && problem "an accepted theorem is missing from the inventory"
-sed 's/^/     /' "$tmp/axioms.log" | grep "depends on axioms" | sed 's/^     //'
+# Both verdict forms are displayed: an inventory that showed only the theorems with axioms would
+# hide the strongest entries — the ones that rest on nothing — from the reader it is printed for.
+sed 's/^/     /' "$tmp/axioms.log" | grep -e "depends on axioms" -e "does not depend on any axioms" | sed 's/^     //'
 for theorem in "$accepted_theorem" extended_header_width body_starts_after_the_header \
                SpecAMQP.Contracts.accepted_frames_carry_performatives \
                SpecAMQP.Contracts.consumed_is_the_declared_size \
@@ -419,9 +434,21 @@ for theorem in "$accepted_theorem" extended_header_width body_starts_after_the_h
                SpecAMQP.Proofs.two_pow_eight_mul SpecAMQP.Proofs.lengthPrefixed_eq \
                SpecAMQP.Proofs.lengthPrefixed_ok SpecAMQP.Proofs.takeBe_beOctets \
                SpecAMQP.Spec.ReadLaws.extract_toList_eq_drop_take \
-               SpecAMQP.Spec.ReadLaws.takeBe_eq_fold; do
-  grep -q "$theorem' depends on axioms" "$tmp/axioms.log" ||
+               SpecAMQP.Spec.ReadLaws.takeBe_eq_fold \
+               SpecAMQP.Contracts.endpoint_conformance_public \
+               SpecAMQP.Proofs.endpoint_conforms \
+               SpecAMQP.Proofs.arriving_agrees SpecAMQP.Proofs.sending_agrees \
+               SpecAMQP.Proofs.answerOf_agrees SpecAMQP.Proofs.submissionOf_agrees \
+               SpecAMQP.Proofs.toOctets_agrees SpecAMQP.Proofs.callOctets_agrees; do
+  # The kernel prints one of two sentences, and both are verdicts: a theorem that depends on axioms,
+  # and one that depends on none — which is the stronger case and was, until the endpoint's acceptance
+  # listed an `rfl`-level theorem, the case this check could not see. A pattern that matched only the
+  # first reported the second as "the kernel did not print it", which is exactly wrong: the kernel
+  # printed it and said something better.
+  if ! grep -qF "$theorem' depends on axioms" "$tmp/axioms.log" &&
+     ! grep -qF "$theorem' does not depend on any axioms" "$tmp/axioms.log"; then
     problem "$theorem was not inventoried — the inventory names a theorem the kernel did not print"
+  fi
 done
 note "every accepted theorem's axiom inventory contains no sorryAx and no ofReduceBool"
 
