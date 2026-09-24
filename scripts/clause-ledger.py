@@ -1413,6 +1413,30 @@ WORD_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_']*")
 # that resolves against these is read as vocabulary and not as a cited vector.
 LEDGER_VOCABULARY = (*DISPOSITION_PREFIXES, "informative")
 
+# A note's citation of the tree: a module under `lean/**` and the line or line range in
+# it. The `lean/` prefix is optional and both spellings are read the same way, because
+# `Contracts/Settlement.lean:185-189` names the module `lean/Contracts/Settlement.lean`
+# — the ledger writes the prefix when the citation is the subject of a sentence and
+# drops it when the sentence already names the directory.
+LEAN_CITATION_PATTERN = re.compile(
+    r"(?:lean/)?((?:Spec|Ref|Harness|Impl|Shell|Contracts|Proofs|Generated)/[\w./-]+\.lean)"
+    r":(\d+)(?:-(\d+))?"
+)
+
+# The name a citation is attributed to is the one written *beside* it, and the three
+# shapes that count are the note's own: backticked (`` `attachLink` (lean/…) ``),
+# qualified (`Spec.Session.detachLink (lean/…)`) and camel-cased (`detachLink (lean/…)`).
+# A bare lowercase word before a citation is prose, and reading one as a name attributes
+# the citation to whatever declaration shares the word: measured against this ledger,
+# accepting them reported six citations for `version`, `refusal` (three times), `layer`
+# and `live` — each a declaration in the cited module — where the note's subject was
+# `negotiationReply`, `linkHandleOf`, `applyState`, `stepHeader` or `discharge`, so the
+# message named a declaration the note never cited.
+CITATION_SEPARATOR_PATTERN = re.compile(r"[\s(\[,;:—–-]+$")
+CITATION_BACKTICKED_NAME_PATTERN = re.compile(r"`([^`\s]+)`$")
+CITATION_WRITTEN_NAME_PATTERN = re.compile(r"([A-Za-z_][\w.']*[?!]?)$")
+CAMEL_CASE_PATTERN = re.compile(r"[a-z][A-Z]")
+
 
 def ledger_strings(root: Path):
     """Every string in every JSON document under `root`, with file and JSON path.
@@ -1570,6 +1594,164 @@ def check_note_names(root: Path, vectors_dir: Path, lean_root: Path, report: dic
                 f"no vector id in it and no name this ledger defines"
             )
     return problems
+
+
+def lean_declaration_extents(root: Path) -> dict[Path, dict[str, list[tuple[int, int]]]]:
+    """Every declaration under `lean/**`, as the lines it occupies.
+
+    A declaration occupies its own line and every line after it until the next
+    declaration at the same or a shallower indentation — the indentation is what keeps a
+    `where` clause's local definition inside the declaration that owns it rather than
+    ending it. Only the last segment of a qualified name is keyed, which is the reading
+    `check_note_names` already gives a backticked token, so `attachLink` and
+    `Spec.Session.attachLink` both resolve against the module the citation names, and a
+    name resolves against no other module's namesake.
+
+    The documentation above a declaration is **not** part of its extent. The ledger's
+    citations to documentation are written without a name beside them — "(its module doc,
+    lean/Proofs/HandleUniqueness.lean:36-42)", "both artefacts state the exclusion in
+    their own docstrings (Spec/Connection.lean:44-46)" — so no name is attributed to them
+    and this boundary is never reached; a citation that *does* name a declaration is a
+    citation to the declaration, and what is checked is that the lines land on it.
+    """
+    modules: dict[Path, dict[str, list[tuple[int, int]]]] = {}
+    for path in sorted(root.rglob("*.lean")):
+        if ".lake" in path.parts:
+            continue
+        lines = lean_code_lines(path.read_text(encoding="utf-8"))
+        written: list[tuple[int, int, str]] = []
+        for number, (indent, code) in enumerate(lines, 1):
+            declaration = LEAN_DECLARATION_PATTERN.match(code)
+            if declaration is not None:
+                written.append((number, indent, declaration.group(2).rsplit(".", 1)[-1]))
+        extents: dict[str, list[tuple[int, int]]] = {}
+        for index, (number, indent, name) in enumerate(written):
+            end = len(lines)
+            for later, later_indent, _ in written[index + 1:]:
+                if later_indent <= indent:
+                    end = later - 1
+                    break
+            extents.setdefault(name, []).append((number, end))
+        modules[path] = extents
+    return modules
+
+
+def citation_attribution(text: str, position: int) -> str | None:
+    """The declaration name the citation at `position` is attributed to, or None.
+
+    The name is the one written beside the citation, past the separators a note puts
+    there — a space, the opening parenthesis, a comma, a dash — and it must be written in
+    one of the three shapes a note uses: backticked, qualified or camel-cased. Nothing
+    further back is read, and the reason is measured rather than stylistic. A reading that
+    took the sentence's last name that resolves reported `lean/Spec/Session.lean:446-448`
+    — the two handle fields, cited correctly — as a citation of `attachLink`, because
+    `handles` and `peerHandles` are fields no declaration scan holds and the nearest name
+    left standing was the previous citation's. A reading that let each citation consume a
+    name reported `lean/Spec/Connection.lean:677` — `minMaxFrameSize`'s constant, in the
+    note's own words — as a citation of `constantNat`, the expression written beside it.
+    Both readings produce a failure naming a declaration the note did not cite, which is
+    the one outcome this check exists to remove; reading only what is written beside the
+    citation keeps every message about a declaration the note wrote there.
+    """
+    written = CITATION_SEPARATOR_PATTERN.sub("", text[:position])
+    backticked = CITATION_BACKTICKED_NAME_PATTERN.search(written)
+    if backticked is not None:
+        return backticked.group(1)
+    bare = CITATION_WRITTEN_NAME_PATTERN.search(written)
+    if bare is None:
+        return None
+    token = bare.group(1)
+    if "." in token or CAMEL_CASE_PATTERN.search(token):
+        return token
+    return None
+
+
+def check_line_citations(root: Path, lean_root: Path) -> tuple[list[str], int, int]:
+    """Every `lean/….lean:A[-B]` citation must land on the declaration it is attributed to.
+
+    A disposition note cites the tree, and nothing read the citation. The S4 triage found
+    the batch's citations drifted: `attachLink` cited at `lean/Spec/Session.lean:656-736`
+    and declared at `:768`, `flowLink` at `:763-775` and `:888`, `transferLink` at
+    `:815-921` and `:1022`, `detachLink` at `:961-974` and `:1165`. Each of those
+    citations *resolves* — the module exists and the lines are in range — and points at a
+    different declaration than the note names, because the declarations below them moved
+    as the module grew. A planner acting on such a note reads the wrong declaration, and
+    that is how a note about a carrier becomes a note about something else.
+
+    The rule, in one sentence: **the module must exist and hold the cited lines, and the
+    declaration the citation is attributed to must have those lines inside its own extent**
+    — its declaration line through the line before the next declaration at that
+    indentation, its documentation excluded. The tolerance is zero, and it is not
+    arbitrary: the boundary is the declaration itself, read from the tree rather than
+    chosen, so a citation to a fragment of a body intersects it and passes while a
+    citation whose lines have moved out from under it does not. A range that starts late
+    and still lands inside the declaration passes, which is the intended reading — this
+    check is about *which* declaration a note points at, not about the exactness of its
+    offsets.
+
+    Attribution is local and the boundary it draws is stated rather than implied. Of the
+    ledger's 342 citations, 92 are written with a declaration name beside them and are
+    checked against it; the rest are checked for existence and range alone, because a note
+    may cite a line range with no name in the sentence (the module doc at
+    `lean/Proofs/HandleUniqueness.lean:36-42`) or with its name written at a distance —
+    "Spec.Session.flowLink refuses a flow whose handle is unset … (lean/Spec/Session.lean:
+    763-775)" names its declaration at the sentence's start, and the five citations of that
+    shape are left to the reader. What is not left to the reader is the same declaration
+    where a note does write the name beside the citation: `flowLink` at `:742-806` is
+    reported. A name the cited module does not declare is left alone as well rather than
+    resolved against another module, because `Session.delivery` is a structure field and
+    `Submission.frame` a constructor: names this scan cannot place are not claims it can
+    read. Both boundaries err toward silence, which is where a check over prose has to err —
+    a failure naming a declaration the note did not cite is worse than the drift this looks
+    for, and two wider readings were measured and rejected for exactly that
+    (`citation_attribution`).
+
+    Unlike the existence gates this one is not gated on the repository's own ledger: it
+    compares a ledger's prose with a tree, and both are readable from a fixture, so a
+    planted citation exercises it. Returns the problems and the two counts the summary
+    prints — citations read, and citations attributed to a declaration.
+    """
+    extents = lean_declaration_extents(lean_root)
+    lengths: dict[Path, int] = {}
+    problems: list[str] = []
+    citations = 0
+    attributed = 0
+    for where, text in ledger_strings(root):
+        for match in LEAN_CITATION_PATTERN.finditer(text):
+            relative = match.group(1)
+            first = int(match.group(2))
+            last = int(match.group(3)) if match.group(3) is not None else first
+            citations += 1
+            module = lean_root / relative
+            if not module.is_file():
+                problems.append(
+                    f"{where}: cites {relative}:{first}-{last}, which is no module under "
+                    f"{lean_root.name}/"
+                )
+                continue
+            if module not in lengths:
+                lengths[module] = len(module.read_text(encoding="utf-8").splitlines())
+            if not 1 <= first <= last <= lengths[module]:
+                problems.append(
+                    f"{where}: cites {relative}:{first}-{last}, and the module has "
+                    f"{lengths[module]} line(s)"
+                )
+                continue
+            name = citation_attribution(text, match.start())
+            if name is None:
+                continue
+            declared = extents.get(module, {}).get(name.rsplit(".", 1)[-1])
+            if not declared:
+                continue  # a name this module does not declare: not a claim this check reads
+            attributed += 1
+            if any(start <= last and first <= end for start, end in declared):
+                continue
+            occupied = ", ".join(f"{start}-{end}" for start, end in declared)
+            problems.append(
+                f"{where}: cites {relative}:{first}-{last} for {name}, which that module "
+                f"declares at {occupied}"
+            )
+    return problems, citations, attributed
 
 
 def check_ambiguities(report: dict, dispositions: dict[str, dict], path: Path) -> list[str]:
@@ -1732,6 +1914,13 @@ def command_check(args: argparse.Namespace) -> int:
     # repository's own ledger: a planted note in a fixture exercises it, which is what
     # keeps a name-resolving check from only ever seeing the passing direction.
     problems.extend(check_note_names(Path(args.out), repository / "vectors", repository / "lean", report))
+    # The citation check reads a ledger's prose against the tree beside it, so it is not
+    # gated on `dispositions_required` either: a fixture that cites a module the tree holds
+    # exercises it, and the repository's own run is the one that must report the drift.
+    citation_problems, citations, attributed = check_line_citations(
+        Path(args.out), repository / "lean"
+    )
+    problems.extend(citation_problems)
 
     for name, entry in sorted(report["per_artifact"].items()):
         audit = entry["audit"]
@@ -1790,6 +1979,10 @@ def command_check(args: argparse.Namespace) -> int:
         print(
             f"notes: {len(named)} ledger string(s) name a corpus, {tokens} backticked "
             f"token(s) besides the paths resolved in them"
+        )
+        print(
+            f"notes: {citations} lean line citation(s) checked, {attributed} of them "
+            "attributed to a declaration"
         )
 
     if problems:
