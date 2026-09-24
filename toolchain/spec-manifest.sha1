@@ -21,7 +21,7 @@ c5ee92929caed5a244bae9a85cea9d0af5e7749a  lean/Contracts/TypeSystem.lean
 c92c679a91d5a504610bbd47f27ffe33f7776971  lean/Spec/Frame.lean
 31e43aed7900e071a7a1615d739be50f716b5b74  lean/Spec/FrameCodec.lean
 7c2fc8950376880dfbba4beb86a052316ea8b589  lean/Spec/Main.lean
-f1aa87779544d6f2305c84a24a96d482bcfb6956  lean/Spec/Message.lean
+f653e56293e131ee5ddd22c400377f31ede4be1e  lean/Spec/Message.lean
 9fa46bb63a4e3b09f04c9d89689b74a676356783  lean/Spec/ReadLaws.lean
 eb9cfb001d3ae1417d6c5def00a8ce6ef6568fa2  lean/Spec/Session.lean
 0d21912c7627dddca29799f8b7a224fe91907b05  lean/Spec/SessionCodec.lean
@@ -96,7 +96,7 @@ cd8cf38336ebfd9594ad8d13182da07d711d5295  tests/contracts/s2_frame_vectors.sh
 f5bdf95d70fbdca43b51ec0cdbc2074ec6b62543  tests/contracts/s3_exchanges.sh
 9c4490744cdd9f63ec5f26f2e932c4815125bce9  tests/contracts/s4_flow.sh
 54ee99feb8bbb75838d41aa82ba91ec71881e518  tests/contracts/s5_messages.sh
-f89f5a8c5aa42bfe98ef1e180e9bae75213953de  tests/contracts/s6_transactions.sh
+039f79183031ababcf20fcae9e7741e2cf073713  tests/contracts/s6_transactions.sh
 5003de4bb012c2bc64f5b85d9f5e23142467f6b6  tests/contracts/s7_sasl.sh
 c6fbe09193411f7d9addf96285de6626cff85db7  tests/contracts/value-vector.schema.json
 db82368890d436450b3c199292a6c76d7c1ede34  tests/contracts/value_boundaries.sh
@@ -124,7 +124,7 @@ c876f69bb22065b406c11b423b5ffb93d4d18426  vectors/message/sections.ndjson
 4a008ea51f55fb488b9d01833fca09ccb9eae409  vectors/sasl-negative.ndjson
 1dbd3b9bfcbbdc661b31a4d75a2b8081a49ca3ed  vectors/sasl.ndjson
 2f85e410608d4b6f8e220da9a45cd27497227e4a  vectors/slice.ndjson
-5016bfabb395b8ff29564fb6c95208622dd6d652  vectors/txn-negative.ndjson
-ecac919aaaf979c4765bc027729f1934278582cf  vectors/txn.ndjson
+ec3cf6d8a9e27b0110cb99eac8539425cd0adbca  vectors/txn-negative.ndjson
+70736979c0a73758f1d9896de8924032bc3583c2  vectors/txn.ndjson
 f51ef1e616215fd42bcfc9c7e0839f3ba9cf8db0  vectors/value-boundaries.ndjson
 c7bb623f572834175ae864a74a8196b9353b7a97  vectors/value-boundary-negatives.ndjson
