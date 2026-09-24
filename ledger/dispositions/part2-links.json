@@ -111,7 +111,7 @@
    "clause_text": "In this case, the session endpoint MUST immediately detach the newly created link endpoint.",
    "disposition": "deferred:S3-session",
    "kind": "MUST",
-   "note": "The terminus family: a terminus's creation, the properties it actually has, and the verifying peer's own requirements (links.8's 'its requirements', cf. the companion SHOULD at links.9 about 'the requirements of its partner'). The model holds no terminus properties and no peer requirements, and the family is already deferred there - attach/field:source.u1/u2, attach/field:target.u1/u2, links.u3 and links.u5 all carry deferred:S3-session. The nearest behaviour, Message.checkTerminus (:1541) applied by Session.terminusRefusalOf (:751) through attachLink (:768), checks a terminus against the declared field documentation rather than against a peer's requirements.",
+   "note": "Blocked: lean/Spec/Session.lean line 423-430 structure Session holds one link's flow state, no terminus record; :768 attachLink / :1165 detachLink read a frame the corpus supplies; lean/Spec/Message.lean line 1541 checkTerminus checks a terminus against its declared field documentation, not against a peer's requirements",
    "text_sha256": "6cb94cd066651facc7647c6fbca4860c15bc9b8a55cee66533543f83220b1a89"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.5": {
@@ -125,14 +125,14 @@
    "clause_text": "In this case the endpoint MUST report the actual properties of the terminus as created.",
    "disposition": "deferred:S3-session",
    "kind": "MUST",
-   "note": "The terminus family: a terminus's creation, the properties it actually has, and the verifying peer's own requirements (links.8's 'its requirements', cf. the companion SHOULD at links.9 about 'the requirements of its partner'). The model holds no terminus properties and no peer requirements, and the family is already deferred there - attach/field:source.u1/u2, attach/field:target.u1/u2, links.u3 and links.u5 all carry deferred:S3-session. The nearest behaviour, Message.checkTerminus (:1541) applied by Session.terminusRefusalOf (:751) through attachLink (:768), checks a terminus against the declared field documentation rather than against a peer's requirements.",
+   "note": "Blocked: lean/Spec/Session.lean line 423-430; lean/Spec/Message.lean line 1541 checkTerminus judges a terminus a peer sent, not one this endpoint created",
    "text_sha256": "63bfb9d273a1aa86d0886c193b891af0b4e3a0497bf4990e6bcdef0d18edd6ea"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.8": {
    "clause_text": "Note that a peer MUST take responsibility for verifying that the remote terminus meets its requirements.",
    "disposition": "deferred:S3-session",
    "kind": "MUST",
-   "note": "The terminus family: a terminus's creation, the properties it actually has, and the verifying peer's own requirements (links.8's 'its requirements', cf. the companion SHOULD at links.9 about 'the requirements of its partner'). The model holds no terminus properties and no peer requirements, and the family is already deferred there - attach/field:source.u1/u2, attach/field:target.u1/u2, links.u3 and links.u5 all carry deferred:S3-session. The nearest behaviour, Message.checkTerminus (:1541) applied by Session.terminusRefusalOf (:751) through attachLink (:768), checks a terminus against the declared field documentation rather than against a peer's requirements.",
+   "note": "Blocked: lean/Spec/Session.lean line 423-430; lean/Spec/Message.lean line 1520-1530 checkTerminusRole checks a value against the *declared* role, which is the artifact's requirement, not the peer's own",
    "text_sha256": "ef75b0df4bb80924b872b34624e8770ffd3ee808a8b414b9e9627610b62176e1"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:closing-a-link.2": {

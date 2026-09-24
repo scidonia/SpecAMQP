@@ -16,133 +16,133 @@
    "clause_text": "When traveling in the other direction, from resource to controller, the \u00abtransfer\u00bb and \u00abdisposition\u00bb frames indicate work performed, and the txn-ids included MUST correctly indicate with which (if any) transaction this work is associated.",
    "disposition": "formalized:SpecAMQP.Spec.Transactions.transactionalState; formalized:SpecAMQP.Spec.Transactions.Layer.knows; deferred:S6",
    "kind": "MUST",
-   "note": "**Carried in part, and the halves are named because a `formalized:` covering half a sentence conflates finished work with pending work.** Carried: resource-to-controller frame whose state is a transactional-state \u2014 `SpecAMQP.Spec.Transactions.transactionalState` is the rule and `SpecAMQP.Spec.Transactions.Layer.knows` the predicate it reads, reached from `step`'s transactional-state arm on the disposition side, with the reference's independent reading in `SpecAMQP.Ref.Transactions.onTransactionalState` over `Layer.holds`; the refusal names `unknown-id`, a member of `transaction-error`. Pending: a *transfer*'s txn-id \u2014 the sentence covers transfer and disposition, and the layer is handed the disposition's state and the payload only, so a resource-to-controller transfer carrying a bad txn-id is admitted until Session hands the transfer's delivery state over. The report that carried it is `4c7f4f1`, and the handover it waits on is queued as its own slice because it needs the contract's `step` signature changed and `Session` to pass the transfer's delivery state across.",
+   "note": "Blocked: lean/Spec/Transactions.lean line 386-405 transactionalState (the carried half); lean/Spec/Session.lean line 1022 transferLink",
    "text_sha256": "b618b5582b8d2584bab3490521a246fbe5c06b18c2447c331b3c17247da35b98"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.11": {
    "clause_text": "If a transaction is discharged at a point where a message has been transactionally acquired, but has not been fully sent (i.e., the delivery of the message will require more than one \u00abtransfer\u00bb frame and at least one, but not all, such frames have been sent), then the resource MUST interpret this to mean that the fate of the acquisition is fully decided by the discharge.",
    "disposition": "deferred:S6",
    "kind": "MUST",
-   "note": "deferred: S6 \u2014 uncarried: the acquisition and its partial sending are not modelled. `Layer` holds txn-ids and nothing about acquisitions (lean/Spec/Transactions.lean:197-209), and XXX retires an id without consulting one. The session does hold a delivery across fragmented transfers (lean/Spec/Session.lean:474, :855-866), which is the shape the sentence is about, and nothing ties that delivery to a transaction \u2014 the same missing tie as `.1` and `.16`.",
+   "note": "Blocked: lean/Spec/Transactions.lean line 203-215 structure Layer holds transactions, the next id and capability lists only; :351-361 discharge consults liveness, never an acquisition",
    "text_sha256": "50f5a3d083c8297ac024db1c35baf8ff327476713aaa8673aaff8c5b90468eef"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.12": {
    "clause_text": "If the \u00abdischarge\u00bb indicates the failure of the transaction the resource MUST abort or complete sending the remainder of the message before completing the discharge.",
-   "disposition": "deferred:S6",
+   "disposition": "out-of-scope:frame-construction",
    "kind": "MUST",
-   "note": "deferred: S6 \u2014 uncarried: the model has no sending side to abort or to complete. `transferLink` validates a transfer the corpus supplies and `discharge` (lean/Spec/Transactions.lean:313) retires an id; no declaration emits frames, so 'abort or complete sending the remainder of the message before completing the discharge' is a rule with no code to be built in \u2014 the gap `connections.5`'s entry records for the close frame.",
+   "note": "lean/Spec/Session.lean line 1022-1080 transferLink validates a transfer the corpus supplies; no declaration emits frames",
    "text_sha256": "b94a0ae33f15de22259caeac2ee85cfd726e6eef2639216c7a9cae5d505b4717"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.13": {
    "clause_text": "If the resource is unable to process the delivery it MUST NOT allow the successful discharge of the associated transaction.",
    "disposition": "deferred:S6",
    "kind": "MUST NOT",
-   "note": "deferred: S6 \u2014 uncarried: 'the resource is unable to process the delivery' is an application-level input the model does not have, and the discharge machine refuses for two other causes only \u2014 a settled frame (illegal state) and an id that is not live (`unknown-id`) (lean/Spec/Transactions.lean:313-324). Near-miss: `Contracts/Transaction.lean`'s `DischargeUnknownIdRefused` states the id rule over the same function, which is a different cause and is dispositioned with `txn-discharge.1`.",
+   "note": "Blocked: lean/Spec/Transactions.lean line 351-361",
    "text_sha256": "9a7efb39d1498c15b14dd22e8bb988a58abf270e46fe8a13d940273962da57f6"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.14": {
    "clause_text": "The resource MUST determine the outcome of the delivery before committing the transaction, and this MUST be communicated to the controller before the acceptance of a successful discharge.",
    "disposition": "deferred:S6",
    "kind": "MUST",
-   "note": "deferred: S6 \u2014 uncarried: the ordering this sentence requires \u2014 the outcome determined before the transaction is committed, and communicated before a successful discharge is accepted \u2014 has no carrier. `discharge` (lean/Spec/Transactions.lean:313-324) completes on liveness or on the `fail` flag and consults no outcome, and no declaration holds an outcome it could communicate. The ledger keys this sentence twice, at `.14` and `.15`, with one digest: this entry and `.15` decide the same words, as the mechanism requires.",
+   "note": "Blocked: lean/Spec/Transactions.lean line 351-361 discharge completes on liveness or the `fail` flag and consults no outcome",
    "text_sha256": "d25807980f838eef548d2a657ba188c5e4045c5f12f11495ddf8fd41f838a071"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.15": {
    "clause_text": "The resource MUST determine the outcome of the delivery before committing the transaction, and this MUST be communicated to the controller before the acceptance of a successful discharge.",
    "disposition": "deferred:S6",
    "kind": "MUST",
-   "note": "deferred: S6 \u2014 uncarried: the ordering this sentence requires \u2014 the outcome determined before the transaction is committed, and communicated before a successful discharge is accepted \u2014 has no carrier. `discharge` (lean/Spec/Transactions.lean:313-324) completes on liveness or on the `fail` flag and consults no outcome, and no declaration holds an outcome it could communicate. The ledger keys this sentence twice, at `.14` and `.15`, with one digest: the `.14` entry beside this one and this entry decide the same words, as the mechanism requires.",
+   "note": "Blocked: lean/Spec/Transactions.lean line 351-361",
    "text_sha256": "d25807980f838eef548d2a657ba188c5e4045c5f12f11495ddf8fd41f838a071"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.16": {
    "clause_text": "The outcome communicated by the resource MUST be associated with the same transaction with which the \u00abtransfer\u00bb from controller to resource was associated.",
    "disposition": "formalized:SpecAMQP.Spec.Transactions.transactionalState; formalized:SpecAMQP.Spec.Transactions.Layer.knows; deferred:S6",
    "kind": "MUST",
-   "note": "**Carried in part, and the halves are named because a `formalized:` covering half a sentence conflates finished work with pending work.** Carried: an outcome the resource communicates being associated with a transaction this endpoint holds, checked against the register \u2014 `SpecAMQP.Spec.Transactions.transactionalState` is the rule and `SpecAMQP.Spec.Transactions.Layer.knows` the predicate it reads, reached from `step`'s transactional-state arm on the disposition side, with the reference's independent reading in `SpecAMQP.Ref.Transactions.onTransactionalState` over `Layer.holds`; the refusal names `unknown-id`, a member of `transaction-error`. Pending: 'the same transaction with which the transfer from controller to resource was associated' \u2014 nothing carries a transfer-side txn-id for the outcome's id to be compared with, so *sameness* is unstateable. The report that carried it is `4c7f4f1`, and the handover it waits on is queued as its own slice because it needs the contract's `step` signature changed and `Session` to pass the transfer's delivery state across.",
+   "note": "Blocked: lean/Spec/Transactions.lean line 386-405 the carried half; lean/Spec/Session.lean line 1022 transferLink",
    "text_sha256": "e1330ca4d795d8f0e28b86229d48822f9820b54abb08fbf47de744d03ca4753e"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.17": {
    "clause_text": "If the resource can no longer apply the outcome that it originally indicated would be the result of a successful discharge then it MUST NOT allow the successful discharge of the associated transaction.",
    "disposition": "deferred:S6",
    "kind": "MUST NOT",
-   "note": "deferred: S6 \u2014 uncarried: the model records no outcome that it indicated would follow a successful discharge, so it can never find that the outcome no longer applies. `Layer` holds the transactions, the next id and both ends' capability lists (lean/Spec/Transactions.lean:197-209); a discharge's `fail` flag is a boolean the machine reads (lean/Spec/Transactions.lean:313), not an outcome it stores and later checks.",
+   "note": "Blocked: lean/Spec/Transactions.lean line 203-215 Layer; :351-361 the `fail` flag is read, not an outcome stored",
    "text_sha256": "7f0f2f79fb1d68c4cef1842e62ddfd5eb8b248d9e7187b8ed0fe15f8ff24fd3e"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.18": {
    "clause_text": "After a successful discharge, the state of unsettled deliveries at the resource MUST reflect the outcome that was applied.",
    "disposition": "deferred:S6",
    "kind": "MUST",
-   "note": "deferred: S6 \u2014 uncarried: the resource holds no unsettled deliveries to reflect an outcome on. `Layer.retire` (lean/Spec/Transactions.lean:230-231) marks a transaction discharged and moves nothing else, and `Contracts/Settlement.lean`'s closing section records that the sender's unsettled map is not modelled \u2014 the session holds one delivery (lean/Spec/Session.lean:474). Near-miss: `Spec.Message.recordState` (lean/Spec/Message.lean:1013) applies an outcome to a delivery when the corpus asks it to, not when a discharge succeeds.",
+   "note": "Blocked: lean/Spec/Transactions.lean line 203-215; lean/Spec/Session.lean line 423-430 structure Session; lean/Contracts/Settlement.lean's closing section records the exclusion",
    "text_sha256": "45cb9827f421dff1fc41d8c0fcc9cab0e6fa00f0cc730da0c0435ef20e7f2629"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.2": {
    "clause_text": "If the transaction controller wishes to associate an outgoing \u00abtransfer\u00bb with a transaction, it MUST set the state of the transfer with a \u00abtransactional-state\u00bb carrying the appropriate transaction identifier.",
-   "disposition": "deferred:S6",
+   "disposition": "out-of-scope:frame-construction",
    "kind": "MUST",
-   "note": "deferred: S6 \u2014 uncarried: nothing obliges a sender to state an outgoing transfer's transaction as a `transactional-state`, and the transfer's `state` field is read nowhere. `transferLink` (lean/Spec/Session.lean:815-921) reads delivery-id, delivery-tag, message-format, settled, aborted and more, and never the delivery state, so an outgoing transfer that carries transactional work may carry it in any spelling or none. `deliveryStateOfValue` (lean/Spec/Message.lean:940) can read such a state, which is a reader for a frame the corpus supplies rather than a requirement on a sender.",
+   "note": "lean/Spec/Session.lean line 1022-1080 transferLink reads delivery-id, delivery-tag, message-format, settled and aborted, never the delivery state; no declaration builds a transfer",
    "text_sha256": "2a131d83be0814a74cef4e17d7960009ce5f74a77edb2d36accc9d853c259721"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.21": {
    "clause_text": "At this point the controller can no longer influence the state of the delivery as it is settled, and the resource MUST apply the default outcome.",
    "disposition": "deferred:S6",
    "kind": "MUST",
-   "note": "deferred: S6 \u2014 uncarried: the sentence joins two obligations and neither has a carrier. Nothing freezes a delivery's state when it is settled: `Spec.Message.recordState` (lean/Spec/Message.lean:1013) accumulates the settled flag and a later state is still applied to a delivery that is settled but not terminal, and `applyState`'s refusal (lean/Spec/Message.lean:1031) is about a terminal state rather than a settled one. And 'the default outcome' is named once in the whole part and defined nowhere, so the resource's obligation has no value to apply.",
+   "note": "Blocked: lean/Spec/Message.lean line 1303 def recordState accumulates the settled flag and a later state is still applied to a delivery that is settled but not terminal; :1322 def applyState refuses only a terminal state; lean/Generated/Oasis/Fields.lean line 34 the source's `default-outcome` row (\"default outcome for unsettled transfers\"), whose role is validated when present but which no declaration applies to a delivery",
    "text_sha256": "1b157214fd592c8c0ad73e10b338ed7fadbff0ed504bc9a43814c7c1d48576ff"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.3": {
    "clause_text": "Note that if delivery is split across several \u00abtransfer\u00bb frames then all frames MUST be explicitly associated with the same transaction.",
    "disposition": "deferred:S6",
    "kind": "MUST",
-   "note": "deferred: S6 \u2014 uncarried: the same association as `.2`, one frame at a time. The fragmentation state this sentence needs exists \u2014 `Session.delivery` is held across a delivery's transfers (lean/Spec/Session.lean:474) \u2014 and `transferLink` compares the three identity fields a continuation may contradict (lean/Spec/Session.lean:862-876) while the delivery state, and with it the transaction, is compared nowhere. A continuation that changes or omits the transaction its earlier frames named is admitted.",
+   "note": "Blocked: lean/Spec/Session.lean line 1060-1080 (the continuation comparison); :1022 def transferLink",
    "text_sha256": "124522050efce6fbe424dabb6e6e7addf744881c18f684ba5023534195196dcd"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.4": {
    "clause_text": "If this happens, the control link MUST be terminated with the \u00abtransaction-rollback\u00bb error.",
    "disposition": "deferred:S6",
    "kind": "MUST",
-   "note": "deferred: S6 \u2014 uncarried: 'this' is a discharge attempted against a transaction a partial delivery has been posted to, and the model has neither the partial delivery nor a state to raise the refusal from. `discharge` (lean/Spec/Transactions.lean:313-324) retires an id on liveness alone, and `Spec.Transactions`' own docstring names this sentence as the one needing fragmentation state the layer does not have (lean/Spec/Transactions.lean:49-58). **The mandated condition is a member, and this note said otherwise until it was read against the clause**: the sentence names \u00abtransaction-rollback\u00bb, so nothing is missing from the declared surface \u2014 which its own recitation of the members showed, since `transaction-rollback` is one of them. What is missing is the **state that detects the violation**: the model holds no partial delivery and no delivery-to-transaction association, so there is nothing for a discharge to be attempted against.",
+   "note": "Blocked: lean/Spec/Transactions.lean line 64 the layer's own docstring names this sentence as the one needing fragmentation state; :351-361 discharge retires on liveness alone",
    "text_sha256": "67515942059ecfa1029f0fa1c6a04976fde87130e4c66bd1e6163c9fd46de705"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.5": {
    "clause_text": "On receiving a non-settled delivery associated with a live transaction, the transactional resource MUST inform the controller of the presumptive terminal outcome before it can successfully discharge the transaction.",
    "disposition": "deferred:S6",
    "kind": "MUST",
-   "note": "deferred: S6 \u2014 uncarried: the ordering the sentence states \u2014 the presumptive terminal outcome informed before the discharge can succeed \u2014 is enforced nowhere. `discharge` (lean/Spec/Transactions.lean:313) never asks whether an outcome was communicated, and `dispositionLink` (lean/Spec/Session.lean:985-1019) requires no prior disposition, because the session holds a delivery that belongs to a link and not to a transaction. Near-miss: `Spec.Message.applyState` (lean/Spec/Message.lean:1031) is how a state is applied to a delivery at a node \u2014 the vocabulary this sentence is written in, not the obligation it states.",
+   "note": "Blocked: lean/Spec/Transactions.lean line 351-361 discharge never asks whether an outcome was communicated; lean/Spec/Session.lean line 1189 dispositionLink requires no prior disposition",
    "text_sha256": "7d411649479539fcd24af86ed74d1bf74b919d6d9dd5d6c5c8e77683ee049c3a"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.6": {
    "clause_text": "That is, the resource MUST send a \u00abdisposition\u00bb performative which covers the posted transfer with the state of the delivery being a \u00abtransactional-state\u00bb with the correct transaction identified, and a terminal outcome.",
-   "disposition": "deferred:S6",
+   "disposition": "out-of-scope:frame-construction",
    "kind": "MUST",
-   "note": "deferred: S6 \u2014 uncarried: the performative `.5` obliges the resource to send, and no declaration requires a sender to send one. The reading half is present \u2014 `Spec.Message.deliveryStateOfValue` (lean/Spec/Message.lean:940) recognises a `transactional-state` as a state a disposition may carry, and `Spec.Session.stepTransactionState` (lean/Spec/Session.lean:1072) routes a disposition's state to the transaction layer \u2014 but the model never builds a frame from an obligation; the corpus supplies every frame, which is the same gap `connections.5`'s entry beside `deferred:S4` records for the close frame.",
+   "note": "lean/Spec/Session.lean line 1189 dispositionLink; the reading half is present (Spec.Message.deliveryStateOfValue; Spec.Session.stepTransactionState, :1276)",
    "text_sha256": "63244955265768b7be7d039f98f0654dab05967d1ab149b7cce1fe7c4961407a"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.7": {
    "clause_text": "However, the delivery MUST NOT be associated with a different non-discharged transaction than the outcome.",
    "disposition": "deferred:S6",
    "kind": "MUST NOT",
-   "note": "deferred: S6 \u2014 uncarried: a MUST NOT over an association the model does not make. Neither the held transaction nor the held delivery carries the other's id \u2014 `Layer` holds transactions, the next id and capability lists (lean/Spec/Transactions.lean:197-209) and `Session` holds one delivery (lean/Spec/Session.lean:474) \u2014 so the prohibited pair cannot be formed and no comparison could detect it. The model's only liveness question is `Layer.live` (lean/Spec/Transactions.lean:216-217), which asks whether an id is still in use rather than which delivery an outcome belongs to.",
+   "note": "Blocked: lean/Spec/Transactions.lean line 203-215 Layer; :351-361; lean/Spec/Session.lean line 423-430 Session holds one delivery",
    "text_sha256": "de481c15dc949fe565f7723678cf2ff0de1497e0aaf7b98b466f25060b6016f0"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.8": {
    "clause_text": "If this happens then the control link MUST be terminated with a \u00abtransaction-rollback\u00bb error.",
    "disposition": "deferred:S6",
    "kind": "MUST",
-   "note": "deferred: S6 \u2014 uncarried: the termination `.7`'s violation would mandate. The violation cannot be detected (see `.7`), and the control link's only mandated termination is the rollback of the transactions it created \u2014 `Layer.retireAll` (lean/Spec/Transactions.lean:237-238), reached through `Session.afterLinkRelease` (lean/Spec/Session.lean:599) \u2014 which retires ids rather than refusing the frame that broke the rule. The condition is named as the `transaction-error` family, and no member of it names this cause.",
+   "note": "Blocked: lean/Spec/Transactions.lean line 246-250 retire/retireAll; lean/Spec/Session.lean line 621 afterLinkRelease",
    "text_sha256": "f0fd2828322a7f166e997794c145a1696a1581be4ae8351c924c6822a28c058f"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.9": {
    "clause_text": "If the link endpoint does not support transactional acquisition, the link MUST be terminated with a \u00abnot-implemented\u00bb error.",
    "disposition": "deferred:S6",
    "kind": "MUST",
-   "note": "deferred: S6 \u2014 uncarried, and unenforced by design: the model has no source for the missing input. Whether a link endpoint supports transactional acquisition would be read from the flow frame's `properties` map, and no declaration reads a flow's properties \u2014 `flowLink` (lean/Spec/Session.lean:742-806) reads the link's own fields and the handle it must name. `Contracts/Transaction.lean:43-44` records this clause's `amqp-error` as stated in the ledger as unenforced rather than approximated, which is what this entry does.",
+   "note": "Blocked: lean/Spec/Session.lean line 888 def flowLink; lean/Contracts/Transaction.lean line 43-44 records this clause's amqp-error as stated in the ledger as unenforced rather than approximated",
    "text_sha256": "1978622f7817594e7506b3e171d949d505efb8280ccb9c8b3b4a42bd62ee8d07"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work/doc:transactional-acquisition.1": {
    "clause_text": "An outcome sent by the controller before the transaction has discharged MUST be associated with the same transaction.",
    "disposition": "formalized:SpecAMQP.Spec.Transactions.transactionalState; formalized:SpecAMQP.Spec.Transactions.Layer.knows; deferred:S6",
    "kind": "MUST",
-   "note": "**Carried in part, and the halves are named because a `formalized:` covering half a sentence conflates finished work with pending work.** Carried: an outcome naming an id the register does not hold being refused, in either direction \u2014 `SpecAMQP.Spec.Transactions.transactionalState` is the rule and `SpecAMQP.Spec.Transactions.Layer.knows` the predicate it reads, reached from `step`'s transactional-state arm on the disposition side, with the reference's independent reading in `SpecAMQP.Ref.Transactions.onTransactionalState` over `Layer.holds`; the refusal names `unknown-id`, a member of `transaction-error`. Pending: sameness with the transaction the acquisition was posted under, which needs the acquisition the delivery-state layer would hold. The report that carried it is `4c7f4f1`, and the handover it waits on is queued as its own slice because it needs the contract's `step` signature changed and `Session` to pass the transfer's delivery state across.",
+   "note": "Blocked: lean/Spec/Transactions.lean line 386-405 the carried half (an outcome naming an id the register does not hold is refused); :351-361",
    "text_sha256": "df09e87069a6bf3ca34f19a37aecec3b174078b8b3cf43a3520e4bdd3adc5194"
   }
  }

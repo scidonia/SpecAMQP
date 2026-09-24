@@ -60,9 +60,9 @@
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:source/field:durable.u1": {
    "clause_text": "Indicates what state of the terminus will be retained durably: the state of durable messages, only existence and configuration of the terminus, or no state at all.",
-   "disposition": "deferred:S5",
+   "disposition": "formalized:SpecAMQP.Spec.Message.checkDurability",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier. **And its carrier is defined but not reached, which is why this entry reads `deferred` rather than `formalized`**: `SpecAMQP.Spec.Message.checkDurability` implements the sentence and nothing in the step function calls it — `terminusOfValue`'s docstring says `attach` is the only caller they would ever have, and `attachLink` does not read the field. A `formalized:` must name a declaration the step function **reaches**, and a declaration with no caller carries nothing, so the values these entries carried for half a day were the shape the ledger's conventions forbid: a missing carrier covered by naming a declaration. The wiring is designed, attempted and queued rather than open — read `source` and `target` where present, convert the two refusal types, and repair `attachLink_handle_uniqueness`, which the added guards break (dependent elimination fails at its own guard).",
+   "note": "Spec.Message.checkDurability carries it — lean/Spec/Message.lean line 1506 declares SpecAMQP.Spec.Message.checkDurability, and the sentence's own words appear beside the code. lean/Spec/Message.lean line 1452-1458 `durabilityName?` quotes the sentence's own enumeration ('the state of durable messages, only the existence and configuration of the terminus, or no state at all are the three choices the artifact declares') and reads the value through the declared `terminus-durability` choices; :1506 def checkDurability; the call inside checkTerminus at :1562; reached through lean/Spec/Session.lean line 817 attachLink. Reference: lean/Ref/Message.lean line 1183 durabilityOf?, :1271-1275 the inline check.",
    "text_sha256": "6e8b4553685e3fb082c7218e636007238cda0fe0ec053ef3b5e050c145a49626"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:std-dist-mode/choice:copy.u1": {
@@ -81,9 +81,9 @@
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:target/field:durable.u1": {
    "clause_text": "Indicates what state of the terminus will be retained durably: the state of durable messages, only existence and configuration of the terminus, or no state at all.",
-   "disposition": "deferred:S5",
+   "disposition": "formalized:SpecAMQP.Spec.Message.checkDurability",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier. **And its carrier is defined but not reached, which is why this entry reads `deferred` rather than `formalized`**: `SpecAMQP.Spec.Message.checkDurability` implements the sentence and nothing in the step function calls it — `terminusOfValue`'s docstring says `attach` is the only caller they would ever have, and `attachLink` does not read the field. A `formalized:` must name a declaration the step function **reaches**, and a declaration with no caller carries nothing, so the values these entries carried for half a day were the shape the ledger's conventions forbid: a missing carrier covered by naming a declaration. The wiring is designed, attempted and queued rather than open — read `source` and `target` where present, convert the two refusal types, and repair `attachLink_handle_uniqueness`, which the added guards break (dependent elimination fails at its own guard).",
+   "note": "Spec.Message.checkDurability carries it — lean/Spec/Message.lean line 1506 declares SpecAMQP.Spec.Message.checkDurability, and the sentence's own words appear beside the code. lean/Spec/Message.lean line 1506-1518, keyed on the composite's own name so it applies to a target as to a source; the call at :1562 inside checkTerminus, reached via attachLink :817-821.",
    "text_sha256": "6e8b4553685e3fb082c7218e636007238cda0fe0ec053ef3b5e050c145a49626"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:terminus-durability/choice:configuration.u1": {
@@ -153,14 +153,14 @@
    "clause_text": "If the sender were to mark the transfers as resumes then they would be ignored at the receiver.",
    "disposition": "deferred:S5",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier. **And it is blocked rather than merely pending**: D4's fourth trigger — \"a normative S5 clause the model cannot represent\" — has fired on this family, so no clause batch reaches it until the model holds a link identity, an unsettled map and the sender's delivery bookkeeping. It is unreachable work rather than unfinished work.",
+   "note": "Blocked: lean/Spec/Session.lean line 1022-1080",
    "text_sha256": "f709c95f90713b3bec61b3a6703e9338afa5a48b411a7fbb321b2a862f19e7b2"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.u2": {
    "clause_text": "In this case the sender will either apply that outcome at the source, or in the rare case that it cannot apply that outcome, indicate the terminal outcome that has been applied.",
    "disposition": "deferred:S5",
    "kind": "UNKEYED",
-   "note": "deferred: S5 — the messaging milestone owns this statement. **And it is blocked rather than merely pending**: D4's fourth trigger — \"a normative S5 clause the model cannot represent\" — has fired on this family, so no clause batch reaches it until the model holds a link identity, an unsettled map and the sender's delivery bookkeeping. It is unreachable work rather than unfinished work.",
+   "note": "Blocked: lean/Spec/Message.lean applies a state to a delivery when the corpus asks (recordState/applyState); no sender-side map exists",
    "text_sha256": "7afb62641a9d704698835018efd9e769c2cdfdbff71a58be5414cc71d9d2970e",
    "unkeyed_phrases": [
     "cannot"
@@ -170,14 +170,14 @@
    "clause_text": "For delivery-tag 4, the receiver indicates that it is aware that the delivery had begun, but does not provide any indication that it has retained any data about that delivery except the fact of its existence.",
    "disposition": "deferred:S5",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier. **And it is blocked rather than merely pending**: D4's fourth trigger — \"a normative S5 clause the model cannot represent\" — has fired on this family, so no clause batch reaches it until the model holds a link identity, an unsettled map and the sender's delivery bookkeeping. It is unreachable work rather than unfinished work.",
+   "note": "Blocked: lean/Spec/Session.lean line 423-430",
    "text_sha256": "5c70830619197bc61cd33265507bd1851fe42fe19eed028f43b62cad33ec3acb"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.u4": {
    "clause_text": "The only option available to the sender is to abort the transfer and to then (if possible) resend as a new delivery or else to report the possible message loss in some way if it cannot.",
    "disposition": "deferred:S5",
    "kind": "UNKEYED",
-   "note": "deferred: S5 — the messaging milestone owns this statement. **And it is blocked rather than merely pending**: D4's fourth trigger — \"a normative S5 clause the model cannot represent\" — has fired on this family, so no clause batch reaches it until the model holds a link identity, an unsettled map and the sender's delivery bookkeeping. It is unreachable work rather than unfinished work.",
+   "note": "Blocked: lean/Contracts/Transaction.lean line 37-39 and lean/Spec/Connection.lean line 44-46 record the no-sending-side/no-frame boundary",
    "text_sha256": "a43aafd3435dd0aca63b9d31f94707f948dbf25bf5dc45479f901ff9aff7eba9",
    "unkeyed_phrases": [
     "cannot"
@@ -187,14 +187,14 @@
    "clause_text": "For delivery-tag 9, the receiver indicates that it is aware that the delivery had begun, but does not provide any indication that it has retained any data about that delivery except the fact of its existence.",
    "disposition": "deferred:S5",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier. **And it is blocked rather than merely pending**: D4's fourth trigger — \"a normative S5 clause the model cannot represent\" — has fired on this family, so no clause batch reaches it until the model holds a link identity, an unsettled map and the sender's delivery bookkeeping. It is unreachable work rather than unfinished work.",
+   "note": "Blocked: lean/Spec/Session.lean line 423-430",
    "text_sha256": "48e4e1f151039011e899c8d0a3465401fb50a2604eb278b73fd1722ae25fa917"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/doc:more-resuming-deliveries.u6": {
    "clause_text": "In this case the sender can simply abort the delivery as it cannot be resumed.",
    "disposition": "deferred:S5",
    "kind": "UNKEYED",
-   "note": "deferred: S5 — the messaging milestone owns this statement. **And it is blocked rather than merely pending**: D4's fourth trigger — \"a normative S5 clause the model cannot represent\" — has fired on this family, so no clause batch reaches it until the model holds a link identity, an unsettled map and the sender's delivery bookkeeping. It is unreachable work rather than unfinished work.",
+   "note": "Blocked: lean/Spec/Session.lean line 1022-1080; lean/Contracts/Transaction.lean line 37-39",
    "text_sha256": "f77a4a0e3e970b008815724a2c5400cd99177f3407de578083fbd509b8ecd6b2",
    "unkeyed_phrases": [
     "cannot"
@@ -281,30 +281,30 @@
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:distribution-nodes.u1": {
    "clause_text": "Note that the state of a message at one distribution node does not affect the state of the same message at a separate node.",
-   "disposition": "deferred:S5",
+   "disposition": "out-of-scope:node-and-filter-behaviour",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "PLAN.md §3 bounds a node's treatment of a message out; the class is already used for the Part 3 message-format clauses",
    "text_sha256": "04689e131606535075f59d56b25fbc3da7607706741bd3c465221f3c00a5fdcf"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:distribution-nodes.u2": {
    "clause_text": "Once in the ACQUIRED state, a message is ineligible for acquiring transfers to any other links.",
-   "disposition": "deferred:S5",
+   "disposition": "out-of-scope:node-and-filter-behaviour",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "PLAN.md §3",
    "text_sha256": "b65516075cd5bf05a5a8f85cf11c842261ae1330f06c4f4fff7599d63b847c41"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:distribution-nodes.u3": {
    "clause_text": "A message will remain ACQUIRED at the distribution node until the transfer is settled.",
-   "disposition": "deferred:S5",
+   "disposition": "out-of-scope:node-and-filter-behaviour",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "PLAN.md §3",
    "text_sha256": "6d8a9730a8d85fa023a2365d1b9f8518cf78ece13c658133176ad98d1960d429"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:distribution-nodes.u4": {
    "clause_text": "In this case any transfers of the message are transitioned to a terminal outcome at the distribution node regardless of receiver state.",
-   "disposition": "deferred:S5",
+   "disposition": "out-of-scope:node-and-filter-behaviour",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "PLAN.md §3",
    "text_sha256": "2077c0fbb689b9609bfe8110b2a445636149c09b2657c588f5eb611e9e102f44"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:annotations.u1": {
@@ -501,42 +501,42 @@
    "clause_text": "A transaction-id can be up to 32 octets of binary data.",
    "disposition": "deferred:S6",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier. **Re-milestoned from `deferred:S5`**: the suffix was a placeholder whose own note said so — \"the layer this belongs to has not been written\" — and Part 4 is the transactions layer, whose milestone is S6. Both windows confirmed it: the transactions slice holds its own list, and the message slice reported these as not its own.",
+   "note": "Blocked: lean/Spec/Transactions.lean line 388, :454, :468 the three `valueNat` reads; lean/Generated/Oasis/Types.lean line 82 declares `transaction-id` restricted-over-binary with no recorded limit",
    "text_sha256": "0156ff06e0a3292c5fe453255ab2a3f5d2b222ff16e48a6114ddaeaf81ebe775"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:coordination/type:txn-capability/choice:distributed-transactions.u1": {
    "clause_text": "Support AMQP Distributed Transactions.",
-   "disposition": "deferred:S6",
+   "disposition": "generated-declared-surface",
    "kind": "UNKEYED",
-   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes. **Re-milestoned from `deferred:S5`**: the suffix was a placeholder whose own note said so — \"the layer this belongs to has not been written\" — and Part 4 is the transactions layer, whose milestone is S6. Both windows confirmed it: the transactions slice holds its own list, and the message slice reported these as not its own.",
+   "note": "lean/Generated/Oasis/Choices.lean line 36 `{ ownerPath := \"amqp:transactions/section:coordination/type:txn-capability\", name := \"distributed-transactions\", value := \"amqp:distributed-transactions\" ...}`",
    "text_sha256": "fd8923ca21a89503e204db8098988d6b3f453d17920a125687c2bb50faf4ec56"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:coordination/type:txn-capability/choice:local-transactions.u1": {
    "clause_text": "Support local transactions.",
-   "disposition": "deferred:S6",
+   "disposition": "generated-declared-surface",
    "kind": "UNKEYED",
-   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes. **Re-milestoned from `deferred:S5`**: the suffix was a placeholder whose own note said so — \"the layer this belongs to has not been written\" — and Part 4 is the transactions layer, whose milestone is S6. Both windows confirmed it: the transactions slice holds its own list, and the message slice reported these as not its own.",
+   "note": "lean/Generated/Oasis/Choices.lean line 37",
    "text_sha256": "6481bb1d706588a15ac5e00da73fca63c2fa3c25cd0314f1f55295840bbbad00"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:coordination/type:txn-capability/choice:multi-ssns-per-txn.u1": {
    "clause_text": "Support transactions whose txn-id is used across sessions on one connection.",
-   "disposition": "deferred:S6",
+   "disposition": "generated-declared-surface",
    "kind": "UNKEYED",
-   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes. **Re-milestoned from `deferred:S5`**: the suffix was a placeholder whose own note said so — \"the layer this belongs to has not been written\" — and Part 4 is the transactions layer, whose milestone is S6. Both windows confirmed it: the transactions slice holds its own list, and the message slice reported these as not its own.",
+   "note": "lean/Generated/Oasis/Choices.lean line 38",
    "text_sha256": "5a77282f75301db78d3b4998716c2a402abc0ebd31213ea8ba5c913a352d4a8e"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:coordination/type:txn-capability/choice:multi-txns-per-ssn.u1": {
    "clause_text": "Support multiple active transactions on a single session.",
-   "disposition": "deferred:S6",
+   "disposition": "generated-declared-surface",
    "kind": "UNKEYED",
-   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes. **Re-milestoned from `deferred:S5`**: the suffix was a placeholder whose own note said so — \"the layer this belongs to has not been written\" — and Part 4 is the transactions layer, whose milestone is S6. Both windows confirmed it: the transactions slice holds its own list, and the message slice reported these as not its own.",
+   "note": "lean/Generated/Oasis/Choices.lean line 39",
    "text_sha256": "8e9395a8fd295af18886011c7aaebf0777fa3d47d9262d71eccea1920496e85b"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:coordination/type:txn-capability/choice:promotable-transactions.u1": {
    "clause_text": "Support AMQP Promotable Transactions.",
-   "disposition": "deferred:S6",
+   "disposition": "generated-declared-surface",
    "kind": "UNKEYED",
-   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes. **Re-milestoned from `deferred:S5`**: the suffix was a placeholder whose own note said so — \"the layer this belongs to has not been written\" — and Part 4 is the transactions layer, whose milestone is S6. Both windows confirmed it: the transactions slice holds its own list, and the message slice reported these as not its own.",
+   "note": "lean/Generated/Oasis/Choices.lean line 40",
    "text_sha256": "8a1d9a88d49e6d2a3c975555c253cafc62921ee9e06ca2d77e7df90b27585593"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:transactions.u1": {
@@ -557,7 +557,7 @@
    "clause_text": "Note that links to the «coordinator» cannot be resumed.",
    "disposition": "deferred:S6",
    "kind": "UNKEYED",
-   "note": "deferred: S6 — the transaction machine's milestone owns this statement.",
+   "note": "Blocked: lean/Spec/Session.lean line 617-625 afterLinkRelease quotes the sentence and enforces only the rollback clause (Transactions.Layer.retireAll, :626-627); `resume` is declared (lean/Generated/Oasis/Fields.lean line 148) and read nowhere; structure Session (:423-430) holds one link with no identity to carry across",
    "text_sha256": "426c8c1303fa88e23fda2da183755e8b2a89c1853f903e78b557346aadb92473",
    "unkeyed_phrases": [
     "cannot"
@@ -565,23 +565,23 @@
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-discharge.u1": {
    "clause_text": "As with the «declare» message, it is an error if the sender sends the «transfer» pre-settled.",
-   "disposition": "deferred:S6",
+   "disposition": "formalized:SpecAMQP.Spec.Transactions.discharge; formalized:SpecAMQP.Ref.Transactions.settledRefusal",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier. **Re-milestoned from `deferred:S5`**: the suffix was a placeholder whose own note said so — \"the layer this belongs to has not been written\" — and Part 4 is the transactions layer, whose milestone is S6. Both windows confirmed it: the transactions slice holds its own list, and the message slice reported these as not its own.",
+   "note": "Spec.Transactions.discharge carries it — lean/Spec/Transactions.lean line 351 declares SpecAMQP.Spec.Transactions.discharge, and the sentence's own words appear beside the code. lean/Spec/Transactions.lean line 32 the header docstring quotes the sentence; :351 def discharge; :353 refuseUnless (!settled) raises illegalStateCondition. Reference twin: lean/Ref/Transactions.lean line 175-182 ('The pre-settled error: \"This message MUST NOT be sent settled as the sender is ...\"' / def settledRefusal :178).",
    "text_sha256": "4976d785845c31d63558ba850484fd5fe23bfa3c34b213534b90e17af850bb11"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.u1": {
    "clause_text": "In the case of the «flow» frame traveling from resource to controller, the txn-id does not indicate work that has been performed, but indicates with which transaction future transfers from that link will be performed.",
    "disposition": "deferred:S6",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier. **Re-milestoned from `deferred:S5`**: the suffix was a placeholder whose own note said so — \"the layer this belongs to has not been written\" — and Part 4 is the transactions layer, whose milestone is S6. Both windows confirmed it: the transactions slice holds its own list, and the message slice reported these as not its own.",
+   "note": "Blocked: lean/Spec/Session.lean line 888 def flowLink",
    "text_sha256": "eacdf19af6cb43a730533a6f4fd35a8fb90f5b3577d4979e130f3196049e6b99"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.u10": {
    "clause_text": "This can be communicated by immediately destroying the controlling link on which the transaction was declared, or by rejecting any attempt to discharge the transaction where the fail flag is not set to true.",
    "disposition": "deferred:S6",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier. **Re-milestoned from `deferred:S5`**: the suffix was a placeholder whose own note said so — \"the layer this belongs to has not been written\" — and Part 4 is the transactions layer, whose milestone is S6. Both windows confirmed it: the transactions slice holds its own list, and the message slice reported these as not its own.",
+   "note": "Blocked: lean/Spec/Transactions.lean line 351-361",
    "text_sha256": "c7b9649b5900c22c0c087e83a01ca261fbeb320acbd5cbe2b78ecb5035cf0d4a"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.u11": {
@@ -595,63 +595,63 @@
    "clause_text": "If the resource settles the delivery before the discharge then the behavior after discharge is the same as the case above.",
    "disposition": "deferred:S6",
    "kind": "UNKEYED",
-   "note": "Settling before the discharge leaves the after-discharge behaviour as in the case above: delivery-state. **Re-milestoned from `deferred:S5`**: the suffix was a placeholder whose own note said so — \"the layer this belongs to has not been written\" — and Part 4 is the transactions layer, whose milestone is S6. Both windows confirmed it: the transactions slice holds its own list, and the message slice reported these as not its own.",
+   "note": "Blocked: lean/Spec/Transactions.lean line 203-215; :351-361",
    "text_sha256": "fd479618b3fc7bf2e0d5f83e681a6ed905e42804e2b8dd412390f0c1f2c14369"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.u2": {
    "clause_text": "It is an error for the controller to attempt to discharge a transaction against which a partial delivery has been posted.",
    "disposition": "deferred:S6",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier. **Re-milestoned from `deferred:S5`**: the suffix was a placeholder whose own note said so — \"the layer this belongs to has not been written\" — and Part 4 is the transactions layer, whose milestone is S6. Both windows confirmed it: the transactions slice holds its own list, and the message slice reported these as not its own.",
+   "note": "Blocked: lean/Spec/Transactions.lean line 64 names this family as needing fragmentation state; :351-361",
    "text_sha256": "3b0335b289bd4af9c5b36d20b07d50b906080b29400a428769ade983699bdb45"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.u3": {
    "clause_text": "The effect of transactional posting is that the message does not become available at the destination node within the transactional resource until after the transaction has been successfully discharged.",
-   "disposition": "deferred:S6",
+   "disposition": "out-of-scope:node-and-filter-behaviour",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier. **Re-milestoned from `deferred:S5`**: the suffix was a placeholder whose own note said so — \"the layer this belongs to has not been written\" — and Part 4 is the transactions layer, whose milestone is S6. Both windows confirmed it: the transactions slice holds its own list, and the message slice reported these as not its own.",
+   "note": "lean/Contracts/Transaction.lean line 41-42 ('Posting, acquiring and retiring a delivery are the delivery-state layer's semantics'); PLAN.md §3 bounds a node's treatment of a message out",
    "text_sha256": "09735c20f86cfd2f4bc618ae4d452c4d27c91725caa2621c4f89b2a4bec012da"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.u4": {
    "clause_text": "In the event of a controller-initiated rollback (a «discharge» where the fail flag is set to true) or a resource-initiated rollback (the «discharge» message being rejected, or the link to the «coordinator» being detached with an error), the outcome will not be applied, and the deliveries will still be \"live\" and will remain acquired by the controller, i.e., the resource can expect the controller to request a disposition for the delivery (either transactionally on a new transaction, or non-transactionally).",
    "disposition": "deferred:S6",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier. **Re-milestoned from `deferred:S5`**: the suffix was a placeholder whose own note said so — \"the layer this belongs to has not been written\" — and Part 4 is the transactions layer, whose milestone is S6. Both windows confirmed it: the transactions slice holds its own list, and the message slice reported these as not its own.",
+   "note": "Blocked: lean/Spec/Transactions.lean line 203-215; :351-361 fail=true retires without consulting the register",
    "text_sha256": "ed1335ff63ee20778ecb54eb41212cfafaebd8b49f986994561efb218a352892"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.u5": {
    "clause_text": "When a transaction is discharged, the txn-id of any link endpoints will be cleared.",
    "disposition": "deferred:S6",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier. **Re-milestoned from `deferred:S5`**: the suffix was a placeholder whose own note said so — \"the layer this belongs to has not been written\" — and Part 4 is the transactions layer, whose milestone is S6. Both windows confirmed it: the transactions slice holds its own list, and the message slice reported these as not its own.",
+   "note": "Blocked: lean/Spec/Session.lean line 423-430 structure Session",
    "text_sha256": "5d0e0c143d62d50fc382880670c2c216ffeca93e736e33e24f59bce982ed705e"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.u6": {
    "clause_text": "While the txn-id is cleared when the transaction is discharged, this does not affect the level of outstanding credit.",
    "disposition": "deferred:S6",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier. **Re-milestoned from `deferred:S5`**: the suffix was a placeholder whose own note said so — \"the layer this belongs to has not been written\" — and Part 4 is the transactions layer, whose milestone is S6. Both windows confirmed it: the transactions slice holds its own list, and the message slice reported these as not its own.",
+   "note": "Blocked: lean/Contracts/SessionCredit.lean carries the credit; lean/Spec/Session.lean line 423-430 has no per-link txn-id",
    "text_sha256": "c243b1aa0c7b09e76e3096d902f4fcf11b361a589c80012dcb86d6f974f781b7"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.u7": {
    "clause_text": "If the transaction is rolled back then the delivery is not made available.",
-   "disposition": "deferred:S6",
+   "disposition": "out-of-scope:node-and-filter-behaviour",
    "kind": "UNKEYED",
-   "note": "A rolled-back transaction's delivery is not made available: a delivery-state outcome, which the messaging layer carries. **Re-milestoned from `deferred:S5`**: the suffix was a placeholder whose own note said so — \"the layer this belongs to has not been written\" — and Part 4 is the transactions layer, whose milestone is S6. Both windows confirmed it: the transactions slice holds its own list, and the message slice reported these as not its own.",
+   "note": "lean/Contracts/Transaction.lean line 41-42; PLAN.md §3",
    "text_sha256": "41ddc44e4a8211c726932196d441336b8eb75c3eacb19a74284c3fd17b00bcb9"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.u8": {
    "clause_text": "This can be communicated by immediately destroying the controlling link on which the transaction was declared, or by rejecting any attempt to discharge the transaction where the fail flag is not set to true.",
    "disposition": "deferred:S6",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier. **Re-milestoned from `deferred:S5`**: the suffix was a placeholder whose own note said so — \"the layer this belongs to has not been written\" — and Part 4 is the transactions layer, whose milestone is S6. Both windows confirmed it: the transactions slice holds its own list, and the message slice reported these as not its own.",
+   "note": "Blocked: lean/Spec/Transactions.lean line 351-361 the refuse-with-unknown-id path is the shape of the second mechanism but is about liveness, not about an unappliable outcome",
    "text_sha256": "c7b9649b5900c22c0c087e83a01ca261fbeb320acbd5cbe2b78ecb5035cf0d4a"
   },
   "amqp-core-transactions-v1.0-os.xml#amqp:transactions/section:txn-work.u9": {
    "clause_text": "If the transaction is rolled back then the delivery is not made available at the target.",
-   "disposition": "deferred:S6",
+   "disposition": "out-of-scope:node-and-filter-behaviour",
    "kind": "UNKEYED",
-   "note": "The same at the target. **Re-milestoned from `deferred:S5`**: the suffix was a placeholder whose own note said so — \"the layer this belongs to has not been written\" — and Part 4 is the transactions layer, whose milestone is S6. Both windows confirmed it: the transactions slice holds its own list, and the message slice reported these as not its own.",
+   "note": "lean/Contracts/Transaction.lean line 41-42; PLAN.md §3",
    "text_sha256": "dca753f335a9a865a90828bf0c925b2099f2de8ac25906dd721edc83172f0d7a"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections.u1": {
@@ -666,23 +666,23 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections.u2": {
    "clause_text": "It is illegal to write anything more onto the connection, however there could potentially still be incoming frames.",
-   "disposition": "deferred:S3-session",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.State.sendClass; formalized:SpecAMQP.Spec.Connection.State.receiveClass; formalized:SpecAMQP.Spec.Connection.Refusal.withPlace",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Spec.Connection.State.sendClass carries it — lean/Spec/Connection.lean line 285 declares SpecAMQP.Spec.Connection.State.sendClass, and the sentence's own words appear beside the code. lean/Spec/Connection.lean line 272-286 the Legal Sends column, with DISCARDING at :285; :289-303 the Legal Receives column, with DISCARDING at :302 (`| .discarding => .anyFrame`); :964 Refusal.withPlace places a refused receive in DISCARDING, whose docstring quotes the companion sentence ('MUST be silently discarded until the peer's close frame is received'); :984 permitsSend refuses a send where the column is `.nothing`. The DISCARDING row is exactly this sentence: no writes, incoming frames still legal.",
    "text_sha256": "321510e3cb8d2fef15b98329e615b50f6777dd8c09dde60e28a9e795a027e05c"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections.u3": {
    "clause_text": "In this state it is illegal for either endpoint to write anything more onto the connection.",
-   "disposition": "deferred:S3-session",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.State.sendClass; formalized:SpecAMQP.Spec.Connection.permitsSend",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Spec.Connection.State.sendClass carries it — lean/Spec/Connection.lean line 970 declares SpecAMQP.Spec.Connection.Refusal.withPlace, and the sentence's own words appear beside the code. lean/Spec/Connection.lean line 968-971 the END row's comment, quoting the sentence verbatim while refusing to move a peer already at END; :286 the END row's send column (`.nothing`), :303 its receive column; :984 permitsSend refuses every send in a `.nothing` row.",
    "text_sha256": "1f52403a55534cb7ea21b07b76c0264bb0ae20a6c5c340b354c3316f24a26179"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections/doc:doc-idle-time-out.u1": {
    "clause_text": "Empty frames can only be sent after the «open» frame is sent.",
-   "disposition": "deferred:S3-session",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.bodylessFrame; formalized:SpecAMQP.Spec.Connection.permitsSend; formalized:SpecAMQP.Ref.Connection.emptyFrame",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Spec.Connection.bodylessFrame carries it — lean/Spec/Connection.lean line 1370 declares SpecAMQP.Spec.Connection.bodylessFrame, and the sentence's own words appear beside the code. lean/Spec/Connection.lean line 1336-1340 the docstring stating that an empty frame is asked of the send/receive column with role `.other`; :1370 def bodylessFrame, whose AMQP branch refuses when the column does not admit `.other` (`if !(if outbound then permitsSend endpoint.state .other ...)`, :1383-1388); :272-286 the send column (START/HDR_RCVD `.header`, HDR_SENT/HDR_EXCH/OPEN_RCVD `.open`, OPEN_SENT/OPEN_PIPE `.conforming`), so a bodyless frame is refused until the open has been sent; :984 permitsSend. Reference twin: lean/Ref/Connection.lean line 953 def emptyFrame with the same two branches.",
    "text_sha256": "e818f1080e430a262ad129d879b0a6c2e265ed75fd0274ec1fb4859f0a92fc5b"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/definition:PORT.u1": {
@@ -860,9 +860,9 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/type:delivery-tag.u1": {
    "clause_text": "A delivery-tag can be up to 32 octets of binary data.",
-   "disposition": "deferred:S3-session",
+   "disposition": "formalized:SpecAMQP.Spec.Session.deliveryTagInBounds; formalized:SpecAMQP.Ref.Session.deliveryTagInBounds",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Spec.Session.deliveryTagInBounds carries it — lean/Spec/Session.lean line 1011 declares SpecAMQP.Spec.Session.deliveryTagInBounds, and the sentence's own words appear beside the code. lean/Spec/Session.lean line 999-1018: the docstring quotes the clause by id and sentence, `maxDeliveryTagOctets : Nat := 32` at :1003, `deliveryTagInBounds` at :1011, and the refusal it drives at :1040 (`refuseUnless (deliveryTagInBounds body)`) inside `transferLink` (:1022). Reference twin: lean/Ref/Session.lean line 838-851 (quote at :838, `maxDeliveryTagOctets` :841, `deliveryTagInBounds` :849, refused at :878).",
    "text_sha256": "2732b86814839e3c565af1490146ddac5784671bd9a3dd6820572b31a80d43dd"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/type:link-error/choice:detach-forced.u1": {
@@ -933,16 +933,16 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/type:receiver-settle-mode/choice:first.u1": {
    "clause_text": "The receiver will spontaneously settle all incoming transfers.",
-   "disposition": "deferred:S3-session",
+   "disposition": "generated-declared-surface",
    "kind": "UNKEYED",
-   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes.",
+   "note": "lean/Generated/Oasis/Choices.lean declares the `receiver-settle-mode` choices `first`/`second`, which is what fixes the name and value (the S4 triage's disposition for a declared choice's meaning is `formalized:SpecAMQP.Generated.Oasis.choices`); category 3 rather than 1 only because the carrier is under lean/Generated",
    "text_sha256": "1332b58fb0e661ae8dda8494acacd9f85da3c2657e7bb6e96c3adaee8bd7bf12"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/type:receiver-settle-mode/choice:second.u1": {
    "clause_text": "The receiver will only settle after sending the «disposition» to the sender and receiving a «disposition» indicating settlement of the delivery from the sender.",
-   "disposition": "deferred:S3-session",
+   "disposition": "generated-declared-surface",
    "kind": "UNKEYED",
-   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes.",
+   "note": "lean/Generated/Oasis/Choices.lean (the `receiver-settle-mode` choices)",
    "text_sha256": "8048345ac44b423deec1f98f48e3fefb2e358fdb1bb5e630d5c8a6d458a3ae81"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/type:sender-settle-mode/choice:settled.u1": {
@@ -991,70 +991,70 @@
    "clause_text": "Consequently, a link can only be active in one connection at a time.",
    "disposition": "deferred:S3-session",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Blocked: lean/Spec/Session.lean line 423-430 a session is one link's flow state, with `handles` (:446) a registry of that link's handles and no connection-independent link identity; ledger/ambiguities/link-uniqueness-vacuous.json records the restriction for links.1/sessions.1",
    "text_sha256": "80cbe63b7f8ae3d37842db01c699499fdd6174c727d21478b8425ca59c6e7dad"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.u10": {
    "clause_text": "As one might guess, the scenario presented initially where the sending application settles when the receiver reaches a terminal state, and the receiving application settles when the sender settles, results in an exactly-once guarantee.",
-   "disposition": "deferred:S3-session",
+   "disposition": "informative",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "the sentence states what a settlement scenario 'results in' (an exactly-once guarantee) rather than an obligation; no declaration or vector states it",
    "text_sha256": "249bd50dbd7b0ab4859a03537a156637c835334ea3c2a4f7d26bf9ef1faa5ae6"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.u2": {
    "clause_text": "The link endpoint is then mapped to an unused handle, and an «attach» frame is issued carrying the state of the newly created endpoint.",
-   "disposition": "deferred:S3-session",
+   "disposition": "out-of-scope:frame-construction",
    "kind": "UNKEYED",
-   "note": "Link creation mapping an endpoint to an unused handle and issuing the attach: the link machine's prose. The handle registry exists; whether it carries this sentence is that slice's disposition to make.",
+   "note": "lean/Spec/Session.lean line 768 attachLink (the handle registry half is present: the claimed-handle check at :800-810, with lean/Proofs/HandleUniqueness.lean); the issuing of an attach is not built, and the model's docstrings state the exclusion (lean/Spec/Connection.lean line 44-46)",
    "text_sha256": "ef5b4a02c2c16c2836275d59351e0e5d2f8588095e758f4d7052f05d5c61fce3"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.u3": {
    "clause_text": "If there is no pre-existing terminus, and the peer does not wish to create a new one, this is indicated by setting the local terminus (source or target as appropriate) to null.",
    "disposition": "deferred:S3-session",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Blocked: lean/Spec/Session.lean line 751-761 terminusRefusalOf returns `none` for `none | some .null`, so a null terminus is *not read* rather than *recorded as absent*; lean/Ref/Session.lean line 599-608 the twin",
    "text_sha256": "418e5ec15d2ba848bfca1dbd57a85c8a96adca3f3e51c115b978ef9347306a81"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.u4": {
    "clause_text": "The full link state is then constructed from the authoritative source or target supplied by the other endpoint once the link is established.",
    "disposition": "deferred:S3-session",
    "kind": "UNKEYED",
-   "note": "The full link state constructed from the peer's authoritative source or target once the link is established.",
+   "note": "Blocked: lean/Spec/Session.lean line 423-430 structure Session; :768-825 attachLink validates the peer's terminus and keeps nothing of it",
    "text_sha256": "c1d2cb488b4e77aa496e2893e7b38790b198260c2c96213d1ff8ecaf6f945a1d"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.u5": {
    "clause_text": "If the remote peer has no record of the link, then no terminus will be located, and local terminus (source or target as appropriate) field in the «attach» frame will be null.",
    "disposition": "deferred:S3-session",
    "kind": "UNKEYED",
-   "note": "No peer record of the link means no terminus is located: the attach's outcome for an unknown link.",
+   "note": "Blocked: lean/Spec/Session.lean line 423-430; :751-761 terminusRefusalOf reads the attach's own fields only",
    "text_sha256": "40fc5be6df42797cb822dab460e8c3ec17221689fc75afd54dcf35da71ed9fc7"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.u6": {
    "clause_text": "The sender will then send its final delivery state along with an indication that the delivery is settled at the sender.",
-   "disposition": "deferred:S3-session",
+   "disposition": "out-of-scope:frame-construction",
    "kind": "UNKEYED",
-   "note": "The sender sending its final delivery state with the settled indication.",
+   "note": "no declaration emits frames (lean/Spec/Connection.lean line 44-46; lean/Spec/Session.lean line 1022-1080 validates a transfer the corpus supplies)",
    "text_sha256": "7774caf6ed9a158f0aa74bc9d70644119959d418ceb9d6784290457f427b7b53"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.u7": {
    "clause_text": "The application can then perform some final action, e.g., remove the delivery-tag from a set kept for de-duplication, and then notify the receiver that the delivery is settled.",
-   "disposition": "deferred:S3-session",
+   "disposition": "out-of-scope:frame-construction",
    "kind": "UNKEYED",
-   "note": "The application's final action and the notification to the receiver.",
+   "note": "lean/Spec/Connection.lean line 44-46",
    "text_sha256": "9da2420a24e8fbaacd809278e7ba274545a215f68a81d5bef4ee1c715f64d770"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.u8": {
    "clause_text": "For example if the sending application settles the delivery before sending it, this results in an at-most-once guarantee.",
-   "disposition": "deferred:S3-session",
+   "disposition": "informative",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "the sentence states what a settlement order 'results in' (an at-most-once guarantee) rather than an obligation",
    "text_sha256": "2c9532da67797c50eb929c1e5969bf8a36bde1bd6fcfb3b442bbaa67155306bb"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.u9": {
    "clause_text": "If the disposition frame indicated below is lost, then upon link recovery the sender will not see the delivery-tag in the receiver's unsettled map and will therefore assume the delivery was lost and resend it, resulting in duplicate processing of the message at the receiver.",
    "disposition": "deferred:S3-session",
    "kind": "UNKEYED",
-   "note": "A lost disposition and what the sender sees on link recovery: the unsettled-map rule from the sender's side.",
+   "note": "Blocked: lean/Spec/Session.lean line 423-430 (no map); :1022-1080 (no `resume`, no recovery)",
    "text_sha256": "7eb245561a76d02bef2cd65faa69d3713aac2f4f43fd56f303ca7c4c201f0c2f"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:flow-control.u1": {
@@ -1101,42 +1101,42 @@
    "clause_text": "Any attempt to deliver a message larger than this results in a message-size-exceeded «link-error».",
    "disposition": "deferred:S3-session",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Blocked: lean/Generated/Oasis/Fields.lean line 96 declares the attach field; lean/Spec/Session.lean line 768-825 attachLink reads handle, role, initial-delivery-count and the terminus, never max-message-size",
    "text_sha256": "081f5e30a043d0761f5b3942c07ef6d7fd748a59c6a1a15e7524e1ce5ad60b1a"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:attach/field:source.u1": {
    "clause_text": "If no source is specified on an outgoing link, then there is no source currently attached to the link.",
    "disposition": "deferred:S3-session",
    "kind": "UNKEYED",
-   "note": "No source on an outgoing link means no source currently attached: an attach-field rule the link machine states today as a default rather than as this sentence.",
+   "note": "Blocked: lean/Spec/Session.lean line 751-761 (the `none | some .null` arm); :423-430",
    "text_sha256": "94c8c07fdf38f2ba0081fd22f3fb8f6fef1025105451493127fa4139deb62d7d"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:attach/field:source.u2": {
    "clause_text": "A link with no source will never produce outgoing messages.",
    "disposition": "deferred:S3-session",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Blocked: lean/Spec/Session.lean line 1026-1029 transferLink decides who may send from the attach's `role`, never from whether a source is attached; :423-430",
    "text_sha256": "7dfb39e28c91df1e7862e57ca5fbaa2601052e45778160f8736bbc3eeac43d19"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:attach/field:target.u1": {
    "clause_text": "If no target is specified on an incoming link, then there is no target currently attached to the link.",
    "disposition": "deferred:S3-session",
    "kind": "UNKEYED",
-   "note": "The mirror rule for an incoming link's target.",
+   "note": "Blocked: lean/Spec/Session.lean line 751-761; :807-822 (the target is read only as a present value, and `withControlLink` :610-622 asks what a target *contains*, not whether one is attached)",
    "text_sha256": "4b709bc83b85e76fd65e70f36defe98fb6371865d00cdae722155304dcd3a13c"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:attach/field:target.u2": {
    "clause_text": "A link with no target will never permit incoming messages.",
    "disposition": "deferred:S3-session",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Blocked: lean/Spec/Session.lean line 423-430; :1022-1080 transferLink, which consults the handle and the delivery's identity fields and no terminus",
    "text_sha256": "bb3e5cf610f9e0129e61f2d5a43902ee0523176f0bb488e22f060b22f7768d34"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:close.u1": {
    "clause_text": "It is illegal to send any more frames (or bytes of any other kind) after sending a close frame.",
-   "disposition": "deferred:S3-session",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.State.sendClass; formalized:SpecAMQP.Spec.Connection.permitsSend",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Spec.Connection.State.sendClass carries it — lean/Spec/Connection.lean line 284 declares SpecAMQP.Spec.Connection.State.sendClass, and the sentence's own words appear beside the code. lean/Spec/Connection.lean line 272-286 (CLOSE_SENT at :284, CLOSE_PIPE at :280, END, each `.nothing`); :984-992 permitsSend refuses every send in such a row; :1031-1043 the step that moves CLOSE_SENT/DISCARDING to END and leaves nothing to write. Precedent in the ledger: connections.6 ('This frame MUST be the last thing ever written onto a connection') is already `formalized:Spec.Connection.State.sendClass; formalized:Spec.Connection.permitsSend`, and connections/doc-idle-time-out.10 (the empty-frame twin of this sentence) is dispositioned against the same two declarations.",
    "text_sha256": "fdd59b91be302979d3d4bd6f3d219cf5b9ab1595bc9bc74323f45f541fd1d6be"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:disposition/field:batchable.u1": {
@@ -1175,9 +1175,9 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:hostname.u1": {
    "clause_text": "It is not mandatory to provide the hostname.",
-   "disposition": "deferred:S3-session",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.missingMandatory",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Spec.Connection.missingMandatory carries it — lean/Spec/Connection.lean line 635 declares SpecAMQP.Spec.Connection.missingMandatory, and the sentence's own words appear beside the code. lean/Spec/Connection.lean line 629-640 missingMandatory reads the declared field rows; lean/Generated/Oasis/Fields.lean line 131 the row for this field (`mandatory := false`); reached for the open at :1306 (`| .open => missingMandatory \"open\" body`) and again at lean/Spec/Session.lean line 1455 and lean/Spec/Transactions.lean line 436. Precedent: the identical sentence for the SASL init's hostname is already dispositioned `formalized:Spec.Connection.missingMandatory; formalized:Spec.Connection.stepSaslFrame` in the same ledger.",
    "text_sha256": "4b866057ca9673bc7a7722ad7ed72993322aa25fab810caa9666f9fc303867ff"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:hostname.u2": {
@@ -1199,16 +1199,16 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:incoming-locales.u1": {
    "clause_text": "If none of the requested locales are supported, en-US will be chosen.",
-   "disposition": "deferred:S3-session",
+   "disposition": "environment:locale-policy",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "ledger/dispositions/unkeyed-normative.json already dispositions the same anchor's two keyed sentences (incoming-locales.1, outgoing-locales.1) as `environment:locale-policy`",
    "text_sha256": "b8297eb63e7d9adfd650cc521e4fe0826fd9d18890648411c3ce7cddf231b9ad"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:max-frame-size.u1": {
    "clause_text": "If this field is not set it means that the peer does not impose any specific limit.",
-   "disposition": "deferred:S3-session",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.openLimits",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Spec.Connection.openLimits carries it — lean/Spec/Connection.lean line 759 declares SpecAMQP.Spec.Connection.openLimits, and the sentence's own words appear beside the code. lean/Spec/Connection.lean line 722-732 intField: an absent or null field takes the declared default, and a field with no default is a refusal; lean/Generated/Oasis/Fields.lean line 132 the open's max-frame-size row with `defaultValue := some \"4294967295\"` (the maximum uint, i.e. no specific limit); :759-762 openLimits and :1015-1033 afterFrame install it as the remote's limit, read by limitsFor (:1053-1058). The ledger already counts these declarations for the sibling max-frame-size.3 and MIN-MAX-FRAME-SIZE.1 (`formalized:Spec.Connection.Limits.aPriori`, `openLimits`).",
    "text_sha256": "3956a9715c0883b26a466e6f3647b791955eaa719c6cb31fe00a830c8c0c7fec"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:batchable.u1": {
@@ -1220,16 +1220,16 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:batchable.u2": {
    "clause_text": "If the message being delivered is too large to fit within a single frame, then the setting of batchable to true on any of the «transfer» performatives for the delivery is equivalent to setting batchable to true for all the «transfer» performatives for the delivery.",
-   "disposition": "deferred:S3-session",
+   "disposition": "informative",
    "kind": "UNKEYED",
-   "note": "Setting batchable on any transfer of a multi-frame delivery is equivalent to setting it on all: a rule about the transfer family's fields.",
+   "note": "ledger/dispositions/unkeyed-normative.json: transfer/field:batchable.u1 is dispositioned `informative` ('`hinting that there is no need` - advisory, not a requirement on the peer'); lean/Generated/Oasis/Fields.lean declares the field; no declaration in lean/Spec or lean/Ref reads it (grep: zero hits).",
    "text_sha256": "2885e0c192e2a13267edad24d06b27174f2cfd411866298725f4e57457528fe7"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:batchable.u3": {
    "clause_text": "The batchable value does not form part of the transfer state, and is not retained if a link is suspended and subsequently resumed.",
-   "disposition": "deferred:S3-session",
+   "disposition": "informative",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "ledger/dispositions/unkeyed-normative.json: the same anchor's batchable.u1 is `informative`; nothing in lean/Spec or lean/Ref reads `batchable` (grep: zero hits), so nothing retains it across a suspension either.",
    "text_sha256": "d08b6cd119e64599dfd16ce394b93866fb6746d934c0134cdf00dcb06ec6a19a"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:delivery-id.u1": {
@@ -1278,7 +1278,7 @@
    "clause_text": "The (implicit or explicit) value of this field does not form part of the transfer state, and is not retained if a link is suspended and subsequently resumed.",
    "disposition": "deferred:S3-session",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Blocked: lean/Spec/Session.lean line 960-978; :497; :423-430 (no suspension state)",
    "text_sha256": "392cc4ded1824cebe75fc27e7ea000b6944acd9b1b649975fadfb3acc8049c8f"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions.u1": {
@@ -1300,16 +1300,16 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.u1": {
    "clause_text": "Note that if the server only supports a single protocol version, it is consistent with the above rules for the server to send its protocol header prior to receiving anything from the client and to subsequently close the socket if the client's protocol header does not match the server's.",
-   "disposition": "deferred:S3-session",
+   "disposition": "out-of-scope:stream-progress",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "the S4 triage's disposition of version-negotiation.4 ('both peers MUST close their outgoing stream and SHOULD read the incoming stream until it terminates') is `out-of-scope:stream-progress`, with lean/Contracts/Conformance.lean line 24-29 placing that family as a fairness-qualified progress obligation or a recorded freedom",
    "text_sha256": "7b810a629ecdbfaf4a50da1a67d9bef3e1d95787d3dbfe3138849b3202ab533d"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.u2": {
    "clause_text": "The protocol id is not a part of the protocol version and thus the rule above regarding the highest supported version does not apply.",
-   "disposition": "deferred:S3-session",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.decodeHeader; formalized:SpecAMQP.Spec.Connection.ProtocolId",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Spec.Connection.decodeHeader carries it — lean/Spec/Connection.lean line 443 declares SpecAMQP.Spec.Connection.decodeHeader, and the sentence's own words appear beside the code. lean/Spec/Connection.lean line 64 inductive ProtocolId and :91-96 structure Version (major/minor/revision) are separate types; :443 def decodeHeader reads octet 4 as the id (`ProtocolId.ofCode (beAt bytes 4 1)`, :458) and octets 5-7 as a `Version` (:465), then compares the version within the layer the id selected; :156 structure ProtocolHeader carries both. The second half of the sentence — that the highest-supported-version rule does not apply — is satisfied because that selection rule is the multi-version negotiation the S4 triage classed `out-of-scope:multi-version-negotiation`.",
    "text_sha256": "9341f4946cb0d231c78ab9e19d25e499b869cd2d0af7e0eb9e8247859cbbc6c0"
   },
   "amqp-core-types-v1.0-os.xml#amqp:types/section:primitive-type-definitions/type:map.u1": {

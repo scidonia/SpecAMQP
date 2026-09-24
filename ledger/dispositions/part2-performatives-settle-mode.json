@@ -12,14 +12,14 @@
    "clause_text": "If \u00abfirst\u00bb, this indicates that the receiver MUST settle the delivery once it has arrived without waiting for the sender to settle first.",
    "disposition": "deferred:S3-session",
    "kind": "MUST",
-   "note": "deferred: S3-session \u2014 uncarried: under `receiver-settle-mode` the receiver settles the delivery once it has arrived, and the session holds no receiver-side settlement state to settle from. `Contracts/Settlement.lean`'s closing section states the position exactly and is the record this entry defers to; the model's one settle-mode quantity is the sender's (`Session.senderSettleMode`, read by `transferLink`'s completion rule). The unkeyed sentences of this same anchor are deferred to the same slice, and one vector (`exchange-session-attach-defaults-admitted`) cites the clause for the conforming negotiation.",
+   "note": "Blocked: lean/Spec/Session.lean line 960-978 rcvSettleRefusal? (the negotiation, read per transfer); :497 receiverSettleSecond; :472 senderSettleMode and :485 senderSettleUnsettled, so the model holds three settle-mode flags, not one. lean/Contracts/Settlement.lean line 213-221 carries the corrected bullet — \"`rcv-settle-mode` is modelled, and this bullet said otherwise until the flow work landed\" — which is about the *negotiation* (`rcv-settle-mode.u1`/`.u2`, already dispositioned to those declarations), not about the receiver settling a delivery. The entry's note claim that \"the model's one settle-mode quantity is the sender's\" is stale.",
    "text_sha256": "cd296d39539a2fb04ebcb46420845abe3fad25e24a93f45275972d308ad3cf0d"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:rcv-settle-mode.2": {
    "clause_text": "If \u00absecond\u00bb, this indicates that the receiver MUST NOT settle until sending its disposition to the sender and receiving a settled disposition from the sender.",
    "disposition": "deferred:S3-session",
    "kind": "MUST NOT",
-   "note": "deferred: S3-session \u2014 uncarried: the other half of the same conditional, for the receiver-settle-mode value in which the receiver must not settle until it has sent its disposition. Same missing state as `.1`, and the two clauses are one conditional keyed twice \u2014 its MUST and its MUST NOT \u2014 so both entries decide the same words.",
+   "note": "Blocked: lean/Spec/Session.lean line 960-978 rcvSettleRefusal? (the negotiation, read per transfer); :497 receiverSettleSecond; :472 senderSettleMode and :485 senderSettleUnsettled, so the model holds three settle-mode flags, not one. lean/Contracts/Settlement.lean line 213-221 carries the corrected bullet — \"`rcv-settle-mode` is modelled, and this bullet said otherwise until the flow work landed\" — which is about the *negotiation* (`rcv-settle-mode.u1`/`.u2`, already dispositioned to those declarations), not about the receiver settling a delivery. The entry's note claim that \"the model's one settle-mode quantity is the sender's\" is stale.",
    "text_sha256": "978d0fdac88234f75b34d2cdb9542fe2b2f9d2c48e46187e64bac70dc895049d"
   }
  },

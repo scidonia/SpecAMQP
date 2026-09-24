@@ -10,14 +10,14 @@
    "clause_text": "[picture] untitled: TRANSFER(delivery-id=1, ----------> ** Append message data not ** delivery-tag=2, ** seen previously to delivery ** (1) state=Received(3,0), ** state. ** res...",
    "disposition": "deferred:S5",
    "kind": "picture",
-   "note": "Normative: the transfer carries resume=true and the picture defines what the receiver must do for each state value \u2014 null (resume from section 0, ignoring data already received), Received(section, offset) (start at the given point), Received(3,0). Two receiver obligations are stated as MUST. Uncarried: nothing reads a transfer's `resume` flag and nothing discards already-received data, so neither picture's rule has a carrier today. The disposition previously read `formalized:Spec.Message.resumedTransfer`, a declaration that was never created.",
+   "note": "Blocked: lean/Spec/Session.lean line 1022-1080 (no `resume`); no declaration discards already-received data",
    "text_sha256": "1806720be2de4a8a4c021343cbfb61ffc03669901d9c80a88a1e0ee6a94b91db"
   },
   "amqp-core-messaging-v1.0-os.xml#picture.7": {
    "clause_text": "[picture] untitled: TRANSFER(delivery-id=4, ----------> ** Append message data not ** delivery-tag=6, ** seen previously to delivery ** (1) state=Received(2,0), ** state. ** res...",
    "disposition": "deferred:S5",
    "kind": "picture",
-   "note": "Normative: the same resume rule for a payload continuing mid-section (state anywhere between Received(1,150) and Received(2,0) inclusive); the MUST to ignore data up to the first unreceived position is stated here rather than in the surrounding prose. Uncarried: nothing reads a transfer's `resume` flag and nothing discards already-received data, so neither picture's rule has a carrier today. The disposition previously read `formalized:Spec.Message.resumedTransfer`, a declaration that was never created.",
+   "note": "Blocked: lean/Spec/Session.lean line 1022-1080",
    "text_sha256": "d0bc5a6c9445c4d1968ad8251fa94c5dae1901a2d4f6102426ec492b2a02703b"
   },
   "amqp-core-security-v1.0-os.xml#picture.5": {
