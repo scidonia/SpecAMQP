@@ -275,7 +275,7 @@ LEAN_DECLARATION_PATTERN = re.compile(
     r"^\s*(?:@\[[^\]]*\]\s*)*"
     r"(?:private\s+|protected\s+|noncomputable\s+|partial\s+|unsafe\s+|scoped\s+)*"
     r"(def|theorem|lemma|structure|inductive|abbrev|class|instance|opaque)\s+"
-    r"([A-Za-z_][\w.']*)"
+    r"([A-Za-z_][\w.']*[?!]?)"
 )
 LEAN_CONSTRUCTOR_PATTERN = re.compile(r"^\s*\|\s*([A-Za-z_][\w.']*)")
 LEAN_NAMESPACE_PATTERN = re.compile(r"^\s*namespace\s+([A-Za-z_][\w.']*)")
@@ -1058,6 +1058,18 @@ def lean_declarations(root: Path) -> dict[Path, set[str]]:
             ]
             written = declaration.group(2).split(".")
             names.update(declaration_spellings(enclosing, written))
+            # A declaration's name may end in `?` or `!` — `reservedKey?`, `flowCountRefusal?` — and the
+            # pattern above did not capture the suffix until a message-layer clause needed it: every
+            # declaration was recorded truncated, which is why older entries name `flowCountRefusal`
+            # where the declaration is `flowCountRefusal?`. Both spellings resolve now, the exact one and
+            # the truncated one an entry written before this fix carries. **The leniency runs one way on
+            # purpose**: a value naming the suffixed form is resolved by the declaration, while a value
+            # naming a declaration the tree does not have still fails — which is the direction that
+            # matters, since the check exists to refuse a `formalized:` nobody implemented.
+            if written and written[-1][-1:] in "?!":
+                names.update(
+                    declaration_spellings(enclosing, written[:-1] + [written[-1][:-1]])
+                )
             if declaration.group(1) == "inductive":
                 inductive = (indent, enclosing, written)
         modules[path] = names

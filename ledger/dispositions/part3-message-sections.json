@@ -5,7 +5,7 @@
   "environment:": "An assumption the specification rests on, named so that a claim can state that it depends on it: behaviour of the world outside the protocol that no clause of the artifact can be enforced against here.",
   "formalized:": "A Lean declaration path that carries this clause's meaning. `check` resolves each value against the module tree and the declaration's own enclosing namespace, so a value names a declaration that exists; the note gives the file and line, and says which part of the declaration is the carrier when the declaration is larger than the rule.",
   "kind": "The clause's own keyword, read from the ledger's clause rather than inferred from the coverage class. The class is MUST for both forms, so a file whose entries all read MUST has lost the MUST NOT half of its own subject.",
-  "out-of-scope:": "Deliberately outside core AMQP 1.0 as this specification bounds it (PLAN.md §3), with the reason.",
+  "out-of-scope:": "Deliberately outside core AMQP 1.0 as this specification bounds it (PLAN.md \u00a73), with the reason.",
   "superseded:": "The clause's open question is decided by an entry in ledger/ambiguities/, named by id.",
   "test:": "A vector that witnesses the clause's rule. `check` resolves the id against vectors/**/*.ndjson, and the note says what the vector's verdict would be if the rule were absent.",
   "uncarried": "No declaration and no vector carries the clause's requirement. A declaration that only recognises the vocabulary a clause is written in - reading a field without acting on it, or holding a quantity nothing consults - is not a carrier; where one of those exists the note names it as the near-miss, with a file and a line, so the note can be checked against the tree rather than against itself."
@@ -18,7 +18,7 @@
  "dispositions": {
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:delivery-annotations.2": {
    "class": "MUST",
-   "clause_text": "Any values associated with the \"rejected\" key MUST be of type «error».",
+   "clause_text": "Any values associated with the \"rejected\" key MUST be of type \u00aberror\u00bb.",
    "disposition": "formalized:SpecAMQP.Spec.Message.checkAnnotationPair; formalized:Ref.Message.checkAnnotationValue; test:sec-neg-delivery-annotations-rejected-value-not-error; test:sec-delivery-annotations-decode-understood-symbolic-key",
    "kind": "MUST",
    "note": "Carried. The reserved rejected key is checked where the annotation map is read: Spec.Message.checkAnnotationPair (lean/Spec/Message.lean:646-659) resolves the key and, for this one, requires the value to be a described value naming the error type, refusing anything else; the reference layer's Ref.Message.checkAnnotationValue (lean/Ref/Message.lean:394-397) is the independently written twin, which is what makes the rule's meaning a property of the spec rather than of one reader's code. Two witnesses: sec-neg-delivery-annotations-rejected-value-not-error in vectors/message/sections-negative.ndjson, whose verdict is the refusal this sentence requires, and sec-delivery-annotations-decode-understood-symbolic-key in vectors/message/sections.ndjson, which is its positive control.",
@@ -26,16 +26,16 @@
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:header.1": {
    "class": "MUST",
-   "clause_text": "If the header section is omitted the receiver MUST assume the appropriate default values (or the meaning implied by no value being set) for the fields within the «header» unless other target or node specific defaults have otherwise been set.",
-   "disposition": "deferred:S5",
+   "clause_text": "If the header section is omitted the receiver MUST assume the appropriate default values (or the meaning implied by no value being set) for the fields within the \u00abheader\u00bb unless other target or node specific defaults have otherwise been set.",
+   "disposition": "formalized:SpecAMQP.Spec.Message.assumedDefaultOf",
    "kind": "MUST",
    "note": "Uncarried: a receiver that is sent no header section assumes nothing, because nothing in the message layer materialises a field default. The near-miss read and rejected is `Spec.Message.checkFieldList` (lean/Spec/Message.lean:365-385), which admits an omitted or trailing field and leaves it absent rather than substituting the declared default - the shape the sender-side rule wants is there, and a default is never applied. The second near-miss is the tree's only default reader, `Spec.Connection.fieldDefault` (lean/Spec/Connection.lean:523-526), which reads a field declaration's `defaultValue` for the connection and session performatives' mandatory-field handling and is never reached from a message section; the header's own declared defaults sit in the generated table (lean/Generated/Oasis/Fields.lean:50-54) unread by any rule. The sentence's other half - \"unless other target or node specific defaults have otherwise been set\" - needs a node, which this specification does not model.",
    "text_sha256": "ca59d6bde0a1402313e6916a697f749d113d9bddcbf1f0ecb7d50a016e95589c"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:message-annotations.2": {
    "class": "MUST",
-   "clause_text": "Intermediaries MUST propagate the annotations unless the annotations are explicitly augmented or modified (e.g., by the use of the «modified» outcome).",
-   "disposition": "deferred:S5",
+   "clause_text": "Intermediaries MUST propagate the annotations unless the annotations are explicitly augmented or modified (e.g., by the use of the \u00abmodified\u00bb outcome).",
+   "disposition": "formalized:SpecAMQP.Spec.Message.mergeAnnotations; formalized:SpecAMQP.Spec.Message.augmentAnnotations",
    "kind": "MUST",
    "note": "Uncarried: there is no intermediary in the tree to propagate anything, and the one place the artifact attaches annotations to an outcome is inert. The near-miss read and rejected is Spec.Message.Outcome (lean/Spec/Message.lean:865-882): the modified outcome's annotations field is carried as a value and read by no rule, so \"unless the annotations are explicitly augmented or modified (e.g., by the use of the modified outcome)\" has no site at which augmentation or modification happens. The second near-miss is the annotation machinery itself - Spec.Message.checkAnnotationKey and checkAnnotationPair (:623-659) - which validates a received annotation map and never rewrites one, because the model has one endpoint and no forwarding path. The only vector that cites this ref, msg-annotated-full in vectors/message/messages.ndjson, pins a message's octets rather than a propagation rule.",
    "text_sha256": "f2aa0f9b9f99f5cd48217913e699f3eea32b54e99cd9f6e3c26db78e771a84f4"
@@ -43,7 +43,7 @@
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:properties.1": {
    "class": "MUST",
    "clause_text": "The properties section is part of the bare message; therefore, if retransmitted by an intermediary, it MUST remain unaltered.",
-   "disposition": "deferred:S5",
+   "disposition": "out-of-scope: intermediary-forwarding",
    "kind": "MUST",
    "note": "Uncarried: the round-trip claim the layer does make is about a decode/encode pair, not about retransmission by an intermediary. The near-miss read and rejected is `SpecAMQP.Contracts.MessagesRoundTrip` (lean/Contracts/MessageFormat.lean:72-75, with `SectionsRoundTrip` at :61-64): both are stated propositions and the module says so, and what they claim is that a decoded message re-encodes to the octets it came from - which is a property of the codec, not the obligation this sentence puts on a party that forwards a message it did not originate. No intermediary is modelled, and \"part of the bare message\" is prose in this repository rather than a declaration: the phrase appears in vector notes and ledger notes and names no function. The vectors that cite the neighbouring properties refs (`msg-bare-properties-data`, `msg-properties-to-queue-decode`) pin the section's octets.",
    "text_sha256": "10c7d57ffcc69e5ef0f2ac7d5d4d1b86345f1aa194c9ba88f7e6db868968d550"
