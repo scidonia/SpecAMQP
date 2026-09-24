@@ -1088,6 +1088,30 @@ def corpus(tables: Corpus) -> list[dict]:
              "`**` is not `-`, and neither is `*`"))
 
     vectors.append(exchange(
+        "exchange-bodyless-frame-in-end-refused", start=c("END"),
+        clauses=[STATE_TABLE, EMPTY_FRAME, EMPTY_FRAME_ANY_CHANNEL],
+        steps=[t.refused("receive", reason="illegalState", condition=ILLEGAL_STATE,
+                         state=c("END"), octets=empty_frame(channel=0),
+                         note="END's legal receives are `-`, so a frame arrives where "
+                              "the table admits none"),
+               t.refused("receive", reason="illegalState", condition=ILLEGAL_STATE,
+                         state=c("END"), octets=empty_frame(channel=1))],
+        note="a frame whose header is all there is, arriving where the connection is "
+             "over: `framing.4` licenses the shape and `doc-idle-time-out.7` has a peer "
+             "handle it \"on any valid channel\", but the frame carries no performative, "
+             "so the cell `picture.24` gives END — `-` in the receive column — admits it "
+             "no more than it admits a `close`, and the refusal is the one "
+             "`exchange-frame-in-end-refused` and its receive-side sibling "
+             "`refused_close_in_end` already pin: `amqp:illegal-state` with class "
+             "`illegalState`. The second step offers the same frame on another channel, "
+             "because the artifact's licence is per channel while the column that "
+             "answers is the state's — channel one is refused on channel zero's terms. "
+             "The offered half of the rule has no step form at all: sending an empty "
+             "frame is a MAY and both artefacts' writers decline to take it, so the send "
+             "direction's evidence stays the theorem `frame_none_answers`, which a corpus "
+             "cannot carry as a step"))
+
+    vectors.append(exchange(
         "exchange-pipelined-channel-limit", start=c("START"),
         clauses=[STATE_TABLE, STATE_DIAGRAM, DISPATCH_TABLE, PRE_NEGOTIATION_LIMITS,
                  CHANNEL_MAX, CHANNEL_RANGE, SESSION_STATES],
@@ -2798,15 +2822,13 @@ def staged_corpus(tables: Corpus) -> list[dict]:
     ledger's deferred obligations made visible rather than a backlog of defects for one side
     to fix.
 
-    Eleven members have left since the family was first written — the two `61c0430` aligned,
-    the four the transfer-flag reading settled at `1a21b0a`, and the five settlement and count
-    readings `5624f16` carried — and the four that remain fall into two subjects rather than
-    one. Three are resumption readings the model restriction puts out of reach:
-    `transfer/field:resume.2`, `.3` and `attach/field:unsettled.5` each name the local
-    unsettled map or a resumed delivery, and one link per session is the whole of the model's
-    link state. The fourth needs no link at all — a frame whose header is all there is,
-    arriving in a connection that is over, where `picture.24`'s column for both directions
-    is `-`.
+    Twelve members have left since the family was first written — the two `61c0430` aligned,
+    the four the transfer-flag reading settled at `1a21b0a`, the five settlement and count
+    readings `5624f16` carried, and the bodyless frame here, whose answer `cfc723f` keyed to
+    the direction it is offered in, now that both artefacts consult the table's receive
+    column for it — and the three that remain are one subject: `resume.2`, `.3` and
+    `attach/field:unsettled.5` each name the local unsettled map or a resumed delivery, and
+    one link per session is the whole of the model's link state.
     """
     t = tables
     message = b"a message whose split points are the vector's business"
@@ -2888,27 +2910,6 @@ def staged_corpus(tables: Corpus) -> list[dict]:
                  "The map itself is well formed (an even item count, a null key, an "
                  "octet-string value), so the only rule this frame breaks is the one the "
                  "vector names"),
-
-        exchange(
-            "staged-bodyless-frame-in-end", start=c("END"),
-            clauses=[STATE_TABLE, EMPTY_FRAME, EMPTY_FRAME_ANY_CHANNEL],
-            steps=[t.refused("receive", reason="illegalState", condition=ILLEGAL_STATE,
-                             state=c("END"), octets=empty_frame(channel=0),
-                             note="END's legal receives are `-`, so a frame arrives where "
-                                  "the table admits none"),
-                   t.refused("receive", reason="illegalState", condition=ILLEGAL_STATE,
-                             state=c("END"), octets=empty_frame(channel=1))],
-            note="**Shared gap: a frame with no body defeats the table's `-` column.** "
-                 "`picture.24` gives END `-` in both columns, and the corpus already pins "
-                 "that a `close` and a protocol header arriving there are refused with "
-                 "`amqp:illegal-state` and class `illegalState`. A frame whose header is "
-                 "all there is — which `framing.4` licenses, and which "
-                 "`doc-idle-time-out.10` forbids *sending* after a close — is **admitted "
-                 "by both artefacts in END**, with no state change, because both "
-                 "short-circuit on a bodyless frame before the state column is consulted. "
-                 "The idle-timeout clause requires a peer to handle empty frames \"on any "
-                 "valid channel\"; it does not license one on a connection that is over, "
-                 "and the table's `-` is what says so")
     ]
 
 
