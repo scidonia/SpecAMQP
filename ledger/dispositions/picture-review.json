@@ -22,9 +22,9 @@
   },
   "amqp-core-security-v1.0-os.xml#picture.5": {
    "clause_text": "type: 0x01 - SASL frame +0 +1 +2 +3 +-----------------------------------+ -. 0 | SIZE | | +-----------------------------------+ |---> Frame Header 4 | DOFF |...",
-   "disposition": "deferred:S7",
+   "disposition": "formalized:Spec.Frame.channelOctets; formalized:Spec.Frame.saslTypeCode; formalized:Spec.Frame.carriesPerformative; formalized:Spec.Frame.readFrame; formalized:Spec.Connection.stepSaslFrame; formalized:Spec.Connection.bodylessFrame",
    "kind": "PICTURE",
-   "note": "The SASL Frame: its type code, the octets the channel field occupies and that they carry no meaning, the recommendation that DOFF be two, the size bound and the requirement that the body hold exactly one AMQP type providing `sasl-frame`. The frame shape is already formalized (S2's SASL frame type and the descriptor-role check); what remains is the mechanism negotiation and the layer-transition rules, which are S7's.",
+   "note": "The SASL Frame: its type code, the octets the channel field occupies and that they carry no meaning, the recommendation that DOFF be two, the size bound and the requirement that the body hold exactly one AMQP type providing `sasl-frame`. The frame shape is already formalized (S2's SASL frame type and the descriptor-role check); what remains is the mechanism negotiation and the layer-transition rules, which are S7's. **Carried this session, and the reporter's own words for it**: formalized:Spec.Frame.channelOctets; formalized:Spec.Frame.saslTypeCode; formalized:Spec.Frame.carriesPerformative; formalized:Spec.Frame.readFrame; formalized:Spec.Connection.stepSaslFrame; formalized:Spec.Connection.bodylessFrame",
    "text_sha256": "5b772750d45b0cf6dc787dfd3608cfa24d65adfee0f9b9646cc72451c08ffea1"
   },
   "amqp-core-transport-v1.0-os.xml#picture.10": {

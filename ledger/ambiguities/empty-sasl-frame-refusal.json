@@ -1,0 +1,26 @@
+{
+ "schema_version": 1,
+ "id": "empty-sasl-frame-refusal",
+ "question": "`sasl.u2` makes an empty SASL frame an irrecoverable error without naming the error: which condition and class does the refusal carry?",
+ "readings": [
+  {
+   "name": "The frame layer's condition, with the frame's own class: `amqp:connection:framing-error` and `malformed`",
+   "statement": "Adopted. What is wrong is the *frame* rather than the moment: a SASL frame is legal where it arrives, and it is its body that is absent, so the condition is the connection's framing error and the class says the frame is malformed \u2014 the same pair the frame layer already uses for a body it cannot read. That the refusal leaves the connection at `END` is the table's placement, not a second fact about the cause: `Refusal.withPlace` sets the state, and reading a placement as a class is the confusion this ledger has recorded before."
+  },
+  {
+   "name": "The layer's state condition: `amqp:connection:framing-error` with class `illegalState`",
+   "statement": "Rejected: it would read the *moment* as the violation. The clause's subject is the frame \u2014 an empty one is irrecoverable because the layer cannot proceed without a body \u2014 and an endpoint that received the same frame where it was expected would be in the same position. Reading the placement (`END`, or `DISCARDING` elsewhere) as the reason is what makes this reading look available, and the class is the one thing the placement does not decide."
+  }
+ ],
+ "adopted": "The frame layer's condition, with the frame's own class: `amqp:connection:framing-error` and `malformed`",
+ "open": false,
+ "clauses": [
+  "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl.u2"
+ ],
+ "consequences": [
+  "Both artefacts answer it identically in condition, class and placement, and their prose differs \u2014 which the conformance relation does not compare, so the agreement is at the level the interface fixes.",
+  "**It is the SASL layer's answer only, and that is what makes the idle-timeout reading's scope precise**: the dispatcher's bodyless case answers with the endpoint unchanged and nothing written in the *AMQP* layer (`doc-idle-time-out.7`), and with this refusal in the SASL layer. The two entries now say which layer each describes.",
+  "The send route answers the same way: an empty frame this endpoint is *offered* is refused too, so a send and a receive cannot disagree about the rule \u2014 but no corpus can express an offered bodyless frame, so that half rests on the declaration and the probe rather than on a vector."
+ ],
+ "evidence": "Read from the clause and grounded in the tree: `Spec.Connection.bodylessFrame` answers by the layer the frame was offered to, both routes of `Spec.Connection.step` go through it, and `Ref.Connection.emptyFrame` with `Ref.Connection.apply` is the reference's independent twin. Witnessed by `scripts/probe-sasl-frame-layer.ndjson` vectors 1 and 2, which failed in **both** artefacts before the change and pass after it, and by the three restated bodyless theorems in `Proofs/ConnectionConformance.lean` (`bodyless_answers`, `frame_none_answers`, `arriving_frame_answers`), which had asserted the old answer by `rfl`. The security window supplied the reading and flagged it for a ruling; it is adopted here rather than left implicit, because a condition and a class are observable and a reader is entitled to see which was chosen and why."
+}

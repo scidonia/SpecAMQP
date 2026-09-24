@@ -378,16 +378,16 @@
   },
   "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl.u1": {
    "clause_text": "A SASL frame has a type code of 0x01. Bytes 6 and 7 of the header are ignored.",
-   "disposition": "deferred:S7-SASL",
+   "disposition": "formalized:Spec.Frame.saslTypeCode; formalized:Spec.Frame.FrameType.ofCode; formalized:Spec.Frame.carriesPerformative; formalized:Spec.Connection.step; formalized:Spec.Connection.stepSaslFrame",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier. **Carried this session, and the reporter's own words for it**: formalized:Spec.Frame.saslTypeCode; formalized:Spec.Frame.FrameType.ofCode; formalized:Spec.Frame.carriesPerformative; formalized:Spec.Connection.step; formalized:Spec.Connection.stepSaslFrame",
    "text_sha256": "a70b842e5e7ecb819fcfe12ccc40cb3c3896c433e10784eeabe08d0563a9ec04"
   },
   "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl.u2": {
    "clause_text": "Receipt of an empty frame is an irrecoverable error.",
-   "disposition": "deferred:S7-SASL",
+   "disposition": "formalized:Spec.Connection.bodylessFrame; formalized:Spec.Connection.step",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier. **Carried this session, and the reporter's own words for it**: formalized:Spec.Connection.bodylessFrame; formalized:Spec.Connection.step",
    "text_sha256": "79a9867a159737a8c200b24db263a68fd98ac075556f0914ed0dda929da67466"
   },
   "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl/type:sasl-code/choice:auth.u1": {
@@ -427,9 +427,9 @@
   },
   "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl/type:sasl-init/field:hostname.u1": {
    "clause_text": "It is not mandatory to provide the hostname.",
-   "disposition": "deferred:S7-SASL",
+   "disposition": "formalized:Spec.Connection.missingMandatory; formalized:Spec.Connection.stepSaslFrame",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier. **Carried this session, and the reporter's own words for it**: formalized:Spec.Connection.missingMandatory; formalized:Spec.Connection.stepSaslFrame; test:sasl-plain-client-init-to-open",
    "text_sha256": "4b866057ca9673bc7a7722ad7ed72993322aa25fab810caa9666f9fc303867ff"
   },
   "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl/type:sasl-init/field:hostname.u2": {
@@ -454,9 +454,9 @@
   },
   "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl/type:sasl-outcome/field:additional-data.u1": {
    "clause_text": "If the authentication is unsuccessful, this field is not set.",
-   "disposition": "deferred:S7-SASL",
+   "disposition": "formalized:Spec.Connection.fieldSet; formalized:Spec.Connection.stepSaslFrame",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier. **Carried this session, and the reporter's own words for it**: formalized:Spec.Connection.fieldSet; formalized:Spec.Connection.stepSaslFrame; test:sasl-outcome-additional-data-on-failure",
    "text_sha256": "281286a356dba289645d7c6c2044f14ba3e6ad736fb48b931fb990f0cd5d86ac"
   },
   "amqp-core-security-v1.0-os.xml#amqp:security/section:tls.u1": {
