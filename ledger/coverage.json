@@ -2,7 +2,7 @@
  "by_disposition": {
   "deferred": 171,
   "environment": 12,
-  "formalized": 137,
+  "formalized": 140,
   "informative": 54,
   "out-of-scope": 44,
   "superseded": 2,
@@ -39,8 +39,8 @@
    "total": 12
   },
   "UNKEYED": {
-   "dispositioned": 178,
-   "total": 178
+   "dispositioned": 181,
+   "total": 181
   }
  },
  "lowercase_keyword_statements": 0,
@@ -264,7 +264,7 @@
    "statements": 314
   },
   "amqp-core-types-v1.0-os.xml": {
-   "anchors": 5,
+   "anchors": 6,
    "audit": {
     "excluded": {
      "MAY": 0,
@@ -298,11 +298,11 @@
     "MAY": 1,
     "MUST": 4,
     "REQUIRED": 1,
-    "UNKEYED": 3
+    "UNKEYED": 6
    },
    "must_class": 4,
    "sha256": "2ccf30b2c55924aaa5291cc34430a91b75c85d11d34bc008c36fc7ca7574d28c",
-   "statements": 9
+   "statements": 12
   }
  },
  "pictures": {
@@ -313,13 +313,13 @@
  },
  "schema_version": 1,
  "totals": {
-  "anchors": 234,
-  "clauses": 579,
+  "anchors": 235,
+  "clauses": 582,
   "must_class": 230
  },
  "unkeyed": {
-  "dispositioned": 178,
+  "dispositioned": 181,
   "note": "Statements that carry no conformance keyword but are still normative, or still an explicit silence the specification chooses. Captured because the keyword scan cannot see them: Part 1's duplicate-key rule is one sentence of a paragraph whose other sentences do carry keywords. Every one requires a disposition.",
-  "total": 178
+  "total": 181
  }
 }

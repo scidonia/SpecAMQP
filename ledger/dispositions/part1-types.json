@@ -4,9 +4,9 @@
   "informative": "The keyword is not a conformance keyword (for example it is used as an adjective)."
  },
  "design_consequences": [
-  "Map ordering fixes the value domain: the map case is a sequence of key-value pairs, not a set \u2014 the constructor says 'pairs in wire order' (lean/Spec/Codec.lean:167-168) \u2014 so map equality is order-sensitive except where a clause says otherwise.",
+  "Map ordering fixes the value domain: the map case is a sequence of key-value pairs, not a set — the constructor says 'pairs in wire order' (lean/Spec/Codec.lean:167-168) — so map equality is order-sensitive except where a clause says otherwise.",
   "Trailing-null omission makes decoding and encoding asymmetric: a reader accepts a shorter composite list than the type declares, while a writer may truncate. Both are latitude, so the conformance relation admits either; the reader's half is `checkFieldList` and the writer's half is unrequired.",
-  "Two of these six clauses are uncarried, and both are the same shape: a rule about what counts as absent, where the model counts only `null` and reads the generated `multiple` flag nowhere. They are the finding this file's correction produced, and neither is an artifact of the corrected paths \u2014 the paths were corrected *because* the pass that made them resolvable asked what actually carried each clause."
+  "Two of these six clauses are uncarried, and both are the same shape: a rule about what counts as absent, where the model counts only `null` and reads the generated `multiple` flag nowhere. They are the finding this file's correction produced, and neither is an artifact of the corrected paths — the paths were corrected *because* the pass that made them resolvable asked what actually carried each clause."
  ],
  "dispositions": {
   "amqp-core-types-v1.0-os.xml#amqp:types/section:composite-type-representation.1": {
@@ -20,21 +20,21 @@
    "clause_text": "Note that a null value and a zero-length array (with a correct type for its elements) both describe an absence of a value and MUST be treated as semantically identical.",
    "disposition": "deferred:S1",
    "kind": "MUST",
-   "note": "deferred: S1 \u2014 uncarried: the identity this sentence states is maintained nowhere. The model's own notion of absence is `isNullValue` (lean/Spec/Message.lean:357-359), which counts `null` and nothing else, and the mandatory rule is stated through it (lean/Spec/Message.lean:372-383). The divergence is reachable rather than theoretical: a field the declared surface marks mandatory and that carries a zero-length array is admitted where the same field carrying null is refused, which is the difference this sentence forbids. A carrier would be a declaration that treats the two encodings alike; none exists, and an entry naming one would be false. **And it now has an instance in another layer**: the message layer's `multiple`-field reader treats a zero-length array as unset (`Spec.Message.terminusFieldIsSet`, `Terminus.isSet`), which decides \"a null and a zero-length array both describe an absence of a value\" for the fields it reads. The clause stays deferred to S1 \u2014 an instance is not the general statement \u2014 and the instance is recorded so the next slice does not have to find it again.",
+   "note": "deferred: S1 — uncarried: the identity this sentence states is maintained nowhere. The model's own notion of absence is `isNullValue` (lean/Spec/Message.lean:357-359), which counts `null` and nothing else, and the mandatory rule is stated through it (lean/Spec/Message.lean:372-383). The divergence is reachable rather than theoretical: a field the declared surface marks mandatory and that carries a zero-length array is admitted where the same field carrying null is refused, which is the difference this sentence forbids. A carrier would be a declaration that treats the two encodings alike; none exists, and an entry naming one would be false. **And it now has an instance in another layer**: the message layer's `multiple`-field reader treats a zero-length array as unset (`Spec.Message.terminusFieldIsSet`, `Terminus.isSet`), which decides \"a null and a zero-length array both describe an absence of a value\" for the fields it reads. The clause stays deferred to S1 — an instance is not the general statement — and the instance is recorded so the next slice does not have to find it again.",
    "text_sha256": "3f852cb7656e61c4f02e9bfa280f4b459e089a7bcf03f8a9017c10525bb31d0c"
   },
   "amqp-core-types-v1.0-os.xml#amqp:types/section:composite-type-representation.3": {
    "clause_text": "A field which is defined as both multiple and mandatory MUST contain at least one value (i.e. for such a field both null and an array with no entries are invalid).",
    "disposition": "deferred:S1",
    "kind": "MUST",
-   "note": "deferred: S1 \u2014 uncarried: the flag is declared and never read. `FieldDecl.multiple` is generated from the artifact (lean/Generated/Oasis/Fields.lean:19), and no declaration under `lean/Spec`, `lean/Contracts` or `lean/Harness` consults it \u2014 the mandatory half of this sentence is checked (`checkFieldList`), the multiple half is not, so a field both multiple and mandatory may carry an empty array and be admitted. The general rule belongs in the composite check; until a declaration reads the flag there is nothing for this clause to name.",
+   "note": "deferred: S1 — uncarried: the flag is declared and never read. `FieldDecl.multiple` is generated from the artifact (lean/Generated/Oasis/Fields.lean:19), and no declaration under `lean/Spec`, `lean/Contracts` or `lean/Harness` consults it — the mandatory half of this sentence is checked (`checkFieldList`), the multiple half is not, so a field both multiple and mandatory may carry an empty array and be admitted. The general rule belongs in the composite check; until a declaration reads the flag there is nothing for this clause to name.",
    "text_sha256": "675774f9c45167eea07ac413203e18760cee7f439cf373b3a3f33d66a0dfe34e"
   },
   "amqp-core-types-v1.0-os.xml#amqp:types/section:encodings.1": {
    "clause_text": "All array encodings consist of a size followed by a count followed by an element constructor followed by count elements of encoded data formated as REQUIRED by the element constructor:",
    "disposition": "formalized:SpecAMQP.Spec.Codec.readArrayData; formalized:SpecAMQP.Spec.Codec.Value.array",
    "kind": "REQUIRED",
-   "note": "The shape is the `Value.array` constructor's \u2014 one constructor octet for every element, with the elements' values (lean/Spec/Codec.lean:171-173) \u2014 and the order size, count, element constructor, elements is what `readArrayData` reads, with the declared size checked against the octets measured (lean/Spec/Codec.lean:481-498). Its keyword is adjectival ('formated as REQUIRED by the element constructor'), so the ledger kind overstates it; the note records the misclassification and the disposition records what carries the meaning.",
+   "note": "The shape is the `Value.array` constructor's — one constructor octet for every element, with the elements' values (lean/Spec/Codec.lean:171-173) — and the order size, count, element constructor, elements is what `readArrayData` reads, with the declared size checked against the octets measured (lean/Spec/Codec.lean:481-498). Its keyword is adjectival ('formated as REQUIRED by the element constructor'), so the ledger kind overstates it; the note records the misclassification and the disposition records what carries the meaning.",
    "text_sha256": "2a82273b0f1f114f08a97d682fd8729e4518925a9dd3f381345ff4d777003181"
   },
   "amqp-core-types-v1.0-os.xml#amqp:types/section:primitive-type-definitions/type:map.1": {
@@ -50,6 +50,27 @@
    "kind": "MUST",
    "note": "Map equality is order-sensitive by construction: the value domain's map case is 'a map with its pairs in wire order' (lean/Spec/Codec.lean:167), a sequence of pairs rather than a set, so two maps differing only in pair order are different values. The latitude in 'unless known to be otherwise' is recorded in ledger/ambiguities/map-ordering.json.",
    "text_sha256": "17ac6fa53d206a7278c7aa2c535b753be0e85f191d082f1dde1b55f45e63a1d9"
+  },
+  "amqp-core-types-v1.0-os.xml#amqp:types/section:composite-type-representation.u1": {
+   "clause_text": "The permitted element values are determined by the type specification and multiplicity of the corresponding field definitions.",
+   "disposition": "formalized:SpecAMQP.Spec.Message.checkField",
+   "kind": "UNKEYED",
+   "note": "The sentence that makes the `multiple` attribute part of the type test rather than a licence to widen it: a field's values are judged against its declared type *and its multiplicity*, so a field the artifact declares `multiple` admits one element of that type or an array of them. `checkField` is where that lands, and it is also why a `requires` role belongs to the elements: the array that carries them is not a value providing an archetype. Both halves were repaired in one movement - the role used to be asked of the whole value, so a correctly encoded two-element capabilities could never be admitted. The evidence is `vectors/txn.ndjson`, moved to the array form, and `vectors/txn-negative.ndjson`'s `txn-coordinator-capabilities-as-a-list-refused`, which pins the shape both artefacts refuse.",
+   "text_sha256": "d41141cddcb5e1e713dd2c6018de35dfb0e49781b40fd8202b5a3d96637563c0"
+  },
+  "amqp-core-types-v1.0-os.xml#amqp:types/section:composite-type-representation.u2": {
+   "clause_text": "Multiple values are represented by the use of an array where the type of the elements in the array is the type defined in the field definition.",
+   "disposition": "formalized:SpecAMQP.Spec.Message.multipleAccepts",
+   "kind": "UNKEYED",
+   "note": "The representation rule: multiple values are carried as an array whose elements are the field's declared type. `multipleAccepts` is the declaration that reads it - an array is admitted exactly when every element is - and this sentence is why a list of symbols is not a representation any reader may admit, which is the shape `txn-coordinator-capabilities-as-a-list-refused` pins. The sentence had no clause id until now, so a rule the corpus rests on was uncitable: a reading without an id cannot be cited by the vector that pins it.",
+   "text_sha256": "2f787afd635f06d0322a690b665ed6f6acaca182bb991e417d79c9d2391d096b"
+  },
+  "amqp-core-types-v1.0-os.xml#amqp:types/section:type-notation.u3": {
+   "clause_text": "Field values are restricted to types providing at least one of the specified archetypes.",
+   "disposition": "formalized:SpecAMQP.Spec.Message.satisfiesRequires",
+   "kind": "UNKEYED",
+   "note": "What `requires` means: a field value is restricted to types providing at least one of the listed archetypes. `satisfiesRequires` resolves a role against the described type for composite providers and against the primitive's own name otherwise. Following the multiplicity sentence above, the role is asked of a `multiple` field's elements rather than of the array carrying them, which is the branch `checkField` now takes.",
+   "text_sha256": "9ded4fb06f0ee04ca11fd8036e0adf6a125dcaef7173c0ad9cd4d02c5c616e10"
   }
  },
  "schema_version": 1,

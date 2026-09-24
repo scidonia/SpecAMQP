@@ -8020,6 +8020,21 @@
   {
    "anchor": "amqp:types/section:composite-type-representation",
    "artifact": "amqp-core-types-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 1,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-types-v1.0-os.xml#amqp:types/section:composite-type-representation.u1",
+   "references": [],
+   "statement_sha256": "d41141cddcb5e1e713dd2c6018de35dfb0e49781b40fd8202b5a3d96637563c0",
+   "text": "The permitted element values are determined by the type specification and multiplicity of the corresponding field definitions.",
+   "text_sha256": "d41141cddcb5e1e713dd2c6018de35dfb0e49781b40fd8202b5a3d96637563c0",
+   "unkeyed_phrases": [
+    "field definitions"
+   ]
+  },
+  {
+   "anchor": "amqp:types/section:composite-type-representation",
+   "artifact": "amqp-core-types-v1.0-os.xml",
    "class": "MUST",
    "index": 2,
    "kind": "MUST",
@@ -8028,6 +8043,21 @@
    "statement_sha256": "7502a1403cb9755aa9683a2fccebc0dfe983874c18ca2aef4afa65c7a1aee12a",
    "text": "Note that a null value and a zero-length array (with a correct type for its elements) both describe an absence of a value and MUST be treated as semantically identical.",
    "text_sha256": "3f852cb7656e61c4f02e9bfa280f4b459e089a7bcf03f8a9017c10525bb31d0c"
+  },
+  {
+   "anchor": "amqp:types/section:composite-type-representation",
+   "artifact": "amqp-core-types-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 2,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-types-v1.0-os.xml#amqp:types/section:composite-type-representation.u2",
+   "references": [],
+   "statement_sha256": "2f787afd635f06d0322a690b665ed6f6acaca182bb991e417d79c9d2391d096b",
+   "text": "Multiple values are represented by the use of an array where the type of the elements in the array is the type defined in the field definition.",
+   "text_sha256": "2f787afd635f06d0322a690b665ed6f6acaca182bb991e417d79c9d2391d096b",
+   "unkeyed_phrases": [
+    "field definition"
+   ]
   },
   {
    "anchor": "amqp:types/section:composite-type-representation",
@@ -8120,6 +8150,21 @@
    "text_sha256": "18678c39411025bdad63771b077d9c985f7863ffd35e4e87ba2cc7c8195fa806",
    "unkeyed_phrases": [
     "are reserved"
+   ]
+  },
+  {
+   "anchor": "amqp:types/section:type-notation",
+   "artifact": "amqp-core-types-v1.0-os.xml",
+   "class": "UNKEYED",
+   "index": 3,
+   "kind": "UNKEYED",
+   "ref": "amqp-core-types-v1.0-os.xml#amqp:types/section:type-notation.u3",
+   "references": [],
+   "statement_sha256": "9ded4fb06f0ee04ca11fd8036e0adf6a125dcaef7173c0ad9cd4d02c5c616e10",
+   "text": "Field values are restricted to types providing at least one of the specified archetypes.",
+   "text_sha256": "9ded4fb06f0ee04ca11fd8036e0adf6a125dcaef7173c0ad9cd4d02c5c616e10",
+   "unkeyed_phrases": [
+    "field values"
    ]
   }
  ],

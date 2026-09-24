@@ -55,10 +55,10 @@ c661a0341ee5572bd716861459bcfbedbae36a7f  ledger/ambiguities/unmapped-begin.json
 69182b1732c04cb750dd8bc37ac373fee96f7e38  ledger/ambiguities/value-octets-are-a-prefix.json
 2dd54d7eeae541a3df93bd52a17aae4d8cff5a6e  ledger/ambiguities/version-mismatch-condition.json
 003cbf78615e5a2c39ff63ce21b19ef4ab0b6b68  ledger/ambiguities/zero-width-array-count.json
-5f651a63266b6a944c3db9748c868787bd2e07e6  ledger/clauses.json
-059e2a02b5cd1318d5aa6aacc1ff014ca298f278  ledger/coverage.json
+a713fbf4e03ad80112e701e2e7dfabe6dbb53623  ledger/clauses.json
+acdc857bc6b0557579f4f9a2b003d4168fa3e394  ledger/coverage.json
 b929301beea8db3509a392840563a35946f76b30  ledger/dispositions/part0-conformance-and-transport-lifecycle.json
-98c5aaeed8df4602af776bb77f6d3be75975c9b0  ledger/dispositions/part1-types.json
+22914db7d7ac979d338c8174170e302aec0ab44a  ledger/dispositions/part1-types.json
 fb65f4047b683315bf859f5b7cda00fc48027c17  ledger/dispositions/part2-connection-establishment.json
 300a02a0c9d2f653d9f26f1f0eea7b6ad87ae760  ledger/dispositions/part2-links.json
 b3394a9076715246a32d155c6e527ba7e4488085  ledger/dispositions/part2-performatives-link-state.json
@@ -76,7 +76,7 @@ c36967feb16eedb417605418dbcd8fb455785e36  ledger/dispositions/part5-security-lay
 9eb481aced08d8ee16ad5684bbdc214b37bf1a89  ledger/dispositions/unkeyed-normative.json
 fd83990fdb34dca23fc732e566fa109c98af71b5  ledger/lowercase-keywords.json
 bade00376950e4a224326e89498494519b4c5452  ledger/pictures.json
-745a82ff70e5e9eaa0a4f0a944d56ac4acb99119  ledger/reconciliation.json
+9866f8e45f15cbcd1663a08f6d9b2afc6232f1fb  ledger/reconciliation.json
 fae3db7cde111a89b20982e85df213054988d697  tests/contracts/exchange-vector.schema.json
 9addf5e827c82fd34990f9636858ed75de642b64  tests/contracts/frame-vector.schema.json
 470e2cf5c611d8b49637d8fb30e1bfd0f8c1d3fa  tests/contracts/message-vector.schema.json
