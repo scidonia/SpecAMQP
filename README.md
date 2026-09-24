@@ -2,110 +2,64 @@
 
 # SpecAMQP
 
-An **executable formal specification of AMQP 1.0 core** (OASIS Standard, Parts 0–5) written in Lean 4,
-with a clause-level ledger that makes completeness and fidelity *measurable*.
+An **executable formal specification of AMQP 1.0 core** (OASIS Standard, Parts 0–5), written in Lean 4,
+with a second independently written reference implementation of it, and a clause-level ledger that makes
+completeness and fidelity *measurable*.
 
-**This repository holds a specification, and a reference implementation of it.** It defines what a
-conforming AMQP 1.0 endpoint must do, states that as mathematics a machine can run, records for every clause
-of the standard how — and to what extent — the specification accounts for it, and ships an endpoint written
-in Lean whose protocol core carries the specification's conformance statement — frozen in `Contracts/EndpointConformance.lean`,
-with R3 as the proof still owed — and whose framing laws are proved. What it does not ship is a
-*verified binary*: Lean's compiler is trusted, the socket boundary and the Lean shell that drives it are the unproved parts, and
-`PLAN.md` §23.1 names both rather than leaving them to be inferred.
+- **579 clauses** of the standard, each with a recorded disposition: 238 formalized, 105 covered by test
+  vectors, 180 deferred to a named milestone, and the rest informative, out of scope or superseded.
+- **24 test corpora**, replayed step by step against both implementations, comparing each step's verdict
+  *and the condition behind every refusal*.
+- **20 gates** in `tests/contracts/`, each a script that fails loudly, offline, with no network, clock or
+  randomness.
+- **76 Lean modules**, and an endpoint in `lean/Impl/` compiled by Lean's own C backend whose protocol core
+  is proved to conform to the specification.
+
+The specification is meant to be a target, not a description: conformance is defined as a state machine over
+an interface alphabet frozen before any implementation existed, and implementations prove their own
+instances of it. `PLAN.md` is the programme of record.
 
 ## What is here
 
 | layer | what it holds |
 |---|---|
-| `spec/oasis/` | the vendored OASIS artifacts, byte-identity pinned in `toolchain/sources.toml`. **Immutable**: every clause id, disposition and vector citation refers to these bytes |
-| `lean/Generated/Oasis/` | the declared surface as Lean data — descriptors, encodings, types, fields, choices — generated from the artifacts |
+| `spec/oasis/` | the vendored OASIS artifacts, byte-identity pinned in `toolchain/sources.toml`; every clause id, disposition and citation refers to these bytes |
+| `lean/Generated/` | the standard's declared surface — descriptors, encodings, types, fields, choices — as generated Lean data |
 | `lean/Spec/` | the handwritten semantics: executable, total, and independent of every consumer |
-| `lean/Ref/` | an independently written reference implementation, authored from the artifacts and sharing no definition with `lean/Spec/` |
-| `lean/Impl/` | the shipped endpoint's Lean side: the pure protocol core, whose `Conforms` instance is R3 and **undischarged**, and `Transport.lean` — the one module in this directory that is not proved (the socket boundary, `PLAN.md` §23.1) |
-| `lean/Shell/` | the shipped process: the recv/feed/write loop and the socket lifecycle over the protocol core — whose conformance is stated and owed (R3), not proved. It imports the boundary because it owns the `IO`, which is why it sits outside `lean/Impl/` — that directory's claim is about its own files |
-| `lean/Harness/` | the runner: corpus replay, per-step verdicts, and the reason-class vocabulary the corpus schemas mirror |
-| `lean/Contracts/` | acceptance declarations: the exact propositions the specification claims |
-| `lean/Proofs/` | proofs of those declarations |
-| `ledger/` | the clause ledger, its coverage and reconciliation, the dispositions, and the **ambiguity register** — every place the standard is silent and a reading was taken |
-| `vectors/` | the specification test vectors: positive, negative and recorded third-party, each authored from clauses or recordings and **never produced by the executable specification** |
-| `tests/contracts/` | the gates: what makes the claims above checkable |
-| `bench/` | timing evidence for the corpus instruments — off-gate, never a gate, with the environment, the input digests and the per-run figures in `bench/results/`; the ratio it reports is what detects a complexity regression |
+| `lean/Ref/` | a second, independently written reading of the same artifacts, sharing no definition with `lean/Spec/` |
+| `lean/Impl/` | the shipped endpoint: its protocol core, proved to conform, and `Transport.lean`, its socket boundary — the one module there that is not proved |
+| `lean/Shell/` | the shipped process: the recv/feed/write loop and the socket lifecycle |
+| `lean/Harness/`, `lean/Contracts/`, `lean/Proofs/` | the runner and its reason-class vocabulary; the acceptance declarations; their proofs |
+| `ledger/` | the clause ledger, its coverage and reconciliation, and the **ambiguity register** — every place the standard is silent and a reading was taken |
+| `vectors/` | the test vectors: authored from clauses or recordings, **never produced by the executable specification** |
+| `tests/contracts/` | the gates |
+| `bench/` | off-gate timing evidence for the corpus instruments |
 | `PLAN.md` | the programme of record, including its own rules of evidence |
 
-## Where an implementation fits
+## Status
 
-**The specification's purpose is to be a target.** `PLAN.md` defines what it means for an endpoint to
-conform — a state machine over a frozen interface alphabet — and that interface was frozen *before any
-implementation existed* for exactly this reason: proving an instance of it for a concrete programme is
-downstream work. This repository now supplies **two** things to that work: an **executable oracle and a
-definite contract to prove against**, and — since the implementation track of `PLAN.md` §23.1 — **a
-reference endpoint of its own**, written in Lean and compiled natively, whose protocol core carries a *stated* instance of that same conformance relation, with its proof owed. TemperMint's Rust programme, its extraction through Charon and
-Aeneas, and the proofs about it remain TemperMint's work and are not replaced by it: the endpoint here is a
-second instance of the relation, and the corpus is what the two are compared over.
+**Every clause is accounted for, and every reading is recorded.** All 579 clauses of Parts 0–5 have a disposition, and where the standard is silent the register carries the reading taken *and* the alternatives it was chosen over, so a disagreement with a decision here is a disagreement about a written argument rather than about a default; trust is accounted
+for gate-wise: the proof-integrity gate scans the handwritten modules for `sorry`, `native_decide`, `axiom`,
+`opaque`, `unsafe` and `extern`, the one permitted `extern` boundary is `lean/Impl/Transport.lean` — pinned by
+path and printed with its count, so the exemption cannot silently widen — and each accepted theorem's transitive
+axiom inventory is printed, so the trust base of a claim is visible per theorem.
 
-**How far the endpoint's evidence reaches.** Its protocol core's conformance is *stated* rather than proved — the claim is frozen in
-`Contracts/EndpointConformance.lean` and R3 is the proof — so what is proved about its parts today is the framing laws, under the same gates as
-every other proof in this repository. Its compiled form is a *trusted* step rather than a proved one — Lean's
-compiler and runtime are not verified — and its socket layer is a small, separately named unproved
-dependency: **a choice rather than a necessity**, because the pinned stdlib does have TCP (`Std.Async/TCP`,
-over libuv compiled into `libleanshared.so`) and a POSIX wrapper — a couple of hundred lines, measured in
-`PLAN.md` §23.1 — was taken instead, so that the endpoint's frame loop stays synchronous and the unnamed part of the trust base
-stays small. `PLAN.md` §23.1 records the measurement, the decision and the rejected alternative, which was
-built and passed before it was rejected. **The corpus does run against the
-endpoint over a socket as a third runner beside `amqp-spec` and `amqp-ref`** — that runner is R4, its rung is in
-the tree (`scripts/run-endpoint-wire-differential.sh` with `scripts/endpoint/WireApp/` and the wire peer), and it
-compares the shipped binary's per-step socket verdict against `amqp-spec`'s in-process verdict. **Its state is declared in the gate rather than transcribed here**, because a measurement moves and this paragraph
-has gone stale three times in one day: `tests/contracts/r4_wire_differential.sh` names the agreeing and diverging
-vectors per vector, requires every divergence to carry a cause drawn from the tier's own vocabulary, forbids an
-unattributed divergence, and treats a run that never tested anything as "not evidence". **What the state is: all six
-vectors of `vectors/slice.ndjson` agree at the socket, with no residual divergence** — three of them diverged when the
-gate was written, each because of a property of the differential's *own* application seam, and closing those seams
-(the shell re-asks the application after each step it takes; the protocol header is the application's opening move)
-moved all three to agreement. **That the closure left nothing over is the point**: those seams were hiding the
-endpoint, not excusing it. For the current state, run the gate; for what it means, read its declaration. **The protocol core's `Conforms` instance is no longer owed: R3 is discharged and the rung is accepted.**
-`Proofs/EndpointConformance.lean` proves `Contracts/EndpointConformance.lean`'s statement at exactly the type
-that file froze, and `Contracts/EndpointAcceptance.lean` binds it — so what is proved *about the endpoint* is now
-that its core is a forward simulation of the specification's connection endpoint over the unit alphabet the
-interface fixes, at the axiom set this repository accepts, with two of its lemmas resting on no axioms at all.
-The proof is the plumbing and says so rather than claiming more: three of the four equalities relating the two
-independently written constructions are `rfl`-level, so a defect inside `Spec.Connection.step` is inherited by
-both sides rather than caught here. **What remains unproved is unchanged and named**: the socket boundary, the
-compiler link, the stream corollary that waits on `ValuePrefixDetermined`, and the delivery contract a second
-connection would rest on.
+**The endpoint's protocol core is proved.** `Proofs/EndpointConformance.lean` proves the statement
+`Contracts/EndpointConformance.lean` froze — the core is a forward simulation of the specification's
+connection endpoint over the alphabet the interface fixes — and `Contracts/EndpointAcceptance.lean` binds
+it. Its framing laws are proved under the same gates as everything else. The proof is plumbing and says so:
+three of the four equalities relating the two independently written constructions are `rfl`-level, so a
+defect inside `Spec.Connection.step` is inherited by both sides rather than caught here.
 
-**`lean/Ref/` is not that proof, and it is not an implementation-acceptance mechanism.** It is a second
-*independent reading* of the same standard, because the dominant residual risk here is prose ambiguity: two
-readings by the same reader share their errors, so the way to test a reading is to build a second one from
-the artifacts without looking at the first and see whether the two agree on the wire. Where they disagree,
-one of them has misread the standard, and the disagreement is the evidence. That is a check on **the
-specification**, not on an implementation.
+**What is not proved is named rather than left to be found**: Lean's compiler and runtime (which makes the
+shipped binary *trusted* rather than verified), the socket boundary, the process loop above it, the stream
+corollary that waits on `ValuePrefixDetermined`, and the delivery contract a second connection would rest
+on. `PLAN.md` §23.1 records the measurement, the decision and the rejected alternative behind the socket
+boundary — a choice, not a necessity.
 
-And because the vectors, the verdict schema and the comparison are deliberately implementation-agnostic — a
-Rust binary, a Gallina development through extraction, or a third party's stack can be added as a runner
-rather than requiring a rewrite — the same corpus that tests the two readings also becomes the first
-acceptance test any implementation runs. A second formalisation in a second prover was considered and not
-adopted; `PLAN.md` records the reasons rather than the conclusion alone.
-
-## How it is checked
-
-Evidence is tiered, and each tier's blind spots are stated rather than assumed:
-
-- **V1 — proofs.** The proof-integrity gate scans every handwritten module for `sorry`, `native_decide`,
-  `axiom`, `opaque`, `unsafe` and `extern`, and prints the transitive axiom inventory of each accepted
-  theorem so the trust base of a claim is visible per theorem.
-- **V2 — the corpus.** The specification and the reference run the same vectors; the differential compares
-  verdicts *and the condition each refusal names*, because agreeing that a step is refused is only half of
-  agreeing about why.
-- **V3 — third-party evidence.** Recordings and observations from implementations not generated from this
-  model. A specification-built runner is a consumer, not third-party evidence.
-- **V4 — mutation controls.** For each new semantic layer, a structural, a semantic-boundary, an omission
-  and an acceptance/rejection-polarity mutant are planted and run, because the question is what *class* of
-  wrong specification the evidence would fail to notice.
-
-The gates are also the memory, because the repository's rules have each been bought by something that went
-wrong. They sit in `tests/contracts/`, and `PLAN.md` records the rules themselves — quoting rather than
-paraphrasing in a dispatch, deriving a label from its evidence cell rather than from a word in it, treating
-a generated corpus's generator as its target rather than a previous copy of its output, and the rest.
+**What is deliberately absent is a status snapshot.** The numbers above come from the ledger and the gates; which vectors pass, which remain staged and what has just moved are printed by running them, and `PLAN.md` carries the state and the history. A sentence here that described them would be wrong within a day, which is how most of the earlier drafts of this file were wrong. The endpoint is also exercised over a real socket as a
+third runner beside `amqp-spec` and `amqp-ref`, with `tests/contracts/r4_wire_differential.sh` as the
+record of what agrees and what does not.
 
 ## Running it
 
@@ -114,30 +68,34 @@ Everything runs in the pinned shell; the first `nix develop` realizes the closur
 ```sh
 alias shell='nix --extra-experimental-features "nix-command flakes" develop --offline --no-update-lock-file .#spec --command'
 
-# data and provenance
 shell bash tests/contracts/s0_sources_ledger.sh      # vendored identity, ledger, dispositions
 shell bash tests/contracts/s0_tables_fidelity.sh     # generated tables current and load-bearing
-shell bash tests/contracts/s0_lean_environment.sh    # pinned toolchain, mathlib, offline resolution
 shell bash tests/contracts/s0_spec_manifest.sh       # planner-owned files as the manifest records them
 shell bash tests/contracts/s0_vector_citations.sh    # every citation in the corpus resolves
 shell bash tests/contracts/s0_generator_fidelity.sh  # each corpus is what its generator produces
 
-# proofs and the two artefacts
-shell bash tests/contracts/s1_proof_integrity.sh     # no sorry, no native_decide, axiom inventories printed
+shell bash tests/contracts/s1_proof_integrity.sh     # no sorry, no native_decide; axiom inventories
 shell bash tests/contracts/s1_differential.sh        # specification and reference agree on the wire
 shell bash tests/contracts/s2_frame_vectors.sh       # the frame layer's corpus
+shell bash tests/contracts/s3_exchanges.sh           # the exchange corpora, both artefacts
 shell bash tests/contracts/s5_messages.sh            # the message layer's differential
 shell bash tests/contracts/s6_transactions.sh        # the transaction layer's differential
+shell bash tests/contracts/s7_sasl.sh                # the security layer
+shell bash tests/contracts/r4_wire_differential.sh   # the endpoint over a socket, per vector
 
-# the ledger and the generated tables
 shell python3 scripts/clause-ledger.py check         # ledger, dispositions and reconciliation
 shell python3 scripts/gen-oasis-lean.py --check      # generated tables current
 ```
 
-`nix develop` provisions a writable copy of the pinned mathlib closure from a prewarmed store path, so
-Lean and mathlib are exactly the revisions the downstream proof work pins. `scripts/fetch-oasis.sh
---verify` checks the vendored artifacts offline; it is the only step that ever fetches, and it refuses any
-hash mismatch.
+## How it is checked
+
+- **Proofs.** No `sorry`, `native_decide`, `axiom`, `opaque`, `unsafe` or `extern` in the handwritten
+  modules, with each accepted theorem's transitive axiom inventory printed.
+- **The corpus.** Both implementations replay the same vectors, and the differential compares verdicts
+  *and the condition each refusal names* — agreeing that a step is refused is half of agreeing why.
+- **Third-party evidence.** Recordings from implementations not generated from this model.
+- **Mutation controls.** For each semantic layer, structural, boundary, omission and polarity mutants are
+  planted, because the question is what *class* of wrong specification the evidence would fail to notice.
 
 ## License
 
