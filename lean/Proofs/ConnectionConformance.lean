@@ -1390,10 +1390,11 @@ def specAnswerOf (s : SpecAMQP.Spec.Connection.Endpoint)
 /-- The octets the reference's answer writes, from the offer it was given: the layer's own vocabulary
 says the caller supplies them, and `apply` returns the peer alone, so this is where the wire comes from
 on that side. It is exactly the same list the specification's layer builds internally — including the one
-case that is not "the octets I was handed when I am sending": a frame with no body is admitted writing
-nothing in either direction, on both sides, so a send of an empty frame puts no octets on the wire. What
-checks this list is the simulation below, which compares it against the octets the specification's own
-`Outcome` reports. -/
+case that is not "the octets I was handed when I am sending": a bodyless frame is admitted writing nothing
+in the AMQP layer, and in the SASL layer it is refused, where the answer's octets are the refusal's own
+reply rather than this list, and that reply is empty too. So a bodyless frame puts no octets on the wire
+on either side and in either layer. What checks this list is the simulation below, which compares it
+against the octets the specification's own `Outcome` reports. -/
 
 def refOfferWrote (outbound : Bool) (offer : SpecAMQP.Ref.Connection.Offer) : List Octets :=
   match offer with
@@ -5169,7 +5170,7 @@ def frameAnswerSpec (s : Spec.Connection.Endpoint) (bytes : Octets) :
        .error ⟨Spec.Connection.framingError, refusal.reasonClass, refusal.message, none, []⟩
      | .ok (frame, consumed) =>
        match frame.body with
-       | none => .ok ⟨s, []⟩
+       | none => Spec.Connection.bodylessFrame s
        | some body =>
          if s.layer == Spec.Connection.Layer.sasl then
            Spec.Connection.stepSaslFrame s false consumed body #[]
@@ -5186,11 +5187,46 @@ def frameAnswerRef (i : Ref.Connection.Peer) (bytes : Octets) :
                   reasonClass := failure.reasonClass }
      | .ok (frame, used) =>
        match frame.body with
-       | none => .ok i
+       | none => Ref.Connection.emptyFrame i
        | some body =>
          if i.protocolId == Ref.Connection.saslId then
            Ref.Connection.takeSasl i false used body
          else Ref.Connection.takeFrame i false frame.channel used body)
+
+/-- **The bodyless frame's answer, in both layers.** The layer the empty frame arrives in decides its
+answer, and the two artefacts decide alike. In the AMQP layer the frame is the traffic the idle-timeout
+clause licenses, so both leave the peer where it was and write nothing. In the SASL layer the security
+section makes it an irrecoverable error, so both refuse it — with the condition a wire-level failure
+carries, the class the frame layer names for a body that is not a performative, and the peer at END,
+which is where the layer's own placement puts every refusal it raises.
+
+The two refusals' prose differs, which is why the relation compares the condition, the class and the
+placement rather than the sentence: a difference in wording is not a difference in what the peer is
+told about the artifact. -/
+
+theorem bodyless_answers (s : Spec.Connection.Endpoint) (i : Ref.Connection.Peer)
+    (hR : refPeerOf s = i) (outbound : Bool) :
+    AnswersAgree (placedSpec s outbound (Spec.Connection.bodylessFrame s))
+      (placedRef i outbound (Ref.Connection.emptyFrame i)) [] := by
+  subst i
+  have hlayEq : ((refPeerOf s).protocolId == Ref.Connection.saslId) =
+      (s.layer == Spec.Connection.Layer.sasl) := by
+    rw [refPeerOf]
+    exact refLayer_sasl_iff s.layer
+  unfold Spec.Connection.bodylessFrame Ref.Connection.emptyFrame
+  cases hlayer : s.layer with
+  | amqp =>
+    rw [hlayEq, hlayer, if_neg (by decide), if_neg (by decide)]
+    have hs : placedSpec s outbound (.ok ⟨s, []⟩) = .ok ⟨s, []⟩ := rfl
+    have hr : placedRef (refPeerOf s) outbound (.ok (refPeerOf s)) = .ok (refPeerOf s) := rfl
+    rw [hs, hr]
+    refine ⟨⟨fun out hout => ?_, fun r' hr' => absurd hr' (by simp)⟩, rfl⟩
+    obtain rfl := Except.ok.inj hout
+    exact ⟨refPeerOf s, rfl, rfl, rfl⟩
+  | sasl =>
+    rw [hlayEq, hlayer, if_pos (by decide), if_pos (by decide)]
+    exact error_answers_agree s (refPeerOf s) rfl outbound _ _
+      ⟨framingError_eq, rfl, rfl, rfl⟩
 
 /-- **The frame half of the receive direction.** Which frame arrived is the reader agreement's
 business; once it has, the layer's own step answers, and each of the two layer steps is the slice's
@@ -5218,9 +5254,7 @@ theorem arriving_frame_answers (h : ReadersAgree) (s : Spec.Connection.Endpoint)
       have hrb : rframe.body = none := hagree.bodyNone.mp hsb
       rw [hrb]
       try dsimp only []
-      refine ⟨⟨fun out hout => ?_, fun r' hr' => absurd hr' (by simp)⟩, rfl⟩
-      obtain rfl := Except.ok.inj hout
-      exact ⟨refPeerOf s, rfl, rfl, rfl⟩
+      exact bodyless_answers s (refPeerOf s) rfl false
     | some sbody =>
       cases hrb : rframe.body with
       | none => exact absurd (hagree.bodyNone.mpr hrb) (by rw [hsb]; simp)
@@ -5380,25 +5414,23 @@ theorem arriving_matched (h : ReadersAgree) (s : Spec.Connection.Endpoint)
 
 /-! ## The step question -/
 
-/-- The bodyless frame of `idle-time-out.7`: it is traffic, it carries no performative, and both layers
-leave the endpoint alone and write nothing. -/
+/-- The bodyless frame of `idle-time-out.7` on the send route: which layer it is offered to decides
+its answer, in the same two ways the receive route's `bodyless_answers` states — traffic in the AMQP
+layer, an irrecoverable error in the SASL one. -/
 
 theorem frame_none_answers (s : Spec.Connection.Endpoint) (i : Ref.Connection.Peer)
     (hR : refPeerOf s = i) (outbound : Bool) (channel : Nat) (octets : Octets) :
     AnswersAgree (Spec.Connection.step s outbound (.frame channel octets none))
       (Ref.Connection.apply i outbound (.frame channel octets none)) [] := by
   subst i
-  have hs : Spec.Connection.step s outbound (.frame channel octets none) = .ok ⟨s, []⟩ := rfl
-  have hr : Ref.Connection.apply (refPeerOf s) outbound (.frame channel octets none) =
-      .ok (refPeerOf s) := rfl
-  rw [hs, hr]
-  refine ⟨⟨fun out hout => ?_, fun r' hr' => absurd hr' (by simp)⟩, rfl⟩
-  obtain rfl := Except.ok.inj hout
-  exact ⟨refPeerOf s, rfl, rfl, rfl⟩
+  show AnswersAgree (placedSpec s outbound (Spec.Connection.bodylessFrame s))
+    (placedRef (refPeerOf s) outbound (Ref.Connection.emptyFrame (refPeerOf s))) []
+  exact bodyless_answers s (refPeerOf s) rfl outbound
 
 /-- **The step question.** The three slices, composed: the header exchange from the columns the table
 states, the AMQP frame from the mandatory rule and the limits, the SASL dialogue from its stages, and the
-bodyless frame from both layers leaving the endpoint alone. -/
+bodyless frame from the layer it was offered to — traffic where the idle-timeout clause licenses it, an
+irrecoverable error in the security layer. -/
 
 theorem stepAgrees : StepAgrees := by
   intro h s i hR outbound sub offer hcorr

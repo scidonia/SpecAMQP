@@ -1086,6 +1086,12 @@ def stepHeader (endpoint : Endpoint) (outbound : Bool) (header : ProtocolHeader)
 
 /-- One SASL performative, applied to the security layer's dialogue.
 
+This function is reached only by a frame that carries a body: a bodyless frame is answered by the
+dispatcher's `bodylessFrame`, which the security section makes an irrecoverable error in this layer,
+so the "exactly one AMQP type" the frames clause requires is enforced before the dialogue is asked
+anything here. The performative it is handed is the one the dispatcher decoded, whose descriptor the
+frame layer has already checked provides `sasl-frame`.
+
 The dialogue is ordered by the security section and not by the connection state table:
 the server announces its mechanisms, the partner chooses one and initiates, the
 challenge and response step may occur zero or more times, and the outcome closes the
@@ -1255,6 +1261,39 @@ def stepAmqpFrame (endpoint : Endpoint) (outbound : Bool) (channel size : Nat)
   let endpoint := endpoint.afterFrame outbound role declared
   return ⟨endpoint, if outbound then [wrote] else []⟩
 
+/-- A frame with no body, answered by the layer it was offered to.
+
+The two layers read the same empty frame differently, and the difference is the artifact's
+rather than a convenience of this dispatcher.
+
+In the AMQP layer an empty frame is traffic: "If a peer needs to satisfy the need to send
+traffic to prevent idle timeout, and has nothing to send, it MAY send an empty frame, i.e., a
+frame consisting solely of a frame header, with no frame body" — so the step is admitted and
+the endpoint is left where it was, which is the reading `doc-idle-time-out.7` records for this
+dispatcher and the one the corpus's `exchange-empty-frame-any-channel` pins.
+
+In the SASL layer the security section states the opposite rule about the same octets: "The
+frame body of a SASL frame MUST contain exactly one AMQP type, whose type encoding MUST have
+provides=\"sasl-frame\". Receipt of an empty frame is an irrecoverable error." A bodyless frame
+is therefore refused in whatever phase it arrives, because the rule is about the frame rather
+than about the dialogue's position.
+
+The condition is this specification's condition for a wire-level failure, which is what a frame
+whose body is not the performative its section requires is; the class is the frame layer's own
+class for exactly that failure, because `readFrame` refuses a body that is not a described
+performative the same way. The security artifact names no error condition at all — recorded in
+`ledger/ambiguities/sasl-dialogue-condition.json` — so this is a reading of the layer's
+existing convention rather than a transcription, and it is the convention every other frame the
+SASL layer reads already uses. The place is END: the error is irrecoverable in the section's
+own word, and in this layer no AMQP close can be written, because the layer is not
+established. -/
+def bodylessFrame (endpoint : Endpoint) : Except Refusal Outcome :=
+  if endpoint.layer == Layer.sasl then
+    .error (refusal "malformed" "the SASL frame carries no body, and the security section \
+      requires a SASL frame's body to hold exactly one AMQP type providing sasl-frame: \
+      receipt of an empty frame is an irrecoverable error")
+  else .ok ⟨endpoint, []⟩
+
 /-- Apply one submission to the connection layer, and place the refusal it raises.
 
 A frame that arrives is decoded here rather than by the caller, because which of the
@@ -1268,10 +1307,10 @@ def step (endpoint : Endpoint) (outbound : Bool) (submission : Submission) :
     match submission with
     | .header header => stepHeader endpoint outbound header
     | .frame channel octets body =>
-      -- a bodyless frame reaches this path too, and the clause's reading is the same one
-      -- the receive seam applies: nothing to dispatch, so the endpoint is unchanged
+      -- a bodyless frame reaches this path too, and which layer it was offered to decides
+      -- its reading: traffic in the AMQP layer, an irrecoverable error in the SASL one
       match body with
-      | none => .ok ⟨endpoint, []⟩
+      | none => bodylessFrame endpoint
       | some body =>
         if endpoint.layer == Layer.sasl then
           stepSaslFrame endpoint outbound octets.size body octets
@@ -1304,11 +1343,12 @@ def step (endpoint : Endpoint) (outbound : Bool) (submission : Submission) :
               -- layer's message, which is what a caller has always been shown here.
               .error ⟨framingError, refusal.reasonClass, refusal.message, none, []⟩
             | .ok (frame, consumed) =>
-              -- an empty frame carries no performative — "apart from this use, empty frames
-              -- have no meaning" — so the endpoint is left as it was and nothing is
-              -- written, which is what the reference layer does for the same input
+              -- an empty frame carries no performative, and which layer received it decides
+              -- what that means — "apart from this use, empty frames have no meaning" here,
+              -- an irrecoverable error in the SASL layer — which is the reading the send
+              -- route above applies to the same input
               match frame.body with
-              | none => .ok ⟨endpoint, []⟩
+              | none => bodylessFrame endpoint
               | some body =>
                 if endpoint.layer == Layer.sasl then
                   stepSaslFrame endpoint false consumed body #[]
