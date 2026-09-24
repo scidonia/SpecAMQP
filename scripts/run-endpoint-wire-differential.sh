@@ -3,7 +3,7 @@
 # R4: the wire differential — the corpus replayed against the shipped endpoint *over a socket*,
 # compared per vector with `amqp-spec`'s in-process answer.
 #
-#   shell bash scripts/run-endpoint-wire-differential.sh [corpus]
+#   shell bash scripts/run-endpoint-wire-differential.sh [--report PATH] [corpus]
 #
 # The whole corpus is replayed in process today. Nothing drives the shipped process through it, so
 # "the endpoint speaks AMQP" is demonstrated at the connection level and one `open` deep. This script is
@@ -42,6 +42,33 @@
 # run can weigh; the same words kept in a commit message are archaeology, and the reviewer of this tier
 # found exactly that — three findings attributed where nobody running the script would look.
 #
+# ## The machine-readable report, and the closed set of causes
+#
+# `--report PATH` writes a JSON document beside the table — for the contract that asserts over this tier
+# rather than over its prose:
+#
+#   {"corpus": "<as given>",
+#    "vectors": [{"vector": "<id>",
+#                 "socket": "pass" | "fail" | "INVALID",
+#                 "in_process": "pass" | "fail" | "unreported",
+#                 "divergences": [{"step": <int>, "cause": "<label>", "detail": "<the line the table printed>"}]}]}
+#
+# `divergences` is one entry per **step**, not per problem line: a step whose divergence produced three
+# sentences is one divergence, and its `detail` is those sentences joined by newlines — the same text the
+# table prints, so the two can be read against each other without the prose being re-derived here.
+#
+# A divergence's `cause` is drawn from a **closed set** rather than left to the sentence, because a
+# contract cannot assert over prose: `app-seam-prompt-after-read` and `app-seam-start-pre-state` are the
+# two seam properties named above, and `unknown` is a divergence this script cannot attribute — the case
+# the gate exists to catch. The `app-seam-` prefix is load-bearing: it says the cause is a property of the
+# differential's seam between the shell and the application rather than of the endpoint's protocol core,
+# so a `core-…` cause can be admitted later as a deliberate, reviewed addition rather than by accident.
+#
+# A row that never ran — the port range exhausted, a listener that could not bind — carries
+# `"socket": "INVALID"` and a row-level `detail`, and **no** `divergences` at all: nothing diverged, so
+# `unknown` is not borrowed for it. Two failure modes that must not read alike — the endpoint disagreeing
+# for an unnameable reason, and the run never having tested anything — stay distinguishable.
+#
 # ## The two lessons this driver is built on
 #
 # The readiness line is **read**, not polled, and it must be the server's own announcement: a server that
@@ -56,7 +83,52 @@ set -u
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 readonly root
-corpus="${1:-vectors/slice.ndjson}"
+
+# The corpus is the one positional argument it has always been; `--report PATH` (also `--report=PATH`) is
+# the option that writes the machine-readable document the contract reads. An option this driver does not
+# know is refused **by name** rather than ignored: a run whose report option was silently dropped would
+# look like a run that produced no report, which is the near-silent failure this option exists to avoid.
+usage() {
+  printf 'usage: %s [--report PATH] [corpus]\n' "$0" >&2
+  exit 2
+}
+report=""
+corpus=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --report)
+      [ $# -ge 2 ] && [ -n "$2" ] || { printf 'wire-differential: --report needs a non-empty path\n' >&2; usage; }
+      report=$2
+      shift 2
+      ;;
+    --report=*)
+      report=${1#--report=}
+      [ -n "$report" ] || { printf 'wire-differential: --report needs a non-empty path\n' >&2; usage; }
+      shift
+      ;;
+    -*)
+      printf 'wire-differential: unknown option %s\n' "$1" >&2
+      usage
+      ;;
+    *)
+      [ -z "$corpus" ] || { printf 'wire-differential: more than one corpus given\n' >&2; usage; }
+      corpus=$1
+      shift
+      ;;
+  esac
+done
+corpus="${corpus:-vectors/slice.ndjson}"
+
+# The report path is resolved against the caller's directory **before** the `cd "$root/lean"` below: a
+# relative path meant for the caller's shell must not land inside the package.
+if [ -n "$report" ]; then
+  case "$report" in
+    /*) : ;;
+    *) report="$PWD/$report" ;;
+  esac
+  [ -d "$(dirname "$report")" ] ||
+    { printf 'wire-differential: --report directory does not exist: %s\n' "$(dirname "$report")" >&2; exit 2; }
+fi
 
 # Evidence builds set LAKE_NO_CACHE=1 (see AGENTS.md).
 export LAKE_NO_CACHE="${LAKE_NO_CACHE:-1}"
@@ -266,13 +338,14 @@ done
 
 # ---------------------------------------------------------------- the comparison
 
-python3 - "$root/$corpus" "$work/spec.log" "$work/socket.log" "$work" <<'PY' 
+python3 - "$root/$corpus" "$work/spec.log" "$work/socket.log" "$work" "$report" "$corpus" <<'PY'
 import json, pathlib, re, sys
 
-corpus, spec_log, socket_log, work = sys.argv[1], sys.argv[2], sys.argv[3], pathlib.Path(sys.argv[4])
+corpus_path, spec_log, socket_log, work, report_path, corpus_given = (
+    sys.argv[1], sys.argv[2], sys.argv[3], pathlib.Path(sys.argv[4]), sys.argv[5], sys.argv[6])
 
 vectors = {}
-for line in pathlib.Path(corpus).read_text().splitlines():
+for line in pathlib.Path(corpus_path).read_text().splitlines():
     if line.strip():
         entry = json.loads(line)
         vectors[entry["vector"]] = entry
@@ -337,6 +410,53 @@ SEAM_NO_UNIT_TO_PROMPT = (
     "so the second of two sends played from one state, with no octets arriving between them, has nothing "
     "to prompt it — a known seam limitation, not the endpoint's answer")
 
+# The **closed set** a divergence's cause is drawn from, so a contract can assert over it rather than over
+# the sentence above. `unknown` is a divergence whose cause this script cannot show, and it is exactly what
+# the gate exists to catch; a divergence is attributed to a seam label by `seam_cause` below and to nothing
+# else. The `app-seam-` prefix says the cause is a property of the seam between the shell and the
+# application rather than of the endpoint's protocol core, so a `core-…` cause can be admitted later as a
+# deliberate, reviewed addition rather than by accident.
+CAUSE_START_PRE_STATE = "app-seam-start-pre-state"
+CAUSE_PROMPT_AFTER_READ = "app-seam-prompt-after-read"
+CAUSE_UNKNOWN = "unknown"
+
+
+def in_process_verdict(vector_id, steps):
+    """The vector's in-process verdict, as the table's `in process` column reads it.
+
+    The status of the step-1 entry `amqp-spec` printed, or of the first entry present. `unreported` is the
+    case where `amqp-spec` printed nothing for the vector at all — a value a contract must not read as
+    `fail`, because "the specification refused this" and "the specification said nothing" are not the same
+    statement. The second return value is the column's own text, which carries the reason class.
+    """
+    entry = spec.get(f"{vector_id}#1") or next(
+        (spec[f"{vector_id}#{n}"] for n in range(1, len(steps) + 1) if f"{vector_id}#{n}" in spec), None)
+    if entry is None:
+        return "unreported", "amqp-spec has no verdict for this vector"
+    klass = reason_class(entry.get("detail", ""))
+    return entry["status"], f"amqp-spec {entry['status']}" + (f" ({klass})" if klass else "")
+
+
+def divergence_lines(problems):
+    """The problems as the table prints them, and the per-step divergences the report carries.
+
+    A divergence is **per step**: a step whose divergence produced three sentences is one divergence of
+    that step, not three, and its report `detail` is those sentences joined by newlines — the same text the
+    table prints, so the two can be read against each other. The step's `cause` is the seam label any of
+    its problems carried, or `unknown`: a divergence nothing attributable explains is what the gate exists
+    to catch, and a step whose only problems are un-attributable must not borrow a seam's name.
+    """
+    lines = [f"step {number}: {text}" for number, text, _ in problems]
+    divergences = []
+    for number, text, cause in problems:
+        if divergences and divergences[-1]["step"] == number:
+            divergences[-1]["detail"] += "\n" + text
+            if divergences[-1]["cause"] == CAUSE_UNKNOWN and cause:
+                divergences[-1]["cause"] = cause
+        else:
+            divergences.append({"step": number, "cause": cause or CAUSE_UNKNOWN, "detail": text})
+    return lines, divergences
+
 rows = []
 for record in pathlib.Path(socket_log).read_text().splitlines():
     parts = record.split()
@@ -345,7 +465,15 @@ for record in pathlib.Path(socket_log).read_text().splitlines():
         startup = pathlib.Path(work / f"{parts[0]}.startup.log")
         if startup.exists():
             reason += " — " + startup.read_text().strip()
-        rows.append((parts[0], "INVALID", "the endpoint did not serve this vector", [reason]))
+        # A row that never ran: `socket` says INVALID, the reason is a row-level `detail`, and there are no
+        # divergences at all — nothing diverged, so `unknown` is not borrowed for a run that tested nothing.
+        # A contract can then tell "the endpoint disagreed for an unnameable reason" from "the listener
+        # never bound", which are different failures that must not read alike.
+        steps = vectors.get(parts[0], {}).get("steps", [])
+        in_process, _ = in_process_verdict(parts[0], steps)
+        rows.append({"vector": parts[0], "socket": "INVALID", "in_process": in_process,
+                     "in_process_text": "the endpoint did not serve this vector",
+                     "lines": [], "detail": reason, "divergences": None})
         continue
     if len(parts) != 4:
         continue
@@ -375,22 +503,25 @@ for record in pathlib.Path(socket_log).read_text().splitlines():
         cursor = bare_state(named) if named else cursor
 
     def seam_cause(number):
-        """The known reason this `send` step was never the application's to play, quoted, or nothing.
+        """The known reason this `send` step was never the application's to play: a label and its prose.
 
         A cause is named only where the step's own pre-state shows it: silence where the reason is
         unknown is the honest output, and a plausible-sounding cause nothing supports would be worse than
         none. The two are measured ones (`WireApp/Main.lean`'s header carries the reproduction), and both
-        are properties of the shell/application seam rather than of the endpoint's protocol core.
+        are properties of the shell/application seam rather than of the endpoint's protocol core. The first
+        value is the structured cause the report carries (one of `CAUSE_*` above), the second the sentence
+        the table prints; a step the pre-state does not attribute gets `(None, "")`, and the caller labels
+        its divergence `unknown` rather than guessing at a seam it cannot show.
         """
         index = number - 1
         if index >= len(steps) or steps[index].get("direction") != "send":
-            return ""
+            return None, ""
         if played_from[index] == "START":
-            return f" [{SEAM_HEADER_BEFORE_START}]"
+            return CAUSE_START_PRE_STATE, f" [{SEAM_HEADER_BEFORE_START}]"
         if index > 0 and steps[index - 1].get("direction") == "send" \
                 and played_from[index - 1] == played_from[index]:
-            return f" [{SEAM_NO_UNIT_TO_PROMPT}]"
-        return ""
+            return CAUSE_PROMPT_AFTER_READ, f" [{SEAM_NO_UNIT_TO_PROMPT}]"
+        return None, ""
 
     # What the endpoint narrated, and how it lines up with the vector's steps. A `took <state>` is one
     # answer to one step and names the state the peer is in after it. A **refusal is two answers** — the
@@ -421,10 +552,11 @@ for record in pathlib.Path(socket_log).read_text().splitlines():
         step_problems = []
         if step["direction"] == "send" and status == "refused":
             if observed.get("got"):
-                step_problems.append("the endpoint wrote octets the vector says it must refuse")
+                step_problems.append(("the endpoint wrote octets the vector says it must refuse", None))
         elif step["direction"] == "send":
             if not observed.get("matched"):
                 wrote = observed.get("got", "")
+                cause = None
                 detail = f"the vector expects the endpoint to write {len(step['bytes']) // 2} octets"
                 if wrote:
                     detail += (f"; it wrote {len(wrote) // 2}: {wrote[:64]}"
@@ -434,8 +566,9 @@ for record in pathlib.Path(socket_log).read_text().splitlines():
                 else:
                     detail += (f"; {observed.get('observed', 'no observation')} — the endpoint was in "
                                f"{in_state or 'no state it narrated'}, where the vector asks for no send")
-                    detail += seam_cause(number)
-                step_problems.append(detail)
+                    cause, prose = seam_cause(number)
+                    detail += prose
+                step_problems.append((detail, cause))
         # the endpoint's own answer to this step
         if status == "refused":
             consumed = []
@@ -443,17 +576,19 @@ for record in pathlib.Path(socket_log).read_text().splitlines():
                 consumed.append(answers[answer_index][1])
                 answer_index += 1
             if not consumed:
-                step_problems.append(
+                cause, prose = seam_cause(number)
+                step_problems.append((
                     "the endpoint narrated no refusal: the vector expects it to offer these octets and be "
-                    "refused, and no refusal reached the wire" + seam_cause(number))
+                    "refused, and no refusal reached the wire" + prose, cause))
             else:
                 said = " ".join(consumed)
                 if (expect.get("condition") or "") not in said:
-                    step_problems.append(
-                        f"the endpoint refused as `{said}`; the vector names {expect.get('condition')}")
+                    step_problems.append((
+                        f"the endpoint refused as `{said}`; the vector names {expect.get('condition')}",
+                        None))
                 if (expect.get("reason") or "") not in said:
-                    step_problems.append(
-                        f"the endpoint refused as `{said}`; the vector names {expect.get('reason')}")
+                    step_problems.append((
+                        f"the endpoint refused as `{said}`; the vector names {expect.get('reason')}", None))
             if state:
                 # **Where a refusal leaves the peer is stated by the endpoint, not assumed here.** The
                 # narration vocabulary carries no state on a refusal, so this comparison used to read the
@@ -467,19 +602,19 @@ for record in pathlib.Path(socket_log).read_text().splitlines():
                 else:
                     after, told_by = in_state, f"what the endpoint narrated last, `took {in_state}`"
                 if after and after != bare_state(state):
-                    step_problems.append(
+                    step_problems.append((
                         f"the vector expects the peer in {state}; the endpoint's own last word was {after} "
-                        f"({told_by})")
+                        f"({told_by})", None))
         elif state and answer_index < len(answers) and answers[answer_index][0] == "took":
             in_state = answers[answer_index][1]
             answer_index += 1
             if in_state != state.split(":")[-1]:
-                step_problems.append(
-                    f"the vector expects the peer in {state}; the endpoint said {in_state}")
+                step_problems.append((
+                    f"the vector expects the peer in {state}; the endpoint said {in_state}", None))
         elif state:
-            step_problems.append(
+            step_problems.append((
                 f"the vector expects the peer in {state}, and the endpoint narrated nothing for this "
-                f"step: it is in {in_state or 'no state it narrated'}")
+                f"step: it is in {in_state or 'no state it narrated'}", None))
         elif answer_index < len(answers) and answers[answer_index][0] == "took":
             # The step names no state, so the vector compares nothing about where the peer is — and it
             # must not be read as demanding an answer either: a step that says nothing about the state is
@@ -495,45 +630,72 @@ for record in pathlib.Path(socket_log).read_text().splitlines():
             step_socket = "pass" if not step_problems else "fail"
             if step_socket != spec_entry["status"]:
                 spec_class = reason_class(spec_entry.get("detail", ""))
-                step_problems.append(
+                step_problems.append((
                     f"over the socket this step is {step_socket}; the specification says "
                     f"{spec_entry['status']}"
-                    + (f" ({spec_class})" if spec_class else ""))
-        for problem in step_problems:
-            problems.append(f"step {number}: {problem}")
+                    + (f" ({spec_class})" if spec_class else ""), None))
+        for text, cause in step_problems:
+            problems.append((number, text, cause))
 
     socket_verdict = "pass" if not problems else "fail"
-    spec_entry = spec.get(f"{vector_id}#1") or next(
-        (spec[f"{vector_id}#{n}"] for n in range(1, len(steps) + 1) if f"{vector_id}#{n}" in spec), None)
-    if spec_entry is None:
-        rows.append((vector_id, socket_verdict, "amqp-spec has no verdict for this vector", problems))
-        continue
-    spec_status = spec_entry["status"]
-    spec_class = reason_class(spec_entry.get("detail", ""))
-    rows.append((vector_id, socket_verdict,
-                 f"amqp-spec {spec_status}" + (f" ({spec_class})" if spec_class else ""),
-                 problems))
+    in_process, in_process_text = in_process_verdict(vector_id, steps)
+    lines, divergences = divergence_lines(problems)
+    rows.append({"vector": vector_id, "socket": socket_verdict, "in_process": in_process,
+                 "in_process_text": in_process_text, "lines": lines, "divergences": divergences})
 
 print()
 print(f"{'vector':<46} {'socket':<7} {'in process':<22} divergence")
 agree = 0
-for vector_id, verdict, spec_text, problems in rows:
+for row in rows:
     # Every problem is printed **in full**, one per line, where it used to be cut at seventy columns and
     # capped at two: the part that says *which* it is — a seam limitation named with its cause, or the
     # endpoint's own last word quoted — lands at the end of the line, and a fixed-width cut hides exactly
     # that. Whoever reads this table and nothing else is the reader the attribution is for.
-    first = problems[0] if problems else ""
-    print(f"{vector_id:<46} {verdict:<7} {spec_text:<22} {first}")
-    for extra in problems[1:]:
+    lines = row["lines"]
+    first = lines[0] if lines else row.get("detail", "")
+    print(f"{row['vector']:<46} {row['socket']:<7} {row['in_process_text']:<22} {first}")
+    for extra in lines[1:]:
         print(f"{'':<46} {'':<7} {'':<22} {extra}")
-    if verdict == "pass" and spec_text.startswith("amqp-spec pass"):
+    if row["socket"] == "pass" and row["in_process_text"].startswith("amqp-spec pass"):
         agree += 1
 print()
 print(f"{len(rows)} vector(s): {agree} agree with the specification, "
-      f"{sum(1 for r in rows if r[1] == 'fail')} diverge over the socket")
-sys.exit(1 if any(r[1] != "pass" for r in rows) else 0)
+      f"{sum(1 for r in rows if r['socket'] == 'fail')} diverge over the socket")
+
+# The report, when asked for: written **before** the exit status is decided, so a diverging run — the run
+# this tier is for — still leaves the document the contract reads. `corpus_given` is the path the caller
+# passed rather than the absolute one the reading above uses: the report should name what was asked for, so
+# it stays reproducible from the invocation. A row that never ran carries a row-level `detail` and no
+# `divergences`, which is what keeps `unknown` meaning "the cause is unnameable" rather than "nothing ran".
+if report_path:
+    document = {"corpus": corpus_given, "vectors": []}
+    for row in rows:
+        entry = {"vector": row["vector"], "socket": row["socket"], "in_process": row["in_process"]}
+        if row.get("detail"):
+            entry["detail"] = row["detail"]
+        if row["divergences"] is not None:
+            entry["divergences"] = row["divergences"]
+        document["vectors"].append(entry)
+    try:
+        pathlib.Path(report_path).write_text(json.dumps(document, indent=2) + "\n")
+    except OSError as exc:
+        print(f"wire-differential: could not write the report to {report_path}: {exc}", file=sys.stderr)
+        sys.exit(3)
+
+sys.exit(1 if any(row["socket"] != "pass" for row in rows) else 0)
 PY
 compare_status=$?
+
+# A report that was asked for and **not** produced is a loud failure of this run, checked before the exit
+# status is read: a `--report` invocation whose contract input silently did not appear would be exactly the
+# near-silent failure this option exists to prevent. The comparator's own message (on stderr) says why. The
+# confirmation that follows goes to stderr too, so the table and summary on stdout are byte-for-byte the
+# run without the option.
+if [ -n "$report" ]; then
+  [ -s "$report" ] ||
+    { printf 'wire-differential: FAIL: --report was given but no report was written to %s\n' "$report" >&2; exit 1; }
+  printf 'wire-differential: report written to %s\n' "$report" >&2
+fi
 
 printf '\n'
 printf 'wire-differential: socket replay of %s against the shipped endpoint (%s vector(s))\n' \
