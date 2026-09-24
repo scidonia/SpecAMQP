@@ -1,3 +1,5 @@
+![SpecAMQP — AMQP 1.0, specified in Lean: an AMQP frame pipeline from a sender to a receiver through OPEN, BEGIN, ATTACH, FLOW and TRANSFER, the connection's state diagram over Open, Active, End and Closed, and a machine-checked Lean proof](assets/banner.png)
+
 # SpecAMQP
 
 An **executable formal specification of AMQP 1.0 core** (OASIS Standard, Parts 0–5) written in Lean 4,
