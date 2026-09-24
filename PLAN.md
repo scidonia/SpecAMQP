@@ -1508,7 +1508,10 @@ layer on the wire is the corpus's; **`slice-sasl-challenge-from-client` agrees e
 through the core, and that agreement survives ImplCore's layer seam unchanged — a regression check as much as an agreement. Two of six playable vectors agree
 and four diverge, **each named with its step**: two because the shell prompts the application only *after* a read, so two consecutive sends with nothing
 arriving between cannot be played; one because the pre-state is `START` and the shell's own header announcement has already left it; and one endpoint state
-after a refusal, not yet attributed to core or vector.
+after a refusal, not yet attributed to core or vector. **Re-measured by running the tier, that last case is gone**: three of the six vectors agree and three diverge, every divergence
+attributed by the run itself to the two seam properties its docstring names, so the open attribution this paragraph recorded was closed by the endpoint work since and the paragraph became
+the stale artefact. *The run is the record; a summary of a run ages as soon as what it summarises moves* — which is why the tier prints each divergence with its cause on the line, and why
+this sentence was corrected by running it rather than by reading it.
 
 **The policy ruling, with its condition**: the shipped binary keeps the conservative AMQP default — the corpus is written for a peer that offers SASL first, but
 a product's default is a different decision from a differential's needs, and the app supplies the vector's header. **Revisit only when R4 grows a rung whose
