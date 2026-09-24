@@ -80,6 +80,7 @@ fae3db7cde111a89b20982e85df213054988d697  tests/contracts/exchange-vector.schema
 470e2cf5c611d8b49637d8fb30e1bfd0f8c1d3fa  tests/contracts/message-vector.schema.json
 d3d45a51befd4d402fc0d1f6e32da0f0cdcc1474  tests/contracts/r1_transport_shell.sh
 3930a6a9fcc8b607e3a93c38b77e20455bfa6805  tests/contracts/r2_endpoint_shell.sh
+23eba18156b29a48e75226b22dd3aa180a56a9f5  tests/contracts/r4_wire_differential.sh
 71d9ac69341ac360f9b89d01cfc406640e5523af  tests/contracts/s0_generator_fidelity.sh
 f5457f3e3647561dc84ed0761556857f431bcad9  tests/contracts/s0_lean_environment.sh
 8f1b7c67a05fb6bda033be31f3819d3bde09f123  tests/contracts/s0_sources_ledger.sh
