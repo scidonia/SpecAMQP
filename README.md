@@ -3,17 +3,16 @@
 # SpecAMQP
 
 An **executable formal specification of AMQP 1.0 core** (OASIS Standard, Parts 0–5) written in Lean 4, a
-clause-level ledger that makes completeness and fidelity *measurable*, and a **second, independently written
-implementation** of the same standard — because the main risk in a specification is prose ambiguity, and two
-readings by one reader share their mistakes. Both run the same vectors and their verdicts are compared step
-by step: where they disagree, one of them has misread the standard.
+clause-level ledger that makes completeness and fidelity measurable, and a **second, independently written
+implementation** of the same standard. The second implementation catches misreadings: it is written from the
+same OASIS artifacts without reference to the specification, the two run the same vectors, and a disagreement
+between them means one has misread the standard.
 
 - **579 clauses** of the standard, each with a recorded disposition: 238 formalized, 105 covered by test
   vectors, 180 deferred to a named milestone, and the rest informative, out of scope or superseded.
 - **24 test corpora**, replayed step by step against the specification's executable semantics and against the
-  reference implementation, comparing each step's verdict *and the condition behind every refusal*.
-- **20 gates** in `tests/contracts/`, each a script that fails loudly, offline, with no network, clock or
-  randomness.
+  reference implementation, comparing each step's verdict and the condition behind every refusal.
+- **20 gates** in `tests/contracts/`, each a script with a pass/fail exit status, runnable offline.
 - **76 Lean modules**, and an endpoint in `lean/Impl/` compiled by Lean's own C backend whose protocol core
   is proved to conform to the specification.
 
@@ -43,8 +42,8 @@ What is done:
 
 - Every clause of the standard (Parts 0–5; 579 clauses) has a disposition: 238 formalized, 105 covered by
   test vectors, 180 deferred to named work, and the rest informative, out of scope or superseded.
-- Every ambiguity found so far is written down in `ledger/ambiguities/`, with the reading taken and the
-  alternatives it was chosen over.
+- Every ambiguity found so far is written down in `ledger/ambiguities/`, with the reading and the alternatives it was
+  chosen over.
 - The specification (`lean/Spec/`) and the reference implementation (`lean/Ref/`) agree on every committed
   corpus. `scripts/staged-exchange-divergences.ndjson` lists the vectors that do not yet pass, with their
   failing steps.
@@ -58,15 +57,13 @@ What is not done:
 - 180 clauses are deferred. The largest groups are sessions and links (49), transactions (44), messages
   (37) and session state (32); the rest are spread across the other layers.
 - `lean/Impl/Transport.lean`, the socket boundary, and `lean/Shell/`, the process loop above it, are not
-  proved. The shipped binary therefore rests on Lean's compiler and runtime, which are trusted and not
-  verified.
+  proved. The shipped binary therefore rests on Lean's compiler and runtime, which are not verified.
 - The stream corollary that waits on `ValuePrefixDetermined`, and the delivery contract a second connection
   would rest on.
 - The wire differential — the corpus replayed against the shipped binary over a real socket, compared per
-  vector with `amqp-spec` — has its current result in `tests/contracts/r4_wire_differential.sh` rather
-  than here.
+  vector with `amqp-spec` — has its current result in `tests/contracts/r4_wire_differential.sh`.
 
-The numbers in this file come from the ledger and the gates; run those for the current values. `PLAN.md`
+Numbers come from the ledger and the gates; run them for current values. `PLAN.md`
 has the decisions and their history.
 
 ## Running it
@@ -99,11 +96,11 @@ shell python3 scripts/gen-oasis-lean.py --check      # generated tables current
 
 - **Proofs.** No `sorry`, `native_decide`, `axiom`, `opaque`, `unsafe` or `extern` in the handwritten
   modules, with each accepted theorem's transitive axiom inventory printed.
-- **The corpus.** Both implementations replay the same vectors, and the differential compares verdicts
-  *and the condition each refusal names* — agreeing that a step is refused is half of agreeing why.
-- **Third-party evidence.** Recordings from implementations not generated from this model.
+- **The corpus.** Both implementations replay the same vectors; the differential compares verdicts and the
+  condition each refusal names.
+- **Third-party evidence.** Recordings from implementations written outside this model.
 - **Mutation controls.** For each semantic layer, structural, boundary, omission and polarity mutants are
-  planted, because the question is what *class* of wrong specification the evidence would fail to notice.
+  planted, and the gate reports which of them the corpus fails to catch.
 
 ## License
 
