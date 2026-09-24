@@ -71,10 +71,11 @@ from the artifact that at least one artefact does not meet. Each is a *divergenc
 two artefacts answer the same step differently, and neither side is chosen) or a *shared
 gap* (both admit what a clause forbids, so no differential can see it); the divergence
 kind is empty as the file stands — its last two members were aligned by `d50abc1` and
-`1540777` and promoted — so the family is shared gaps only, which is what the file is for:
-holding the obligations a gate cannot yet require rather than being emptied. `staged_corpus`
-names which, with the clause and both observed answers, because the file is a fix
-slice's opening evidence rather than a corpus a gate runs.
+`1540777`, five more by `5624f16`, and all seven were promoted — so the family is shared
+gaps only, which is what the file is for: holding the obligations a gate cannot yet
+require rather than being emptied. `staged_corpus` names which, with the clause and both
+observed answers, because the file is a fix slice's opening evidence rather than a corpus
+a gate runs.
 
 Runs offline; the only input is the vendored artifacts under `spec/oasis/`.
 """
@@ -126,6 +127,14 @@ ATTACH_SETTLE_DEFAULT = f"{TRANSPORT}#amqp:transport/section:performatives/type:
 FLOW_NEXT_INCOMING_ID = f"{TRANSPORT}#amqp:transport/section:performatives/type:flow/field:next-incoming-id.1"
 FLOW_HANDLE_MUST_BE_ATTACHED = f"{TRANSPORT}#amqp:transport/section:performatives/type:flow/field:handle.1"
 FLOW_DELIVERY_COUNT_SET_BY_SENDER = f"{TRANSPORT}#amqp:transport/section:performatives/type:flow/field:delivery-count.2"
+# `.4` is the same field's other presence rule, stated for the moment before the sender has
+# attached: the receiver's flow may not name a count it has no sender to have taken it from.
+FLOW_DELIVERY_COUNT_NOT_BEFORE_ATTACH = f"{TRANSPORT}#amqp:transport/section:performatives/type:flow/field:delivery-count.4"
+# link-credit's ownership is stated twice — once in the `flow-control` doc, as the one of the
+# four quantities only the receiver chooses, and once in the field's own table — and the pairs
+# that carry it cite both. (The doc's `.u1`, not its `.u3`: `.u3` is `drain`'s sentence.)
+FLOW_CREDIT_RECEIVER_CHOOSES = f"{TRANSPORT}#amqp:transport/section:links/doc:flow-control.u1"
+LINK_CREDIT_RECEIVER_SETS = f"{TRANSPORT}#amqp:transport/section:performatives/type:flow/field:link-credit.u1"
 # Five of the flow's fields carry one sentence each — "When the handle field is not set,
 # this field MUST NOT be set" — so the vector that exercises the coupling cites all five.
 # One name for the five, because the artifact states one coupling and repeats it per field.
@@ -146,6 +155,9 @@ WINDOW_AFTER_RECEIVING = f"{TRANSPORT}#amqp:transport/section:sessions/doc:sessi
 # so a vector names the clause whose choice it negotiates rather than the family.
 TRANSFER_SETTLED_NEVER = f"{TRANSPORT}#amqp:transport/section:performatives/type:transfer/field:settled.6"
 TRANSFER_RCV_SETTLE_ILLEGAL = f"{TRANSPORT}#amqp:transport/section:performatives/type:transfer/field:rcv-settle-mode.u1"
+# `.u2` is the same field's exemption: a transfer the sender flags settled makes the field
+# ignored, so the rule above is gated on the frame's own flag rather than on the negotiation.
+TRANSFER_RCV_SETTLE_IGNORED = f"{TRANSPORT}#amqp:transport/section:performatives/type:transfer/field:rcv-settle-mode.u2"
 # The resumption clauses, none of which has a carrier: `resume.2` is the sender's MUST NOT
 # and `.3` the first-transfer rule, and both are statements about a delivery's presence in
 # an unsettled map the layer does not hold.
@@ -1366,6 +1378,20 @@ def session_corpus(tables: Corpus) -> list[dict]:
     def transfer(**kwargs) -> dict:
         return t.transfer_body(**kwargs)
 
+    def link_flow(handle: int = 0, **fields: dict) -> dict:
+        """A flow that names the link, carrying the four session windows and whichever of
+        the link's own fields the vector sets. `flow_body` writes all three of those, and
+        the count and credit vectors are about the ones a flow leaves off, so this writes
+        the windows and the handle and nothing else unless it is asked.
+
+        `windows()` is the begin's three fields — a flow names `next-incoming-id` as well,
+        and the session rules require it once the peer's begin has arrived, so a flow built
+        from them alone is a frame refused for the wrong reason."""
+        return t.body("flow", **windows(),
+                      **{"next-incoming-id": {"type": "uint", "value": 0},
+                         "handle": {"type": "uint", "value": handle}},
+                      **fields)
+
     def link_up(role_sender: bool = False, handle: int = 0, peer_handle: int = 0,
                 credit: int = 1000, peer_settle: int | None = None,
                 own_settle: int | None = None, own_rcv_settle: int | None = None) -> list:
@@ -1940,6 +1966,48 @@ def session_corpus(tables: Corpus) -> list[dict]:
              "endpoint granted, is admitted"))
 
     vectors.append(exchange(
+        "exchange-link-credit-echo-sent-not-the-last-known", start=s("MAPPED"),
+        clauses=[FLOW_SENDER_MATCHES_DELIVERY_LIMIT, FLOW_CREDIT_RECEIVER_CHOOSES,
+                 LINK_CREDIT_RECEIVER_SETS],
+        steps=[t.send_frame(AMQP_FRAME, t.attach_body(role=False), state=s("MAPPED"),
+                            channel=1),
+               t.receive_frame(AMQP_FRAME, t.attach_body(role=True),
+                               state=s("MAPPED"), channel=1),
+               t.receive_frame(AMQP_FRAME,
+                               t.flow_body(handle=0, delivery_count=0, link_credit=3),
+                               state=s("MAPPED"), channel=1),
+               t.refused("send", reason="malformed", condition=INVALID_FIELD,
+                         state=s("MAPPED"),
+                         body=link_flow(**{"delivery-count": {"type": "uint", "value": 0},
+                                           "link-credit": {"type": "uint", "value": 5}}),
+                         channel=1)],
+        note="the conservation law in the direction this endpoint owns: the receiver chose "
+             "three, and the flow we write as the link's sender names five, so the step is "
+             "refused with `amqp:invalid-field` without the frame being written. The "
+             "receive-direction vector above is the peer's half of the same quantity"))
+
+    vectors.append(exchange(
+        "exchange-link-credit-echo-sent-the-last-known", start=s("MAPPED"),
+        clauses=[FLOW_SENDER_MATCHES_DELIVERY_LIMIT, FLOW_CREDIT_RECEIVER_CHOOSES,
+                 LINK_CREDIT_RECEIVER_SETS],
+        steps=[t.send_frame(AMQP_FRAME, t.attach_body(role=False), state=s("MAPPED"),
+                            channel=1),
+               t.receive_frame(AMQP_FRAME, t.attach_body(role=True),
+                               state=s("MAPPED"), channel=1),
+               t.receive_frame(AMQP_FRAME,
+                               t.flow_body(handle=0, delivery_count=0, link_credit=3),
+                               state=s("MAPPED"), channel=1),
+               t.send_frame(AMQP_FRAME,
+                            link_flow(**{"delivery-count": {"type": "uint", "value": 0},
+                                         "link-credit": {"type": "uint", "value": 3}}),
+                            state=s("MAPPED"), channel=1)],
+        note="the conforming form of the same quantity: the sender's flow echoes the three "
+             "the receiver last indicated, and every step is admitted. It is the "
+             "delimitation for the refusal beside it — a layer that read the sender's flow "
+             "as its own quantity would admit both frames, and one that refused any flow "
+             "from the sending end would refuse this one too"))
+
+    vectors.append(exchange(
         "exchange-link-credit-counts-messages-not-frames", start=s("MAPPED"),
         clauses=[FLOW_SENDER_STOPS_AT_ZERO_CREDIT, TRANSFER_FIRST_FIELDS],
         steps=link_up(role_sender=True, credit=1) + [
@@ -2085,15 +2153,31 @@ def session_corpus(tables: Corpus) -> list[dict]:
     # two obligations, each selected by the `choice` attribute of its xref rather than by
     # the field's declared type, and the corpus already carries the `settled` choice in the
     # receive direction (`exchange-link-sender-settle-mode-unmet`). The vectors below are
-    # the rest of the matrix: the `unsettled` choice's MUST NOT and its abort exemption,
-    # the `mixed` choice's absence of obligation, and the delivery boundary each one is
-    # stated at — "at least one transfer frame for a delivery" against "every transfer".
+    # the rest of the matrix: the `unsettled` choice's MUST NOT in the direction each end
+    # owns and its abort exemption in both, the `mixed` choice's absence of obligation, and
+    # the delivery boundary each one is stated at — "at least one transfer frame for a
+    # delivery" against "every transfer".
     settle_choices = {
         "unsettled": t.settle_mode("sender-settle-mode", "unsettled"),
         "settled": t.settle_mode("sender-settle-mode", "settled"),
         "mixed": t.settle_mode("sender-settle-mode", "mixed"),
+        "first": t.settle_mode("receiver-settle-mode", "first"),
         "second": t.settle_mode("receiver-settle-mode", "second"),
     }
+
+    vectors.append(exchange(
+        "exchange-link-settled-over-unsettled-negotiation", start=s("MAPPED"),
+        clauses=[TRANSFER_SETTLED_NEVER, SESSION_END_ON_ERROR, SESSION_ERRORS],
+        steps=link_up(role_sender=False, peer_settle=settle_choices["unsettled"]) + [
+            t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                      state=s("DISCARDING"), body=t.transfer_body(settled=True),
+                      channel=1, payload=message)],
+        note="the `unsettled` choice's obligation in the direction the peer owns: the "
+             "link's sender negotiated it, so a transfer it flags settled is refused with "
+             "`amqp:invalid-field` and the session lands in `session:DISCARDING`. The "
+             "transfer's own exemption is the abort vector beside it, which is what keeps "
+             "the pair a reading of the choice rather than of the flag; both artefacts "
+             "admitted this frame until `5624f16`"))
 
     vectors.append(exchange(
         "exchange-link-settled-over-unsettled-negotiation-aborted", start=s("MAPPED"),
@@ -2102,13 +2186,39 @@ def session_corpus(tables: Corpus) -> list[dict]:
             t.receive_frame(AMQP_FRAME,
                             t.transfer_body(settled=True, aborted=True),
                             state=s("MAPPED"), channel=1, payload=message)],
-        note="`settled.6`'s exemption read as the conforming half of a sentence whose "
-             "refusal half is staged: the artifact forbids the flag on every transfer of "
-             "a delivery \"unless the delivery is aborted\", so a settled, aborted "
-             "transfer under the `unsettled` choice is admitted — and the delimitation is "
-             "the point, since neither artefact enforces the refusal at all "
-             "(`scripts/staged-exchange-divergences.ndjson`), and this vector would fail "
-             "if one of them refused the flag outright"))
+        note="the same sentence's exemption: the artifact forbids the flag on every "
+             "transfer of a delivery \"unless the delivery is aborted\", so a settled, "
+             "aborted transfer under the `unsettled` choice is admitted and the peer stays "
+             "in `session:MAPPED`. It is the delimitation for the refusal beside it — a "
+             "layer that refused the flag outright fails here, and the two together are "
+             "what makes the choice, rather than the flag, the thing being read"))
+
+    vectors.append(exchange(
+        "exchange-link-settled-over-unsettled-negotiation-sent", start=s("MAPPED"),
+        clauses=[TRANSFER_SETTLED_NEVER, TRANSFER_ONE_SECTION],
+        steps=link_up(role_sender=True, credit=1,
+                      own_settle=settle_choices["unsettled"]) + [
+            t.refused("send", reason="malformed", condition=INVALID_FIELD,
+                      state=s("MAPPED"), body=t.transfer_body(settled=True),
+                      channel=1, payload=message)],
+        note="the same obligation in the direction this endpoint owns: our own attach "
+             "negotiated the `unsettled` choice, so a transfer we write under it must not "
+             "carry the flag, and the step is refused with `amqp:invalid-field` without "
+             "the frame being written. The receive-direction refusal above is the peer's "
+             "half of the sentence; both artefacts wrote this frame until `5624f16`"))
+
+    vectors.append(exchange(
+        "exchange-link-settled-over-unsettled-negotiation-sent-aborted", start=s("MAPPED"),
+        clauses=[TRANSFER_SETTLED_NEVER, ABORTED_MESSAGES_DISCARDED],
+        steps=link_up(role_sender=True, credit=1,
+                      own_settle=settle_choices["unsettled"]) + [
+            t.send_frame(AMQP_FRAME, t.transfer_body(settled=True, aborted=True),
+                         state=s("MAPPED"), channel=1, payload=message)],
+        note="the exemption read from this endpoint's own side: under our `unsettled` "
+             "negotiation a transfer we write may carry the flag when it aborts the "
+             "delivery, and this one does, so the step is admitted and the peer stays in "
+             "`session:MAPPED`. Beside the refusal it is what shows the rule is about the "
+             "delivery the flag settles rather than about the field's presence"))
 
     vectors.append(exchange(
         "exchange-link-settled-on-a-continuation-suffices", start=s("MAPPED"),
@@ -2161,6 +2271,38 @@ def session_corpus(tables: Corpus) -> list[dict]:
     # -- the receiver's settlement mode, and what a transfer may say about it -------- #
 
     vectors.append(exchange(
+        "exchange-link-rcv-settle-second-over-first", start=s("MAPPED"),
+        clauses=[TRANSFER_RCV_SETTLE_ILLEGAL, ATTACH_SETTLE_DEFAULT, SESSION_END_ON_ERROR,
+                 SESSION_ERRORS],
+        steps=link_up(role_sender=False, own_rcv_settle=settle_choices["first"]) + [
+            t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                      state=s("DISCARDING"),
+                      body=t.transfer_body(rcv_settle_mode=settle_choices["second"]),
+                      channel=1, payload=message)],
+        note="the mode the negotiation forbids: our attach fixed this link at `first`, so "
+             "the peer's transfer naming `second` is refused with `amqp:invalid-field` and "
+             "the session lands in `session:DISCARDING`. Both artefacts admitted this frame "
+             "until `5624f16`; `exchange-link-rcv-settle-second-over-second` beside it is "
+             "the same field value admitted under the other negotiation, which is what "
+             "makes the refusal about the negotiation rather than the field"))
+
+    vectors.append(exchange(
+        "exchange-link-rcv-settle-second-over-first-ignored-when-settled",
+        start=s("MAPPED"),
+        clauses=[TRANSFER_RCV_SETTLE_IGNORED, TRANSFER_RCV_SETTLE_ILLEGAL],
+        steps=link_up(role_sender=False, own_rcv_settle=settle_choices["first"]) + [
+            t.receive_frame(AMQP_FRAME,
+                            t.transfer_body(settled=True,
+                                            rcv_settle_mode=settle_choices["second"]),
+                            state=s("MAPPED"), channel=1, payload=message)],
+        note="the same field and the same `first` negotiation as the refusal above, with "
+             "the transfer sent settled: the sender's flag makes the field ignored, so the "
+             "frame is admitted and the peer stays in `session:MAPPED`. It is the "
+             "exemption rather than the rule, and a weaker witness than its neighbours for "
+             "that reason — a layer that never read the field at all arrives here, so what "
+             "the pair pins is the gate on the flag, not the refusal's own reach"))
+
+    vectors.append(exchange(
         "exchange-link-rcv-settle-second-over-second", start=s("MAPPED"),
         clauses=[TRANSFER_RCV_SETTLE_ILLEGAL, ATTACH_SETTLE_DEFAULT, TRANSFER_ONE_SECTION],
         steps=link_up(role_sender=False, own_rcv_settle=settle_choices["second"]) + [
@@ -2192,9 +2334,8 @@ def session_corpus(tables: Corpus) -> list[dict]:
              "vector does not reach: the receiver's count is what the peer's deliveries "
              "have advanced, and a flow claiming a count of its own is the sender "
              "inventing the number the receiver checks. Both artefacts refuse this one "
-             "frame for this one reason, which is what makes the two staged halves of the "
-             "same clause — the field absent, and the receiver's own count restated — "
-             "readable as gaps rather than as a rule nobody implements"))
+             "frame for this one reason, and the clause's other readings — the field "
+             "absent, and the receiver's own count restated — are the vectors beside it"))
 
     vectors.append(exchange(
         "exchange-flow-sender-count-null", start=s("MAPPED"),
@@ -2216,6 +2357,48 @@ def session_corpus(tables: Corpus) -> list[dict]:
              "refused it since"))
 
     vectors.append(exchange(
+        "exchange-flow-sender-count-absent", start=s("MAPPED"),
+        clauses=[FLOW_DELIVERY_COUNT_SET_BY_SENDER, SESSION_END_ON_ERROR,
+                 SESSION_ERRORS],
+        steps=link_up(role_sender=False) + [
+            t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                      state=s("DISCARDING"), body=link_flow(), channel=1)],
+        note="the presence half of the sender's count: this flow names the link and leaves "
+             "the field off altogether, which the clause forbids as squarely as it forbids "
+             "a wrong value, so the frame is refused with `amqp:invalid-field` and the "
+             "session lands in `session:DISCARDING`. The vector above pins the value half "
+             "of the same sentence; both artefacts admitted this frame until `5624f16`"))
+
+    vectors.append(exchange(
+        "exchange-flow-sender-count-absent-sent", start=s("MAPPED"),
+        clauses=[FLOW_DELIVERY_COUNT_SET_BY_SENDER, SESSION_END_ON_ERROR,
+                 SESSION_ERRORS],
+        steps=[t.send_frame(AMQP_FRAME, t.attach_body(role=False), state=s("MAPPED"),
+                            channel=1),
+               t.refused("send", reason="malformed", condition=INVALID_FIELD,
+                         state=s("MAPPED"), body=link_flow(), channel=1)],
+        note="the same presence rule in the direction this endpoint owns: a flow we write "
+             "as the link's sender that names the link without the field is not written at "
+             "all, and the step is refused with `amqp:invalid-field` leaving the peer in "
+             "`session:MAPPED`"))
+
+    vectors.append(exchange(
+        "exchange-flow-sender-count-not-its-current-sent", start=s("MAPPED"),
+        clauses=[FLOW_DELIVERY_COUNT_SET_BY_SENDER, SESSION_END_ON_ERROR,
+                 SESSION_ERRORS],
+        steps=[t.send_frame(AMQP_FRAME, t.attach_body(role=False), state=s("MAPPED"),
+                            channel=1),
+               t.refused("send", reason="malformed", condition=INVALID_FIELD,
+                         state=s("MAPPED"),
+                         body=link_flow(**{"delivery-count": {"type": "uint", "value": 5},
+                                           "link-credit": {"type": "uint", "value": 0}}),
+                         channel=1)],
+        note="the value half in the same direction: the count we write has to be this "
+             "endpoint's own current one, and five is not the count of a sender that has "
+             "sent nothing, so the step is refused with `amqp:invalid-field` without the "
+             "frame being written"))
+
+    vectors.append(exchange(
         "exchange-flow-receiver-count-echoed", start=s("MAPPED"),
         clauses=[FLOW_DELIVERY_COUNT_ECHO, FLOW_SENDER_SETS_CREDIT,
                  FLOW_SENDER_MATCHES_DELIVERY_LIMIT],
@@ -2229,10 +2412,60 @@ def session_corpus(tables: Corpus) -> list[dict]:
              "receiver to the sender MUST carry \"the last known value of the "
              "corresponding sending endpoint\", and this endpoint — the link's sender — "
              "has sent one delivery, so the receiver's flow carries one and the grant it "
-             "carries is applied. It is the delimitation for a staged vector that asks "
-             "the same flow to carry a value that is not the sender's: a rule nobody "
-             "enforces would admit both, so the admitted half is what gives the refused "
-             "half its meaning"))
+             "carries is applied. It is the delimitation for the refusal beside it, which "
+             "asks the same flow to carry a value that is not the sender's: a layer that "
+             "read any value as the peer's would admit both, so the admitted half is what "
+             "gives the refused half its meaning"))
+
+    vectors.append(exchange(
+        "exchange-flow-receiver-count-not-echoed", start=s("MAPPED"),
+        clauses=[FLOW_DELIVERY_COUNT_ECHO, FLOW_SENDER_SETS_CREDIT],
+        steps=link_up(role_sender=True, credit=1) + [
+            t.send_frame(AMQP_FRAME, t.transfer_body(), state=s("MAPPED"), channel=1,
+                         payload=message),
+            t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                      state=s("DISCARDING"),
+                      body=t.flow_body(handle=0, delivery_count=0, link_credit=1),
+                      channel=1)],
+        note="the receiver's flow refused for naming a count the sending endpoint never "
+             "had: this endpoint is the link's sender and has sent one delivery, so a "
+             "receiver's flow carrying zero is refused with `amqp:invalid-field` and the "
+             "session lands in `session:DISCARDING`. Both artefacts admitted this frame "
+             "until `5624f16`"))
+
+    # The `.4` moment: the peer is the link's receiver and *this* endpoint has not attached
+    # yet, so there is no sender for it to have a count from. Neither vector can use
+    # `link_up`, whose first step is our own attach — the rule is about the state before it.
+    peer_receiver_only = t.receive_frame(AMQP_FRAME, t.attach_body(role=True, handle=0),
+                                         state=s("MAPPED"), channel=1)
+
+    vectors.append(exchange(
+        "exchange-flow-receiver-count-set-before-sender-attach", start=s("MAPPED"),
+        clauses=[FLOW_DELIVERY_COUNT_NOT_BEFORE_ATTACH, SESSION_END_ON_ERROR,
+                 SESSION_ERRORS],
+        steps=[peer_receiver_only,
+               t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                         state=s("DISCARDING"),
+                         body=link_flow(**{"delivery-count": {"type": "uint", "value": 0},
+                                           "link-credit": {"type": "uint", "value": 0}}),
+                         channel=1)],
+        note="the count a receiver may not name yet: the peer attached as the link's "
+             "receiver and this endpoint has not attached, so it has seen no sender to "
+             "take a count from, and its flow setting the field is refused with "
+             "`amqp:invalid-field`, leaving the session in `session:DISCARDING`. The "
+             "conforming form beside it leaves the field off, which is what makes the "
+             "refusal about the field's presence rather than the flow's"))
+
+    vectors.append(exchange(
+        "exchange-flow-receiver-count-absent-before-sender-attach", start=s("MAPPED"),
+        clauses=[FLOW_DELIVERY_COUNT_NOT_BEFORE_ATTACH, FLOW_DELIVERY_COUNT_ECHO],
+        steps=[peer_receiver_only,
+               t.receive_frame(AMQP_FRAME, link_flow(), state=s("MAPPED"), channel=1)],
+        note="the conforming form of the rule above: at the same moment the receiver's "
+             "flow carries the windows and names the link with no count, and both steps "
+             "are admitted. It is the delimitation for the refusal beside it, since the "
+             "echo rule that governs the receiver's later flows is the one this moment "
+             "excepts"))
 
     # -- `more` and `aborted`: the delivery a transfer ends, and the one it discards --- #
 
@@ -2488,135 +2721,31 @@ def staged_corpus(tables: Corpus) -> list[dict]:
     ledger's deferred obligations made visible rather than a backlog of defects for one side
     to fix.
 
-    Three of them are settled-mode or delivery-count readings the register is silent on
-    (`Transfer/field:settled.6`, `transfer/field:rcv-settle-mode.u1`,
-    `flow/field:delivery-count.2`'s presence half and `.3`), and one is a frame with no
-    body in a state whose table column is `-`.
+    Seven members have left since the family was first written — the aborted-credit pair,
+    and the five settlement and count readings `5624f16` carried — and the four that remain
+    fall into two subjects rather than one. Three are resumption readings the model
+    restriction puts out of reach: `transfer/field:resume.2`, `.3` and
+    `attach/field:unsettled.5` each name the local unsettled map or a resumed delivery, and
+    one link per session is the whole of the model's link state. The fourth needs no link
+    at all — a frame whose header is all there is, arriving in a connection that is over,
+    where `picture.24`'s column for both directions is `-`.
     """
     t = tables
     message = b"a message whose split points are the vector's business"
 
-    def windows() -> dict:
-        return {"next-outgoing-id": {"type": "uint", "value": 0},
-                "incoming-window": {"type": "uint", "value": 1000},
-                "outgoing-window": {"type": "uint", "value": 1000}}
-
-    def link_up(role_sender: bool = False, handle: int = 0, peer_handle: int = 0,
-                credit: int = 1000, peer_settle: int | None = None,
-                own_settle: int | None = None, own_rcv_settle: int | None = None) -> list:
+    def link_up(role_sender: bool = False, credit: int = 1000) -> list:
         return [
-            t.send_frame(AMQP_FRAME, t.attach_body(role=not role_sender, handle=handle,
-                                                   snd_settle_mode=own_settle,
-                                                   rcv_settle_mode=own_rcv_settle),
+            t.send_frame(AMQP_FRAME, t.attach_body(role=not role_sender),
                          state=s("MAPPED"), channel=1),
-            t.receive_frame(AMQP_FRAME, t.attach_body(role=role_sender,
-                                                      handle=peer_handle,
-                                                      snd_settle_mode=peer_settle),
+            t.receive_frame(AMQP_FRAME, t.attach_body(role=role_sender),
                             state=s("MAPPED"), channel=1),
             t.receive_frame(AMQP_FRAME, t.flow_body(
-                handle=peer_handle, delivery_count=0,
+                handle=0, delivery_count=0,
                 link_credit=(credit if role_sender else 0)),
                 state=s("MAPPED"), channel=1)]
 
-    unsettled = t.settle_mode("sender-settle-mode", "unsettled")
-    second = t.settle_mode("receiver-settle-mode", "second")
-
     return [
         # -- frames both artefacts admit against the clause --------------------- #
-
-        exchange(
-            "staged-link-settled-over-unsettled-negotiation", start=s("MAPPED"),
-            clauses=[TRANSFER_SETTLED_NEVER, SESSION_END_ON_ERROR, SESSION_ERRORS],
-            steps=link_up(role_sender=False, peer_settle=unsettled) + [
-                t.refused("receive", reason="malformed", condition=INVALID_FIELD,
-                          state=s("DISCARDING"), body=t.transfer_body(settled=True),
-                          channel=1, payload=message)],
-            note="**Shared gap.** The peer's attach negotiated the `unsettled` choice of "
-                 "`sender-settle-mode`, and `settled.6` says the flag \"MUST be false (or "
-                 "unset) on every transfer frame for a delivery\" under that choice. "
-                 "**Both artefacts admit** this frame and leave the peer in "
-                 "`session:MAPPED`: neither reads the `unsettled` choice anywhere. The "
-                 "clause is disposed `deferred:S4`, and `Contracts/Settlement.lean`'s "
-                 "own closing section states that only the sender's `settled` obligation "
-                 "has a proposition — but the two artefacts enforcing the `settled` "
-                 "choice's MUST while ignoring the `unsettled` choice's MUST NOT is "
-                 "exactly the declared-against-negotiated shape the sweep was pointed at"),
-
-        exchange(
-            "staged-link-settled-over-unsettled-negotiation-sent", start=s("MAPPED"),
-            clauses=[TRANSFER_SETTLED_NEVER, TRANSFER_ONE_SECTION],
-            steps=link_up(role_sender=True, credit=1, own_settle=unsettled) + [
-                t.refused("send", reason="malformed", condition=INVALID_FIELD,
-                          state=s("MAPPED"), body=t.transfer_body(settled=True),
-                          channel=1, payload=message)],
-            note="**Shared gap, in the direction the sender owns.** Our own attach "
-                 "negotiated `unsettled`, so `settled.6` forbids the flag on the "
-                 "transfers *we* write — the obligation is the sending end's, and a "
-                 "conformant endpoint withholds the frame rather than being told about "
-                 "it. **Both artefacts write it**: each admits the step and leaves the "
-                 "peer in `session:MAPPED`. The receive-direction vector above says the "
-                 "same about the peer's frames; this one says it about ours, which is "
-                 "where an enforcement would have to live to stop the frame"),
-
-        exchange(
-            "staged-link-rcv-settle-second-over-first", start=s("MAPPED"),
-            clauses=[TRANSFER_RCV_SETTLE_ILLEGAL, ATTACH_SETTLE_DEFAULT,
-                     SESSION_END_ON_ERROR, SESSION_ERRORS],
-            steps=link_up(role_sender=False, own_rcv_settle=t.settle_mode(
-                "receiver-settle-mode", "first")) + [
-                t.refused("receive", reason="malformed", condition=INVALID_FIELD,
-                          state=s("DISCARDING"),
-                          body=t.transfer_body(rcv_settle_mode=second), channel=1,
-                          payload=message)],
-            note="**Shared gap.** `rcv-settle-mode.u1` says that \"If the negotiated link "
-                 "value is «first», then it is illegal to set this field to «second»\" — "
-                 "the attach fixed the link at `first`, and this transfer names `second`. "
-                 "**Both artefacts admit** it: neither reads the transfer's "
-                 "`rcv-settle-mode` at all, and neither reads the attach's. The corpus's "
-                 "conforming vector for the negotiation "
-                 "(`exchange-session-attach-defaults-admitted`) cites the attach field, so "
-                 "the transfer-side rule has been cited and never exercised"),
-
-        exchange(
-            "staged-flow-receiver-count-not-echoed", start=s("MAPPED"),
-            clauses=[FLOW_DELIVERY_COUNT_ECHO, FLOW_SENDER_SETS_CREDIT],
-            steps=link_up(role_sender=True, credit=1) + [
-                t.send_frame(AMQP_FRAME, t.transfer_body(), state=s("MAPPED"), channel=1,
-                             payload=message),
-                t.refused("receive", reason="malformed", condition=INVALID_FIELD,
-                          state=s("DISCARDING"),
-                          body=t.flow_body(handle=0, delivery_count=0, link_credit=1),
-                          channel=1)],
-            note="**Shared gap.** `flow/field:delivery-count.3` requires a flow sent from "
-                 "the receiver to the sender to carry \"the last known value of the "
-                 "corresponding sending endpoint\". This endpoint is the link's sender and "
-                 "has sent one delivery, so the receiver's flow reporting zero is naming "
-                 "a value the sending endpoint never had. **Both artefacts admit** it, and "
-                 "the specification's own disposition says so in terms: `.3` \"is not "
-                 "carried at all\", because its selector asks which end *issued* the "
-                 "frame and returns `none` for the receiver's flows. The corpus's admitted "
-                 "half (`exchange-flow-receiver-count-echoed`) is the delimitation"),
-
-        exchange(
-            "staged-flow-sender-count-absent", start=s("MAPPED"),
-            clauses=[FLOW_DELIVERY_COUNT_SET_BY_SENDER, SESSION_END_ON_ERROR,
-                     SESSION_ERRORS],
-            steps=link_up(role_sender=False) + [
-                t.refused("receive", reason="malformed", condition=INVALID_FIELD,
-                          state=s("DISCARDING"),
-                          body=t.body("flow", **windows(),
-                                      **{"next-incoming-id": {"type": "uint", "value": 0},
-                                         "handle": {"type": "uint", "value": 0}}),
-                          channel=1)],
-            note="**Shared gap: the presence half of a sentence whose value half is "
-                 "enforced.** `flow/field:delivery-count.2` requires the field to be set, "
-                 "not only to be right, and this flow names the link and omits it "
-                 "entirely. **Both artefacts admit** it: the specification's guard is a "
-                 "match on a present field and falls through when it is absent, which the "
-                 "disposition for `.2` records as the half its carrier misses, and the "
-                 "reference returns early on an absent count. `exchange-flow-sender-count-"
-                 "not-its-current` pins the half both do enforce, so the two together "
-                 "give the clause both readings"),
 
         exchange(
             "staged-link-resume-sent-not-in-map", start=s("MAPPED"),
