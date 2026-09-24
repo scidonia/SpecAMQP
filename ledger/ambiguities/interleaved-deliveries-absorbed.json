@@ -1,6 +1,7 @@
 {
  "adopted": "absorbed as a continuation of the delivery in progress",
  "clauses": [
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.23",
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.31"
  ],
  "consequences": [
@@ -19,7 +20,7 @@
   },
   {
    "name": "refuse the interleaving loudly",
-   "statement": "Rejected: the artifact constrains the sender and says nothing about a receiver's answer, so a refusal would be our invention standing where the artifact is silent \u2014 the same reason `transport-close-not-an-input` declines to reuse a condition that means something else."
+   "statement": "Rejected: the artifact constrains the sender and says nothing about a receiver's answer, so a refusal would be our invention standing where the artifact is silent — the same reason `transport-close-not-an-input` declines to reuse a condition that means something else."
   },
   {
    "name": "model a map from delivery-tags to states so interleaving is representable",

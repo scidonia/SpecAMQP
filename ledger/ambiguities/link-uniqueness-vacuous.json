@@ -1,11 +1,12 @@
 {
  "adopted": "the single-link model satisfies the link-uniqueness clause vacuously",
  "clauses": [
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.1",
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions.1"
  ],
  "consequences": [
-  "`sessions.1`, \"a link MUST NOT be attached to more than one session at a time\", is satisfied trivially by a model in which a session holds one link's flow state: there is no second session for a link to be attached to. The model has no session-side multiplicity at all \u2014 a session *is* one link's worth of state \u2014 so there is no second session for a link to attach to; the clause becomes expressible when a session holds a link registry, which is a later slice's shape rather than the slice's. Registering it now and expressing it there is the same call as `available` and `drain`: record the exclusion where the model is silent, and revisit at the slice that gives it a subject.",
-  "The clause is therefore *uncarried* rather than unimplemented \u2014 nothing was omitted, and no vector or declaration should be written to hold it, since a model that cannot express the violation cannot test it.",
+  "`sessions.1`, \"a link MUST NOT be attached to more than one session at a time\", is satisfied trivially by a model in which a session holds one link's flow state: there is no second session for a link to be attached to. The model has no session-side multiplicity at all — a session *is* one link's worth of state — so there is no second session for a link to attach to; the clause becomes expressible when a session holds a link registry, which is a later slice's shape rather than the slice's. Registering it now and expressing it there is the same call as `available` and `drain`: record the exclusion where the model is silent, and revisit at the slice that gives it a subject.",
+  "The clause is therefore *uncarried* rather than unimplemented — nothing was omitted, and no vector or declaration should be written to hold it, since a model that cannot express the violation cannot test it.",
   "What it rules out for the slice is the multi-session case, which is the same limitation the two single-link admissions already record: a second attach on a live link naming another handle, and a link with both endpoints as sender. All three are consequences of the one-link model rather than rules."
  ],
  "evidence": "A read-only mapping pass over the slice's undispositioned MUST-class clauses found no declaration or vector in `lean/Spec`, `lean/Ref`, `lean/Contracts` or `vectors` that carries this clause, and the reason is the model's shape rather than an omission: `Session` holds one link's flow state, with `handles` a registry of the handles that link has used.",

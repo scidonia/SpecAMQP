@@ -37,8 +37,8 @@ f0a5a536ee5fa80d7edb54ebba12e6c02e428432  ledger/ambiguities/empty-sasl-frame-re
 9cb58a5caf168e43340942811352ca89b5c978cd  ledger/ambiguities/flow-link-field-without-handle.json
 1e4244761b674c05d55c077b5eb729c296911b75  ledger/ambiguities/head-only-payload-admitted.json
 63c608c8e8e369bf42623a85cf8b294bd52b9cb2  ledger/ambiguities/hostname-meanings.json
-0a4f2402a909204beb513fd9ec654a6cc3858776  ledger/ambiguities/interleaved-deliveries-absorbed.json
-1092310820915987af91379bc39de52d14bd5549  ledger/ambiguities/link-uniqueness-vacuous.json
+0e8699b09f4e530c751b23ce801c2276c4a6e479  ledger/ambiguities/interleaved-deliveries-absorbed.json
+e059995d437d0a84bdc388200858aa95c709ce8c  ledger/ambiguities/link-uniqueness-vacuous.json
 49aa74044fcaedbbd43858b42022b11e8860ccde  ledger/ambiguities/map-ordering.json
 d7cf7735d5765392d594e61138d761c141ef77a2  ledger/ambiguities/rejected-discharge-leaves-the-id-dischargeable.json
 25af84ed4ed482efc59e0b427637320bc3546eda  ledger/ambiguities/sasl-code-distinguishable.json
@@ -56,7 +56,7 @@ c661a0341ee5572bd716861459bcfbedbae36a7f  ledger/ambiguities/unmapped-begin.json
 2dd54d7eeae541a3df93bd52a17aae4d8cff5a6e  ledger/ambiguities/version-mismatch-condition.json
 003cbf78615e5a2c39ff63ce21b19ef4ab0b6b68  ledger/ambiguities/zero-width-array-count.json
 a713fbf4e03ad80112e701e2e7dfabe6dbb53623  ledger/clauses.json
-cff5171906a6bf46264578718b8d32e168b1a434  ledger/coverage.json
+134cbc564e6346bf02d9e5550aa46c7dbf01252f  ledger/coverage.json
 14a36a38e585c6d19918615f3a1ce4600a8ed6af  ledger/dispositions/part0-conformance-and-transport-lifecycle.json
 22914db7d7ac979d338c8174170e302aec0ab44a  ledger/dispositions/part1-types.json
 ff542597f45c497265f066d40c502a8253f67599  ledger/dispositions/part2-connection-establishment.json
