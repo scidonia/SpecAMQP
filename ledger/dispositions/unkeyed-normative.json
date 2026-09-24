@@ -656,9 +656,9 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections.u1": {
    "clause_text": "The use of pipelined frames by a peer cannot be distinguished by the peer's partner from non-pipelined use so long as the pipelined frames conform to the partner's capabilities and limitations.",
-   "disposition": "deferred:S4",
+   "disposition": "deferred:S2",
    "kind": "UNKEYED",
-   "note": "deferred: S4 — the session/link machine's milestone owns this statement.",
+   "note": "An epistemic statement about a partner's inability to distinguish pipelined from non-pipelined frames. It belongs to the connection and frame layer rather than to any session obligation, and the model embodies it without stating it: the table's pipe rows (Spec.Connection.State.openPipe/closePipe/ocPipe, :187-189, with sendClass/receiveClass at :279-281 and :296-298) are exactly the claim that those states are reachable only by a peer that chose to pipeline. Re-milestoned from S4 to S2, which owns that layer; that S2's slice landed does not make the obligation met, because what is owed is the statement rather than the behaviour.",
    "text_sha256": "b0b58ff0fc6da36b46eeef908f4f6bfb4c49fad936800bd204b9ac5bb41b5d90",
    "unkeyed_phrases": [
     "cannot"
@@ -704,9 +704,9 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/type:amqp-error/choice:frame-size-too-small.u1": {
    "clause_text": "The peer cannot send a frame because the smallest encoding of the performative with the currently valid values would be too large to fit within a frame of the agreed maximum frame size.",
-   "disposition": "deferred:S4",
+   "disposition": "formalized:SpecAMQP.Generated.Oasis.choices",
    "kind": "UNKEYED",
-   "note": "deferred: S4 — the session/link machine's milestone owns this statement.",
+   "note": "Each is the artifact's definition of a declared error condition, and the declared surface fixes the name and its value (Generated/Oasis/Choices.lean:42 `amqp:frame-size-too-small`, :59 `amqp:link:redirect`, read through Generated.Oasis.choices). Neither condition is ever raised, and that is deliberate rather than an omission: the model refuses an oversized frame under the artifact's other mandated condition, framing-error, as the open's own documentation quoted at Spec/Connection.lean:38 requires. A definition the table carries is formalized; which condition a given failure is reported under is a question for the rule that raises it, not for the definition.",
    "text_sha256": "012db40ed18696e5a15efa315d9adbbcb3b69808b8a11ebc92bd0c663034219e",
    "unkeyed_phrases": [
     "cannot"
@@ -881,9 +881,9 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/type:link-error/choice:redirect.u1": {
    "clause_text": "The address provided cannot be resolved to a terminus at the current container.",
-   "disposition": "deferred:S4",
+   "disposition": "formalized:SpecAMQP.Generated.Oasis.choices",
    "kind": "UNKEYED",
-   "note": "deferred: S4 — the session/link machine's milestone owns this statement.",
+   "note": "Each is the artifact's definition of a declared error condition, and the declared surface fixes the name and its value (Generated/Oasis/Choices.lean:42 `amqp:frame-size-too-small`, :59 `amqp:link:redirect`, read through Generated.Oasis.choices). Neither condition is ever raised, and that is deliberate rather than an omission: the model refuses an oversized frame under the artifact's other mandated condition, framing-error, as the open's own documentation quoted at Spec/Connection.lean:38 requires. A definition the table carries is formalized; which condition a given failure is reported under is a question for the rule that raises it, not for the definition.",
    "text_sha256": "05fb1d33c46427a1db30dfcc0976ada62bf7653d1afb65162bc4a1beff096745",
    "unkeyed_phrases": [
     "cannot"
@@ -1069,9 +1069,9 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:flow-control.u2": {
    "clause_text": "Only the sender can independently modify this field.",
-   "disposition": "deferred:S4",
+   "disposition": "out-of-scope:unread-flow-quantities",
    "kind": "UNKEYED",
-   "note": "deferred: S4 — the session/link machine's milestone owns this statement.",
+   "note": "Quantities this slice deliberately does not track, and the credit contract states the exclusion: Contracts/SessionCredit.lean's closing section records that `available` and `drain` are outside it, because `available` is advisory and the model holds no sender-side quantity to compare it against. flowLink (:888) reads `available` only as a field forbidden without a handle, which is a presence rule rather than the quantity rules these sentences state; flow-control.u2's 'only the sender can independently modify this field' is the same gap from the other end.",
    "text_sha256": "e0233cdfcb03212d1e69dac9df38db00516a61c049c13c5aeac820127a059431",
    "unkeyed_phrases": [
     "only the sender can"
@@ -1148,9 +1148,9 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:available.u1": {
    "clause_text": "Only the sender can independently set this value.",
-   "disposition": "deferred:S4",
+   "disposition": "out-of-scope:unread-flow-quantities",
    "kind": "UNKEYED",
-   "note": "deferred: S4 — the session/link machine's milestone owns this statement.",
+   "note": "Quantities this slice deliberately does not track, and the credit contract states the exclusion: Contracts/SessionCredit.lean's closing section records that `available` and `drain` are outside it, because `available` is advisory and the model holds no sender-side quantity to compare it against. flowLink (:888) reads `available` only as a field forbidden without a handle, which is a presence rule rather than the quantity rules these sentences state; flow-control.u2's 'only the sender can independently modify this field' is the same gap from the other end.",
    "text_sha256": "f20e053727bc5a0aaaefefdf52f853ea0c716a1286ea94c5e679ee9f71cfa5a4",
    "unkeyed_phrases": [
     "only the sender can"

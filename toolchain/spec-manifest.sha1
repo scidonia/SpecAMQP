@@ -56,13 +56,13 @@ c661a0341ee5572bd716861459bcfbedbae36a7f  ledger/ambiguities/unmapped-begin.json
 2dd54d7eeae541a3df93bd52a17aae4d8cff5a6e  ledger/ambiguities/version-mismatch-condition.json
 003cbf78615e5a2c39ff63ce21b19ef4ab0b6b68  ledger/ambiguities/zero-width-array-count.json
 a713fbf4e03ad80112e701e2e7dfabe6dbb53623  ledger/clauses.json
-25b1a215c9472132658be7de71fe1dbf865a0d44  ledger/coverage.json
-b929301beea8db3509a392840563a35946f76b30  ledger/dispositions/part0-conformance-and-transport-lifecycle.json
+cff5171906a6bf46264578718b8d32e168b1a434  ledger/coverage.json
+14a36a38e585c6d19918615f3a1ce4600a8ed6af  ledger/dispositions/part0-conformance-and-transport-lifecycle.json
 22914db7d7ac979d338c8174170e302aec0ab44a  ledger/dispositions/part1-types.json
-fb65f4047b683315bf859f5b7cda00fc48027c17  ledger/dispositions/part2-connection-establishment.json
-300a02a0c9d2f653d9f26f1f0eea7b6ad87ae760  ledger/dispositions/part2-links.json
+ff542597f45c497265f066d40c502a8253f67599  ledger/dispositions/part2-connection-establishment.json
+ecf66e4033ce9c36758db76dcaff830025afb0a2  ledger/dispositions/part2-links.json
 b3394a9076715246a32d155c6e527ba7e4488085  ledger/dispositions/part2-performatives-link-state.json
-263c436012df43e347d427c83b14cf9486e3b474  ledger/dispositions/part2-performatives-remainder.json
+77685884ffa42a3ea031608eef46bcc6b7aaa035  ledger/dispositions/part2-performatives-remainder.json
 10b78af1149c1ce129b73ae4e9699f7ce2645235  ledger/dispositions/part2-performatives-settle-mode.json
 9dea9b0de904689b8c07e28a7167072f6855265c  ledger/dispositions/part3-addressing.json
 46320d5e573ef4ea9b9f77a1683d62ed000638b3  ledger/dispositions/part3-delivery-state.json
@@ -73,7 +73,7 @@ b3394a9076715246a32d155c6e527ba7e4488085  ledger/dispositions/part2-performative
 cadc4e9d66322682d315568b134ff709c73cd7c2  ledger/dispositions/part5-sasl.json
 c36967feb16eedb417605418dbcd8fb455785e36  ledger/dispositions/part5-security-layers.json
 9a61482a177c99cac9d0c4926a55bcbc2ffa3097  ledger/dispositions/picture-review.json
-e8912703636b87e1f74de6a74cd9a69468b45d82  ledger/dispositions/unkeyed-normative.json
+e5f5a2e917a10dde84365fcc36e6542178acad16  ledger/dispositions/unkeyed-normative.json
 fd83990fdb34dca23fc732e566fa109c98af71b5  ledger/lowercase-keywords.json
 bade00376950e4a224326e89498494519b4c5452  ledger/pictures.json
 9866f8e45f15cbcd1663a08f6d9b2afc6232f1fb  ledger/reconciliation.json
