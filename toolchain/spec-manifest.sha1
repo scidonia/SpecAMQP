@@ -58,9 +58,9 @@ c661a0341ee5572bd716861459bcfbedbae36a7f  ledger/ambiguities/unmapped-begin.json
 a713fbf4e03ad80112e701e2e7dfabe6dbb53623  ledger/clauses.json
 134cbc564e6346bf02d9e5550aa46c7dbf01252f  ledger/coverage.json
 14a36a38e585c6d19918615f3a1ce4600a8ed6af  ledger/dispositions/part0-conformance-and-transport-lifecycle.json
-22914db7d7ac979d338c8174170e302aec0ab44a  ledger/dispositions/part1-types.json
-ff542597f45c497265f066d40c502a8253f67599  ledger/dispositions/part2-connection-establishment.json
-ecf66e4033ce9c36758db76dcaff830025afb0a2  ledger/dispositions/part2-links.json
+7b5e533f2c184659155332e8449f1008cee9893c  ledger/dispositions/part1-types.json
+5d31eb3ea45d1194a5a5677ebbef06fe6c6f4056  ledger/dispositions/part2-connection-establishment.json
+387334e1ba4e8c1150b85fb7aca9a11f8354c1e9  ledger/dispositions/part2-links.json
 b3394a9076715246a32d155c6e527ba7e4488085  ledger/dispositions/part2-performatives-link-state.json
 77685884ffa42a3ea031608eef46bcc6b7aaa035  ledger/dispositions/part2-performatives-remainder.json
 10b78af1149c1ce129b73ae4e9699f7ce2645235  ledger/dispositions/part2-performatives-settle-mode.json

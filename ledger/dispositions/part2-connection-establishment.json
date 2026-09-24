@@ -45,7 +45,7 @@
    "clause_text": "The first frame sent on a connection in either direction MUST contain an open performative.",
    "disposition": "formalized:SpecAMQP.Spec.Connection.permitsSend; formalized:SpecAMQP.Spec.Connection.State.sendClass",
    "kind": "MUST",
-   "note": "The first frame in each direction is an `open` because that is the table's send column: after the header exchange the legal send is `open` (`State.sendClass`, lean/Spec/Connection.lean:272-279) and `permitsSend` (lean/Spec/Connection.lean:911-917) is the guard `stepAmqpFrame` applies (lean/Spec/Connection.lean:1210-1215). The exclusion of a *second* `open` is not the table's — the artifact says the first frame contains an open, which implies at most one — and the function's own documentation cites the register's `second-open-refusal` for it. No vector in the corpus cites this clause; the refusal is exercised through `version-negotiation.1`'s vectors, which reach the same row.",
+   "note": "The first frame in each direction is an `open` because that is the table's send column: after the header exchange the legal send is `open` (`State.sendClass`, lean/Spec/Connection.lean:272-279) and `permitsSend` (lean/Spec/Connection.lean:984-993) is the guard `stepAmqpFrame` applies (lean/Spec/Connection.lean:1210-1215). The exclusion of a *second* `open` is not the table's — the artifact says the first frame contains an open, which implies at most one — and the function's own documentation cites the register's `second-open-refusal` for it. No vector in the corpus cites this clause; the refusal is exercised through `version-negotiation.1`'s vectors, which reach the same row.",
    "text_sha256": "0d993e1d21d782f3e69fb9d11f4e7ca6a334460cc402a69979f28bc141de7f5d"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:channel-max.1": {
@@ -220,7 +220,7 @@
    "clause_text": "In this case, the server MUST send a protocol header with an acceptable protocol id (and version) and then close the socket.",
    "disposition": "formalized:SpecAMQP.Spec.Connection.decodeHeader; formalized:SpecAMQP.Spec.Connection.headerFailure; test:exchange-header-protocol-id-unsupported",
    "kind": "MUST",
-   "note": "An unacceptable protocol id is refused by the same reader, with the same reply-then-close: `decodeHeader`'s `unsupported` for an id this peer does not speak and for an unassigned one (lean/Spec/Connection.lean:426-460), answered by `headerFailure` (lean/Spec/Connection.lean:414-416). The vector cites the clause.",
+   "note": "An unacceptable protocol id is refused by the same reader, with the same reply-then-close: `decodeHeader`'s `unsupported` for an id this peer does not speak and for an unassigned one (lean/Spec/Connection.lean:426-460), answered by `headerFailure` (lean/Spec/Connection.lean:431-442). The vector cites the clause.",
    "text_sha256": "8a181c1a874dfca9fb9218040d2771351d4ceda6259742a4888d7410bfc311bf"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.14": {
@@ -241,7 +241,7 @@
    "clause_text": "If the incoming and outgoing protocol headers do not match, both peers MUST close their outgoing stream and SHOULD read the incoming stream until it is terminated.",
    "disposition": "formalized:SpecAMQP.Spec.Connection.stepHeader; formalized:SpecAMQP.Spec.Connection.headerFailure; test:exchange-two-headers; test:exchange-header-mismatch-in-hdr-sent",
    "kind": "MUST",
-   "note": "A header that disagrees with the header this peer sent is the table's `R:HDR[!=S:HDR]` row: `stepHeader` refuses it (lean/Spec/Connection.lean:1015-1050, whose documentation states the send-side mirror as the reason the check is not decoration), and `headerFailure` (lean/Spec/Connection.lean:414-416) leaves the refusal in the END state with the reply the section mandates written — so both halves of the sentence are in the tree, and both vectors cite the clause.",
+   "note": "A header that disagrees with the header this peer sent is the table's `R:HDR[!=S:HDR]` row: `stepHeader` refuses it (lean/Spec/Connection.lean:1015-1050, whose documentation states the send-side mirror as the reason the check is not decoration), and `headerFailure` (lean/Spec/Connection.lean:431-442) leaves the refusal in the END state with the reply the section mandates written — so both halves of the sentence are in the tree, and both vectors cite the clause.",
    "text_sha256": "b7d98bf73aede5725151eef296e35dd8b2e487e3a38420cbeae8e9f35ece1405"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:version-negotiation.4": {

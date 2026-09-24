@@ -20,7 +20,7 @@
    "clause_text": "Link names MUST uniquely identify the link amongst all links of the same direction between the two participating containers.",
    "disposition": "deferred:S4",
    "kind": "MUST",
-   "note": "deferred: S4 — uncarried: the model stores no link name and holds one link per session, so the uniqueness this sentence requires has no subject. `attachLink` (lean/Spec/Session.lean:656-736) reads an attach's role, handle, initial-delivery-count, snd-settle-mode and target and never its `name`, and the session keeps one handle registry for its one link (lean/Spec/Session.lean:446-448). This is the shape the register calls vacuous for `sessions.1` (`link-uniqueness-vacuous`), but that entry's text and clause list name `sessions.1` alone, so it is not cited here; widening it, or registering a name-uniqueness reading, is the planner's pen.",
+   "note": "deferred: S4 — uncarried: the model stores no link name and holds one link per session, so the uniqueness this sentence requires has no subject. `attachLink` (lean/Spec/Session.lean:768-887) reads an attach's role, handle, initial-delivery-count, snd-settle-mode and target and never its `name`, and the session keeps one handle registry for its one link (lean/Spec/Session.lean:446-448). This is the shape the register calls vacuous for `sessions.1` (`link-uniqueness-vacuous`), but that entry's text and clause list name `sessions.1` alone, so it is not cited here; widening it, or registering a name-uniqueness reading, is the planner's pen.",
    "text_sha256": "13cc11d74778e2dfd2caf315599aae0ef534a4f7261f2fbbb532271f67c8275e"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.10": {
@@ -41,7 +41,7 @@
    "clause_text": "The link endpoint MUST then be destroyed.",
    "disposition": "formalized:SpecAMQP.Spec.Session.detachLink",
    "kind": "MUST",
-   "note": "formalized:SpecAMQP.Spec.Session.detachLink — the release is the destruction: it clears the endpoint's handle, role, flow state and delivery (lean/Spec/Session.lean:961-974), and a later frame naming that handle is refused as unattached (`linkHandleOf`, lean/Spec/Session.lean:608-625). The case this misses, stated as a finding: the destruction is not conditioned on an error and nothing about the error survives it, so the sentence's 'then' — destroyed after the error detach of `.13` — reads here as destroyed by any detach. `Contracts/Settlement.lean`'s closing section records the field a model distinguishing the two would need.",
+   "note": "formalized:SpecAMQP.Spec.Session.detachLink — the release is the destruction: it clears the endpoint's handle, role, flow state and delivery (lean/Spec/Session.lean:961-974), and a later frame naming that handle is refused as unattached (`linkHandleOf`, lean/Spec/Session.lean:645-684). The case this misses, stated as a finding: the destruction is not conditioned on an error and nothing about the error survives it, so the sentence's 'then' — destroyed after the error detach of `.13` — reads here as destroyed by any detach. `Contracts/Settlement.lean`'s closing section records the field a model distinguishing the two would need.",
    "text_sha256": "ff8fb5b3f81d9ec41a059ab57dd9668ad56065bdc0b3602df0ae2145a36a5544"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.15": {
@@ -55,14 +55,14 @@
    "clause_text": "Since the link endpoint has been destroyed, the peer cannot reattach, and MUST resume the link in order to restore communication.",
    "disposition": "deferred:S4",
    "kind": "MUST",
-   "note": "deferred: S4 — uncarried: the sentence both forbids a reattach and requires a resume, and the model can express neither. With no link name, no terminus and no read of the attach's `unsettled` field (`.17`), an attach after a release that names a fresh handle is admitted by `attachLink` (lean/Spec/Session.lean:656-736) and creates a new link rather than restoring one, so there is no distinction between reattaching and resuming to enforce. The restriction `interleaved-deliveries-absorbed` records — one held delivery, no link registry — is the same shape: a resume would have to restore into something the session does not keep.",
+   "note": "deferred: S4 — uncarried: the sentence both forbids a reattach and requires a resume, and the model can express neither. With no link name, no terminus and no read of the attach's `unsettled` field (`.17`), an attach after a release that names a fresh handle is admitted by `attachLink` (lean/Spec/Session.lean:768-887) and creates a new link rather than restoring one, so there is no distinction between reattaching and resuming to enforce. The restriction `interleaved-deliveries-absorbed` records — one held delivery, no link registry — is the same shape: a resume would have to restore into something the session does not keep.",
    "text_sha256": "e0926f88699e41138bfc126c110866cb72d72f8e295cf53dbd870a5192c42d2c"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.17": {
    "clause_text": "In order to disambiguate the resume request from a pipelined re-attach the resuming «attach» performative MUST contain a non-null value for its unsettled field.",
    "disposition": "deferred:S4",
    "kind": "MUST",
-   "note": "deferred: S4 — uncarried: nothing reads the attach's `unsettled` field, which is the whole of the discriminator this sentence names. `attachLink` (lean/Spec/Session.lean:656-736) reads an attach's role, handle, initial-delivery-count, snd-settle-mode and target, and the session holds one delivery in progress (`Session.delivery`, lean/Spec/Session.lean:474) rather than a map of unsettled deliveries, so a non-null value has nothing to be true of. This is `.5`'s gap read from the resuming side: the same field, required to be absent-to-present in one case and present in the other.",
+   "note": "deferred: S4 — uncarried: nothing reads the attach's `unsettled` field, which is the whole of the discriminator this sentence names. `attachLink` (lean/Spec/Session.lean:768-887) reads an attach's role, handle, initial-delivery-count, snd-settle-mode and target, and the session holds one delivery in progress (`Session.delivery`, lean/Spec/Session.lean:474) rather than a map of unsettled deliveries, so a non-null value has nothing to be true of. This is `.5`'s gap read from the resuming side: the same field, required to be absent-to-present in one case and present in the other.",
    "text_sha256": "053cdb007b98d30f96c73894c15d308c61233b531d6fb3bbea72ff519609c11a"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.18": {
