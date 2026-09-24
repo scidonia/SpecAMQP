@@ -21,7 +21,11 @@ the `global-id` field rule against the coordinator's announced capabilities.
 
 The `txn-work` obligations — transactional delivery states, the provisional outcome, the
 partial-delivery rider — are the delivery-state layer's, and are carried rather than
-judged here, as on the specification's side.
+judged here, with one exception that is written over the register: the `txn-id` a
+`transactional-state` carries "identifies the transaction with which the state is
+associated", so an outcome naming an id this endpoint does not hold is refused with the
+transaction-error family's `unknown-id`. That is the half of the section this machine can
+decide; what the state does to the delivery it names is not.
 -/
 
 namespace SpecAMQP.Ref.Transactions
@@ -127,6 +131,13 @@ def Layer.isLive (layer : Layer) (id : Nat) : Bool :=
   | some txn => txn.live
   | none => false
 
+/-- Whether this endpoint's register holds the txn-id at all, retired or not. This is the
+question an outcome's `transactional-state` asks, and it is not `isLive`'s: a state naming
+a transaction a discharge has already retired still names the transaction its delivery
+belonged to, which is what an outcome settling that delivery has to say. -/
+def Layer.holds (layer : Layer) (id : Nat) : Bool :=
+  (layer.find? id).isSome
+
 /-- The txn-id stops being in use: what a discharge says, and what the control link's
 close does to every transaction it created. -/
 def Layer.retired (layer : Layer) (id : Nat) : Layer :=
@@ -141,7 +152,7 @@ def Layer.retiredAll (layer : Layer) : Layer :=
 
 /-- The txn-id this endpoint knows, added where it is new. -/
 def Layer.learned (layer : Layer) (id : Nat) : Layer :=
-  if (layer.find? id).isSome then layer else { layer with known := ⟨id, true⟩ :: layer.known }
+  if layer.holds id then layer else { layer with known := ⟨id, true⟩ :: layer.known }
 
 /-- The coordinator's capabilities, as the `global-id` rule reads them: the end that
 receives a declare is the coordinator, so an outbound declare is judged against what the
@@ -208,6 +219,37 @@ allocated it learns nothing new. -/
 def onDeclared (layer : Layer) (outbound : Bool) (id : Nat) : Layer :=
   if outbound then layer else layer.learned id
 
+/-- The error for an outcome whose state names a txn-id this endpoint does not hold. The
+condition is the `transaction-error` family's `unknown-id`, which is the same condition a
+commit against an absent id is refused with, because the defect is the same one: an id
+nothing here holds. -/
+def absentTransactionRefusal (id : Nat) : Refusal :=
+  refuse unknownIdCondition "illegalState"
+    s!"the outcome carries a transactional-state naming txn-id {id}, which is not one this \
+      endpoint holds"
+
+/-- The same error for a state whose `txn-id` is a value of another kind: this coordinator
+allocates integer identifiers, so a value that is not an integer names no transaction. -/
+def nonIntegerIdRefusal (typeName : String) : Refusal :=
+  refuse unknownIdCondition "illegalState"
+    s!"the {typeName}'s txn-id is not an integer identifier, and this coordinator allocates \
+      integer identifiers"
+
+/-- The `transactional-state` outcome: the transaction an outcome's state names, read
+against the register.
+
+`transactional-state`'s `txn-id` "identifies the transaction with which the state is
+associated", so a state naming an id this endpoint has never held names no transaction
+here, and it is refused with `unknown-id`. A state naming a transaction a discharge has
+retired is admitted: the state is then what settles a delivery that transaction's work
+created. What the state does to the *delivery* — the terminal state it carries in that
+composite and the outcome beside it — is not this machine's, and is carried. -/
+def onTransactionalState (layer : Layer) (value : Value) : Except Refusal Layer :=
+  match (valueOfField "transactional-state" "txn-id" value).bind numberOf with
+  | some id =>
+    if layer.holds id then .ok layer else .error (absentTransactionRefusal id)
+  | none => .error (nonIntegerIdRefusal "transactional-state")
+
 /-- Where a transaction value arrived, which decides what it may be. The control link
 carries the declare and discharge dialogue — "they do not represent the demarcation of
 transactional work" — and "No transactional work is allowed on the control link", so a
@@ -248,10 +290,7 @@ def step (layer : Layer) (carrier : Carrier) (outbound : Bool) (value : Value)
     onDeclare layer outbound globalId settled
   | .discharge =>
     match (valueOfField "discharge" "txn-id" value).bind numberOf with
-    | none =>
-      .error (refuse unknownIdCondition "illegalState"
-        "the discharge's txn-id is not an integer identifier, and this coordinator \
-          allocates integer identifiers")
+    | none => .error (nonIntegerIdRefusal "discharge")
     | some id =>
       let fail :=
         match valueOfField "discharge" "fail" value with
@@ -268,7 +307,7 @@ def step (layer : Layer) (carrier : Carrier) (outbound : Bool) (value : Value)
   | .transactionalState =>
     match carrier with
     | .payload => .error (notTheControlDialogue act.label)
-    | .state => return layer
+    | .state => onTransactionalState layer value
   | .other => return layer
 
 end SpecAMQP.Ref.Transactions

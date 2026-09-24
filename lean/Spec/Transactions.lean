@@ -52,12 +52,18 @@ retiring a message, the `transactional-state` a transfer or a disposition carrie
 provisional outcome a resource owes before a discharge can succeed, and the rule that a
 partial delivery makes a discharge an error. Those are the delivery-state layer's — the
 message and link layers carry the states they are about, and this machine would have to
-model a transfer's delivery state to see them. The `transactional-state` composite is
-recognised as part of the family here and *carried* rather than judged, and its clauses
-are dispositioned to that layer in the ledger rather than absorbed here. One sentence of
-that family is where the difference is sharpest: `txn-work.3`'s rider, "It is an error for
-the controller to attempt to discharge a transaction against which a partial delivery has
-been posted", needs fragmentation state this layer does not have.
+model a transfer's delivery state to see them. **One half of that family is this machine's,
+and it is the half written over the register**: `transactional-state`'s `txn-id` "identifies
+the transaction with which the state is associated", so an outcome whose state names a
+txn-id this endpoint has never held names no transaction here, and it is refused with the
+`transaction-error` family's own `unknown-id` — `transactionalState` below. What the state
+does to a *delivery* — the terminal state it combines with that id, the outcome it carries,
+and whether the outcome may be applied — stays the delivery-state layer's, so the composite
+is otherwise carried rather than judged and its remaining clauses are dispositioned to that
+layer in the ledger rather than absorbed here. One sentence of that family is where the
+difference is sharpest: `txn-work.3`'s rider, "It is an error for the controller to attempt
+to discharge a transaction against which a partial delivery has been posted", needs
+fragmentation state this layer does not have.
 
 **Two cells the artifact leaves open, which this machine therefore decides without
 enforcing either reading in the corpus.** A discharge whose `fail` flag is set is
@@ -216,6 +222,17 @@ def Layer.fresh : Layer := ⟨[], 0, [], []⟩
 def Layer.live (layer : Layer) (id : Nat) : Bool :=
   layer.transactions.any (fun transaction => transaction.id == id && !transaction.discharged)
 
+/-- Whether this endpoint's register holds the txn-id at all, discharged or not.
+
+`transactional-state`'s `txn-id` "identifies the transaction with which the state is
+associated", and an id nothing here has ever held identifies nothing — which is the
+question the outcome's association asks. `live` is the other question, and a discharge
+turns on it: an outcome for work a discharge has already retired still names the
+transaction that owned that work, so the register the association is read against keeps
+retired entries. -/
+def Layer.knows (layer : Layer) (id : Nat) : Bool :=
+  layer.transactions.any (fun transaction => transaction.id == id)
+
 /-- One transaction, retired when it is the one an id names. -/
 def Transaction.retireIf (transaction : Transaction) (id : Nat) : Transaction :=
   if transaction.id == id then { transaction with discharged := true } else transaction
@@ -249,6 +266,27 @@ def notTheControlDialogue (typeName : String) : Refusal :=
   refusal illegalStateCondition "illegalState"
     s!"the control link carries the declare and discharge messages and no transactional \
       work, and this message carries a {typeName}"
+
+/-- The refusal for an outcome whose `transactional-state` names a txn-id this endpoint's
+register does not hold.
+
+The condition is the `transaction-error` family's `unknown-id` — "The specified txn-id does
+not exist" — which is the same condition a discharge against an id this endpoint does not
+hold is refused with, and for the same reason: the defect is an id nothing here holds, read
+where the id is claimed rather than where it is acted on. -/
+def absentTransactionRefusal (txnId : Nat) : Refusal :=
+  refusal unknownId "illegalState"
+    s!"the outcome carries a transactional-state naming txn-id {txnId}, and this endpoint \
+      holds no transaction with that id"
+
+/-- The same refusal for a `transactional-state` whose `txn-id` is a value of another kind:
+`txn-id` is declared `*` and its capability is the restricted `transaction-id` a
+coordinator may allocate as binary, so a value that is not an integer is a txn-id this
+coordinator did not allocate rather than a value to coerce. -/
+def nonIntegerTxnIdRefusal (typeName : String) : Refusal :=
+  refusal unknownId "illegalState"
+    s!"the {typeName}'s txn-id is not an integer identifier, and this coordinator \
+      allocates integer identifiers"
 
 /-- The coordinator's capabilities, as `global-id`'s rule needs them.
 
@@ -328,8 +366,32 @@ that asked for it. It is what makes the id dischargeable — the controller "obt
 transaction identifier from the resource" by being told it — so a controller that was
 never told, and a coordinator answering its own declare, both leave the register alone. -/
 def declared (layer : Layer) (outbound : Bool) (txnId : Nat) : Layer :=
-  if outbound || layer.transactions.any (fun transaction => transaction.id == txnId) then layer
+  if outbound || layer.knows txnId then layer
   else { layer with transactions := ⟨txnId, false⟩ :: layer.transactions }
+
+/-- The `transactional-state` outcome: the transaction an outcome's state names.
+
+`transactional-state`'s `txn-id` "identifies the transaction with which the state is
+associated", so the id the state carries is a claim about which transaction it belongs to,
+and this is the layer's reading of that claim: an id the register does not hold names no
+transaction here, and the state is refused with the `transaction-error` family's own
+`unknown-id`. A state naming a transaction a discharge has already retired is admitted,
+because that state is then what settles a delivery the transaction's work created — the
+clause that tells the controller to settle outstanding unsettled deliveries after a
+discharge needs exactly that.
+
+The registry question is all this outcome answers. What a state does to a *delivery* — the
+terminal state it "combines ... together with", the outcome it carries, and whether that
+outcome may be applied — is the delivery-state layer's, so the composite's other half is
+carried rather than judged, here and in the dispatch below. -/
+def transactionalState (layer : Layer) (value : Value) : Except Refusal Layer :=
+  match (fieldValue "transactional-state" "txn-id" value).bind valueNat with
+  | some txnId =>
+    if layer.knows txnId then .ok layer else .error (absentTransactionRefusal txnId)
+  | none =>
+    -- the declared surface marks `txn-id` mandatory and refuses its absence, so what
+    -- reaches here is the field present with a value of another kind
+    .error (nonIntegerTxnIdRefusal "transactional-state")
 
 /-! ## The dispatch -/
 
@@ -395,9 +457,7 @@ def step (layer : Layer) (carrier : Carrier) (outbound : Bool) (value : Value)
       -- `txn-id` is declared `*` and its capability is the restricted `transaction-id` a
       -- coordinator may allocate as binary, so a value that is not an integer is a
       -- txn-id this coordinator did not allocate rather than a value to coerce
-      .error (refusal unknownId "illegalState"
-        "the discharge's txn-id is not an integer identifier, and this coordinator \
-          allocates integer identifiers")
+      .error (nonIntegerTxnIdRefusal "discharge")
   | .declared =>
     match carrier with
     | .payload =>
@@ -412,11 +472,11 @@ def step (layer : Layer) (carrier : Carrier) (outbound : Bool) (value : Value)
     match carrier with
     | .payload => .error (notTheControlDialogue typeName)
     | .state =>
-      -- the delivery-state layer's: `transactional-state` "combines a txn-id together with
-      -- one of the terminal delivery states" and its obligations are the txn-work clauses',
-      -- which are about posting, acquiring and retiring rather than about this machine's
-      -- declare/discharge lifecycle. Carried here, and dispositioned to that layer.
-      return layer
+      -- the association the layer judges, and nothing else: the state's `txn-id` must name
+      -- a transaction this endpoint holds. The delivery-state layer's half — the terminal
+      -- state the composite combines with that id, the outcome it carries, and whether the
+      -- outcome may be applied — is carried rather than judged.
+      transactionalState layer value
   | .other => return layer
 
 end SpecAMQP.Spec.Transactions
