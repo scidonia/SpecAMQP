@@ -8,14 +8,22 @@ completeness and fidelity *measurable*.
 
 - **579 clauses** of the standard, each with a recorded disposition: 238 formalized, 105 covered by test
   vectors, 180 deferred to a named milestone, and the rest informative, out of scope or superseded.
-- **24 test corpora**, replayed step by step against both implementations, comparing each step's verdict
-  *and the condition behind every refusal*.
+- **24 test corpora**, replayed step by step against the specification's executable semantics and against the
+  reference implementation, comparing each step's verdict *and the condition behind every refusal*.
 - **20 gates** in `tests/contracts/`, each a script that fails loudly, offline, with no network, clock or
   randomness.
 - **76 Lean modules**, and an endpoint in `lean/Impl/` compiled by Lean's own C backend whose protocol core
   is proved to conform to the specification.
 
-The specification is meant to be a target, not a description: conformance is defined as a state machine over a fixed interface alphabet, and implementations prove their own instances of it. `PLAN.md` is the programme of record.
+**There are two Lean artefacts on purpose.** `lean/Spec/` is the specification. `lean/Ref/` is a second
+reading of the same OASIS documents, written without looking at the first and sharing no definition with it.
+The main risk in a specification is prose ambiguity, and two readings by the same reader share their
+mistakes — so both are run against the same vectors and their verdicts compared. Where they disagree, one of
+them has misread the standard, and finding that out is the point of having the second one.
+
+The specification is meant to be a target, not a description: conformance is defined as a state machine over
+a fixed interface alphabet, and implementations prove their own instances of it. `PLAN.md` is the programme
+of record.
 
 ## What is here
 
@@ -24,7 +32,7 @@ The specification is meant to be a target, not a description: conformance is def
 | `spec/oasis/` | the vendored OASIS artifacts, byte-identity pinned in `toolchain/sources.toml`; every clause id, disposition and citation refers to these bytes |
 | `lean/Generated/` | the standard's declared surface — descriptors, encodings, types, fields, choices — as generated Lean data |
 | `lean/Spec/` | the handwritten semantics: executable, total, and independent of every consumer |
-| `lean/Ref/` | a second, independently written reading of the same artifacts, sharing no definition with `lean/Spec/` |
+| `lean/Ref/` | a second, independently written reading of the same artifacts, sharing no definition with `lean/Spec/`; where the two disagree on a vector, one of them has misread the standard |
 | `lean/Impl/` | the shipped endpoint: its protocol core, proved to conform, and `Transport.lean`, its socket boundary — the one module there that is not proved |
 | `lean/Shell/` | the shipped process: the recv/feed/write loop and the socket lifecycle |
 | `lean/Harness/`, `lean/Contracts/`, `lean/Proofs/` | the runner and its reason-class vocabulary; the acceptance declarations; their proofs |
