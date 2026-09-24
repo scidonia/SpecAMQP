@@ -453,7 +453,10 @@ theorem assumedDefaultOf_some (decl : FieldDecl) (text primitive : String) (valu
 
 /-- Check one present, non-null field against its declaration. A field the artifact declares
 `multiple` is judged by `multipleAccepts`, because the attribute widens what the declared type
-admits: its value is one element of the type or an array of them. -/
+admits: its value is one element of the type or an array of them. The `requires` test follows the
+same rule, because the types section conditions the *permitted element values* on the type
+specification "and multiplicity of the corresponding field definition" — so a role is asked of
+each element rather than of the array that carries them. -/
 def checkField (decl : FieldDecl) (value : Value) : Except Refusal Unit := do
   let accepted ← liftRefusal
     (if decl.multiple then multipleAccepts decl.typeName value
@@ -466,7 +469,10 @@ def checkField (decl : FieldDecl) (value : Value) : Except Refusal Unit := do
     match decl.requires with
     | none => pure ()
     | some role =>
-      let satisfied ← liftRefusal (satisfiesRequires role value)
+      let satisfied ← liftRefusal
+        (match value, decl.multiple with
+         | .array _ items, true => items.allM (satisfiesRequires role)
+         | _, _ => satisfiesRequires role value)
       if !satisfied then
         .error (decodeRefusal "malformed"
           s!"{decl.owner}.{decl.name} requires a value providing {role} and the section \

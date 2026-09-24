@@ -18,7 +18,10 @@
 #      *that* a step is refused is half the claim: a coordinator can refuse a discharge for an
 #      unknown id and a controller for an unset field, and a status-only comparison would call
 #      those two the same. The conditions here are `amqp:illegal-state`,
-#      `amqp:transaction:unknown-id` and `amqp:invalid-field`, each pinned by the vector;
+#      `amqp:transaction:unknown-id`, `amqp:invalid-field` and `amqp:decode-error`, each pinned
+#      by the vector. The last is the encode side of a declared shape rather than a rule about
+#      transactions: a `multiple` field of the control link's coordinator carried as a list is
+#      refused where Part 1 gives it an array, and both artefacts refuse it as a decode error;
 #   4. the comparison is not vacuous: the negative corpus exercises refusals, and this contract
 #      fails rather than passing on an empty comparison.
 #
@@ -60,7 +63,8 @@ for corpus in "$positive" "$negative"; do
   python3 - "$tmp/ref-$name.log" "$tmp/spec-$name.log" "$name" "$corpus" <<'PYCMP' || exit 1
 import json, pathlib, sys
 
-CONDITIONS = ("amqp:illegal-state", "amqp:transaction:unknown-id", "amqp:invalid-field")
+CONDITIONS = ("amqp:illegal-state", "amqp:transaction:unknown-id", "amqp:invalid-field",
+              "amqp:decode-error")
 
 def verdicts(path):
     out = {}
