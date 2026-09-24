@@ -88,7 +88,7 @@ f5457f3e3647561dc84ed0761556857f431bcad9  tests/contracts/s0_lean_environment.sh
 c2ad5a412456853b4de79bc3a893d4b2c1d7252d  tests/contracts/s0_tables_fidelity.sh
 c86fe5435dc380611e92f80f069a812dc9f48a3a  tests/contracts/s0_vector_citations.sh
 72cbf59d3abfe53b4f1cc829fce4b5e5df2043c3  tests/contracts/s1_differential.sh
-571aac2b5b9b76e4992485d71ce10bc1757fdbad  tests/contracts/s1_proof_integrity.sh
+3448983db43ce0f639ba47a897fbba4cfeab3df5  tests/contracts/s1_proof_integrity.sh
 e53d486954fbe9a2dac96037e9970ecf70d95732  tests/contracts/s1_ref_vectors.sh
 cd8cf38336ebfd9594ad8d13182da07d711d5295  tests/contracts/s2_frame_vectors.sh
 f5bdf95d70fbdca43b51ec0cdbc2074ec6b62543  tests/contracts/s3_exchanges.sh

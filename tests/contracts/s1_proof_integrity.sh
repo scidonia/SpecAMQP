@@ -292,6 +292,9 @@ import Proofs.ReadProgress
 import Proofs.CodecNarrowestAssembly
 import Proofs.EndpointConformance
 import Contracts.EndpointAcceptance
+import Contracts.FrameConformance
+import Contracts.MessageFormat
+import Proofs.HandleUniqueness
 -- S5: the message layer's theorems, so their axiom inventories are disclosed per theorem
 import Spec.Message
 #print axioms SpecAMQP.Contracts.constructor_grammar_public
@@ -382,6 +385,24 @@ import Spec.Message
 #print axioms SpecAMQP.Proofs.submissionOf_agrees
 #print axioms SpecAMQP.Proofs.toOctets_agrees
 #print axioms SpecAMQP.Proofs.callOctets_agrees
+-- **Every acceptance-shaped theorem the contract tree declares**, added when an audit of this list
+-- against `lean/Contracts/**` found six of them missing: the frame layer's three conformance bindings
+-- and the message layer's two were proved and cited by their slices, and this gate had never printed
+-- their inventories at all. The entries are read from the tree by the check below, so the list is a
+-- walk rather than a list of whatever someone remembered to add.
+#print axioms SpecAMQP.Contracts.frame_conformance_public
+#print axioms SpecAMQP.Contracts.frame_receive_conformance
+#print axioms SpecAMQP.Contracts.frame_send_conformance_public
+#print axioms SpecAMQP.Contracts.settled_monotone_public
+#print axioms SpecAMQP.Contracts.terminal_absorbing_public
+-- S4's handle-uniqueness ties, discharged after that acceptance line said the invariants were met for
+-- one operation of four, with the accepted theorem beside them: the claim is "proved for every
+-- operation", and the three ties being *weaker* than the accepted one — no Classical.choice in any of
+-- them — is then visible rather than incidental.
+#print axioms SpecAMQP.Proofs.HandleUniqueness.attachLink_handle_uniqueness
+#print axioms SpecAMQP.Proofs.HandleUniqueness.detachLink_handle_uniqueness
+#print axioms SpecAMQP.Proofs.HandleUniqueness.flowLink_handle_uniqueness
+#print axioms SpecAMQP.Proofs.HandleUniqueness.transferLink_handle_uniqueness
 #print axioms SpecAMQP.Proofs.lengthPrefixed_ok
 #print axioms SpecAMQP.Proofs.takeBe_beOctets
 #print axioms SpecAMQP.Spec.ReadLaws.extract_toList_eq_drop_take
@@ -439,7 +460,16 @@ for theorem in "$accepted_theorem" extended_header_width body_starts_after_the_h
                SpecAMQP.Proofs.endpoint_conforms \
                SpecAMQP.Proofs.arriving_agrees SpecAMQP.Proofs.sending_agrees \
                SpecAMQP.Proofs.answerOf_agrees SpecAMQP.Proofs.submissionOf_agrees \
-               SpecAMQP.Proofs.toOctets_agrees SpecAMQP.Proofs.callOctets_agrees; do
+               SpecAMQP.Proofs.toOctets_agrees SpecAMQP.Proofs.callOctets_agrees \
+               SpecAMQP.Contracts.frame_conformance_public \
+               SpecAMQP.Contracts.frame_receive_conformance \
+               SpecAMQP.Contracts.frame_send_conformance_public \
+               SpecAMQP.Contracts.settled_monotone_public \
+               SpecAMQP.Contracts.terminal_absorbing_public \
+               SpecAMQP.Proofs.HandleUniqueness.attachLink_handle_uniqueness \
+               SpecAMQP.Proofs.HandleUniqueness.detachLink_handle_uniqueness \
+               SpecAMQP.Proofs.HandleUniqueness.flowLink_handle_uniqueness \
+               SpecAMQP.Proofs.HandleUniqueness.transferLink_handle_uniqueness; do
   # The kernel prints one of two sentences, and both are verdicts: a theorem that depends on axioms,
   # and one that depends on none — which is the stronger case and was, until the endpoint's acceptance
   # listed an `rfl`-level theorem, the case this check could not see. A pattern that matched only the
@@ -450,6 +480,27 @@ for theorem in "$accepted_theorem" extended_header_width body_starts_after_the_h
     problem "$theorem was not inventoried — the inventory names a theorem the kernel did not print"
   fi
 done
+
+# **The inventory is a walk, not a list.** Every acceptance-shaped theorem `lean/Contracts/**` declares
+# must be named above: the shape is the one a contract's own claim leans on (`*_public`, `*_conformance`,
+# `*_conforms`, `*_uniqueness`), and the exemption below is a helper of the interface rather than a claim
+# about the implementation. Without this check the inventory was a list of whatever each slice happened to
+# add, and an audit of it against the tree found six acceptance bindings missing.
+python3 - "$root/tests/contracts/s1_proof_integrity.sh" <<'WALK' || problem "an acceptance-shaped theorem is not inventoried"
+import pathlib, re, sys
+gate = pathlib.Path(sys.argv[1]).read_text()
+exempt = {"SpecAMQP.Contracts.conforms_via_of_conforms": "an interface helper, not a claim about an artefact"}
+missing = []
+for f in sorted(pathlib.Path("lean/Contracts").glob("*.lean")):
+    for m in re.finditer(r"^theorem\s+([A-Za-z0-9_?'\.]+)", f.read_text(), re.M):
+        name = f"SpecAMQP.Contracts.{m.group(1)}"
+        if re.search(r"(_public|_conformance|_conforms|_uniqueness)$", name) and name not in gate and name not in exempt:
+            missing.append(f"{name} ({f.name})")
+if missing:
+    print("problem: acceptance-shaped theorems absent from the inventory: " + ", ".join(missing))
+    sys.exit(1)
+WALK
+
 note "every accepted theorem's axiom inventory contains no sorryAx and no ofReduceBool"
 
 note "every clause above reported: the scan, the probe, the inventory and the package build"
