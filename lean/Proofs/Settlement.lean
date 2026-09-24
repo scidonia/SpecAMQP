@@ -99,7 +99,7 @@ theorem senderSettleModeIsTheChoiceTheClauseSelects :
   simp only [] at hattach
   repeat (first | split at hattach | simp at hattach)
   all_goals (try (cases hw : (fieldValue "attach" "handle" body).bind valueNat <;> simp_all))
-  all_goals (try (simp only [guard_chain2_tail, guard_last] at hattach))
+  all_goals (try (simp only [guard_chain2_tail] at hattach))
   all_goals (try (cases hcount : (fieldValue "attach" "initial-delivery-count" body).bind valueNat
     <;> simp_all))
   all_goals (try (simp only [guard_last] at hattach))
