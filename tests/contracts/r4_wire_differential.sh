@@ -3,11 +3,16 @@
 #
 # `scripts/run-endpoint-wire-differential.sh` replays a corpus against the shipped endpoint over a socket and
 # compares each step with `amqp-spec`'s in-process answer, through `scripts/endpoint/WireApp/` and its peer.
-# The rung exists so that what the endpoint *claims* and what it *does* are compared at the wire at all, and
-# its acceptance question is therefore not "does the run pass" — three of `vectors/slice.ndjson`'s six vectors
-# diverge or are refused at the socket by construction, because the differential drives the endpoint through an
-# application at a seam the shell reaches only after a read, and two of those steps are not the application's
-# to play. Its acceptance question is **whether every divergence is one the run can name**.
+# The rung exists so that what the endpoint *claims* and what it *does* are compared at the wire at all.
+# **Its state is declared here vector by vector rather than asserted as a count, and the state is that all six
+# agree.** Three of them diverged when this contract was written, every one attributed to a property of the
+# differential's *own* application seam: the shell prompted the application only after a unit of the peer's
+# octets arrived, so a second `send` from one state was never prompted, and the shell announced the protocol
+# header itself, so a vector whose pre-state was `START` was not the application's to play. Those seams are
+# closed — the shell re-asks the application after each step it takes, bounded and loud, and the header is the
+# application's opening move — and all three moved to `pass` with no residual, which is the outcome that says
+# a seam was hiding the endpoint rather than excusing it. **Which is why the declaration is the mechanism**:
+# closing a seam or finding a divergence are both reviewed changes to this file, not a tolerance to widen.
 #
 # So what is asserted here is the rung's state, declared vector by vector:
 #
@@ -52,13 +57,21 @@ R4_STATUS="$status" python3 - "$report" <<'PY' || exit 1
 import json, os, pathlib, sys
 
 corpus = "vectors/slice.ndjson"
-# The declared state: every vector of `slice.ndjson`, and the cause each divergence is attributed to.
-agree = {"slice-open-close-handshake", "slice-sasl-challenge-from-client", "slice-sasl-mechanisms-empty"}
-diverge = {
-    "slice-open-missing-container-id":          "app-seam-prompt-after-read",
-    "slice-open-channel-max-wrong-type":        "app-seam-prompt-after-read",
-    "slice-open-before-header":                 "app-seam-start-pre-state",
+# The declared state: **all six vectors of `slice.ndjson` agree at the socket, and none diverges.**
+# It was not always so — three diverged, each attributed to a property of the differential's own
+# application seam, and closing those seams moved every one of them to `pass` with **no residual**, which
+# is the outcome that says the seams were hiding the endpoint rather than excusing it. A divergence
+# declared here is a *change of state* to be reviewed, not a tolerance: that is why the map is empty
+# rather than narrower, and why any cause label now fails.
+agree = {
+    "slice-open-close-handshake", "slice-open-missing-container-id",
+    "slice-open-channel-max-wrong-type", "slice-sasl-challenge-from-client",
+    "slice-sasl-mechanisms-empty", "slice-open-before-header",
 }
+diverge = {}
+# And the cause vocabulary is `unknown` alone now: the two `app-seam-*` labels went with the seams they
+# named, so a divergence would be reported unattributed rather than named after a closed seam. A
+# `core-...` label would be a reviewed addition to this file *and* to the tier's set.
 seams = set(diverge.values())
 
 def die(msg):
@@ -104,13 +117,14 @@ for name, e in sorted(seen.items()):
     if not causes <= seams:
         die(f"{name} diverges with cause(s) {sorted(causes)}, which is not the declared seam set {sorted(seams)}")
 
-if not found:
-    die("no divergence was reported, so this run is not evidence: a tier that finds nothing is either fixed or not run")
 if status == 0 and found:
     die(f"the tier exited zero while its report lists {len(found)} divergence(s)")
 if status != 0 and not found:
     die(f"the tier exited {status} with no divergence in its report")
 
-print(f"r4_wire_differential: PASS — {len(agree)} vector(s) agree and {len(found)} diverge, "
-      f"every divergence attributed to a declared seam: {', '.join(sorted(found))}")
+if found:
+    print(f"r4_wire_differential: PASS — {len(agree)} vector(s) agree and {len(found)} diverge, "
+          f"every divergence attributed to a declared seam: {', '.join(sorted(found))}")
+else:
+    print(f"r4_wire_differential: PASS — all {len(agree)} vector(s) agree at the socket and none diverges")
 PY

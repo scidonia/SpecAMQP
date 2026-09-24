@@ -1519,7 +1519,12 @@ carrying a **structured cause** drawn from a closed set — `app-seam-prompt-aft
 diverging sets, every divergence attributed to a declared seam, **`unknown` forbidden** because an unattributable divergence is the one thing the rung exists to catch, and an `INVALID` run treated as "not evidence" with its own message.
 A count is asserted nowhere in it, because a count hides a swap. The declared sets are a planner-owned declaration, so closing a seam is a reviewed change to that file rather than a tolerance to widen — which is the arrangement the
 seam closure now underway depends on. **And those three divergences were not excusing the endpoint, they were hiding it**: the seam closure is therefore not tidying, and a vector that still diverges once it is closed is evidence about
-the shipped binary rather than about the harness. **The suite is twenty contracts.**
+the shipped binary rather than about the harness. **The suite is twenty contracts.** **And the seams are closed with no residual: all six vectors agree at the socket** (`4a82ba1`). The shell now re-asks the application after each step it
+takes — bounded by a named round count and loud when the bound is exhausted — and the protocol header is the **application's** opening move rather than the shell's, with `layerOfHeader` and the `header` parameter of
+`runConnection`/`serveConn`/`dial` removed and every caller migrated. **The outcome is the part worth recording**: those three divergences were hiding the endpoint rather than excusing it, and closing the seams moved
+all three to `pass` — the shipped endpoint agrees with the executable specification end to end, over a socket, on every vector of `slice.ndjson`, which is R4's rung in its strongest form. **The vocabulary moved with the
+seams**: the tier's two `app-seam-*` cause labels were removed, so `unknown` stands alone and a divergence would be reported unattributed rather than named after a closed seam, and the contract's declared state is now
+six agreements with an empty divergence map — a reviewed change to a planner-owned declaration rather than a tolerance, which is what the contract was built to make possible.
 
 **The policy ruling, with its condition**: the shipped binary keeps the conservative AMQP default — the corpus is written for a peer that offers SASL first, but
 a product's default is a different decision from a differential's needs, and the app supplies the vector's header. **Revisit only when R4 grows a rung whose
