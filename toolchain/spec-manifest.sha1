@@ -28,6 +28,7 @@ e46b73f366cda8f2605b7990f8af7d46e688e3be  lean/Spec/Session.lean
 9824a25e7b937000c8f8c16a9986f6bda2869632  lean/Spec/Transactions.lean
 d4de8144b2390024ff98ef4bb5a6ddc34ad5d2d4  lean/Spec/Value.lean
 c80948aad7c0afaa70330570dd2624f60982d0b6  ledger/ambiguities/attach-retains-link-flow-state.json
+6bc45dafea9ac908facc68e24901d75a6589dc76  ledger/ambiguities/bodyless-frame-permitted-states.json
 973e66b7a1143546319dedc4b165a4f508747c78  ledger/ambiguities/channel-zero-layering.json
 b5f824512d926a5475306134bb61ee8c215ae2d2  ledger/ambiguities/check-precedence-unspecified.json
 6292292dc07ef18bb452326358be8c2e0a711c77  ledger/ambiguities/compound-size-field.json

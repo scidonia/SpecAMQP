@@ -11,9 +11,12 @@ import hashlib, pathlib, sys
 manifest = pathlib.Path('toolchain/spec-manifest.sha1').read_text().splitlines()
 want = dict(l.split('  ', 1)[::-1] for l in manifest if l.strip())
 # Every tree AGENTS.md names planner-owned, plus the one file of toolchain/ that is a
-# contract rather than a pin record. `lean/Proofs`, `lean/Generated` and `scripts/` are
+# contract rather than a pin record. `lean/Proofs`, `lean/Generated`, `lean/Ref` and `scripts/` are
 # deliberately absent: they are coder-owned, and their integrity is the trust gate's and the
-# generator-fidelity gate's business rather than this manifest's. Adding `tests/contracts`
+# generator-fidelity gate's business rather than this manifest's: `lean/Ref` is the second
+# reading, written independently by whichever slice owns it, and the differential is what holds
+# the two readings together — a hash here would say the reference matches its own past rather
+# than the specification it is a reading of. Adding `tests/contracts`
 # closes a real hole: a contract script is the thing that says what the evidence means, and
 # until today nothing compared its bytes to anything, which is how one was edited by a coder
 # in flight and noticed only by a reviewer reading the diff.
