@@ -2212,3 +2212,29 @@ So SpecNodes' first version should **read AMQP Management before inventing a pub
 8. **Settlement survives until the link does not** — `disposition.4` (deliveries remain unsettled while the links are neither closed nor detached with an error). *Failing before*: the disposition has no link whose life it depends on.
 
 **What the vectors are not.** Every one of these is a *behaviour at the harness boundary* — a vector the runner replays, as the corpus's scenarios are — and none is a proof obligation. The proof obligations are §24's projection theorem and the widened instance's own; if a behaviour here needed a theorem rather than a vector, the widened model would not be reachable by the corpus, which would be a finding about the model rather than about the vector.
+
+## 26. The widened model's shape
+
+**Recommended rather than adopted**, like §23.4 and §23.5: the state's shape is a data-model decision, and three of its choices are worth naming rather than assuming.
+
+**The shape.** `Session` gains a link table in place of today's handle set: `links : Map Handle Link`, where a `Link` carries the fields the 26 clauses read and nothing else. Each field exists because a clause consults it, which is the test for whether it belongs:
+
+| field | the clauses that read it |
+|---|---|
+| `name : String` | `links.1` — names uniquely identify the link among all links of the same direction; so the table's key stays the handle and the invariant is over names *per role* |
+| `role : LinkRole` | `links.1` and `links.2` — the direction is part of the identity, and suspension is per endpoint |
+| `terminus : Option Terminus` | `links.5` — an attach for a link already associated with a terminus must include it |
+| `suspended : Bool` | `links.2`, `links.16` — a suspended link is the one a resume addresses |
+| `unsettled : Map DeliveryTag DeliveryState` | `attach/field:unsettled.1`–`.3`, `attach/field:incomplete-unsettled.1`–`.4`, `resuming-deliveries.2`–`.5`, `transfer/field:resume.1`–`.3`, `disposition.4`, `links.23` |
+| `incompleteUnsettled : Bool` | `attach/field:incomplete-unsettled.3` — the flag that says a re-attach is coming, and the latch on new deliveries |
+| `nextDeliveryId : Nat` | `resuming-deliveries.2`–`.5` — the sender's record of what it has sent and from where |
+
+**Three choices worth naming.**
+
+1. **`DeliveryState` is a pair of endpoint states, not one.** `attach/field:unsettled.u1` says the local and remote states for a delivery-tag must be *compared* to resolve an inconsistency, which means the model has to hold both to be able to compare them. The alternative — one state per tag — makes the clause unstatable rather than satisfied.
+2. **Uniqueness becomes structural.** `links.23` requires a delivery-tag to be unique among the deliveries either end could still consider unsettled. Keyed by tag, a `Map` cannot represent the violation, so the clause becomes a property of the representation rather than a check that can fail — the same shape as the register's `link-uniqueness-vacuous`, and it should be recorded as such rather than counted as enforced. Four of the 26 are of this kind; the fold says which.
+3. **The link name is a `String`, and the model does not interpret it.** The standard gives a link name no grammar, and the routing that a name might imply is a node's business, which §23.3 puts outside this repository. A name is compared and stored, nothing more.
+
+**What the shape deliberately leaves out.** No application interface: the widened model decides *when* a resend is permitted and *what* the frames must carry, and never asks what the application wanted to send. No durability: `disposition.4` says deliveries stay unsettled while the links live, and the link's life is the session's, which is the process's. And no receiving-side application state beyond the map — a delivery absent from it is one the clause says nothing can be inferred about, which is why `attach/field:unsettled.1` is a rule about *not* consulting a default.
+
+**How the 26 land on this shape.** Each is one of three things, and the fold is what the implementation and its proof will be measured against: **structural** (the representation cannot express the violation — uniqueness, and the null-key prohibition which a tag-keyed map already satisfies), **checked** (a guard the step functions read, which is where most of the 26 sit), and **still deferred** (a rule whose subject the widening does not reach, to be named rather than silently carried). The three-way classification is a planner act like the dispositions themselves, and it should be recorded in the ledger when the model lands rather than inferred from the code.
