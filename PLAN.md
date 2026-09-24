@@ -2151,3 +2151,18 @@ awaiting a trigger, it is the boundary of what a step relation over frames can s
 **5. Host-level assumptions a server leans on harder than a client.** `environment: server-hostname-default`, the TLS and SNI boundary entries, `tcp-ordered-stream` and
 `tcp-close-order`: assumptions about the host, recorded as assumptions, and the ones a listener depends on most. They sit in the ledger beside the clause they qualify, which is
 where an implementer should look rather than here.
+
+
+### 23.4 The route to a real server: what stays, what leaves, and what the demo should be
+
+**Recommended rather than adopted** — advice given on request, recorded here so it can be accepted, amended or refused in one place rather than re-derived.
+
+**1. The boundary is measured, and it decides the split.** §23.3's first category is the standard's own division rather than a gap: `source`/`target` semantics, routing, queues, filters, `dynamic` and node properties are the clauses the ledger classes `out-of-scope: node-and-filter-behaviour` and `out-of-scope: container-node-topology`. A specification that added routing would be specifying something else, and a broker built in this tree would be the first artefact here not checkable against the standard — the one property the tree exists to keep.
+
+**2. What stays here.** The protocol, the corpus, the differential and the proved core, and §23.2's server narrowed to what this repository can state: no node model, no format above AMQP. Its messages are Part 3's — the layer this repository specifies and still owes through S5 — and its body a `data` section. Even that is worth doing only when there is an audience: R4 already proves the endpoint is a server, so a demo's marginal value is communication rather than evidence.
+
+**3. The demonstration worth building is the specification narrating live traffic.** R4 drives the shipped binary over a socket and compares its per-step verdicts against the specification's in-process ones. Put a real third-party AMQP client at the other end and print, per frame, the verdict, the condition and the rule in words, with one mutation client whose violation is refused and quoted. That shows what nothing else can — a clause-level view of a real client's session — and it needs **no node model, no CloudEvents and no seam migration**, because it uses machinery that is built and green. A node server, by contrast, demonstrates a worse broker.
+
+**4. The real server belongs in another repository, and its first artefact is its own specification.** Queues, routing, an address grammar, an application format, concurrency and durability have no AMQP clauses to conform to, so they need a node model stated its own way; this repository's *method* is the transferable part — a clause ledger, dispositions, an ambiguity register, gates. What it draws from here is what this repository exists to supply: the specification, the corpus, and `r4_wire_differential.sh`, which checks any shipped binary in any language by running it. Its implementation should be Rust through TemperMint, whose own plan already names what it needs from here.
+
+**5. Order, if this is accepted.** The widening first (26 clauses, contracts before implementation), then S5's message layer, then the narrator demonstration. The node server leaves this tree entirely, and its specification becomes the next repository's first milestone rather than this one's last.
