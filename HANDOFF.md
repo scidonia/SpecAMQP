@@ -25,8 +25,10 @@ the `grep` that re-locates it; the line numbers are as of the tree at the time o
 **Is.** An executable formal specification of AMQP 1.0 core (OASIS Standard, Parts 0–5) in
 Lean 4; a clause-level ledger with dispositions and a coverage report; a vector corpus; the
 gates that check all three; and — since `PLAN.md` §23.1 — an implementation track: a Lean
-endpoint compiled natively, its transport boundary landed, its protocol core being written, and
-that core to carry a stated instance of the conformance relation (§8), with its proof owed.
+endpoint compiled natively, its transport boundary landed, its protocol core written, and **that core
+carrying a proved instance of the conformance relation (§8)** — R3 is discharged and the instance accepted
+(`lean/Contracts/EndpointAcceptance.lean`), leaving the compiled binary and the socket boundary as the trusted
+and disclosed steps downstream should still price in.
 
 **Is not.** There is no Rust here, no Charon/Aeneas extraction, and no performance claim
 (`git grep -n "There is no Rust here" -- AGENTS.md`). There is no *verified binary*: Lean's
@@ -38,12 +40,15 @@ the **plumbing** — unit extraction, buffering, direction, output order, render
 reading — not the protocol decisions: the core is a driver over `Spec.Connection.step` and so
 shares the specification's decision function *by construction*, which means a defect inside
 `Spec.Connection.step` is inherited rather than caught, and finding it is the corpus's and the
-differential's work (`grep -n "shares the specification" PLAN.md`).
+differential's work (`grep -n "shares the specification" PLAN.md`). **And it is proved rather than owed**: `Proofs/EndpointConformance.lean` establishes the statement
+`Contracts/EndpointConformance.lean` froze, at exactly that type, and `Contracts/EndpointAcceptance.lean` binds it — the proof's own content matching the
+sentence above is the check on the sentence, three of its four plumbing equalities having closed by `rfl`.
 
 **Therefore.** An independent second *reading* of the standard already exists in `lean/Ref/`,
 and the corpus over it tests that reading. The corpus run against this endpoint at the wire
 tests **plumbing and the boundary** — that octets survive a socket, that framing and buffering do
-not reorder or truncate them, and that the endpoint's answers match `amqp-spec`'s. It is not an
+not reorder or truncate them, and that the endpoint's answers match `amqp-spec`'s. **It does**: `tests/contracts/r4_wire_differential.sh` declares that tier's state per vector, and all six vectors of
+`vectors/slice.ndjson` agree at the socket (`10ccc05`) with no residual divergence — the two application seams that made three of them diverge are closed. It is not an
 independent protocol reading, and adding a third runner over the same corpus does not make
 `lean/Ref/` redundant (`sed -n '/^- \*\*R3 — the conformance theorem/,/^- \*\*R4/p' PLAN.md`).
 
@@ -442,7 +447,7 @@ carries the measured figures with the command that re-measures them and the READ
 its own, which is the repair for every drift found today: state it once, and measure it
 (`wc -l scripts/transport_shim.c`; `grep -c "^\s*\(//\|\*\|/\*\)" scripts/transport_shim.c`).
 
-**R2 — the endpoint core: landed, review returned findings, not accepted.** `22f1228` adds
+**R2 — the endpoint core: landed, review returned findings, accepted after four rounds.** `22f1228` adds
 `lean/Impl/Core.lean` (384 lines), `lean/Impl/Stream.lean` (541), `lean/Proofs/CoreLaws.lean` (183)
 and the new `lean/Shell/` tree — `Driver.lean` (238, the recv/feed/write loop and the three
 obligations it states as unproved), `Main.lean` (116) and an `amqp-endpoint` executable. The core is
