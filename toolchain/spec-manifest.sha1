@@ -107,7 +107,7 @@ af7bb1f7da0bf50c65238f43394e42eb3d248ae7  vectors/constructor-disagreement.ndjso
 240d04abf05f593c59062c75e2ed16a2ac6185ed  vectors/flow.ndjson
 0f123312d720c0282d52ceb90467270f289dc6ed  vectors/frames-negative.ndjson
 860b8160aeeff3a1c8033f86292924a99e797a9c  vectors/frames.ndjson
-4ba242e5273244f9421c5dd48fd53c57df3fae89  vectors/generated-exchanges.ndjson
+49f6a5da67b644e185acb32b816590f6a8084512  vectors/generated-exchanges.ndjson
 8a192591a2dd0907664c3501963469af085e88ac  vectors/generated-frames.ndjson
 4a842a5f63cacefa036e922f31581432817c3228  vectors/generated.ndjson
 f7fe109975981669f41c09b08c16c1ff72e4eb97  vectors/isolation.md
@@ -120,7 +120,7 @@ c876f69bb22065b406c11b423b5ffb93d4d18426  vectors/message/sections.ndjson
 8a0698b69a00e858aefea2249a89ec7c20c1aed5  vectors/messages.ndjson
 0ae3389f5cb1a5360d7b8bcce6d601463b735b2e  vectors/open-bad-field.ndjson
 4edac54f39746f6464d5b2711111720c5b658b5e  vectors/primitives.ndjson
-6a727ec6002313ac695bb0746ebbd17c5bfed16b  vectors/sasl-negative.ndjson
+4a008ea51f55fb488b9d01833fca09ccb9eae409  vectors/sasl-negative.ndjson
 1dbd3b9bfcbbdc661b31a4d75a2b8081a49ca3ed  vectors/sasl.ndjson
 2f85e410608d4b6f8e220da9a45cd27497227e4a  vectors/slice.ndjson
 5016bfabb395b8ff29564fb6c95208622dd6d652  vectors/txn-negative.ndjson
