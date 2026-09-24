@@ -16,14 +16,14 @@ f1b824c9c4aeae571c20a0acb2e7ff06d1b50741  lean/Contracts/Sasl.lean
 7a52a63a35cda512b63a483e43af4799ae81beea  lean/Contracts/Transaction.lean
 c5ee92929caed5a244bae9a85cea9d0af5e7749a  lean/Contracts/TypeSystem.lean
 316c36a5a9f758c3dae57928cc7010485da89c40  lean/Spec/Codec.lean
-37bd73026b86c3fd7fb3fdba1ad1ac404ee68598  lean/Spec/Connection.lean
+b757b9176c5dbe08409b5d8e28d3372d22dca7b5  lean/Spec/Connection.lean
 2a205f752ad6833b88e2064a498eba8b86193fba  lean/Spec/ConnectionCodec.lean
 c92c679a91d5a504610bbd47f27ffe33f7776971  lean/Spec/Frame.lean
 31e43aed7900e071a7a1615d739be50f716b5b74  lean/Spec/FrameCodec.lean
 7c2fc8950376880dfbba4beb86a052316ea8b589  lean/Spec/Main.lean
 f1aa87779544d6f2305c84a24a96d482bcfb6956  lean/Spec/Message.lean
 9fa46bb63a4e3b09f04c9d89689b74a676356783  lean/Spec/ReadLaws.lean
-ab18d9b0c99c419ecffb89f08f2355000fac7834  lean/Spec/Session.lean
+623f06de3126703f4e196825921cdf748e247b07  lean/Spec/Session.lean
 0d21912c7627dddca29799f8b7a224fe91907b05  lean/Spec/SessionCodec.lean
 9824a25e7b937000c8f8c16a9986f6bda2869632  lean/Spec/Transactions.lean
 d4de8144b2390024ff98ef4bb5a6ddc34ad5d2d4  lean/Spec/Value.lean
