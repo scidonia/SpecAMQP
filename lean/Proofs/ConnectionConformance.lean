@@ -1391,10 +1391,11 @@ def specAnswerOf (s : SpecAMQP.Spec.Connection.Endpoint)
 says the caller supplies them, and `apply` returns the peer alone, so this is where the wire comes from
 on that side. It is exactly the same list the specification's layer builds internally — including the one
 case that is not "the octets I was handed when I am sending": a bodyless frame is admitted writing nothing
-in the AMQP layer, and in the SASL layer it is refused, where the answer's octets are the refusal's own
-reply rather than this list, and that reply is empty too. So a bodyless frame puts no octets on the wire
-on either side and in either layer. What checks this list is the simulation below, which compares it
-against the octets the specification's own `Outcome` reports. -/
+in the AMQP layer where the state's receive column admits a frame, and refused in the SASL layer and in a
+state whose column admits none, where the answer's octets are the refusal's own reply rather than this
+list, and that reply is empty too. So a bodyless frame puts no octets on the wire on either side, in
+either layer and in any state. What checks this list is the simulation below, which compares it against
+the octets the specification's own `Outcome` reports. -/
 
 def refOfferWrote (outbound : Bool) (offer : SpecAMQP.Ref.Connection.Offer) : List Octets :=
   match offer with
@@ -5193,12 +5194,15 @@ def frameAnswerRef (i : Ref.Connection.Peer) (bytes : Octets) :
            Ref.Connection.takeSasl i false used body
          else Ref.Connection.takeFrame i false frame.channel used body)
 
-/-- **The bodyless frame's answer, in both layers.** The layer the empty frame arrives in decides its
-answer, and the two artefacts decide alike. In the AMQP layer the frame is the traffic the idle-timeout
-clause licenses, so both leave the peer where it was and write nothing. In the SASL layer the security
-section makes it an irrecoverable error, so both refuse it — with the condition a wire-level failure
-carries, the class the frame layer names for a body that is not a performative, and the peer at END,
-which is where the layer's own placement puts every refusal it raises.
+/-- **The bodyless frame's answer, in both layers and in every state.** Two things decide it, and the
+two artefacts decide alike. The layer comes first: in the SASL layer the security section makes an empty
+frame an irrecoverable error, so both refuse it — with the condition a wire-level failure carries, the
+class the frame layer names for a body that is not a performative, and the peer at END, which is where
+the layer's own placement puts every refusal it raises. In the AMQP layer the state's row decides, and
+that row is picture 24's legal-receives column: where it admits a frame the empty frame is the traffic
+the idle-timeout clause licenses, so both leave the peer where it was and write nothing; where it does
+not admit one — a blank cell, or a cell naming the open or the header — both refuse it, with the
+condition the table's own refusals carry (`amqp:illegal-state`) and the class `illegalState`.
 
 The two refusals' prose differs, which is why the relation compares the condition, the class and the
 placement rather than the sentence: a difference in wording is not a difference in what the peer is
@@ -5216,13 +5220,41 @@ theorem bodyless_answers (s : Spec.Connection.Endpoint) (i : Ref.Connection.Peer
   unfold Spec.Connection.bodylessFrame Ref.Connection.emptyFrame
   cases hlayer : s.layer with
   | amqp =>
-    rw [hlayEq, hlayer, if_neg (by decide), if_neg (by decide)]
-    have hs : placedSpec s outbound (.ok ⟨s, []⟩) = .ok ⟨s, []⟩ := rfl
-    have hr : placedRef (refPeerOf s) outbound (.ok (refPeerOf s)) = .ok (refPeerOf s) := rfl
-    rw [hs, hr]
-    refine ⟨⟨fun out hout => ?_, fun r' hr' => absurd hr' (by simp)⟩, rfl⟩
-    obtain rfl := Except.ok.inj hout
-    exact ⟨refPeerOf s, rfl, rfl, rfl⟩
+    -- Each `if` below is discharged by a hypothesis that fixes its condition, rather than by a
+    -- `by decide` whose type the elaborator would have to guess: the answers now nest an `if` inside
+    -- an `if`, and a bare `by decide` matches whichever one it meets first. `cases` has already
+    -- replaced the specification's layer by the constructor in this goal, so the hypothesis is
+    -- stated against the constructor and the reference's condition is reduced to it.
+    have hnoLayer : ¬ ((Spec.Connection.Layer.amqp == Spec.Connection.Layer.sasl) = true) := by
+      decide
+    have hnoRef : ¬ (((refPeerOf s).protocolId == Ref.Connection.saslId) = true) := by
+      rw [hlayEq, hlayer]
+      exact hnoLayer
+    rw [if_neg hnoLayer, if_neg hnoRef]
+    -- The row's receive column, read the same way by both transcriptions: `permitsReceive` with the
+    -- role the bodyless frame has is the reference's `mayReceive` with the kind it has.
+    have hcol : Spec.Connection.permitsReceive s.state Spec.Connection.FrameRole.other =
+        Ref.Connection.mayReceive (refPeerOf s).state Ref.Connection.Kind.relayed := by
+      rw [show (refPeerOf s).state = refState s.state from rfl]
+      exact permitsReceive_eq s.state Spec.Connection.FrameRole.other (by decide)
+    by_cases hperm : Spec.Connection.permitsReceive s.state Spec.Connection.FrameRole.other = true
+    · -- The column admits a frame: the idle-timeout traffic, left where it was.
+      have hrperm : Ref.Connection.mayReceive (refPeerOf s).state Ref.Connection.Kind.relayed
+          = true := by rw [← hcol]; exact hperm
+      rw [if_neg (not_not_true hperm), if_neg (not_not_true hrperm)]
+      have hs : placedSpec s outbound (.ok ⟨s, []⟩) = .ok ⟨s, []⟩ := rfl
+      have hr : placedRef (refPeerOf s) outbound (.ok (refPeerOf s)) = .ok (refPeerOf s) := rfl
+      rw [hs, hr]
+      refine ⟨⟨fun out hout => ?_, fun r' hr' => absurd hr' (by simp)⟩, rfl⟩
+      obtain rfl := Except.ok.inj hout
+      exact ⟨refPeerOf s, rfl, rfl, rfl⟩
+    · -- The column admits no frame: the table's own refusal for a frame that is not permitted
+      -- where it arrived, which is what END's `-` already answers a `close` with.
+      have hrperm : ¬ (Ref.Connection.mayReceive (refPeerOf s).state
+          Ref.Connection.Kind.relayed = true) := fun h => hperm (by rw [hcol]; exact h)
+      rw [if_pos (not_true_of_not hperm), if_pos (not_true_of_not hrperm)]
+      exact error_answers_agree s (refPeerOf s) rfl outbound _ _
+        ⟨illegalState_eq, rfl, rfl, rfl⟩
   | sasl =>
     rw [hlayEq, hlayer, if_pos (by decide), if_pos (by decide)]
     exact error_answers_agree s (refPeerOf s) rfl outbound _ _
@@ -5400,7 +5432,6 @@ theorem arriving_answers (h : ReadersAgree) (s : Spec.Connection.Endpoint)
     · have hshapeF : Spec.Connection.headerShaped bytes = false := by simpa using hshape
       have hshapeRF : Ref.Connection.looksLikeHeader bytes = false := hshapeF
       rw [if_neg hshape, if_neg (by simp [hshapeRF])]
-      trace_state
       exact arriving_frame_answers h s (refPeerOf s) rfl bytes
 
 /-- **The receive direction's obligation.** The specification's answer to an arriving buffer is the
@@ -5414,9 +5445,10 @@ theorem arriving_matched (h : ReadersAgree) (s : Spec.Connection.Endpoint)
 
 /-! ## The step question -/
 
-/-- The bodyless frame of `idle-time-out.7` on the send route: which layer it is offered to decides
-its answer, in the same two ways the receive route's `bodyless_answers` states — traffic in the AMQP
-layer, an irrecoverable error in the SASL one. -/
+/-- The bodyless frame of `idle-time-out.7` on the send route: which layer it is offered to, and inside
+the AMQP layer which state's row it is offered in, decides its answer — in the same ways the receive
+route's `bodyless_answers` states: traffic where the receive column admits a frame, the table's own
+illegal-state refusal where it does not, and an irrecoverable error in the SASL one. -/
 
 theorem frame_none_answers (s : Spec.Connection.Endpoint) (i : Ref.Connection.Peer)
     (hR : refPeerOf s = i) (outbound : Bool) (channel : Nat) (octets : Octets) :
@@ -5429,8 +5461,9 @@ theorem frame_none_answers (s : Spec.Connection.Endpoint) (i : Ref.Connection.Pe
 
 /-- **The step question.** The three slices, composed: the header exchange from the columns the table
 states, the AMQP frame from the mandatory rule and the limits, the SASL dialogue from its stages, and the
-bodyless frame from the layer it was offered to — traffic where the idle-timeout clause licenses it, an
-irrecoverable error in the security layer. -/
+bodyless frame from the layer it was offered to and the state's own receive column — traffic where that
+column admits a frame, the table's illegal-state refusal where it does not, an irrecoverable error in the
+security layer. -/
 
 theorem stepAgrees : StepAgrees := by
   intro h s i hR outbound sub offer hcorr

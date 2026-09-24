@@ -867,27 +867,42 @@ inductive Offer where
     frame (channel : Nat) (octets : Octets) (body : Option Value)
   | arrives (octets : Octets)
 
-/-- An empty frame, answered by the layer this peer is in.
+/-- An empty frame, answered by the layer this peer is in and by the row the table gives its state.
 
 The same eight octets mean two different things and the artifact says which. In the AMQP layer
 an empty frame is the traffic a peer sends to keep a connection alive — "it MAY send an empty
 frame, i.e., a frame consisting solely of a frame header, with no frame body" — so the peer is
-left as it was. Once protocol id three has been negotiated the security section states the
-opposite rule about the same frame: a SASL frame's body "MUST contain exactly one AMQP type,
-whose type encoding MUST have provides=\"sasl-frame\"", and "receipt of an empty frame is an
-irrecoverable error". So it is refused wherever in the dialogue it arrives, because the rule is
-about the frame and not about the dialogue's position.
+left as it was.
 
-The refusal is a wire-level one — the condition the artifact assigns to a frame whose octets
-break its framing rules — and its class is the one the frame reader names when a body is not a
-described performative, which is what an absent body is the limiting case of. It leaves the
-peer at END: an error the section calls irrecoverable is not answered with an AMQP close, and
-in this layer there is no established connection to close. -/
+That licence is the row's to give rather than the frame's to claim. An empty frame is a frame,
+and a row's receive column is what admits one — `receivesAny` and nothing less. A row whose
+receive column is blank admits no frame at all, and a row reading `receivesOpen` or
+`receivesHeader` admits the open or the protocol header it names, which a frame with no body is
+not: it carries no performative. So the row is asked before the peer is left as it was, with
+the same `mayReceive` the frame step asks of a kind, and where the row admits no frame the
+refusal is the one the table's existing refusals use — `amqp:illegal-state` with the class
+`illegalState`, which is what the corpus's END refusals (`exchange-frame-in-end-refused`, whose
+receive step is `refused_close_in_end`) pin for a frame arriving where the table admits none.
+
+Once protocol id three has been negotiated the security section states the opposite rule about
+the same frame: a SASL frame's body "MUST contain exactly one AMQP type, whose type encoding
+MUST have provides=\"sasl-frame\"", and "receipt of an empty frame is an irrecoverable error".
+So it is refused wherever in the dialogue it arrives, because the rule is about the frame and
+not about the dialogue's position.
+
+The SASL refusal is a wire-level one — the condition the artifact assigns to a frame whose
+octets break its framing rules — and its class is the one the frame reader names when a body is
+not a described performative, which is what an absent body is the limiting case of. It leaves
+the peer at END: an error the section calls irrecoverable is not answered with an AMQP close,
+and in this layer there is no established connection to close. -/
 def emptyFrame (peer : Peer) : Except Refusal Peer :=
   if peer.protocolId == saslId then
     .error (refuse "malformed" "the SASL frame carries no body, and the security section \
       requires a SASL frame's body to hold exactly one AMQP type providing sasl-frame: an \
       empty frame is an irrecoverable error")
+  else if !mayReceive peer.state .relayed then
+    .error (refuseWith stateCondition "illegalState" s!"{peer.state.label} does not admit a \
+      frame with no body: its receive column admits no frame")
   else .ok peer
 
 /-- Apply one offer. A frame that arrives is read here, because whether the octets are a
@@ -898,8 +913,9 @@ def apply (peer : Peer) (outbound : Bool) (offer : Offer) : Except Refusal Peer 
     | .header header => takeHeader peer outbound header
     | .frame channel octets body =>
       match body with
-      -- an empty frame: which layer it was offered to decides its reading, since it is
-      -- traffic in the AMQP layer and an irrecoverable error in the SASL one
+      -- an empty frame: which layer it was offered to and which row the peer's state has
+      -- decide its reading, since it is traffic in the AMQP layer only where the receive
+      -- column admits a frame, and an irrecoverable error in the SASL one
       | none => emptyFrame peer
       | some body =>
         if peer.protocolId == saslId then takeSasl peer outbound octets.size body
@@ -927,7 +943,8 @@ def apply (peer : Peer) (outbound : Bool) (offer : Offer) : Except Refusal Peer 
           .error { fromFrame failure.message with reasonClass := failure.reasonClass }
         | .ok (frame, used) =>
           match frame.body with
-          -- the same input as the send route above, and the same rule: the layer decides
+          -- the same input as the send route above, and the same rule: the layer, and the
+          -- state's receive column inside the AMQP layer, decide
           | none => emptyFrame peer
           | some body =>
             if peer.protocolId == saslId then takeSasl peer false used body

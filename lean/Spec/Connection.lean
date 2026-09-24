@@ -1261,7 +1261,7 @@ def stepAmqpFrame (endpoint : Endpoint) (outbound : Bool) (channel size : Nat)
   let endpoint := endpoint.afterFrame outbound role declared
   return ⟨endpoint, if outbound then [wrote] else []⟩
 
-/-- A frame with no body, answered by the layer it was offered to.
+/-- A frame with no body, answered by the layer it was offered to and by the state it arrives in.
 
 The two layers read the same empty frame differently, and the difference is the artifact's
 rather than a convenience of this dispatcher.
@@ -1271,6 +1271,20 @@ traffic to prevent idle timeout, and has nothing to send, it MAY send an empty f
 frame consisting solely of a frame header, with no frame body" — so the step is admitted and
 the endpoint is left where it was, which is the reading `doc-idle-time-out.7` records for this
 dispatcher and the one the corpus's `exchange-empty-frame-any-channel` pins.
+
+That licence is the table's to give, and it is a *cell* rather than a shape. An empty frame is
+still a frame, and picture 24's legal-receives column is what says whether a frame may arrive:
+where the column is `*` the idle-timeout reading stands, and where it is `-` it may not. Nor is
+the column asked only for its blank cell: a cell reading `OPEN` names the open performative and
+a cell reading `HDR` names a protocol header, and a frame with no body is neither — it carries
+no performative at all — so it is no more permitted in those states than in a state whose
+column is `-`. So the receive column is consulted here before the frame is admitted, through
+the same `permitsReceive` the frame step asks of a role, with the role the bodyless frame
+actually has (`.other`: a frame the connection relays without deciding). Where the column does
+not admit it, the refusal is the one the table's existing refusals use rather than one invented
+for this case: `exchange-frame-in-end-refused` and its receive-side sibling `refused_close_in_end`
+pin that a frame arriving in END — where both columns are `-` — is refused with
+`amqp:illegal-state` and the class `illegalState`, and this is that same failure.
 
 In the SASL layer the security section states the opposite rule about the same octets: "The
 frame body of a SASL frame MUST contain exactly one AMQP type, whose type encoding MUST have
@@ -1286,12 +1300,20 @@ performative the same way. The security artifact names no error condition at all
 existing convention rather than a transcription, and it is the convention every other frame the
 SASL layer reads already uses. The place is END: the error is irrecoverable in the section's
 own word, and in this layer no AMQP close can be written, because the layer is not
-established. -/
+established.
+
+Both routes of `step` answer through this function — the submission a peer offered and the
+frame `readFrame` decoded — so neither route can read an empty frame one way and the other the
+other, which is the property the layer distinction already had and this column check keeps. -/
 def bodylessFrame (endpoint : Endpoint) : Except Refusal Outcome :=
   if endpoint.layer == Layer.sasl then
     .error (refusal "malformed" "the SASL frame carries no body, and the security section \
       requires a SASL frame's body to hold exactly one AMQP type providing sasl-frame: \
       receipt of an empty frame is an irrecoverable error")
+  else if !permitsReceive endpoint.state .other then
+    .error (stateRefusal "illegalState" s!"{endpoint.state.name} does not permit a frame with \
+      no body to arrive: the table's legal receives column is \
+      {endpoint.state.receiveClass.name}")
   else .ok ⟨endpoint, []⟩
 
 /-- Apply one submission to the connection layer, and place the refusal it raises.
@@ -1307,8 +1329,10 @@ def step (endpoint : Endpoint) (outbound : Bool) (submission : Submission) :
     match submission with
     | .header header => stepHeader endpoint outbound header
     | .frame channel octets body =>
-      -- a bodyless frame reaches this path too, and which layer it was offered to decides
-      -- its reading: traffic in the AMQP layer, an irrecoverable error in the SASL one
+      -- a bodyless frame reaches this path too, and which layer it was offered to and which
+      -- state it was offered in decide its reading: traffic in the AMQP layer where the
+      -- table's receive column admits a frame, a refusal where it does not, and an
+      -- irrecoverable error in the SASL one
       match body with
       | none => bodylessFrame endpoint
       | some body =>
@@ -1343,10 +1367,11 @@ def step (endpoint : Endpoint) (outbound : Bool) (submission : Submission) :
               -- layer's message, which is what a caller has always been shown here.
               .error ⟨framingError, refusal.reasonClass, refusal.message, none, []⟩
             | .ok (frame, consumed) =>
-              -- an empty frame carries no performative, and which layer received it decides
-              -- what that means — "apart from this use, empty frames have no meaning" here,
-              -- an irrecoverable error in the SASL layer — which is the reading the send
-              -- route above applies to the same input
+              -- an empty frame carries no performative, and which layer received it and which
+              -- state it arrived in decide what that means — "apart from this use, empty
+              -- frames have no meaning" here, but only in a state whose receive column admits
+              -- a frame; an irrecoverable error in the SASL layer — which is the reading the
+              -- send route above applies to the same input
               match frame.body with
               | none => bodylessFrame endpoint
               | some body =>
