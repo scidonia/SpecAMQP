@@ -833,6 +833,14 @@ whose declared constructor is unassigned and whose item list is empty wrote octe
 array whose declared constructor is unassigned, whatever it carries, nested included). The send instance stays conditional, and **the classing removed the *type* obstruction that made its endpoint-level
 refutation inexpressible** — so that refutation is now landable and is not yet landed.
 
+**And the 49 clauses marked `deferred:S4` were triaged rather than assumed, which changed what the widening is for.** They split three ways: **one was already carried** — `definition:connection-error/choice:framing-error.u1`, whose
+rule both artefacts state beside the condition constant they raise, so it was the ledger under-reporting its own coverage rather than an obligation — **25 are genuinely blocked** on the widening, and **23 belong to another class or milestone**, which is
+the number that matters because it was the largest and the least expected. The blocked set also says which part of the model each needs, and the answer is not the one the D4 record leads with: **the unsettled map is wanted by 22 of the 25**, link
+identity by 8, sender-side delivery bookkeeping by 6, and more than one link per session by only 2 — so the widening's centre of gravity is the map, not the second handle it is usually described by. Of the 23, four are the sending half the model
+states as an exclusion in its own docstring (it transitions on frames and builds none), five are extension capabilities the plan bounds out, four are flow quantities the credit contract already excludes (`available` and `drain`), two are definitional
+sentences the generated choice tables fix, two are multi-version negotiation, one is a SHOULD the conformance contract's own rule places as a fairness-qualified progress obligation, and the rest are the terminus family that belongs to `S3-session`.
+**None of the 23 is blocked on the widening**, so the widening's contract list is 25 clauses rather than 49 — and the triage reported the count of the other class as its headline because it was wrong in the direction nobody looks for.
+
 **Why the corpus missed it is a fact about the corpus, and worth the sentence**: **no vector in `vectors/**` uses an unassigned array constructor at all** — the corpus spells `"constructor": "a1"`, `"a3"` and
 assigned siblings — so 68,395 vectors and a 114,225-buffer class sweep said nothing about a hole that one authored vector found immediately. **A corpus that samples a space rather than sweeping it cannot report
 what it never visits**, which is the argument for the widening slice and the reason three defects this session were invisible to every gate.
