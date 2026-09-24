@@ -2,9 +2,11 @@
 
 # SpecAMQP
 
-An **executable formal specification of AMQP 1.0 core** (OASIS Standard, Parts 0–5), written in Lean 4,
-with a second independently written reference implementation of it, and a clause-level ledger that makes
-completeness and fidelity *measurable*.
+An **executable formal specification of AMQP 1.0 core** (OASIS Standard, Parts 0–5) written in Lean 4, a
+clause-level ledger that makes completeness and fidelity *measurable*, and a **second, independently written
+implementation** of the same standard — because the main risk in a specification is prose ambiguity, and two
+readings by one reader share their mistakes. Both run the same vectors and their verdicts are compared step
+by step: where they disagree, one of them has misread the standard.
 
 - **579 clauses** of the standard, each with a recorded disposition: 238 formalized, 105 covered by test
   vectors, 180 deferred to a named milestone, and the rest informative, out of scope or superseded.
@@ -15,11 +17,6 @@ completeness and fidelity *measurable*.
 - **76 Lean modules**, and an endpoint in `lean/Impl/` compiled by Lean's own C backend whose protocol core
   is proved to conform to the specification.
 
-**There are two Lean artefacts on purpose.** `lean/Spec/` is the specification. `lean/Ref/` is a second
-reading of the same OASIS documents, written without looking at the first and sharing no definition with it.
-The main risk in a specification is prose ambiguity, and two readings by the same reader share their
-mistakes — so both are run against the same vectors and their verdicts compared. Where they disagree, one of
-them has misread the standard, and finding that out is the point of having the second one.
 
 The specification is meant to be a target, not a description: conformance is defined as a state machine over
 a fixed interface alphabet, and implementations prove their own instances of it. `PLAN.md` is the programme
