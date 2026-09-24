@@ -659,12 +659,16 @@ theorem readCompound_consumes (fuel : Nat) (decl : EncodingDecl) (c : Cursor) (v
         | ok v => exact ⟨v.1, v.2, rfl⟩
       rw [hbi] at h
       simp only [except_bind_ok] at h
+      -- the duplicate-key check, which is a rule on the map's items and so runs before the
+      -- declared size is compared with the octets measured
       split at h
-      · simp only [Except.ok.injEq, Prod.mk.injEq] at h
-        refine ⟨size, count, items, c₁, hstart, ?_, hsize, hcount, Or.inr (Or.inl h.1.symm)⟩
-        rw [← h.2]
-        assumption
       · simp at h
+      · split at h
+        · simp only [Except.ok.injEq, Prod.mk.injEq] at h
+          refine ⟨size, count, items, c₁, hstart, ?_, hsize, hcount, Or.inr (Or.inl h.1.symm)⟩
+          rw [← h.2]
+          assumption
+        · simp at h
   · -- an owner that is not a compound form
     simp at h
 

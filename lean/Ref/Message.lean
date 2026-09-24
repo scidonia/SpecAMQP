@@ -368,7 +368,15 @@ the one absence the artifact forbids.
 A field the artifact declares `multiple` is judged by the types section's own reading of the
 attribute — a single element of the declared type is always permitted, and multiple values are an
 array whose elements are the type the field defines — so an array is judged entry by entry. An
-array in a field that is *not* `multiple` is refused, because the attribute is what permits it. -/
+array in a field that is *not* `multiple` is refused, because the attribute is what permits it.
+
+A **zero-length** array is the exception to both, and it is the types section's own rule rather
+than one made here: "a null value and a zero-length array (with a correct type for its elements)
+both describe an absence of a value and MUST be treated as semantically identical", so an empty
+array is absent exactly as a null is — refused for a mandatory field, admitted for any other —
+and it never reaches the element-by-element judgement. The element constructor is not consulted,
+the reading the specification's carried sites apply for the same sentence, and an array with no
+entries carries nothing whose type the absence could turn on. -/
 def checkFields : List FieldDecl → List Value → Except Refusal Unit
   | decls, [] =>
     match decls.find? (fun field => field.mandatory) with
@@ -381,6 +389,11 @@ def checkFields : List FieldDecl → List Value → Except Refusal Unit
   | decl :: rest, value :: values => do
     let _ ←
       match value with
+      | .array _ [] =>
+        if decl.mandatory then
+          .error (malformed s!"the mandatory field {decl.name} of {decl.owner} is carried as a \
+            zero-length array, which the types section makes the same absence a null states")
+        else .ok ()
       | .array _ items =>
         if decl.multiple then do
           let _ ← items.mapM (fun item => checkTyped decl.typeName decl.requires false item)

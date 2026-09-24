@@ -252,6 +252,24 @@ def assignedConstructor (octet : UInt8) : Bool :=
   | 0xE0 | 0xF0 => true
   | _ => false
 
+/-- Whether a key value occurs more than once among a map's pairs: Part 1's rule that "a map
+in which there exist two identical key values is invalid", asked here because a map's
+reader is where a map's items are formed.
+
+Keys are compared by their own value, which is what "two identical key values" is about: the
+clause says nothing about how a key was encoded, so a `uint 1` key and a `ubyte 1` key are
+two different keys. The comparison is a rule on the map's items, so it is asked before the
+declared size is compared with what the reading measured, which is the order
+`ledger/ambiguities/check-precedence-unspecified.json` adopts — form checks before the size
+comparison — and the order the parity guard in `readMap` already runs in.
+
+The writer asks the same question of its own pairs (`encodePairs`), because the clause is
+about the map's value rather than about one direction of the wire: octets this reader refuses
+are octets no conforming writer produces. -/
+def keysRepeat : List (Value × Value) → Bool
+  | [] => false
+  | (key, _) :: rest => rest.any (fun pair => pair.1 == key) || keysRepeat rest
+
 mutual
 
 /-- Read one value.
@@ -381,7 +399,9 @@ inconsistent size made this reader answer `sizeMismatch` where the specification
 answered `malformed`, which is a class divergence the differential's corpus did not
 reach; `Proofs.ValueLayerLaws` records it. The `pairUp` arm below is kept as a second
 line of defence rather than deleted, the same way `readElement`'s `unassigned` clause
-is. -/
+is. The duplicate-key comparison (`keysRepeat`) is asked in that same place and for the
+same reason: it is a rule on the map's items, so a map that both repeats a key and
+disagrees with its declared size is the malformed map it is. -/
 def readMap : Nat → Nat → Cursor → Result Value
   | 0, _, _ => .error (.truncated "no octets left")
   | fuel + 1, width, c => do
@@ -392,12 +412,14 @@ def readMap : Nat → Nat → Cursor → Result Value
       .error (.malformed "a map must have an even number of items")
     else do
       let (items, c) ← readItems fuel count c
-      if c.pos - start != size then
-        .error (.sizeMismatch "map" size (c.pos - start))
-      else
-        match pairUp items with
-        | some pairs => return (.map pairs, c)
-        | none => .error (.malformed "a map must have an even number of items")
+      match pairUp items with
+      | none => .error (.malformed "a map must have an even number of items")
+      | some pairs =>
+        if keysRepeat pairs then
+          .error (.malformed "a map carries two identical key values, and such a map is invalid")
+        else if c.pos - start != size then
+          .error (.sizeMismatch "map" size (c.pos - start))
+        else return (.map pairs, c)
 termination_by fuel _ _ => (fuel, 0)
 
 /-- Items taken two at a time, key then value: the pairing a map encoding
@@ -851,14 +873,23 @@ def encodeAll : List Value → Except EncodeRefusal Octets
 termination_by items => sizeOf items
 
 /-- A map's items concatenated in order: each key followed by its value, both with
-their own constructors, exactly as a compound's items are written. -/
+their own constructors, exactly as a compound's items are written.
+
+A map whose keys repeat is refused, as `readMap` refuses one: the clause is about the map's
+value, so a writer that produced such octets would write what its own reader rejects. The
+comparison is one-sided at each step — a repeated key is caught where the *earlier* of the
+two pairs is written — which covers every pair without a second pass over them. -/
 def encodePairs : List (Value × Value) → Except EncodeRefusal Octets
   | [] => .ok #[]
   | (key, value) :: rest => do
-    let head ← encode key
-    let middle ← encode value
-    let tail ← encodePairs rest
-    return head ++ middle ++ tail
+    if rest.any (fun pair => pair.1 == key) then
+      .error (encodeRefusal "malformed" "a map carries two identical key values, and such \
+        a map is invalid")
+    else
+      let head ← encode key
+      let middle ← encode value
+      let tail ← encodePairs rest
+      return head ++ middle ++ tail
 termination_by pairs => sizeOf pairs
 
 /-- An array's elements, each in the array's declared element constructor form: what an

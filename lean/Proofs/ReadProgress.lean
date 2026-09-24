@@ -166,11 +166,15 @@ theorem readValue_progress : ∀ (fuel : Nat),
         · obtain ⟨⟨items, c₃⟩, h3, h⟩ := exists_of_bind_ok h
           try dsimp only at h
           have p3 := hItems count c₂ items c₃ h3
+          -- the duplicate-key check stands before the size comparison, so a map's read past its
+          -- items is two guards rather than the one the size rule used to be
           split at h
-          · simp only [Except.ok.injEq, Prod.mk.injEq] at h
-            rw [← h.2]
-            omega
           · exact absurd h (by simp)
+          · split at h
+            · simp only [Except.ok.injEq, Prod.mk.injEq] at h
+              rw [← h.2]
+              omega
+            · exact absurd h (by simp)
       · exact absurd h (by simp)
     have hArrayData : ∀ (decl : EncodingDecl) (c : Cursor) (v : Value) (c' : Cursor),
         readArrayData 0 decl c = .ok (v, c') → c.pos ≤ c'.pos := by
@@ -308,11 +312,15 @@ theorem readValue_progress : ∀ (fuel : Nat),
         · obtain ⟨⟨items, c₃⟩, h3, h⟩ := exists_of_bind_ok h
           try dsimp only at h
           have p3 := hItems count c₂ items c₃ h3
+          -- the duplicate-key check stands before the size comparison, so a map's read past its
+          -- items is two guards rather than the one the size rule used to be
           split at h
-          · simp only [Except.ok.injEq, Prod.mk.injEq] at h
-            rw [← h.2]
-            omega
           · exact absurd h (by simp)
+          · split at h
+            · simp only [Except.ok.injEq, Prod.mk.injEq] at h
+              rw [← h.2]
+              omega
+            · exact absurd h (by simp)
       · exact absurd h (by simp)
     have hArrayData : ∀ (decl : EncodingDecl) (c : Cursor) (v : Value) (c' : Cursor),
         readArrayData (n + 1) decl c = .ok (v, c') → c.pos ≤ c'.pos := by
@@ -436,12 +444,15 @@ theorem readCompound_advance (fuel : Nat) (decl : EncodingDecl) (c : Cursor) (va
     · obtain ⟨⟨items', c₃⟩, h3, h⟩ := exists_of_bind_ok h
       try dsimp only at h
       have p2 : c₂.pos ≤ c₃.pos := (readValue_progress fuel).2.1 count' c₂ items' c₃ h3
+      -- the duplicate-key check stands before the size comparison
       split at h
-      · simp only [Except.ok.injEq, Prod.mk.injEq] at h
-        have hc : c'.pos = c₃.pos := by rw [← h.2]
-        rw [hc] at hmeasure
-        omega
       · exact absurd h (by simp)
+      · split at h
+        · simp only [Except.ok.injEq, Prod.mk.injEq] at h
+          have hc : c'.pos = c₃.pos := by rw [← h.2]
+          rw [hc] at hmeasure
+          omega
+        · exact absurd h (by simp)
   · exact absurd h (by simp)
 
 /-- **An array row's window is an advance.** The companion of `readCompound_advance`: the tail

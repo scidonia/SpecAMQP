@@ -170,7 +170,7 @@ inductive Value where
   form). -/
   | array (constructor : UInt8) (items : List Value)
   | described (descriptor : Value) (value : Value)
-deriving Repr
+deriving Repr, BEq
 
 /-- A value's name in the corpus vocabulary, for diagnostics. -/
 def typeName : Value → String
@@ -399,6 +399,26 @@ def pairUp : List Value → List (Value × Value)
   | key :: value :: rest => (key, value) :: pairUp rest
   | _ => []
 
+/-- Whether a key value occurs more than once among a map's pairs: the comparison Part 1
+requires of a map — "a map in which there exist two identical key values is invalid" — and
+the one `pairUp` does not make. Keys are compared by their own *value*, which is what "two
+identical key values" is about: the clause is silent on how a key was encoded, so a
+`uint 1` key and a `ubyte 1` key are two different keys, as two different values are.
+
+A rule on the map's items rather than on its octets, and asked before the declared size is
+compared with what the reading measured: the artifact ranks none of a map's checks, and the
+order the register adopts is form checks before the size comparison
+(`ledger/ambiguities/check-precedence-unspecified.json`), which is also the order the parity
+guard above runs in. A buffer that breaks both rules is therefore the malformed map it is,
+rather than a size contradiction.
+
+The writer asks the same question of the same predicate, because the clause is about the
+map's value rather than about one direction of the wire: a map that exists only as octets
+this reader refuses is a map its own writer must not produce. -/
+def keysRepeat : List (Value × Value) → Bool
+  | [] => false
+  | (key, _) :: rest => rest.any (fun pair => pair.1 == key) || keysRepeat rest
+
 /-- The data of a scalar declaration — one whose encoding is fixed or variable — read
 without recursion. That is also the form an array's elements take when the array's
 constructor is one of them. -/
@@ -462,8 +482,12 @@ def readCompound (fuel : Nat) (decl : EncodingDecl) (c : Cursor) : Result Value 
         come in pairs, so an odd count is not a map")
     else do
       let (items, c) ← readItems fuel count c
+      let pairs := pairUp items
       let measured := c.pos - start
-      if measured = size then .ok (.map (pairUp items), c)
+      if keysRepeat pairs then
+        .error (refusal "malformed" "a map carries two identical key values, and such a \
+          map is invalid")
+      else if measured = size then .ok (.map pairs, c)
       else .error (refusal "sizeMismatch" s!"a map declares {size} octet(s) after its \
         size field and measures {measured}")
   | owner =>
@@ -893,14 +917,25 @@ def writeItems : List Value → Except Refusal (List UInt8)
     return head ++ tail
 termination_by items => sizeOf items
 
-/-- A map's pairs in wire order. -/
+/-- A map's pairs in wire order.
+
+A map in which two key values are identical is invalid, which is a rule about the map's
+value rather than about one direction of the wire, so this writer refuses one exactly as the
+reader does: a writer that emitted octets its own reader refuses would put its domain outside
+what it accepts, and the round trip the contracts state — for every value the writer encodes,
+the reader recovers it from exactly those octets — has no room for a value it can write and
+cannot read. -/
 def writePairs : List (Value × Value) → Except Refusal (List UInt8)
   | [] => .ok []
   | (key, value) :: rest => do
-    let head ← writeValue key
-    let middle ← writeValue value
-    let tail ← writePairs rest
-    return head ++ middle ++ tail
+    if rest.any (fun pair => pair.1 == key) then
+      .error (refusal "malformed" "a map carries two identical key values, and such a \
+        map is invalid")
+    else
+      let head ← writeValue key
+      let middle ← writeValue value
+      let tail ← writePairs rest
+      return head ++ middle ++ tail
 termination_by pairs => sizeOf pairs
 
 /-- Array elements' data, each in the array's declared constructor form. -/

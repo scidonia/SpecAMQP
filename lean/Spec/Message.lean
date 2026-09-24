@@ -479,15 +479,26 @@ def checkField (decl : FieldDecl) (value : Value) : Except Refusal Unit := do
             carries a {typeName value}")
       else pure ()
 
-/-- Whether a field's value is the null that says "not set". -/
-def isNullValue : Value → Bool
+/-- Whether a field's value is one that describes an absence of a value: the `null` that says
+"not set", and a zero-length array, which the types section states describes the same absence —
+"a null value and a zero-length array (with a correct type for its elements) both describe an
+absence of a value and MUST be treated as semantically identical".
+
+The array's element constructor is deliberately not consulted: this is the reading the two
+carried sites already apply (`terminusFieldIsSet` and `multipleEntries` both treat any
+zero-length array as the absence), and an array with no elements carries nothing whose type
+the absence could turn on. A *non-empty* array is not an absence whatever its elements: it
+states values, and it is judged by the field's declared type and multiplicity instead. -/
+def isAbsentValue : Value → Bool
   | .null => true
+  | .array _ [] => true
   | _ => false
 
 /-- Check a composite's body: a list no longer than the declared field count, whose
-mandatory fields are present and non-null, and whose present fields match their declared
-types and roles. Trailing absent fields are the encoding's way of saying "not set", which
-is why a short list is admitted and a long one is not. -/
+mandatory fields are present and carry a value, and whose present fields match their declared
+types and roles. A field is absent when it is null or a zero-length array — the two the types
+section makes the same absence — and trailing absent fields are the encoding's way of saying
+"not set", which is why a short list is admitted and a long one is not. -/
 def checkFieldList (name : String) (items : List Value) : Except Refusal (List Value) := do
   let decls ← liftRefusal (fieldDeclsOf name)
   if items.length > decls.length then
@@ -502,10 +513,11 @@ def checkFieldList (name : String) (items : List Value) : Except Refusal (List V
             s!"{name} declares {decl.name} mandatory and the section omits it")
         else pure ()
       | some value =>
-        if isNullValue value then
+        if isAbsentValue value then
           if decl.mandatory then
             .error (decodeRefusal "malformed"
-              s!"{name} declares {decl.name} mandatory and the section carries null for it")
+              s!"{name} declares {decl.name} mandatory and the section carries \
+                {typeName value}, which states no value")
           else pure ()
         else checkField decl value)
     return items
