@@ -49,9 +49,17 @@ dependency: **a choice rather than a necessity**, because the pinned stdlib does
 over libuv compiled into `libleanshared.so`) and a POSIX wrapper — a couple of hundred lines, measured in
 `PLAN.md` §23.1 — was taken instead, so that the endpoint's frame loop stays synchronous and the unnamed part of the trust base
 stays small. `PLAN.md` §23.1 records the measurement, the decision and the rejected alternative, which was
-built and passed before it was rejected. **The corpus will run against the
-endpoint over a socket as a third runner beside `amqp-spec` and `amqp-ref`** — that runner is R4 and does not
-exist yet, so what the endpoint claims and what it does are not compared by the vectors today. The protocol
+built and passed before it was rejected. **The corpus does run against the
+endpoint over a socket as a third runner beside `amqp-spec` and `amqp-ref`** — that runner is R4, its first rung
+is in the tree (`scripts/run-endpoint-wire-differential.sh` with `scripts/endpoint/WireApp/` and the wire peer),
+and it compares the shipped binary's per-step socket verdict against `amqp-spec`'s in-process verdict. **Two of
+`slice.ndjson`'s six playable vectors agree end to end — one of them exercising the SASL layer through the core
+including its refused step — and four diverge, each named with its step**: two because the shell prompts the
+application only after a read, so two consecutive sends with nothing arriving between them cannot be played; one
+because that vector's pre-state is `START` and the shell has already announced its own header; and one endpoint
+state after a refusal, not yet attributed to the core or to the vector. So the rung discriminates, three of its
+four divergences are attributed to the application seam rather than the core, and **R4 is not accepted**: an
+unattributed divergence is what acceptance is waiting for, not a passing count. The protocol
 core's `Conforms` instance is likewise R3 and undischarged: what is proved *about the endpoint* at this point
 is nothing, and what is proved *about its parts* is the framing laws in `lean/Proofs/CoreLaws.lean`.
 
