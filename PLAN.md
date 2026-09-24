@@ -1467,6 +1467,16 @@ Contracts: `lean/Contracts/MessageFormat.lean`, `vectors/messages.ndjson`, `vect
 
 Acceptance: every section type round-trips; the outcome state machine is proved; the partial-transfer `received` path is modelled and vector-covered; a fragmented recorded message is admitted.
 
+**And the corpus grows two negatives the message layer's rules had no form for** (`messages-negative.ndjson`, authored from the clauses rather than from any artefact): a properties section
+setting `content-encoding` with a body that is not a data section, and `identity` as the encoding with a data body. The two are separate vectors on purpose — the first breaks only `.1` and the second
+only `.2`, so a decoder that refused either message for the *section* rather than for the *encoding* satisfies one and not the other, which is the difference between evidence and a refusal.
+
+**Two carried families have no corpus form at all, and the ruling is that the harness is extended rather than the declarations left as their evidence.** `Harness.MessageCodec` and `DeliveryCodec` cannot
+carry a terminus, and `Harness.DeliveryOutcome` has no field for a delivery's annotations, so the terminus field sets and `message-annotations.2`'s merged-annotation observable rest on declarations alone —
+which is *weaker* evidence in a repository whose corpus is the instrument, and the gap is in the runner rather than in either artefact. Extending it means a field on `DeliveryOutcome`, a terminus in the
+message codec, and the schema those corpora are validated against moving with them, which is a planner-owned contract change plus the slice that implements it. It is queued rather than dropped: the
+alternative is a family of clauses the corpus cannot see, and this plan has already recorded what that costs.
+
 ### S6 — transactions (Part 4)
 
 Scope: `coordinator`, `declare`/`declared`, `discharge`, `txn-id`, transactional delivery state, transaction outcomes and errors, resumption rules, interaction with settlement.
