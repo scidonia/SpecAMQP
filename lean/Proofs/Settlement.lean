@@ -56,7 +56,14 @@ side, and what the same script leaves is only the branch the role's own hypothes
 impossible: the `do`-block's `if (role == LinkRole.sender)` is cased by `split` as a `Bool`,
 which produces a `(LinkRole.sender == LinkRole.sender) = false` branch beside the real one.
 `sender_role_beq_self` refutes it, and every goal still open after the reduction is it.
--/
+
+That was the residue while the selection was the last thing `attachLink` did before it built the
+record. The session layer has since added the two `attach/source` and `attach/target` guards the
+attach now runs first, and they move the boundary: the chain lemmas invert the guards up to the
+one that reads a terminus, so the `k` they hand the closing steps is the record's own `do`-block
+rather than the record, and the branch in which both guards pass reaches those steps with its
+chain un-inverted. The theorem cases each `terminus` lookup by name to reduce it, and both
+residues — that branch and the impossible role one — close the way every other branch does. -/
 
 namespace SpecAMQP.Proofs.Settlement
 
@@ -67,7 +74,7 @@ open SpecAMQP.Proofs.HandleUniqueness (guard_last guard_chain2_tail)
 
 /-- The scrutinee the `if (role == LinkRole.sender)` a `do`-block's branch elaborates to
 reduces to once the hypothesis naming the role has been rewritten in. Its `= false` branch is
-one no session can be in, and it is what every goal still open after the reduction is. -/
+one no session can be in, and this equality is what refutes it. -/
 theorem sender_role_beq_self : (LinkRole.sender == LinkRole.sender) = true := rfl
 
 set_option maxHeartbeats 1600000 in
@@ -76,10 +83,14 @@ equality `Contracts/Settlement.lean` states, in the contract's own name.
 
 The proof is the `do`-block's case analysis. `attachLink`'s guards are `refuseUnless (c) r`,
 which Lean elaborates into `if` terms inside the block's `>>=` chain — where `split` cannot
-case them from — so the role lookup is rewritten by the hypothesis that names it, the two
-guards are inverted by `Proofs/HandleUniqueness`' chain lemmas, and each surviving branch is
-the record the function builds. Both branches assign `senderSettleMode` from the same
-selection, so the two of them close on the same definitional equality. -/
+case them from — so the role lookup is rewritten by the hypothesis that names it, the guards
+whose chains `Proofs/HandleUniqueness`' lemmas state are inverted by them, and each surviving
+branch is the record the function builds. The `attach/source` and `attach/target` guards the
+block runs before it records the selection are cased one `terminus` lookup at a time instead:
+they stand between the chain those lemmas invert and the record, so the `k` such a lemma hands
+over is the record's own `do`-block, a shape no lemma of the family states. Both branches
+assign `senderSettleMode` from the same selection, so the two of them close on the same
+definitional equality. -/
 theorem senderSettleModeIsTheChoiceTheClauseSelects :
     SpecAMQP.Contracts.SenderSettleModeIsTheChoiceTheClauseSelects := by
   intro session session' outbound body hrole hattach
@@ -92,11 +103,27 @@ theorem senderSettleModeIsTheChoiceTheClauseSelects :
   all_goals (try (cases hcount : (fieldValue "attach" "initial-delivery-count" body).bind valueNat
     <;> simp_all))
   all_goals (try (simp only [guard_last] at hattach))
+  -- The two `attach/source` and `attach/target` guards the block runs before it records the
+  -- selection, cased on the `terminus` lookup each one reads. They stand between the chain the
+  -- lemmas above invert and the record, so what they leave is a `do`-block no chain lemma states,
+  -- and `cases` on the lookup is what reduces it. Each case is stated apart from the reduction
+  -- that follows — `cases … <;> simp_all` fails as one tactic where the branch in which the guard
+  -- passes survives its `simp_all`. The endpoint is `sender`, which is the branch `rw [hrole]`
+  -- leaves the `let sentBy` lookup in.
+  all_goals (try (cases hsource :
+    (terminusRefusalOf Spec.Message.SendingEndpoint.sender "source" body)))
+  all_goals (try (cases htarget :
+    (terminusRefusalOf Spec.Message.SendingEndpoint.sender "target" body)))
   all_goals (try (rw [Except.ok.injEq] at hattach))
   all_goals (try (obtain ⟨_, hrec⟩ := hattach))
   all_goals (try (obtain ⟨_, hrec⟩ := hrec))
   all_goals (try (cases hrec))
   all_goals (try (simp_all))
   all_goals (try (simp_all [sender_role_beq_self]))
+  -- What the two lookups leave is the record the block builds, so the successor equality the goals
+  -- still carry is cased the way every other branch's is, and the field projection then reduces to
+  -- the selection — which is the whole of the contract.
+  all_goals (try (cases hrec))
+  all_goals (try (simp_all))
 
 end SpecAMQP.Proofs.Settlement
