@@ -16,7 +16,7 @@ a20b89eb67ba868de68a1412a939495c29c965bb  lean/Contracts/Settlement.lean
 7a52a63a35cda512b63a483e43af4799ae81beea  lean/Contracts/Transaction.lean
 c5ee92929caed5a244bae9a85cea9d0af5e7749a  lean/Contracts/TypeSystem.lean
 316c36a5a9f758c3dae57928cc7010485da89c40  lean/Spec/Codec.lean
-6ae6b3fd8a72c2bf6f74d357f36c2cf3eb798868  lean/Spec/Connection.lean
+c6a4e53394d07c4bb462c2b734c70e80f4a635f1  lean/Spec/Connection.lean
 2a205f752ad6833b88e2064a498eba8b86193fba  lean/Spec/ConnectionCodec.lean
 c92c679a91d5a504610bbd47f27ffe33f7776971  lean/Spec/Frame.lean
 31e43aed7900e071a7a1615d739be50f716b5b74  lean/Spec/FrameCodec.lean
@@ -56,7 +56,7 @@ c661a0341ee5572bd716861459bcfbedbae36a7f  ledger/ambiguities/unmapped-begin.json
 2dd54d7eeae541a3df93bd52a17aae4d8cff5a6e  ledger/ambiguities/version-mismatch-condition.json
 003cbf78615e5a2c39ff63ce21b19ef4ab0b6b68  ledger/ambiguities/zero-width-array-count.json
 a713fbf4e03ad80112e701e2e7dfabe6dbb53623  ledger/clauses.json
-acdc857bc6b0557579f4f9a2b003d4168fa3e394  ledger/coverage.json
+25b1a215c9472132658be7de71fe1dbf865a0d44  ledger/coverage.json
 b929301beea8db3509a392840563a35946f76b30  ledger/dispositions/part0-conformance-and-transport-lifecycle.json
 22914db7d7ac979d338c8174170e302aec0ab44a  ledger/dispositions/part1-types.json
 fb65f4047b683315bf859f5b7cda00fc48027c17  ledger/dispositions/part2-connection-establishment.json
@@ -108,7 +108,7 @@ af7bb1f7da0bf50c65238f43394e42eb3d248ae7  vectors/constructor-disagreement.ndjso
 240d04abf05f593c59062c75e2ed16a2ac6185ed  vectors/flow.ndjson
 0f123312d720c0282d52ceb90467270f289dc6ed  vectors/frames-negative.ndjson
 860b8160aeeff3a1c8033f86292924a99e797a9c  vectors/frames.ndjson
-49f6a5da67b644e185acb32b816590f6a8084512  vectors/generated-exchanges.ndjson
+f5b1552c3bf4fe7bbb924d2ed55ffe3540f70c2d  vectors/generated-exchanges.ndjson
 8a192591a2dd0907664c3501963469af085e88ac  vectors/generated-frames.ndjson
 4a842a5f63cacefa036e922f31581432817c3228  vectors/generated.ndjson
 f7fe109975981669f41c09b08c16c1ff72e4eb97  vectors/isolation.md
@@ -121,9 +121,9 @@ c876f69bb22065b406c11b423b5ffb93d4d18426  vectors/message/sections.ndjson
 8a0698b69a00e858aefea2249a89ec7c20c1aed5  vectors/messages.ndjson
 0ae3389f5cb1a5360d7b8bcce6d601463b735b2e  vectors/open-bad-field.ndjson
 4edac54f39746f6464d5b2711111720c5b658b5e  vectors/primitives.ndjson
-4a008ea51f55fb488b9d01833fca09ccb9eae409  vectors/sasl-negative.ndjson
-1dbd3b9bfcbbdc661b31a4d75a2b8081a49ca3ed  vectors/sasl.ndjson
-2f85e410608d4b6f8e220da9a45cd27497227e4a  vectors/slice.ndjson
+83e65ce3be13bc89cad800751b93a5055bd58f6e  vectors/sasl-negative.ndjson
+55ad0e4cee3056c52933498cdee784fa1f941b3c  vectors/sasl.ndjson
+ce11efb0f70ae9b5357e08894bff4b02455a3376  vectors/slice.ndjson
 ec3cf6d8a9e27b0110cb99eac8539425cd0adbca  vectors/txn-negative.ndjson
 70736979c0a73758f1d9896de8924032bc3583c2  vectors/txn.ndjson
 f51ef1e616215fd42bcfc9c7e0839f3ba9cf8db0  vectors/value-boundaries.ndjson
