@@ -206,6 +206,11 @@ ATTACH_UNSETTLED_NULL_ON_REATTACH = f"{TRANSPORT}#amqp:transport/section:perform
 # puts a latch on the sending endpoint and a detach-with-an-error on the receiving one.
 ATTACH_INCOMPLETE_LATCH = f"{TRANSPORT}#amqp:transport/section:performatives/type:attach/field:incomplete-unsettled.1"
 ATTACH_INCOMPLETE_LATCH_MUST = f"{TRANSPORT}#amqp:transport/section:performatives/type:attach/field:incomplete-unsettled.2"
+# The lift: "if this flag is set to true then the endpoints MUST detach and reattach at
+# least once in order to send new deliveries", which the latch vector pins through its
+# consequence — a new delivery admitted again once the flag is clear — because the
+# detach-and-reattach itself is an emission no step can observe.
+ATTACH_INCOMPLETE_DETACH_AND_REATTACH = f"{TRANSPORT}#amqp:transport/section:performatives/type:attach/field:incomplete-unsettled.3"
 # Resuming a delivery: the marked resend the receiver ignores (`resuming-deliveries.2`),
 # and the resumed delivery the receiver's own map does not hold (the transfer field's `.1`).
 RESUMING_MARKED_RESEND_IGNORED = f"{TRANSPORT}#amqp:transport/section:links/doc:resuming-deliveries.2"
@@ -2947,10 +2952,13 @@ def staged_corpus(tables: Corpus) -> list[dict]:
     2. *detach, re-attach and resume are three different things* —
        `staged-link-pipelined-reattach` (links.16, links.17, links.18).
     3. *the unsettled map on the attach* — `staged-link-attach-unsettled-null-key`
-       (unsettled.5), `staged-link-reattach-with-unsettled-map` (unsettled.6).
+       (unsettled.5), `staged-link-reattach-with-unsettled-map` (unsettled.6; that
+       vector's note also records `unsettled.1` and `incomplete-unsettled.u1`, which no
+       vector pins).
     4. *an incomplete unsettled map latches the sender* —
        `staged-link-incomplete-map-latch` (the sending endpoint's half of
-       incomplete-unsettled.1/.2),
+       incomplete-unsettled.1/.2, and `.3`'s lift through its consequence: the same new
+       delivery admitted once the peer has detached and resumed with a complete map),
        `staged-link-incomplete-map-receipt` (the receiving endpoint's half of the same
        sentence).
     5. *resuming a delivery* — `staged-link-resume-sent-not-in-map` (resume.2),
@@ -2963,21 +2971,23 @@ def staged_corpus(tables: Corpus) -> list[dict]:
     8. *settlement survives until the link does not* — `staged-disposition-after-detach`
        (disposition.3, disposition.4, resume.2).
 
-    **What is staged as a finding rather than as a vector, and why.** Seven of the 26
-    clauses require the endpoint to *emit* a frame, or to hold a comparison whose outcome
+    **What is staged as a finding rather than as a vector, and why.** Sixteen of the 26
+    clauses are pinned by a vector above — several of them through a consequence, since a
+    clause about a state rather than about a frame is observable one step later. The other
+    ten require the endpoint to *emit* a frame, or to hold a comparison whose outcome
     nothing reads, and the corpus vocabulary is per-step verdicts over `send` and `receive`
     steps with no step kind for "the peer must now produce this frame": links.2's second
     half ("the first attach MUST then be closed with a link error of «stolen»"),
     closing-a-link.2 ("the partner MUST signal that it has closed the link by reattaching
     and then sending a closing detach"), unsettled.1 (compare the local and remote delivery
-    states), resuming-deliveries.5 and `.8` (the sender MUST resume, with the flag set —
-    the flag a peer *writes* is not something a vector can observe, since a `send` step's
-    value is the vector's), incomplete-unsettled.3 (detach and reattach at least once), and
-    resuming-deliveries.6/.7 (reduce the levels of unsettled state, then suspend and
-    re-attempt) — §25's behaviour 6, whose whole subject is an exchange between two
-    endpoints that this vocabulary can only observe one step at a time. They stay
-    `deferred:S4` with no vector, which is a finding about the harness rather than about the
-    clauses: a model can satisfy each of them and no corpus step can say so.
+    states), incomplete-unsettled.u1 (the absence of an entry is not evidence of
+    settlement), resuming-deliveries.3 and `.4` (the deliveries only the target considers
+    unsettled), `.5` and `.8` (the sender MUST resume, with the flag set), and `.6`/`.7`
+    (reduce the levels of unsettled state, then suspend and re-attempt) — §25's behaviour 6,
+    whose whole subject is an exchange between two endpoints that this vocabulary can only
+    observe one step at a time. Each is named in the note of the vector for its behaviour,
+    and stays `deferred:S4` with no vector: a finding about the harness rather than about
+    the clauses, since a model can satisfy each of them and no corpus step can say so.
     """
     t = tables
     message = b"a message whose split points are the vector's business"
@@ -3135,7 +3145,15 @@ def staged_corpus(tables: Corpus) -> list[dict]:
                  "`attach/field:handle.2`'s immediate close carrying "
                  "`amqp:session:handle-in-use` -- a different rule with a different "
                  "condition, which is the distinction `s3_exchanges`'s per-step condition "
-                 "comparison exists to keep visible"),
+                 "comparison exists to keep visible. Two of this behaviour's five clauses "
+                 "have no vector, and the reason is the same for both: `links.2`'s second "
+                 "half (\"the first attach MUST then be closed with a link error of "
+                 "«stolen»\") and `closing-a-link.2` (\"the partner MUST signal that it has "
+                 "closed the link by reattaching and then sending a closing detach\") each "
+                 "oblige the endpoint to *emit* a frame with a chosen content, and no step "
+                 "asserts what a peer writes of its own accord — a `send` step's value is "
+                 "the vector's, so the error symbol a model would choose is not observable "
+                 "here. `PLAN.md` §25 ruling 2 records both"),
 
         # 3. The unsettled map on the attach -- unsettled.5 (the vector above),
         # unsettled.6.
@@ -3170,7 +3188,15 @@ def staged_corpus(tables: Corpus) -> list[dict]:
                  "artefact's road from octets to a link sees it. The reading it rests on "
                  "is the artifact's own definition of suspension: with the endpoint alive "
                  "the link is not suspended, and only a resume carries a map "
-                 "(`links.17`)"),
+                 "(`links.17`). Two of this behaviour's clauses have no vector, and both are "
+                 "rules about what an endpoint may conclude rather than about a frame: "
+                 "`unsettled.1` -- compare the local and remote delivery states to resolve "
+                 "an in-doubt delivery -- is a comparison *held*, and its only observable "
+                 "shadow is the receiver ignoring a resumed delivery its map does not hold, "
+                 "which is `staged-link-resume-not-in-receiver-map`; and "
+                 "`incomplete-unsettled.u1` -- the absence of an entry in an incomplete map "
+                 "is not evidence of settlement -- is a rule about not consulting a "
+                 "default. `PLAN.md` §25 ruling 2 records both"),
 
         # 4. An incomplete unsettled map latches the sender -- incomplete-unsettled.1,
         # .2 (the same sentence declared twice, once MUST NOT and once MUST), which
@@ -3178,10 +3204,14 @@ def staged_corpus(tables: Corpus) -> list[dict]:
 
         exchange(
             "staged-link-incomplete-map-latch", start=s("MAPPED"),
-            clauses=[ATTACH_INCOMPLETE_LATCH, ATTACH_INCOMPLETE_LATCH_MUST],
+            clauses=[ATTACH_INCOMPLETE_LATCH, ATTACH_INCOMPLETE_LATCH_MUST,
+                     ATTACH_INCOMPLETE_DETACH_AND_REATTACH],
             steps=link_up(role_sender=True) + [
                 t.receive_frame(AMQP_FRAME, t.detach_body(handle=0, closed=True),
-                                state=s("MAPPED"), channel=1),
+                                state=s("MAPPED"), channel=1,
+                                note="the peer destroys its endpoint and resumes the "
+                                     "link, which is how an incomplete map arrives at a "
+                                     "sending endpoint at all"),
                 t.receive_frame(AMQP_FRAME,
                                 t.attach_body(
                                     role=True, handle=1,
@@ -3189,7 +3219,10 @@ def staged_corpus(tables: Corpus) -> list[dict]:
                                         [(t.tag(b"tag"),
                                           t.delivery_state("received"))]),
                                     incomplete_unsettled=True),
-                                state=s("MAPPED"), channel=1),
+                                state=s("MAPPED"), channel=1,
+                                note="role `true` is the receiver, so its map is what it "
+                                     "considers unsettled; `incomplete-unsettled` is the "
+                                     "flag the latch turns on"),
                 t.refused("send", reason="illegalState", condition=ILLEGAL_STATE,
                           state=s("MAPPED"),
                           body=t.transfer_body(handle=0, delivery_id=0,
@@ -3201,14 +3234,50 @@ def staged_corpus(tables: Corpus) -> list[dict]:
                                "not set -- and the transfer the vector asks it to write "
                                "is exactly that. `illegal-state` is the reading: the "
                                "condition the session's own refusals use for a "
-                               "well-formed frame at a moment the state does not permit")],
+                               "well-formed frame at a moment the state does not permit"),
+                # `incomplete-unsettled.3` through its consequence: the flag is cleared by
+                # a detach and a re-attach, and only then may a new delivery be sent. The
+                # obligation's emission half -- that the endpoints *do* detach and
+                # reattach -- is not observable, so the vector pins the lift instead: the
+                # same transfer refused a moment ago is admitted here, which is what makes
+                # "at least once" a rule rather than a sentence.
+                t.receive_frame(AMQP_FRAME, t.detach_body(handle=1, closed=True),
+                                state=s("MAPPED"), channel=1,
+                                note="the detach `incomplete-unsettled.3` requires before "
+                                     "new deliveries may flow; `closed=True` destroys the "
+                                     "endpoint, so the attach that follows is a resume "
+                                     "and carries the map"),
+                t.receive_frame(AMQP_FRAME,
+                                t.attach_body(
+                                    role=True, handle=2,
+                                    unsettled=t.unsettled_map(
+                                        [(t.tag(b"tag"),
+                                          t.delivery_state("received"))]),
+                                    incomplete_unsettled=False),
+                                state=s("MAPPED"), channel=1,
+                                note="the re-attach, with the flag set to false: the map "
+                                     "is now complete, which is the state in which new "
+                                     "deliveries may be sent again"),
+                t.send_frame(AMQP_FRAME,
+                             t.transfer_body(handle=0, delivery_id=0,
+                                             delivery_tag=b"tag"),
+                             state=s("MAPPED"), channel=1, payload=message,
+                             note="the lift: the same new delivery the latch refused "
+                                  "before the detach and the complete re-attach, now "
+                                  "admitted -- so a model that satisfied the latch by "
+                                  "refusing new deliveries outright fails here")],
             note="**Shared gap.** The peer resumes the link with an incomplete map, which "
                  "is the flag `incomplete-unsettled.3` says is cleared only by detaching "
                  "and reattaching again, and the sender is then asked for a new delivery. "
                  "**Both artefacts admit** it: the flag is never read, so the latch has "
-                 "nothing behind it and `incomplete-unsettled.3`'s detach and reattach is "
-                 "an obligation no step can observe. The other end of the same sentence "
-                 "is `staged-link-incomplete-map-receipt`"),
+                 "nothing behind it. The vector's second half is that clause's lift -- the "
+                 "peer detaches, resumes with the flag false, and the new delivery is "
+                 "admitted -- which today's model reaches for the wrong reason (it admits "
+                 "every delivery) and which a widened model that latched permanently "
+                 "would fail; the obligation's *emission* half -- that the endpoints do "
+                 "detach and reattach -- stays unobservable, which `PLAN.md` §25 ruling 2 "
+                 "records. The other end of the same sentence is "
+                 "`staged-link-incomplete-map-receipt`"),
 
         exchange(
             "staged-link-incomplete-map-receipt", start=s("MAPPED"),
@@ -3286,7 +3355,16 @@ def staged_corpus(tables: Corpus) -> list[dict]:
                  "identity-less transfer that follows is a first transfer missing its "
                  "mandatory fields. **Both artefacts admit** that transfer: the resumed "
                  "one began a delivery, so the ignore never happened and the continuation "
-                 "has something to continue"),
+                 "has something to continue. Four of this behaviour's clauses have no "
+                 "vector: `resuming-deliveries.3` and `.4` (the deliveries only the target "
+                 "considers unsettled, which the sender MUST ignore and the receiver MUST "
+                 "consider settled) are a sender's restraint and a receiver's internal "
+                 "state, `.5` (the deliveries both hold MUST be resumed by the sender) is "
+                 "a MUST-send the corpus cannot see, and `.8` (the resume flag MUST be set "
+                 "when resuming) is a flag a peer *writes*, which a `send` step cannot "
+                 "measure because its value is the vector's. Their receiver-side shadow is "
+                 "`resume.3`'s staged vector and this one; `PLAN.md` §25 ruling 2 records "
+                 "the four"),
 
         # 6. The two sides reduce unsettled state together -- resuming-deliveries.6,
         # .7. No vector: the note below says why, and the module docstring records it
