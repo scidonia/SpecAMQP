@@ -10,9 +10,9 @@
  "dispositions": {
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing.u1": {
    "clause_text": "For a move link with a default configuration this is trivially achieved as such an end result will lead to the message in the ARCHIVED state on the node, and thus ineligible for transfer.",
-   "disposition": "deferred:S5",
+   "disposition": "out-of-scope: node-and-filter-behaviour",
    "kind": "UNKEYED",
-   "note": "A move link's archived-state result: the addressing layer's behaviour, which no slice has yet written.",
+   "note": "A move link's archived-state result: the addressing layer's behaviour, which no slice has yet written. **Re-dispositioned from `deferred:S5` to an exclusion**, because the sweep had read it as work nobody had done: The sentence describes state **on the node** — a moved message lands in the node's ARCHIVED state and is therefore ineligible for transfer. §3 excludes what a destination does with a message while keeping `source`/`target` as protocol-visible field sets, so this sentence is the excluded half: unobservable at this boundary, since no wire behaviour follows from it and the node's archive is nobody's obligation here.",
    "text_sha256": "aed598102e20f8f4653a15ffd5e8402b13ff2a713b34f15ae868566c5ed805c0"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:delete-on-close.u1": {
@@ -66,16 +66,16 @@
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:std-dist-mode/choice:copy.u1": {
    "clause_text": "once successfully transferred over the link, the message is still available for other links from the same node",
-   "disposition": "deferred:S5",
+   "disposition": "out-of-scope: node-and-filter-behaviour",
    "kind": "UNKEYED",
-   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes.",
+   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes. **Re-dispositioned from `deferred:S5` to an exclusion**, because the sweep had read it as work nobody had done: Whether a message remains available to other links from the same node is the node's distribution behaviour — the whole content of the `copy`/`move` distinction as a *link* sees it is that the field is set. §3's boundary: the field set is ours, the availability of the message at the node is not.",
    "text_sha256": "38f92b8fbc8f4f486ae39698d45064539369d216ad7444034b62d02d347f088e"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:std-dist-mode/choice:move.u1": {
    "clause_text": "once successfully transferred over the link, the message will no longer be available to other links from the same node",
-   "disposition": "deferred:S5",
+   "disposition": "out-of-scope: node-and-filter-behaviour",
    "kind": "UNKEYED",
-   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes.",
+   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes. **Re-dispositioned from `deferred:S5` to an exclusion**, because the sweep had read it as work nobody had done: The `move` half of the same pair, and read the same way: it states what happens to the message at the node after a successful transfer, not what the link carries.",
    "text_sha256": "96c3c25cc86797bc7b7c808201a04c459e98f3d07a37e1c1d95181c750a27659"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:target/field:durable.u1": {
@@ -87,58 +87,58 @@
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:terminus-durability/choice:configuration.u1": {
    "clause_text": "Only the existence and configuration of the terminus is retained durably.",
-   "disposition": "deferred:S5",
+   "disposition": "out-of-scope: message-durability",
    "kind": "UNKEYED",
-   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes.",
+   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes. **Re-dispositioned from `deferred:S5`**, because what it states is a *retention* property — what survives a restart of whatever holds the terminus — and the ledger already carries three clauses under `message-durability` for exactly that: nothing on the wire follows from it, and the container's persistence is not this specification's obligation.",
    "text_sha256": "dc2b881bf85147d76f04ec5d5dcc8ad6320666ecab68d905330510c94f3c5553"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:terminus-durability/choice:none.u1": {
    "clause_text": "No terminus state is retained durably.",
-   "disposition": "deferred:S5",
+   "disposition": "out-of-scope: message-durability",
    "kind": "UNKEYED",
-   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes.",
+   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes. **Re-dispositioned from `deferred:S5`**, because what it states is a *retention* property — what survives a restart of whatever holds the terminus — and the ledger already carries three clauses under `message-durability` for exactly that: nothing on the wire follows from it, and the container's persistence is not this specification's obligation.",
    "text_sha256": "53dbc9d87326a99c8d151828c777489e94420c9492311487a851bea80f329695"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:terminus-durability/choice:unsettled-state.u1": {
    "clause_text": "In addition to the existence and configuration of the terminus, the unsettled state for durable messages is retained durably.",
-   "disposition": "deferred:S5",
+   "disposition": "out-of-scope: message-durability",
    "kind": "UNKEYED",
-   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes.",
+   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes. **Re-dispositioned from `deferred:S5`**, because what it states is a *retention* property — what survives a restart of whatever holds the terminus — and the ledger already carries three clauses under `message-durability` for exactly that: nothing on the wire follows from it, and the container's persistence is not this specification's obligation.",
    "text_sha256": "3177a3fe5de235f64bbb6be8a90d0adab5404f31e7015ebfa01cf55752c8352b"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:terminus-expiry-policy.u1": {
    "clause_text": "If the link is subsequently re-attached before the terminus is expired, then the count down is aborted.",
-   "disposition": "deferred:S5",
+   "disposition": "out-of-scope: node-and-filter-behaviour",
    "kind": "UNKEYED",
-   "note": "A re-attach aborting the expiry countdown: a node's policy, unwritten.",
+   "note": "A re-attach aborting the expiry countdown: a node's policy, unwritten. **Re-dispositioned from `deferred:S5` to an exclusion**: it describes a **timer the node runs** — when it starts and when a re-attach aborts it — and the model has no clock at all (*timers as explicit ticks*, §10 rule 6, and even the idle timeout is an environment assumption). A terminus lifecycle timer is the node's, and no obligation at this boundary follows from it.",
    "text_sha256": "230a3a0d23c714afe90f1b04578ee77bf92566e9cff23eea18be2833749aa840"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:terminus-expiry-policy/choice:connection-close.u1": {
    "clause_text": "The expiry timer starts when most recently associated connection is closed.",
-   "disposition": "deferred:S5",
+   "disposition": "out-of-scope: node-and-filter-behaviour",
    "kind": "UNKEYED",
-   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes.",
+   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes. **Re-dispositioned from `deferred:S5` to an exclusion**: it describes a **timer the node runs** — when it starts and when a re-attach aborts it — and the model has no clock at all (*timers as explicit ticks*, §10 rule 6, and even the idle timeout is an environment assumption). A terminus lifecycle timer is the node's, and no obligation at this boundary follows from it.",
    "text_sha256": "c278f5b4c40903e6ae627a2c73b2fab2bc5a8a92ff9c67416ea8b4ca88175009"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:terminus-expiry-policy/choice:link-detach.u1": {
    "clause_text": "The expiry timer starts when terminus is detached.",
-   "disposition": "deferred:S5",
+   "disposition": "out-of-scope: node-and-filter-behaviour",
    "kind": "UNKEYED",
-   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes.",
+   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes. **Re-dispositioned from `deferred:S5` to an exclusion**: it describes a **timer the node runs** — when it starts and when a re-attach aborts it — and the model has no clock at all (*timers as explicit ticks*, §10 rule 6, and even the idle timeout is an environment assumption). A terminus lifecycle timer is the node's, and no obligation at this boundary follows from it.",
    "text_sha256": "f205a4c8b00b65c1381eabaad48634dfb8df4fb9a27ad248f6574a543a20e39d"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:terminus-expiry-policy/choice:never.u1": {
    "clause_text": "The terminus never expires.",
-   "disposition": "deferred:S5",
+   "disposition": "out-of-scope: node-and-filter-behaviour",
    "kind": "UNKEYED",
-   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes.",
+   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes. **Re-dispositioned from `deferred:S5` to an exclusion**: it describes a **timer the node runs** — when it starts and when a re-attach aborts it — and the model has no clock at all (*timers as explicit ticks*, §10 rule 6, and even the idle timeout is an environment assumption). A terminus lifecycle timer is the node's, and no obligation at this boundary follows from it.",
    "text_sha256": "399717cb3947b2319d9c952f28a9dbca316a353e57adaccb7f9ec4123b2878bb"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing/type:terminus-expiry-policy/choice:session-end.u1": {
    "clause_text": "The expiry timer starts when the most recently associated session is ended.",
-   "disposition": "deferred:S5",
+   "disposition": "out-of-scope: node-and-filter-behaviour",
    "kind": "UNKEYED",
-   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes.",
+   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes. **Re-dispositioned from `deferred:S5` to an exclusion**: it describes a **timer the node runs** — when it starts and when a re-attach aborts it — and the model has no clock at all (*timers as explicit ticks*, §10 rule 6, and even the idle timeout is an environment assumption). A terminus lifecycle timer is the node's, and no obligation at this boundary follows from it.",
    "text_sha256": "fc43f845446381fa71f585d7b6357b87d8f0879390dd8016d6a293d272ee452a"
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state.u1": {
