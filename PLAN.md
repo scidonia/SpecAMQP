@@ -1425,6 +1425,14 @@ The first draft of this file also carried two statements that were worse than no
 
 The harness's *behaviour* is already pinned by 139 step verdicts across two artefacts, so these statements add what vectors cannot: a claim about all states and all frames rather than about the ones somebody thought to generate.
 
+**And the delivery-tag bound is carried by hand, which the frame layer already established as this repository's way with a limit the artifact states in prose.** The session window found `definitions/type:delivery-tag.u1` — "A delivery-tag can be
+up to 32 octets of binary data" — checkable, since the model reads a transfer's tag as octets, and it raised the choice the number forces: a literal in `Spec/`, which the repository's discipline reads tables instead of, or generator support that extracts a bound from a
+type's *documentation*. **Neither, and the third answer is the one already in the tree**: `Spec.Frame` handwrites `headerOctets := 8`, `minDoff := 2` and `maxSize := 2 ^ 32 - 1`, each a number read out of the artifact's prose and cited in a comment, because a limit is a
+fact about the protocol rather than a descriptor code, and the rule that `Spec/` reads tables is about codes and symbols rather than about the numbers a clause states. So `Session` gains the bound beside the transfer-field logic, with the clause cited, and the refusal's
+condition is recorded as the **reading** it is: the clause names none, and `amqp:invalid-field` with class `malformed` is the family this ledger uses for a field that violates its declared bound. It is verdict-safe — no committed vector carries a tag over 32 octets — and the
+probe that proves it is the two vectors this ruling asks for: a 33-octet tag refused and a 32-octet one admitted. It travels with the terminus wiring because both are small and both are in the same file, and a second window on one file is the cost this repository has
+already paid twice.
+
 ### S4 — sessions, links, and flow control
 
 Scope: `begin`/`end` with the window rules (`incoming-window`, `outgoing-window`, `next-outgoing-id`, `remote-incoming-window`, `remote-outgoing-window` and their recomputation), session errors and `unmapped` termination, `attach` with both roles and all settle modes, handle allocation, `flow` state (`link-credit`, `delivery-count`, `available`, `drain`, `echo`), transfer fragmentation and `more`, `disposition` and settlement, link resumption, link errors, forced detach.
