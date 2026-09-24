@@ -22,7 +22,7 @@
  ],
  "consequences": [
   "The refusal's condition and class are `amqp:illegal-state` with class `illegalState` — the pair `exchange-frame-in-end-refused` and its receive step `refused_close_in_end` already pin, placed by the existing wrapper (END at END, DISCARDING otherwise), so the new refusals are not a new vocabulary.",
-  "The two artefacts answer alike in every state, which is what makes the staged vector `staged-bodyless-frame-in-end` promotable: 13 steps with 5 failures became 3, and the two that moved are the arrival and the offer, each refused with \"END does not permit a frame with no body to arrive: the table's legal receives column is -\". Its three remaining failures are the resume/unsettled vectors, untouched.",
+  "The reading made the staged vector promotable and it is promoted: `exchange-bodyless-frame-in-end-refused` sits beside `exchange-frame-in-end-refused` in the exchange corpus, its arrival and its offered step each refused `amqp:illegal-state` with class `illegalState`. In the staged form the measurement was 13 steps with 5 failures becoming 3; the committed vector carries the two that moved, which are the two the rule decides. Its three remaining failures were the resume and unsettled vectors, untouched by this change and still staged.",
   "No committed vector moved in either direction: `s3_exchanges.sh` and `s4_flow.sh` carry numbers identical to their before-run, so the four `*` states' admissions are unchanged.",
   "The offered empty frame has no corpus form at all — the step builders refuse to write one, in prose — so the send half of this rule remains evidenced by the theorem `frame_none_answers` and is named in the untestable list rather than tested."
  ],

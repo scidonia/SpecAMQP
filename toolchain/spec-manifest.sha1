@@ -28,7 +28,7 @@ eb9cfb001d3ae1417d6c5def00a8ce6ef6568fa2  lean/Spec/Session.lean
 9824a25e7b937000c8f8c16a9986f6bda2869632  lean/Spec/Transactions.lean
 d4de8144b2390024ff98ef4bb5a6ddc34ad5d2d4  lean/Spec/Value.lean
 c80948aad7c0afaa70330570dd2624f60982d0b6  ledger/ambiguities/attach-retains-link-flow-state.json
-6bc45dafea9ac908facc68e24901d75a6589dc76  ledger/ambiguities/bodyless-frame-permitted-states.json
+36cfbc505afafffd0cd014672c25a8b81ac16231  ledger/ambiguities/bodyless-frame-permitted-states.json
 973e66b7a1143546319dedc4b165a4f508747c78  ledger/ambiguities/channel-zero-layering.json
 b5f824512d926a5475306134bb61ee8c215ae2d2  ledger/ambiguities/check-precedence-unspecified.json
 6292292dc07ef18bb452326358be8c2e0a711c77  ledger/ambiguities/compound-size-field.json
@@ -108,7 +108,7 @@ af7bb1f7da0bf50c65238f43394e42eb3d248ae7  vectors/constructor-disagreement.ndjso
 240d04abf05f593c59062c75e2ed16a2ac6185ed  vectors/flow.ndjson
 0f123312d720c0282d52ceb90467270f289dc6ed  vectors/frames-negative.ndjson
 860b8160aeeff3a1c8033f86292924a99e797a9c  vectors/frames.ndjson
-f5b1552c3bf4fe7bbb924d2ed55ffe3540f70c2d  vectors/generated-exchanges.ndjson
+aa0b4347ee441d586200636b2066f2f1c491ba3b  vectors/generated-exchanges.ndjson
 8a192591a2dd0907664c3501963469af085e88ac  vectors/generated-frames.ndjson
 4a842a5f63cacefa036e922f31581432817c3228  vectors/generated.ndjson
 f7fe109975981669f41c09b08c16c1ff72e4eb97  vectors/isolation.md
