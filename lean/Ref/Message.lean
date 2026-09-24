@@ -50,6 +50,18 @@ Deliberate choices, none of which a clause fixes:
 * **An application-properties value must be a simple type.** The artifact excludes
   map, list and array by name; a described value is a composite's encoding and is
   excluded with them.
+* **A field declared `multiple` carries one element or an array of them.** The types section
+  states the attribute's meaning outright, so an array is judged entry by entry there and is
+  refused in a field that is not `multiple`; reading it is what makes a source's announced
+  outcomes readable at all.
+* **The rules that span two sections are applied where both are in hand.** The
+  `content-encoding` field is judged against the body's section kind once the message has been
+  read, and a `modified` outcome's `message-annotations` are merged into the annotations the
+  message already carried rather than recorded beside them.
+* **A terminus is a field record with the sender as an input.** The `source` and `target`
+  composites' documentation conditions the address rules on which link endpoint sent the frame,
+  so `terminusOfValue` takes that endpoint and the record does not: a rule conditioned on
+  knowledge the octets do not carry is handed it rather than guessed at.
 -/
 
 namespace SpecAMQP.Ref.Message
@@ -351,7 +363,12 @@ termination_by sizeOf body
 /-- The declared fields against the body's values, position by position. A body may stop
 before the declared field count; it may not run past it, because the values after the last
 declared field are values the type does not have. A mandatory field the body stops before is
-the one absence the artifact forbids. -/
+the one absence the artifact forbids.
+
+A field the artifact declares `multiple` is judged by the types section's own reading of the
+attribute — a single element of the declared type is always permitted, and multiple values are an
+array whose elements are the type the field defines — so an array is judged entry by entry. An
+array in a field that is *not* `multiple` is refused, because the attribute is what permits it. -/
 def checkFields : List FieldDecl → List Value → Except Refusal Unit
   | decls, [] =>
     match decls.find? (fun field => field.mandatory) with
@@ -362,7 +379,17 @@ def checkFields : List FieldDecl → List Value → Except Refusal Unit
   | [], _ :: _ =>
     .error (malformed "a body carries more values than the type declares fields")
   | decl :: rest, value :: values => do
-    let _ ← checkTyped decl.typeName decl.requires decl.mandatory value
+    let _ ←
+      match value with
+      | .array _ items =>
+        if decl.multiple then do
+          let _ ← items.mapM (fun item => checkTyped decl.typeName decl.requires false item)
+          pure ()
+        else
+          .error (malformed s!"a field declared {decl.typeName} carries an array of \
+            {items.length} entr(ies), and the types section permits multiple values only in a \
+            field the artifact declares multiple")
+      | other => checkTyped decl.typeName decl.requires decl.mandatory other
     checkFields rest values
 termination_by _ vs => sizeOf vs
 
@@ -663,6 +690,64 @@ def stepStructure (state : Structure) (kind : SectionKind) : Except Refusal Stru
             .error (malformed s!"the message's body is one of three choices, and a \
               {kind.name} section does not continue a body of {seen.name} sections")
 
+/-- The values a message's properties section carries, where the message carries one. -/
+def propertiesFields? (sections : List Section) : Option (List Value) :=
+  match sections.find? (fun sec => sec.kind == .properties) with
+  | some sec => match sec.body with
+    | .fields values => some values
+    | _ => none
+  | none => none
+
+/-- The value a message's properties section gives a field: none where the message carries no
+properties section, where its list stops before the field, or where it carries a null for it —
+a null and an omitted trailing field both saying the field is not set. -/
+def propertiesValue? (sections : List Section) (fieldName : String) : Option Value :=
+  match propertiesFields? sections, declaredType? "properties" with
+  | some values, some decl =>
+    match (fieldsOf decl.path).find? (fun field => field.name == fieldName) with
+    | some field =>
+      match values[field.index - 1]? with
+      | some .null => none
+      | other => other
+    | none => none
+  | _, _ => none
+
+/-- The section kinds a message's body carries: the artifact's occurrence list puts the three
+body choices after the head sections and before the footer, so a body kind is one that is neither
+a head nor the footer. -/
+def bodyKinds (sections : List Section) : List SectionKind :=
+  (sections.filter (fun sec => sec.kind.headOrder.isNone && sec.kind != .footer)).map (·.kind)
+
+/-- The encoding the `content-encoding` documentation names as one implementations must not use.
+The artifact declares no encoding vocabulary, so the name is prose in the field's documentation
+rather than a choice this layer could look up. -/
+def identityEncoding : String := "identity"
+
+/-- The two rules the `content-encoding` field's documentation states, applied where the field
+and the body are both in hand: the field may be set only when the application-data section is
+`data`, and the `identity` encoding is not to be used. Part 3 states these rules and names no
+condition for breaking them, so the refusal is the shared decode error, which is what this layer
+carries for a rule of structure or declared field type. -/
+def checkContentEncoding (sections : List Section) : Except Refusal Unit :=
+  match propertiesValue? sections "content-encoding" with
+  | none => .ok ()
+  | some value =>
+    let body := bodyKinds sections
+    if !body.all (fun kind => kind == .data) then
+      .error (malformed s!"the properties section sets content-encoding and the message's body \
+        is {body.length} section(s) that are not data sections, and the field may be set only \
+        when the application-data section is data")
+    else
+      match value with
+      | .symbol text =>
+        if text == identityEncoding then
+          .error (malformed s!"the content-encoding is {identityEncoding}, and implementations \
+            must not use the identity encoding")
+        else .ok ()
+      | other =>
+        .error (malformed s!"a content-encoding is a symbol and the section carries a \
+          {typeName other}")
+
 /-- The message structure the artifact's occurrence list gives. A message that carries any
 section carries a body, because the list gives the body as one of three choices rather than
 as an optional section; the empty payload is the one message with no sections. -/
@@ -674,7 +759,7 @@ def checkStructure (sections : List Section) : Except Refusal Unit :=
     if !final.bodySeen && !sections.isEmpty then
       .error (malformed "the message carries no body, and the artifact's list gives the body \
         as one of three choices")
-    else .ok ()
+    else checkContentEncoding sections
 
 /-- A payload's sections, in the order they appear, with the message structure checked over
 them. The empty payload is the empty section list. -/
@@ -866,14 +951,19 @@ structure Delivery where
   /-- Whether the recorded state is terminal, which is the artifact's own distinction: an
   outcome provides the role both the delivery-state section and the `outcome` role name. -/
   terminal : Bool
+  /-- The message-annotations the delivery's message carries: the ones it arrived with, with a
+  `modified` outcome's `message-annotations` field merged in when one is applied. It is the one
+  quantity a delivery state rewrites rather than reports. -/
+  annotations : List (Value × Value)
 deriving Repr, BEq
 
 namespace Delivery
 
-/-- A delivery with no state applied: unsettled, its count at zero, no resume point, and its
-message available for delivery again. -/
+/-- A delivery with no state applied: unsettled, its count at zero, no resume point, no
+annotations beyond the ones the message arrived with, and its message available for delivery
+again. -/
 def initial : Delivery :=
-  ⟨none, 0, false, none, true, false⟩
+  ⟨none, 0, false, none, true, false, []⟩
 
 /-- The state's name as the corpus gives it. -/
 def stateName (delivery : Delivery) : String :=
@@ -942,13 +1032,42 @@ def rejectedName : String := "rejected"
 def releasedName : String := "released"
 def modifiedName : String := "modified"
 
+/-- Whether two annotation keys are the same key: the annotation rules admit symbols and ulongs,
+and the comparison is on the keys rather than on whole pairs because that is what the merge
+decides — two entries for one key differ in the value, and which survives is the rule. -/
+def sameKey (left right : Value) : Bool :=
+  match left, right with
+  | .symbol a, .symbol b => a == b
+  | .ulong a, .ulong b => a == b
+  | _, _ => false
+
+/-- The prefix that puts a symbolic annotation key outside the reserved space: the annotations type
+reserves every ulong key and every symbolic key except those beginning with `x-`. It is not the
+`x-opt` prefix the mandated detach is conditioned on, which is why both are named. -/
+def unreservedPrefix : String := "x-"
+
+/-- Whether an annotation key is reserved, and `none` for a value that is not a key at all. -/
+def reservedKey? : Value → Option Bool
+  | .symbol text => some (!text.startsWith unreservedPrefix)
+  | .ulong _ => some true
+  | _ => none
+
+/-- The message-annotations a message carries after a `modified` outcome's `message-annotations`
+field is applied to them: an entry whose key the message already carries replaces the message's
+entry for that key, and an entry whose key it does not carry is added. Everything the message
+carried under a key the field does not name survives untouched, which is the propagation half of
+the annotations rule with the augmentation the sentence names as its exception. -/
+def mergeAnnotations (existing augment : List (Value × Value)) : List (Value × Value) :=
+  augment ++ existing.filter (fun pair => !(augment.any (fun entry => sameKey entry.1 pair.1)))
+
 /-- The delivery a state leaves behind. The resume point is a property of the `received`
 state, so it is carried while that state is recorded and dropped when another replaces it;
 the count moves on `rejected` and on `modified` with `delivery-failed`; redelivery is
 forbidden by `accepted`, by `rejected`, and by `modified` with `undeliverable-here`, and
-allowed by `released`; and the settlement the step states is recorded as the delivery's
-settlement. A state the table declares that none of those rules names — the transaction
-layer's — is recorded and moves nothing. -/
+allowed by `released`; the settlement the step states is recorded as the delivery's
+settlement; and a `modified` outcome whose `message-annotations` field is set merges it into
+the annotations the message already carried. A state the table declares that none of those
+rules names — the transaction layer's — is recorded and moves nothing. -/
 def moveDelivery (delivery : Delivery) (decl : TypeDecl) (body : Value) (settled : Bool) :
     Delivery :=
   let name := decl.name
@@ -971,7 +1090,11 @@ def moveDelivery (delivery : Delivery) (decl : TypeDecl) (body : Value) (settled
       else if name == modifiedName then !(boolField decl body "undeliverable-here")
       else if name == receivedName then true
       else delivery.redeliveryAllowed
-    terminal := decl.provides.contains "outcome" }
+    terminal := decl.provides.contains "outcome"
+    annotations :=
+      match name, fieldValue? decl body "message-annotations" with
+      | "modified", some (.map pairs) => mergeAnnotations delivery.annotations pairs
+      | _, _ => delivery.annotations }
 
 /-- The machine a state name from the corpus denotes. The unsettled name is the delivery
 before any state has been applied; any other delivery state denotes a delivery that has
@@ -1017,6 +1140,191 @@ def applyDelivery (delivery : Delivery) (step : Json) : Except String (DeliveryO
     else
       let moved := moveDelivery delivery decl body settled
       return (outcomeOf moved true none s!"applied {decl.name}", moved)
+
+/-! ## The terminus field sets (Part 3, addressing)
+
+The two composites an `attach` carries, whose fields the artifact's documentation constrains
+beyond their declared types: the address/dynamic pair, node properties that may be sent only with
+the dynamic flag, the roles `default-outcome` and `distribution-mode` must fill, the `durable`
+choices, and the `outcomes` descriptors. Which endpoint sent the frame is an input, because the
+address rules are conditioned on it and nothing in the record carries it. What a node then does
+with the node a terminus names is the standard's own boundary and is not modelled.
+-/
+
+/-- Which link endpoint sent a frame. The names are the `role` type's declared choices. -/
+inductive SentBy where
+  | sender
+  | receiver
+deriving Repr, BEq, DecidableEq
+
+/-- An endpoint's name, which is a declared `role` choice's name. -/
+def SentBy.label : SentBy → String
+  | .sender => "sender"
+  | .receiver => "receiver"
+
+/-- The two composites the artifact declares as termini. -/
+def sourceName : String := "source"
+
+def targetName : String := "target"
+
+/-- A terminus record: the declared type and the body it carries. -/
+structure Terminus where
+  decl : TypeDecl
+  body : Value
+deriving Repr
+
+/-- The declared durabilities, read from the type that declares them. -/
+def durabilityChoices : List ChoiceDecl :=
+  match declaredType? "terminus-durability" with
+  | some decl => choices.filter (fun choice => choice.ownerPath == decl.path)
+  | none => []
+
+/-- The durability a value names, where it names one of the declared choices. -/
+def durabilityOf? (value : Value) : Option String :=
+  match value with
+  | .uint n =>
+    (durabilityChoices.find? (fun choice => choice.value == toString n.toNat)).map (·.name)
+  | _ => none
+
+/-- The declared type a symbolic outcome descriptor names, where that type provides the outcome
+role. -/
+def outcomeDescriptor? (text : String) : Option String :=
+  match types.find? (fun decl => decl.descriptor.map (·.name) == some text) with
+  | some decl => if decl.provides.contains "outcome" then some decl.name else none
+  | none => none
+
+/-- The descriptor value of a declared outcome, by name: this is how the fallback below reaches
+the accepted outcome without writing its descriptor down. -/
+def outcomeDescriptorValue? (typeName : String) : Option Value :=
+  (declaredType? typeName).bind (fun decl =>
+    decl.descriptor.map (fun descriptor => .symbol descriptor.name))
+
+namespace Terminus
+
+/-- A terminus field's value, by the declared index: a body that stops before the field and a
+null where the field would be both say the field is not set. -/
+def value? (terminus : Terminus) (fieldName : String) : Option Value :=
+  match (fieldsOf terminus.decl.path).find? (fun field => field.name == fieldName),
+      terminus.body with
+  | some field, .list values =>
+    match values[field.index - 1]? with
+    | some .null => none
+    | other => other
+  | _, _ => none
+
+/-- Whether a field is set: present and not null, and — for a `multiple` field — not an empty
+array, which the types section says describes the same absence a null does. -/
+def isSet (terminus : Terminus) (fieldName : String) : Bool :=
+  match terminus.value? fieldName with
+  | some (.array _ []) => false
+  | some _ => true
+  | none => false
+
+/-- The entries a field carries: a `multiple` field's array entries or its single value, and
+nothing at all for a field that is not set. -/
+def entries (terminus : Terminus) (fieldName : String) : List Value :=
+  match terminus.value? fieldName with
+  | some (.array _ items) => items
+  | some single => [single]
+  | none => []
+
+/-- A boolean field, false when the field is absent or null, which is `dynamic`'s declared
+default. -/
+def flag (terminus : Terminus) (fieldName : String) : Bool :=
+  match terminus.value? fieldName with
+  | some (.boolean b) => b
+  | _ => false
+
+/-- A field that must fill a role: `default-outcome` a valid outcome, `distribution-mode` a
+distribution mode. -/
+def checkRole (terminus : Terminus) (fieldName role : String) : Except Refusal Unit :=
+  match terminus.value? fieldName with
+  | none => .ok ()
+  | some value =>
+    if providesRole value role then .ok ()
+    else
+      .error (malformed s!"{terminus.decl.name}.{fieldName} carries a {typeName value}, and the \
+        field's value must be a valid {role}")
+
+/-- The rules the `source` and `target` field documentation states. The address rule is one rule
+written twice in the artifact: the endpoint that *creates* a dynamic node communicates its
+address and the endpoint that *requests* creation leaves the field unset, and which endpoint that
+is mirrors between the two types. -/
+def check (sentBy : SentBy) (terminus : Terminus) : Except Refusal Unit := do
+  let name := terminus.decl.name
+  let dynamic := terminus.flag "dynamic"
+  let creator := (name == sourceName && sentBy == .sender)
+    || (name == targetName && sentBy == .receiver)
+  if dynamic && creator && !terminus.isSet "address" then
+    .error (malformed s!"a dynamic {name} sent by the {sentBy.label} endpoint carries no address, \
+      and the endpoint that created the node is the one communicating it")
+  else if dynamic && !creator && terminus.isSet "address" then
+    .error (malformed s!"a dynamic {name} sent by the {sentBy.label} endpoint sets the address, \
+      and the endpoint that requested creation must not set it")
+  else if !dynamic && terminus.isSet "dynamic-node-properties" then
+    .error (malformed s!"{name}.dynamic-node-properties is set while the dynamic field is not, \
+      and the field must be left unset unless the dynamic field is set to true")
+  else do
+    checkRole terminus "default-outcome" "outcome"
+    checkRole terminus "distribution-mode" "distribution-mode"
+    match terminus.value? "durable" with
+    | some value =>
+      if (durabilityOf? value).isNone then
+        .error (malformed s!"{name}.durable carries a {typeName value}, and the value must name \
+          one of the declared terminus-durability choices")
+      else pure ()
+    | none => pure ()
+    match (terminus.entries "outcomes").find? (fun entry =>
+        match entry with
+        | .symbol text => (outcomeDescriptor? text).isNone
+        | _ => true) with
+    | some (.symbol text) =>
+      .error (malformed s!"{name}.outcomes names {text}, which is not the symbolic descriptor of \
+        a declared outcome")
+    | some other =>
+      .error (malformed s!"{name}.outcomes carries a {typeName other}, and the field's values \
+        must be symbolic descriptors")
+    | none => pure ()
+
+/-- The outcomes a source's record leaves choosable: the announced ones, or the default-outcome
+where that field is set and the list is empty, or the accepted outcome where neither is set —
+which the field's documentation says such a source must support. -/
+def assumedOutcomes (terminus : Terminus) : Except Refusal (List Value) :=
+  match terminus.entries "outcomes" with
+  | [] =>
+    match terminus.value? "default-outcome" with
+    | some value => .ok [value]
+    | none =>
+      match outcomeDescriptorValue? acceptedName with
+      | some value => .ok [value]
+      | none =>
+        .error (malformed s!"the declared surface carries no {acceptedName} outcome descriptor \
+          for a source that announces no outcomes to fall back on")
+  | announced => .ok announced
+
+end Terminus
+
+/-- A described value read as a terminus: the body checked against the declared fields, the type's
+role confirmed to be one of the two terminus roles the artifact declares, and the field
+documentation's rules applied. -/
+def terminusOfValue (sentBy : SentBy) (value : Value) : Except Refusal Terminus :=
+  match value with
+  | .described descriptor body =>
+    match typeOfDescriptor descriptor with
+    | none =>
+      .error (malformed "a terminus's descriptor names no type the declared surface carries")
+    | some decl =>
+      if !(decl.provides.contains sourceName || decl.provides.contains targetName) then
+        .error (malformed s!"{decl.name} provides neither the source nor the target role, so a \
+          described value of it is not a terminus")
+      else
+        match checkBody decl body with
+        | .error refusal => .error refusal
+        | .ok () => do
+          Terminus.check sentBy ⟨decl, body⟩
+          return ⟨decl, body⟩
+  | _ =>
+    .error (malformed s!"a terminus is a described type, and this value is a {typeName value}")
 
 /-! ## The corpus interface -/
 

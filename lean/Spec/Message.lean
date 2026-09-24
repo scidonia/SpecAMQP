@@ -20,12 +20,16 @@ field index: `SectionKind.typeName` is the only place a section is named, and it
 *type*, which is the key its row is looked up by.
 
 **What the layer is, and what it is not.** A section is a described value, and a message is
-a sequence of them. The reader here is a function from octets to sections and back: it does
-not know about transfers, sessions or links, does not fragment or reassemble payloads, and
+a sequence of them. The reader here is a function from octets to sections and back: it
+does not know about transfers, sessions or links, does not fragment or reassemble payloads, and
 does not act on what it reads beyond refusing. Where a clause mandates an *action* — the
 link detach for an annotation key the receiver does not understand — the refusal is what
 this layer produces and the link layer is what acts, which is the same boundary the frame
-layer draws around the conditions it raises.
+layer draws around the conditions it raises. It reads one thing that is not a section: the two
+*terminus* types Part 3's addressing section defines, `source` and `target`, as field records with
+the rules their documentation states. Their rules are conditioned on which endpoint sent the frame
+that carried them, so the sender is an input to that reader exactly as the annotation policy is an
+input to the section reader.
 
 **Readings.** Three things the artifact leaves open are decided here, each marked at the
 point of use, and each is a reading rather than a citation:
@@ -39,10 +43,15 @@ point of use, and each is a reading rather than a citation:
   the clause-backed refusals are the annotation key rules (`annotations.1`, `.2`) and the
   `rejected` annotation's value type (`delivery-annotations.2`).
 * **An annotation key the endpoint does not implement is `amqp:not-implemented`.** The
-  clause mandates a detach "with a «amqp-error» error", which names the shared condition
-  family rather than a member of it; `not-implemented` ("the peer tried to use
-  functionality that is not implemented in its partner") is the member whose definition
-  fits a peer's use of a key this endpoint does not implement.
+clause mandates a detach "with a «amqp-error» error", which names the shared condition
+family rather than a member of it; `not-implemented` ("the peer tried to use
+functionality that is not implemented in its partner") is the member whose definition
+fits a peer's use of a key this endpoint does not implement.
+* **The rules that relate a field to something outside its own section carry the first
+reading.** The `content-encoding` rules read a properties field and the body's section kind
+together, and the terminus rules read a source's or target's fields against the declared tables;
+Part 3 states each and names no condition, so each is refused as the structure rules are — with
+`amqp:decode-error`.
 
 **What is modelled and what is passed through.** The five delivery states the messaging
 layer defines are modelled. The two the *transaction* layer defines (`declared`,
@@ -270,6 +279,14 @@ def fieldDeclsOf (name : String) : Except String (List FieldDecl) := do
   let decl ← typeDeclOf name
   return fieldsOf decl.path
 
+/-- The choices a declared type carries, read from the generated table. A choice is keyed by its
+owner's *path* rather than by a name, so a type's choices are found through the path its own
+declaration records; a type the table does not carry has none rather than an invented set. -/
+def choicesOf (typeName : String) : List ChoiceDecl :=
+  match typeDeclOf typeName with
+  | .ok decl => choices.filter (fun choice => choice.ownerPath == decl.path)
+  | .error _ => []
+
 /-- The primitive type a declared type resolves to, following the restricted chain:
 `ttl`'s declared type is `milliseconds`, which restricts `uint`. A wildcard stays a
 wildcard. -/
@@ -335,9 +352,112 @@ def satisfiesRequires (role : String) (value : Value) : Except String Bool := do
       let primitives ← providers.mapM (fun entry => primitiveOf entry.name)
       return primitives.contains (typeName value) || primitives.contains "*"
 
-/-- Check one present, non-null field against its declaration. -/
+/-- Whether a value satisfies the declared type of a field the artifact declares `multiple`. The
+types section states the attribute's meaning: *a single element of the type specified in the field
+description is always permitted*, and multiple values are carried as an array whose elements are
+that type. So an array is admitted exactly when every entry is, and an array with an entry that is
+not is refused as a value of the wrong type — which is what makes the entries of such a field
+readable at all. -/
+def multipleAccepts (declared : String) (value : Value) : Except String Bool :=
+  match value with
+  | .array _ items => items.allM (typeAccepts declared)
+  | single => typeAccepts declared single
+
+/-! ## The defaults a receiver assumes for an omitted section
+
+`header.1` is the one rule Part 3 states about a section a message *omits*: "if the header section
+is omitted the receiver MUST assume the appropriate default values (or the meaning implied by no
+value being set) for the fields within the «header»". The defaults are the declared surface's own —
+`Generated.Oasis.Fields` carries every field's `default` attribute — so assuming them is a table
+read rather than a list of values this module believes in, and a field the artifact declares no
+default for is assumed to have no value rather than one chosen here.
+
+A default is *text* in the table, and what a receiver assumes is a value: `durable`'s default is
+the name `none`, which is the `terminus-durability` choice carrying the number 0, while
+`delivery-count`'s is the digit `0` itself. So the text is read in the form the field's declared
+type resolves to, and a default that names a declared choice is read as that choice's value. A text
+the declared form cannot read is an error the caller sees: a receiver that assumed a wrongly-typed
+default would be inventing the field it filled. -/
+
+/-- The default the artifact declares for a field of a named type, as the raw attribute text. -/
+def declaredDefaultOf (owner fieldName : String) : Except String (Option String) := do
+  let decls ← fieldDeclsOf owner
+  match decls.find? (fun decl => decl.name == fieldName) with
+  | some decl => return decl.defaultValue
+  | none => .error s!"the declared surface gives {owner} no field named {fieldName}"
+
+/-- A numeric default's text as the number it spells, or an error naming the form it could not be
+read as. -/
+def numericDefault (primitive text : String) : Except String Nat :=
+  match text.toNat? with
+  | some n => .ok n
+  | none => .error s!"the declared default {text} is not a number a {primitive} field carries"
+
+/-- A default's text as a value of the primitive form a field's declared type resolves to. -/
+def defaultValueOfText (primitive text : String) : Except String Value := do
+  match primitive with
+  | "boolean" => return .boolean (text == "true")
+  | "ubyte" => return .ubyte (← numericDefault primitive text)
+  | "ushort" => return .ushort (← numericDefault primitive text)
+  | "uint" => return .uint (← numericDefault primitive text)
+  | "ulong" => return .ulong (← numericDefault primitive text)
+  | "symbol" => return .symbol text
+  | "string" => return .string text
+  | other => .error s!"this layer assumes no default of the {other} form"
+
+/-- The declared choice a default's text names, where it names one. -/
+def declaredChoiceOf? (typeName text : String) : Option ChoiceDecl :=
+  (choicesOf typeName).find? (fun choice => choice.name == text)
+
+/-- The value a receiver assumes for a field of a section a message omits: the default the artifact
+declares, read as a value of the field's declared type — or as the value of the declared choice the
+default names, since a choice's default is written by name. `none` where the artifact declares no
+default, which is the sentence's "or the meaning implied by no value being set". -/
+def assumedDefaultOf (decl : FieldDecl) : Except String (Option Value) :=
+  match decl.defaultValue with
+  | none => .ok none
+  | some text =>
+    match primitiveOf decl.typeName with
+    | .error message => .error message
+    | .ok primitive =>
+      match declaredChoiceOf? decl.typeName text with
+      | some choice => do return some (← defaultValueOfText primitive choice.value)
+      | none => do return some (← defaultValueOfText primitive text)
+
+/-- The header a receiver assumes when a message carries none: every field the artifact declares for
+`header`, in declared order, at the value assumed for it or `none` where no default is declared.
+This is the sentence as a value, which is what makes it usable by a reader that has to answer what a
+header field's value is for a message that carried no header. -/
+def assumedHeaderFields : Except String (List (String × Option Value)) := do
+  let decls ← fieldDeclsOf "header"
+  decls.mapM (fun decl => do
+    let assumed ← assumedDefaultOf decl
+    return (decl.name, assumed))
+
+/-- A field the artifact declares no default for is assumed to have no value: the second half of the
+sentence, at the assumption. Nothing in this layer fills a field the declared surface leaves
+unfilled. -/
+theorem assumedDefaultOf_none (decl : FieldDecl) (declared : decl.defaultValue = none) :
+    assumedDefaultOf decl = .ok none := by
+  rw [assumedDefaultOf, declared]
+
+/-- A declared default the field's type can read is the value the receiver assumes. -/
+theorem assumedDefaultOf_some (decl : FieldDecl) (text primitive : String) (value : Value)
+    (declared : decl.defaultValue = some text)
+    (primitiveIs : primitiveOf decl.typeName = .ok primitive)
+    (notAChoice : declaredChoiceOf? decl.typeName text = none)
+    (parsed : defaultValueOfText primitive text = .ok value) :
+    assumedDefaultOf decl = .ok (some value) := by
+  simp [assumedDefaultOf, declared, primitiveIs, notAChoice, parsed]
+  all_goals rfl
+
+/-- Check one present, non-null field against its declaration. A field the artifact declares
+`multiple` is judged by `multipleAccepts`, because the attribute widens what the declared type
+admits: its value is one element of the type or an array of them. -/
 def checkField (decl : FieldDecl) (value : Value) : Except Refusal Unit := do
-  let accepted ← liftRefusal (typeAccepts decl.typeName value)
+  let accepted ← liftRefusal
+    (if decl.multiple then multipleAccepts decl.typeName value
+     else typeAccepts decl.typeName value)
   if !accepted then
     .error (decodeRefusal "malformed"
       s!"{decl.owner}.{decl.name} is declared {decl.typeName} and the section carries a \
@@ -533,6 +653,138 @@ def Section.kind : Section → SectionKind
   | .elements kind _ => kind
   | .single kind _ => kind
 
+/-! ## Rules that span two sections, or a message and a state
+
+Two of Part 3's rules relate something a section carries to something outside that section. The
+`content-encoding` field of `properties` is conditioned on the *body's* section kind, and the
+`message-annotations` of a `modified` outcome are combined with the annotations the message
+already carries. A section reader holds one section and a delivery-state reader holds one state,
+which is why neither rule lives in either of them: both are stated here, at the level where the
+two things each rule relates are both in hand.
+
+**The refusals are the layer's readings.** Part 3 states these rules and names no condition for
+breaking them, and this module's standing reading is that a rule of structure or of declared
+field type it refuses carries `amqp:decode-error`. Both rules below are of that kind: the artifact
+constrains what a message may carry, and a receiver that finds the constraint broken has octets it
+cannot read as the message they claim to be. -/
+
+/-- The `properties` section a message carries, where it carries one. -/
+def propertiesSection? (sections : List Section) : Option Section :=
+  sections.find? (fun sec => Section.kind sec == .properties)
+
+/-- The value a message's `properties` section gives a field: none where the message carries no
+properties section, where the section's list stops before the field, or where it carries a null
+for it. A null and an omitted trailing field both say the field is not set, which is the reading
+the composite rules and the delivery states already rest on. -/
+def propertiesField? (sections : List Section) (name : String) : Option Value :=
+  match propertiesSection? sections with
+  | some (.fieldList _ fields) =>
+    match (fieldDeclsOf "properties").toOption with
+    | some decls =>
+      (decls.find? (fun decl => decl.name == name)).bind (fun decl =>
+        match fields[decl.index - 1]? with
+        | some .null => none
+        | other => other)
+    | none => none
+  | _ => none
+
+/-- The section kinds a message's body carries: the structure list gives the body as one of three
+choices, so this is the list of body sections in the order they appear. -/
+def bodyKinds (sections : List Section) : List SectionKind :=
+  (sections.filter (fun sec => (Section.kind sec).slot = .body)).map Section.kind
+
+/-- The encoding the artifact's `content-encoding` documentation names as one implementations must
+not use. The name is prose in the field's documentation rather than a declared choice — the
+artifact declares no encoding vocabulary — so it cannot be a table lookup the way a descriptor
+code can. -/
+def identityEncoding : String := "identity"
+
+/-- The two rules the `content-encoding` field's documentation states, applied where the field and
+the body are both in hand:
+
+* the field MUST NOT be set when the application-data section is other than `data`, so a message
+  whose body is `amqp-sequence` or `amqp-value` sections and whose properties carry an encoding is
+  refused; and
+* implementations MUST NOT use the `identity` encoding, so a message carrying it is refused.
+
+The body's kinds are read rather than assumed, because a body of `data` sections is the only body
+the first rule permits. A payload carrying no body at all never reaches the second rule: the
+structure list requires a body of any message that carries a section. -/
+def checkContentEncoding (sections : List Section) : Except Refusal (List Section) :=
+  match propertiesField? sections "content-encoding" with
+  | none => .ok sections
+  | some value =>
+    let body := bodyKinds sections
+    if !body.all (fun kind => kind == .data) then
+      .error (decodeRefusal "malformed"
+        s!"the properties section sets content-encoding and the body is {body.length} \
+          section(s) that are not data sections, and the field MUST NOT be set when the \
+          application-data section is other than data")
+    else
+      match value with
+      | .symbol text =>
+        if text == identityEncoding then
+          .error (decodeRefusal "malformed"
+            s!"the content-encoding is {identityEncoding}, and implementations MUST NOT use the \
+              identity encoding")
+        else .ok sections
+      -- The field is declared a symbol, so this is unreachable through either reader; a value of
+      -- another type is refused rather than passed as though it were an encoding.
+      | other =>
+        .error (decodeRefusal "malformed"
+          s!"a content-encoding is a symbol and the properties section carries a {typeName other}")
+
+/-- Whether two annotation keys are the same key. The two key types the annotations rules admit
+are symbols and ulongs, and this compares those; a value of neither type is not a key any rule
+admits, so it shares no key with anything, including itself. The comparison is on the keys rather
+than on whole pairs because that is exactly what the merge decides: two entries for one key differ
+in the value, and which of them survives is the rule. -/
+def sameKey : Value → Value → Bool
+  | .symbol left, .symbol right => left == right
+  | .ulong left, .ulong right => left == right
+  | _, _ => false
+
+/-- The prefix that puts a symbolic annotation key *outside* the reserved space: the annotations
+type's text is "all ulong keys, and all symbolic keys except those beginning with `x-` are
+reserved". This is not the prefix the mandated detach is written against — that one is `x-opt` —
+and the two are deliberately separate names here, because a key can be unreserved and still be one
+the receiver must understand. -/
+def unreservedPrefix : String := "x-"
+
+/-- Whether an annotation key is reserved: every ulong key is, and a symbolic key is unless it
+begins with `x-`. `none` where the value is not a key at all — neither a symbol nor a ulong — which
+the key rule refuses on its type before this question is asked. -/
+def reservedKey? : Value → Option Bool
+  | .symbol text => some (!text.startsWith unreservedPrefix)
+  | .ulong _ => some true
+  | _ => none
+
+/-- Whether a value is an annotation key at all: the annotations type admits symbols and ulongs, and
+nothing else. -/
+def isAnnotationKey : Value → Bool
+  | .symbol _ => true
+  | .ulong _ => true
+  | _ => false
+
+/-- **The reserved question is asked of keys and only of keys.** A value the reserved space has no
+answer for is exactly one the key rule refuses on its type, so the two halves of the annotations
+type's text — which keys exist, and which of them are reserved — cannot disagree about the set. -/
+theorem reservedKey_isAskedOfKeys (value : Value) :
+    (reservedKey? value).isSome = isAnnotationKey value := by
+  cases value <;> rfl
+
+/-- **Every ulong key is reserved**, which is the sentence's first half, at the lookup. -/
+theorem ulongKeysAreReserved (code : Nat) : reservedKey? (.ulong code) = some true := rfl
+
+/-- The message-annotations a message carries after a `modified` outcome's `message-annotations`
+field is applied to them — the artifact's own rule for that field: an entry whose key the message
+already carries *replaces* the message's entry for that key, and an entry whose key it does not
+carry is *added*. Everything the message carried under a key the field does not name survives
+untouched, which is the propagation half of the annotations rule with the augmentation the
+sentence names as its exception. -/
+def mergeAnnotations (existing augment : List (Value × Value)) : List (Value × Value) :=
+  augment ++ existing.filter (fun pair => !(augment.any (fun entry => sameKey entry.1 pair.1)))
+
 /-- The structure rules applied to a list of sections, which is what makes a writer's
 domain sit inside a reader's: a caller that hands over an illegal order is refused rather
 than producing octets its own reader would reject. -/
@@ -542,7 +794,7 @@ def checkStructure (sections : List Section) : Except Refusal (List Section) :=
   | .ok state =>
     match state.requireBody with
     | .error reason => .error reason
-    | .ok () => .ok sections
+    | .ok () => checkContentEncoding sections
 
 /-- A section as a corpus value: the shape its kind's declaration gives it. The vocabulary
 is the type-system corpus's, so a section and the value it carries are written the same
@@ -755,7 +1007,9 @@ def decodeMessage (policy : Policy) (bytes : Octets) : Except Refusal (List Sect
           match state.add decoded.kind with
           | .error reason => .error reason
           | .ok next => go fuel (offset + consumed) next (decoded :: acc)
-  go (bytes.size + 1) 0 Assembly.empty []
+  -- The sections are read and the structure applied as they are; the rules that relate two of
+  -- them are applied once the whole message is in hand, which is where the body's kinds are known.
+  (go (bytes.size + 1) 0 Assembly.empty []).bind checkContentEncoding
 
 /-- A payload whose body is exactly one `amqp-value` section, as its value. This is the
 shape a payload-carried performative arrives in, so the transaction layer dispatches on the
@@ -873,10 +1127,12 @@ inductive Outcome where
   | rejected (error : Option Value)
   /-- The message was not, and will not be, processed. -/
   | released
-  /-- The message was modified but not processed. `annotations` is a **maintained but
-  currently inert** quantity for the same reason `rejected`'s error is: the outcome carries
-  the attributes the node is asked to apply, no rule here applies them, and dropping the
-  field would make the state a lossy projection of the one on the wire. -/
+  /-- The message was modified but not processed. `annotations` is the attributes the node is
+  asked to combine with the message's own annotations, and it is **consulted**: the field is the
+  artifact's named example of an augmentation, so `augmentAnnotations` merges it into the
+  delivery's annotation map rather than recording it and moving nothing. That is what makes this
+  the annotations rule's exception a rule about this layer instead of about an absent
+  intermediary. -/
   | modified (deliveryFailed : Bool) (undeliverableHere : Bool)
       (annotations : Option (List (Value × Value)))
 deriving Repr
@@ -984,10 +1240,26 @@ structure Delivery where
   outcome retires it at the node, rejected makes it unprocessable, released makes it
   available again, and modified says which of the two by its own fields. -/
   redeliveryAllowed : Bool
+  /-- The message-annotations the delivery's message carries: what it arrived with, with a
+  `modified` outcome's `message-annotations` field merged in when such an outcome is applied.
+  This is the one quantity a delivery state *rewrites* rather than reports, which is why the
+  artifact's rule for that field is a rule about a merge rather than about a record. -/
+  annotations : List (Value × Value)
 deriving Repr
 
 /-- A delivery before any state has been applied. -/
-def Delivery.empty : Delivery := ⟨0, none, false, true⟩
+def Delivery.empty : Delivery := ⟨0, none, false, true, []⟩
+
+/-- **The delivery machine starts at the count the header declares.** A delivery that has applied no
+state carries the delivery-count a receiver assumes when the message carries no header, and the
+artifact declares that field's default as the text "0": the left half is the declared surface's own
+answer and the right half is the machine's start, stated together so the two cannot drift. This is
+the one header default any rule in this layer consults, and `assumedDefaultOf` is the rule that reads
+the text as the value a receiver assumes. -/
+theorem deliveryStartsAtTheDeclaredDefault :
+    (declaredDefaultOf "header" "delivery-count").toOption = some (some "0")
+      ∧ Delivery.empty.deliveryCount = 0 :=
+  ⟨by decide, rfl⟩
 
 /-- How much an outcome increments the delivery-count: `rejected` counts the attempt, and
 `modified` counts it exactly when the peer said the delivery failed. The artifact's other two
@@ -1006,6 +1278,18 @@ def allowedOf : Outcome → Bool
   | .released => true
   | .modified _ undeliverableHere _ => !undeliverableHere
 
+/-- The annotations an outcome leaves the delivery's message with: a `modified` outcome whose
+`message-annotations` field is set merges them into what the message already carried, and every
+other outcome — and a `modified` whose field is unset — leaves them as they were. This is the site
+at which the annotations rule's exception lives: the clause says annotations are propagated unless
+explicitly augmented or modified, and the one place this layer rewrites a message's annotations is
+here. -/
+def augmentAnnotations (outcome : Outcome) (existing : List (Value × Value)) :
+    List (Value × Value) :=
+  match outcome with
+  | .modified _ _ (some augment) => mergeAnnotations existing augment
+  | _ => existing
+
 /-- A delivery with one state recorded, and the quantities that state's own rule moves:
 `rejected` increments the delivery-count, `modified` increments it when `delivery-failed`
 is set and forbids redelivery to this link when `undeliverable-here` is set, `released`
@@ -1021,7 +1305,8 @@ def recordState (delivery : Delivery) (state : DeliveryState) (settled : Bool) :
       state := some state
       settled := delivery.settled || settled
       deliveryCount := delivery.deliveryCount + incrementOf outcome
-      redeliveryAllowed := allowedOf outcome }
+      redeliveryAllowed := allowedOf outcome
+      annotations := augmentAnnotations outcome delivery.annotations }
 
 /-- Apply a delivery state to a delivery, with settlement as the caller states it. The one
 rule that governs the application itself, from the delivery-state section's own text, is
@@ -1082,6 +1367,238 @@ theorem terminal_absorbing (delivery : Delivery) (state : DeliveryState) (settle
   rw [held]
   simp only [terminal, if_true]
   exact ⟨_, rfl⟩
+
+/-! ## The terminus field sets (Part 3, addressing)
+
+The addressing section's `source` and `target` are the messaging layer's other protocol-visible
+field sets: the two composites an `attach` carries, whose fields the artifact's documentation
+constrains beyond their declared types. The rules are of three kinds — coexistences on the record
+(the address/dynamic pair, and node properties that may be sent only with the dynamic flag), role
+membership for `default-outcome` and `distribution-mode`, and the readings the declared tables
+give `durable` and `outcomes`. All of them are rules about the *record*; what a node then does
+with the node a terminus names is the standard's own boundary and is not modelled here.
+
+**The sender is an input.** The address rules are conditioned on *which link endpoint sent the
+frame*, and that is not in the record: the same fields are legal in one direction and illegal in
+the other. So the caller states it, exactly as it states the annotation policy — and for the same
+reason, that a rule conditioned on knowledge the octets do not carry must be handed that knowledge
+rather than guessed at. -/
+
+/-- The two roles the artifact gives its terminus composites, and the declared outcome a source
+must support when its record names none. They are type names, which is the vocabulary the declared
+table is keyed by. -/
+def sourceTypeName : String := "source"
+
+def targetTypeName : String := "target"
+
+def acceptedOutcomeTypeName : String := "accepted"
+
+/-- Which link endpoint sent the frame a terminus arrived on. The two names are the artifact's own
+`role` vocabulary, so the pair is looked up in the declared table rather than spelled out in a
+rule. -/
+inductive SendingEndpoint where
+  | sender
+  | receiver
+deriving Repr, DecidableEq, BEq
+
+/-- Both link endpoints, for the table check below. -/
+def SendingEndpoint.all : List SendingEndpoint := [.sender, .receiver]
+
+/-- An endpoint's name, which is a declared `role` choice's name. -/
+def SendingEndpoint.name : SendingEndpoint → String
+  | .sender => "sender"
+  | .receiver => "receiver"
+
+/-- The role value the declared `role` type gives an endpoint. -/
+def SendingEndpoint.roleValue (endpoint : SendingEndpoint) : Except String String :=
+  match (choicesOf "role").find? (fun choice => choice.name == endpoint.name) with
+  | some choice => .ok choice.value
+  | none => .error s!"the declared surface's role type carries no {endpoint.name} choice"
+
+/-- The two endpoints' names are the declared `role` choices, so a role added to the artifact's
+table is visible here rather than leaving the two lists to drift apart. -/
+theorem sendingEndpoints_areTheDeclaredRoles :
+    (SendingEndpoint.all.map SendingEndpoint.name).all
+      (fun name => (choicesOf "role").any (fun choice => choice.name == name)) = true := by
+  decide
+
+/-- Whether a terminus field is set. A field the record omits and a field it carries a null for
+both say "not set" — the reading the composite rules and the delivery states' flags already rest
+on — and a zero-length array says the same, which the types section states outright: a null value
+and a zero-length array both describe an absence of a value. -/
+def terminusFieldIsSet (composite : Composite) (name : String) : Bool :=
+  match composite.field? name with
+  | some .null => false
+  | some (.array _ []) => false
+  | some _ => true
+  | none => false
+
+/-- The entries a field the artifact declares `multiple` carries: one element of the declared
+type, or an array of them, which are the two encodings the types section gives the attribute. A
+field that is not set carries no entries, which is the same "none" a zero-length array states. -/
+def multipleEntries (composite : Composite) (name : String) : List Value :=
+  match composite.field? name with
+  | some (.array _ items) => items
+  | some .null | none => []
+  | some single => [single]
+
+/-- The durability a value names, read from the `terminus-durability` type's declared choices. The
+three meanings the field's documentation enumerates — the state of durable messages, only the
+existence and configuration of the terminus, or no state at all — are the three choices the
+artifact declares, so this is a lookup rather than a list of names kept in step by hand. -/
+def durabilityName? (value : Value) : Option String :=
+  match value with
+  | .uint n =>
+    ((choicesOf "terminus-durability").find?
+      (fun choice => choice.value == toString n)).map (fun choice => choice.name)
+  | _ => none
+
+/-- The declared durabilities name three distinct states, so the lookup above answers with one
+choice rather than the first of several. -/
+theorem durabilities_areDistinct :
+    ((choicesOf "terminus-durability").map (fun choice => choice.name)).Nodup = true
+      ∧ ((choicesOf "terminus-durability").map (fun choice => choice.value)).Nodup = true := by
+  decide
+
+/-- The declared type a symbolic outcome descriptor names, where it names one that provides the
+outcome role. The artifact writes an `outcomes` entry as a descriptor *name* —
+`amqp:accepted:list` — so the lookup is against the declared surface's names, and a name no type
+carries, or one whose type provides no outcome, is not a valid outcome descriptor. -/
+def outcomeDescriptorOf? (text : String) : Option String :=
+  match types.find?
+      (fun entry => entry.descriptor.map (fun descriptor => descriptor.name) == some text) with
+  | some entry => if entry.provides.contains "outcome" then some entry.name else none
+  | none => none
+
+/-- The descriptor value a declared outcome is named by: this is how the assumed-outcome rule
+reaches the accepted outcome without writing its descriptor down. -/
+def outcomeDescriptorValue? (typeName : String) : Option Value :=
+  match types.find? (fun entry => entry.name == typeName) with
+  | some entry => entry.descriptor.map (fun descriptor => Value.symbol descriptor.name)
+  | none => none
+
+/-- Check a terminus's `outcomes` field against the field documentation's second rule: when
+present, the values must be a symbolic descriptor of a valid outcome. -/
+def checkOutcomeDescriptors (composite : Composite) : Except Refusal Unit :=
+  match (multipleEntries composite "outcomes").find? (fun entry =>
+      match entry with
+      | .symbol text => (outcomeDescriptorOf? text).isNone
+      | _ => true) with
+  | some (.symbol text) =>
+    .error (decodeRefusal "malformed"
+      s!"{composite.typeName}.outcomes names {text}, which is not the symbolic descriptor of a \
+        declared outcome")
+  | some other =>
+    .error (decodeRefusal "malformed"
+      s!"{composite.typeName}.outcomes carries a {typeName other}, and the field's values must be \
+        symbolic descriptors")
+  | none => .ok ()
+
+/-- Check a terminus's `durable` field: when set, its value must name one of the declared
+`terminus-durability` choices, which is what makes the three states the field's documentation
+enumerates the three the artifact declares rather than three this module believes in. -/
+def checkDurability (composite : Composite) : Except Refusal Unit :=
+  match composite.field? "durable" with
+  | some .null | none => .ok ()
+  | some value =>
+    match durabilityName? value with
+    | some _ => .ok ()
+    | none =>
+      .error (decodeRefusal "malformed"
+        s!"{composite.typeName}.durable carries a {typeName value}, and the value MUST name one \
+          of the declared terminus-durability choices")
+
+/-- Check a terminus field against the role its documentation and its declared `requires`
+attribute both name: `default-outcome` must be a valid outcome, and `distribution-mode` a
+distribution mode. -/
+def checkTerminusRole (composite : Composite) (field role : String) : Except Refusal Unit :=
+  match composite.field? field with
+  | some .null | none => .ok ()
+  | some value => do
+    let satisfied ← liftRefusal (satisfiesRequires role value)
+    if satisfied then .ok ()
+    else
+      .error (decodeRefusal "malformed"
+        s!"{composite.typeName}.{field} carries a {typeName value}, and the field's value MUST \
+          be a valid {role}")
+
+/-- The rules Part 3's `source` and `target` field documentation states, applied to a record.
+`sentBy` is the endpoint that sent the frame, because the address rules are conditioned on it and
+nothing in the record carries it.
+
+The address rule is one rule written twice in the artifact: the endpoint that *creates* a dynamic
+node communicates its address, and the endpoint that *requests* creation must leave the field
+unset — and which endpoint that is mirrors between the two types, because the receiver requests a
+source's node and the sender requests a target's. So the pair of fields is judged against the one
+role that created the node, and the six sentences of the two types' documentation are its six
+instances. -/
+def checkTerminus (sentBy : SendingEndpoint) (composite : Composite) : Except Refusal Unit := do
+  let name := composite.typeName
+  let dynamic ← booleanField composite "dynamic"
+  let addressSet := terminusFieldIsSet composite "address"
+  let creator := (name == sourceTypeName && sentBy == .sender)
+    || (name == targetTypeName && sentBy == .receiver)
+  if dynamic && creator && !addressSet then
+    .error (decodeRefusal "malformed"
+      s!"a dynamic {name} sent by the {sentBy.name} endpoint leaves the address unset, and the \
+        endpoint that created the node is the one communicating its address")
+  else if dynamic && !creator && addressSet then
+    .error (decodeRefusal "malformed"
+      s!"a dynamic {name} sent by the {sentBy.name} endpoint sets the address, and the endpoint \
+        that requested creation MUST NOT set it")
+  else if !dynamic && terminusFieldIsSet composite "dynamic-node-properties" then
+    .error (decodeRefusal "malformed"
+      s!"{name}.dynamic-node-properties is set while the dynamic field is not, and the field MUST \
+        be left unset unless the dynamic field is set to true")
+  else do
+    checkTerminusRole composite "default-outcome" "outcome"
+    checkTerminusRole composite "distribution-mode" "distribution-mode"
+    checkDurability composite
+    checkOutcomeDescriptors composite
+
+/-- The outcomes a source's record leaves choosable, which is the rule the `outcomes` field's
+documentation states for its empty case: an empty field means the default-outcome is assumed for
+every transfer, and where neither that field nor the default-outcome is set the *accepted* outcome
+is the one the source must support. The fallback's descriptor is read from the declared table
+rather than written down, so a surface without it is an error the reader reports instead of a
+value it invents. So the list is never empty — a reader of a source always has an outcome to
+apply, and the one it falls back to is the artifact's own. -/
+def assumedOutcomes (composite : Composite) : Except Refusal (List Value) :=
+  match multipleEntries composite "outcomes" with
+  | [] =>
+    match composite.field? "default-outcome" with
+    | some value => .ok [value]
+    | none =>
+      match outcomeDescriptorValue? acceptedOutcomeTypeName with
+      | some value => .ok [value]
+      | none =>
+        .error (decodeRefusal "malformed"
+          s!"the declared surface carries no {acceptedOutcomeTypeName} outcome descriptor for a \
+            source that announces no outcomes to fall back on")
+  | announced => .ok announced
+
+/-- The assumed-outcome rule really does leave a reader something to apply: whatever a source's
+record announces, the list this returns has at least the field's documentation's fallback in it. -/
+theorem assumedOutcomes_nonEmpty (composite : Composite) (assumed : List Value)
+    (result : assumedOutcomes composite = .ok assumed) : assumed ≠ [] := by
+  intro empty
+  rw [empty] at result
+  unfold assumedOutcomes at result
+  split at result <;> (try (split at result)) <;> (try (split at result)) <;> simp_all
+
+/-- A described value read as a terminus: the composite checked against the declared fields, the
+type's role confirmed to be one of the two terminus roles the artifact declares, and the field
+documentation's rules applied. -/
+def terminusOfValue (sentBy : SendingEndpoint) (value : Value) : Except Refusal Composite := do
+  let composite ← compositeOfValue value
+  let decl ← liftRefusal (typeDeclOf composite.typeName)
+  if !(decl.provides.contains sourceTypeName || decl.provides.contains targetTypeName) then
+    .error (decodeRefusal "malformed"
+      s!"{composite.typeName} is a declared type that provides neither the source nor the target \
+        role, so a described value of it is not a terminus")
+  else do
+    checkTerminus sentBy composite
+    return composite
 
 /-! ## The layer's corpus interface -/
 
