@@ -103,14 +103,20 @@ theorem DeliveryIdentity.of_cleared {s' : Session} (_hdelivery : s'.delivery = n
 /-- `attachLink`'s establish branch for this endpoint: a link that is being established has
 agreed nothing, so the delivery in progress and its recording both go. -/
 theorem attachLink_cleared_this_end {s s' : Session} (handle : Nat) (role : LinkRole)
-    (position : Option Position) (senderSettle : Bool)
+    (position : Option Position) (senderSettle senderUnsettled receiverSecond : Bool)
     (hstep : (Except.ok ({ s with
                             handle := some handle, handles := handle :: s.handles,
                             role := some role, position, peerCount := 0, peerCredit := 0,
                             delivery := none, deliveryTag := none, deliveryFormat := none,
                             senderSettleMode :=
                               if role == LinkRole.sender then senderSettle
-                              else s.senderSettleMode } : Session) : Except Refusal Session)
+                              else s.senderSettleMode,
+                            senderSettleUnsettled :=
+                              if role == LinkRole.sender then senderUnsettled
+                              else s.senderSettleUnsettled,
+                            receiverSettleSecond :=
+                              if role == LinkRole.receiver then receiverSecond
+                              else s.receiverSettleSecond } : Session) : Except Refusal Session)
               = .ok s') :
     DeliveryIdentity s' := by
   cases hstep
@@ -118,13 +124,19 @@ theorem attachLink_cleared_this_end {s s' : Session} (handle : Nat) (role : Link
 
 /-- `attachLink`'s establish branch for the partner: the same, on the peer's handle. -/
 theorem attachLink_cleared_the_peer {s s' : Session} (handle initialCount : Nat) (role : LinkRole)
-    (position : Option Position) (senderSettle : Bool)
+    (position : Option Position) (senderSettle senderUnsettled receiverSecond : Bool)
     (hstep : (Except.ok ({ s with
                             peerRole := some role, peerHandle := some handle,
                             peerHandles := handle :: s.peerHandles, peerCount := initialCount,
                             position, senderSettleMode :=
                               if role == LinkRole.sender then senderSettle
                               else s.senderSettleMode,
+                            senderSettleUnsettled :=
+                              if role == LinkRole.sender then senderUnsettled
+                              else s.senderSettleUnsettled,
+                            receiverSettleSecond :=
+                              if role == LinkRole.receiver then receiverSecond
+                              else s.receiverSettleSecond,
                             delivery := none, deliveryTag := none,
                             deliveryFormat := none } : Session) : Except Refusal Session)
               = .ok s') :

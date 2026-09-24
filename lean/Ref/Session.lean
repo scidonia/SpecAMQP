@@ -389,6 +389,20 @@ structure Endpoint where
   obligation — settling in at least one transfer would be demanded of the `unsettled`
   negotiation and never of the `settled` one. -/
   senderSettleMode : Bool
+  /-- Whether the sender's half of the settlement mode negotiated at attachment is the
+  `unsettled` **choice** of the `sender-settle-mode` element, which is what
+  `transfer/field:settled.6` turns on — "If the negotiated value for snd-settle-mode at
+  attachment is «unsettled», then this field MUST be false (or unset) on every transfer frame for
+  a delivery (unless the delivery is aborted)". `.4` selects the `settled` choice of the same
+  element and `.6` the `unsettled` one, so the negotiation is three-valued and its two recorded
+  outcomes are opposite obligations; a single flag cannot carry both. -/
+  senderSettleUnsettled : Bool := false
+  /-- Whether the receiver's half of the settlement mode negotiated at attachment is the
+  `second` **choice** of the `receiver-settle-mode` element, which is what
+  `transfer/field:rcv-settle-mode.u1` turns on — "If the negotiated link value is «first», then
+  it is illegal to set this field to «second»". The attach field's declared default is `first`,
+  so an attach that leaves it unset is the `first` negotiation and this flag stays false. -/
+  receiverSettleSecond : Bool := false
   /-- The delivery in progress, while one is. -/
   delivery : Option Delivery
   /-- The `delivery-tag` the transfer that *began* the delivery in progress carried, and the
@@ -434,6 +448,8 @@ def Endpoint.fresh (state : State) : Endpoint where
   peerCount := 0
   peerCredit := 0
   senderSettleMode := false
+  senderSettleUnsettled := false
+  receiverSettleSecond := false
   delivery := none
   deliveryTag := none
   deliveryFormat := none
@@ -598,6 +614,20 @@ def attachLink (endpoint : Endpoint) (outbound : Bool) (body : Value) :
     | some value =>
       numberOf value == (((declaredChoice "sender-settle-mode" "settled").bind String.toNat?).getD 0)
     | none => false
+  let unsettled :=
+    -- `.6`'s antecedent is the other choice of the same element; the negotiation is
+    -- three-valued and the two obligations are opposite, so both are recorded
+    match valueOfField "attach" "snd-settle-mode" body with
+    | some value =>
+      numberOf value == (((declaredChoice "sender-settle-mode" "unsettled").bind String.toNat?).getD 0)
+    | none => false
+  let receiverSecond :=
+    -- `transfer/field:rcv-settle-mode.u1`'s antecedent: the attach field's default is `first`,
+    -- so a link whose attach leaves it unset is `first` and this stays false
+    match valueOfField "attach" "rcv-settle-mode" body with
+    | some value =>
+      numberOf value == (((declaredChoice "receiver-settle-mode" "second").bind String.toNat?).getD 0)
+    | none => false
   if outbound then
     -- a fresh link starts with nothing agreed: see `Spec/Session`'s attach for the same
     -- reading, taken from the credit's ownership sentence
@@ -606,7 +636,11 @@ def attachLink (endpoint : Endpoint) (outbound : Bool) (body : Value) :
                             delivery := none, deliveryTag := none, deliveryFormat := none,
                             position := some ⟨(if role == Role.sender then initialCount else 0), 0⟩,
                             senderSettleMode :=
-                              if role == Role.sender then settle else endpoint.senderSettleMode }
+                              if role == Role.sender then settle else endpoint.senderSettleMode,
+                            senderSettleUnsettled :=
+                              if role == Role.sender then unsettled else endpoint.senderSettleUnsettled,
+                            receiverSettleSecond :=
+                              if role == Role.receiver then receiverSecond else endpoint.receiverSettleSecond }
   else
     return { endpoint with peerHandle := some handle,
                             peerHandles := handle :: endpoint.peerHandles,
@@ -618,7 +652,35 @@ def attachLink (endpoint : Endpoint) (outbound : Bool) (body : Value) :
                                              && endpoint.role == some Role.receiver
                                           then initialCount else endpoint.peerCount),
                             senderSettleMode :=
-                              if role == Role.sender then settle else endpoint.senderSettleMode }
+                              if role == Role.sender then settle else endpoint.senderSettleMode,
+                            senderSettleUnsettled :=
+                              if role == Role.sender then unsettled else endpoint.senderSettleUnsettled,
+                            receiverSettleSecond :=
+                              if role == Role.receiver then receiverSecond else endpoint.receiverSettleSecond }
+
+/-- The `link-credit` echo, in the direction the issuing link endpoint writes:
+`links/doc:flow-control.u1` and `.u3` with `flow/field:link-credit.u1` — "Only the receiver can
+independently modify this field. The sender's value is always the last known value indicated by
+the receiver."
+
+One rule for both directions, because its subject is the issuing end: a flow from the sender
+echoes this endpoint's `position.credit` — the last value the receiver indicated — whether the
+frame arrives from the peer's sender or is one this endpoint writes as its own sender; a flow from
+the receiver sets it, which is why the rule is silent there. -/
+def flowCreditEchoRefusal? (endpoint : Endpoint) (outbound : Bool) (body : Value) : Option Refusal :=
+  match valueOfField "flow" "handle" body with
+  | none | some .null => none
+  | some _ =>
+    let issuing := if outbound then endpoint.role else endpoint.peerRole
+    if issuing != some Role.sender then none
+    else
+      match endpoint.position, (valueOfField "flow" "link-credit" body).bind numberOf with
+      | some position, some credit =>
+        if credit == position.credit then none
+        else some (refuse invalidFieldCondition "malformed"
+          s!"a flow from the link's sender carries link-credit {credit}, and this endpoint's last \
+            known value for it is {position.credit}")
+      | _, _ => none
 
 /-- The link's half of a flow: the clauses that forbid the link's fields on a flow that
 names no link, the delivery-count the doc's `flow-control` fixes per direction, and the
@@ -645,47 +707,89 @@ def flowLink (endpoint : Endpoint) (outbound : Bool) (body : Value) :
       .error (refuse invalidFieldCondition "malformed"
         s!"a flow that sets no handle MUST NOT set {carried}")
   let _ ← readHandle endpoint outbound "flow" body
-  match endpoint.position with
-  | none => return endpoint
-  | some position =>
-    if !namesLink then return endpoint
-    -- The count, read through `numberAtField` so that a field the list stops before and one
-    -- it reaches with a null in it stay different answers: a flow that leaves the field
-    -- unset is admitted (`.2`'s presence half, which says the field MUST be set, is not this
-    -- layer's reading yet), while a count that is set to something that is not one is the
-    -- field's rule broken rather than the field absent.
-    let carried ← numberAtField "flow" "delivery-count" body
-    match carried with
-    | none => return endpoint
-    | some count =>
-      let ours := if outbound then endpoint.role == some Role.sender
-                  else endpoint.role == some Role.receiver
-      if ours && count != position.count then
-        .error (refuse invalidFieldCondition "malformed"
-          s!"the flow carries delivery-count {count}, and this endpoint's count is \
-            {position.count}")
-      if outbound then return endpoint
-      else if endpoint.role == some Role.sender then
-        let receivedCredit :=
-          match valueOfField "flow" "link-credit" body with
-          | some value => (numberOf value).getD 0
-          | none => 0
-        let credited :=
-          { position with credit := Position.creditFor count receivedCredit position.count }
-        return { endpoint with position := some credited, peerCount := count, peerCredit := receivedCredit }
-      else
-        -- the ownership sentence `link-credit` carries: only the receiver sets it, and the
-        -- sender echoes the last value it was sent
-        let echoed :=
-          match valueOfField "flow" "link-credit" body with
-          | some value => (numberOf value).getD 0
-          | none => 0
-        if echoed != position.credit then
+  if !namesLink then return endpoint
+  -- the two questions `.4` turns on, asked of the direction the frame travels: which end of the
+  -- link issued the flow, and whether the link's sender has attached yet
+  let issuing := if outbound then endpoint.role else endpoint.peerRole
+  let senderSeen := if outbound then endpoint.peerRole.isSome else endpoint.role.isSome
+  let receiverBeforeSender := issuing == some Role.receiver && !senderSeen
+  -- The count, read through `numberAtField` so that a field the list stops before, one it
+  -- reaches with a null in it, and one carrying a number stay three different answers. One
+  -- value answers all four directions of `.2` and `.3`: this endpoint's `position.count` *is*
+  -- the link sender's current count when the issuing end is the sender, and *is* its last known
+  -- value when the issuing end is the receiver. `.4` is the one case where the field must be
+  -- absent, and its subject is a receiver that has not yet seen the sender's attach.
+  match (← numberAtField "flow" "delivery-count" body) with
+  | none =>
+    if receiverBeforeSender then return endpoint
+    else
+      .error (refuse invalidFieldCondition "malformed"
+        "a flow that names the link MUST set its delivery-count, and this one omits it")
+  | some count =>
+    if receiverBeforeSender then
+      .error (refuse invalidFieldCondition "malformed"
+        "the receiving link endpoint has not yet seen the initial attach frame from the \
+          sender, so its flow MUST NOT set the delivery-count")
+    else
+      match endpoint.position with
+      | none => return endpoint
+      | some position =>
+        if count != position.count then
           .error (refuse invalidFieldCondition "malformed"
-            s!"a flow from the link's sender carries link-credit {echoed}, and this \
-              receiver's last known value is {position.credit}")
-        let counted := { position with count }
-        return { endpoint with position := some counted, peerCredit := echoed }
+            s!"the flow carries delivery-count {count}, and this endpoint's \
+              {if outbound then "current" else "last known"} count is {position.count}")
+        -- the echo rule, in whichever direction issued the frame: a flow from the sender — the
+        -- peer's or this endpoint's own — carries the receiver's last known value
+        match flowCreditEchoRefusal? endpoint outbound body with
+        | some reason => .error reason
+        | none => pure ()
+        if outbound then return endpoint
+        else if endpoint.role == some Role.sender then
+          let receivedCredit :=
+            match valueOfField "flow" "link-credit" body with
+            | some value => (numberOf value).getD 0
+            | none => 0
+          let credited :=
+            { position with credit := Position.creditFor count receivedCredit position.count }
+          return { endpoint with position := some credited, peerCount := count, peerCredit := receivedCredit }
+        else
+          let echoed :=
+            match valueOfField "flow" "link-credit" body with
+            | some value => (numberOf value).getD 0
+            | none => 0
+          let counted := { position with count }
+          return { endpoint with position := some counted, peerCredit := echoed }
+
+/-- `transfer/field:rcv-settle-mode.u1` and `.u2`: a transfer carrying the `second` choice is
+refused exactly when the link's receiver settled on the `first` choice — the attach field's declared
+default — and the transfer does not carry `settled` true, which `.u2` says makes the field ignored. -/
+def rcvSettleRefusal? (endpoint : Endpoint) (body : Value) (settled : Bool) : Option Refusal :=
+  match (valueOfField "transfer" "rcv-settle-mode" body).bind numberOf with
+  | none => none
+  | some mode =>
+    if settled || endpoint.receiverSettleSecond then none
+    else if some mode == ((declaredChoice "receiver-settle-mode" "second").bind String.toNat?) then
+      some (refuse invalidFieldCondition "malformed"
+        "the transfer sets rcv-settle-mode to the second choice, and the link negotiated the \
+          first choice")
+    else none
+
+/-- `transfer/field:settled.6`: under the `unsettled` choice of `sender-settle-mode` the flag MUST
+be false (or unset) on every transfer frame for a delivery, unless the delivery is aborted. -/
+def unsettledSettleRefusal? (endpoint : Endpoint) (settled aborted : Bool) : Option Refusal :=
+  if endpoint.senderSettleUnsettled && settled && !aborted then
+    some (refuse invalidFieldCondition "malformed"
+      "the link negotiated the unsettled choice of sender-settle-mode, so the settled flag MUST \
+        be false (or unset) on a transfer for a delivery unless the delivery is aborted")
+  else none
+
+/-- The two negotiated-settlement rules as the one guard `transferLink` runs: each sentence keeps
+its own predicate above, and this is only the composition. -/
+def negotiatedSettleRefusal? (endpoint : Endpoint) (body : Value) (settled aborted : Bool) :
+    Option Refusal :=
+  match rcvSettleRefusal? endpoint body settled with
+  | some reason => some reason
+  | none => unsettledSettleRefusal? endpoint settled aborted
 
 /-- The link's half of a transfer: the role its direction requires, the credit a sender
 spends, the fields a first transfer must carry, the `settled` interpretation with
@@ -1026,6 +1130,13 @@ def step (endpoint : Endpoint) (outbound : Bool) (channel : Nat) (body : Value)
         (match endpoint.delivery with
          | some delivery => delivery.settled
          | none => false)
+    -- the negotiated-settlement rules the transfer's own fields carry, answered at the frame gate
+    -- as the specification answers them: `rcv-settle-mode.u1` with `.u2`'s exemption and
+    -- `settled.6` with `aborted`'s
+    match negotiatedSettleRefusal? endpoint body settled
+        (booleanAtField "transfer" "aborted" body) with
+    | some reason => .error (placeLink reason)
+    | none => pure ()
     if outbound then
       if endpoint.windows.outgoing == 0 then
         .error (placed windowViolationCondition "limit"

@@ -268,15 +268,26 @@ set_option maxHeartbeats 800000 in
 /-- **A flow preserves handle uniqueness.** The successor is the session itself, or a record update
 over `position`, `peerCount` and `peerCredit`; no branch of the exchange writes a handle or a
 registry, so the frame lemma's four equalities are `rfl` and the invariant is carried across the
-step unchanged. -/
+step unchanged.
+
+The reduction needs `cases` **inside** the loop, on the same ground `transferLink`'s does: a flow
+now carries two guards whose conditions are opaque calls — the delivery-count rule and the
+`link-credit` echo — so `split` reaches a refused branch whose successor equality is
+`Except.error … = .ok s'`, and carrying every one of them to the end of the loop is what made this
+the reduction that spent its heartbeat budget. Closing each as the loop reaches it is the fix, and
+the branch count it prunes is exactly the guards' count. -/
 theorem flowLink_handle_uniqueness {s s' : Session} (outbound : Bool) (body : Value)
     (h : HandleUniqueness s) (hstep : flowLink s outbound body = .ok s') :
     HandleUniqueness s' := by
   unfold flowLink linkHandleOf refuseUnless at hstep
   dsimp only at hstep
-  repeat' (first | split at hstep | simp only [pure_bind] at hstep)
-  all_goals (try cases hstep)
-  all_goals (first | exact h | exact HandleUniqueness.frame h rfl rfl rfl rfl)
+  repeat' (first
+    | cases hstep
+    | split at hstep
+    | simp only [pure_bind] at hstep
+    | simp only [Except.ok.injEq] at hstep)
+  all_goals (try exact h)
+  all_goals (try exact HandleUniqueness.frame h rfl rfl rfl rfl)
 
 set_option maxHeartbeats 1600000 in
 /-- **A transfer preserves handle uniqueness.** The successor is a record update over `position`,

@@ -470,6 +470,31 @@ structure Session where
   least once — govern the `unsettled` negotiation and `.6`'s — never settle — govern the
   `settled` one, which is neither sentence. -/
   senderSettleMode : Bool
+  /-- Whether the settlement mode negotiated for this link's sender side is the `unsettled`
+  **choice** of the same element `senderSettleMode` reads the `settled` choice of, which is what
+  `transfer/field:settled.6` turns on — "If the negotiated value for snd-settle-mode at
+  attachment is <xref name="sender-settle-mode" choice="unsettled"/>, then this field MUST be
+  false (or unset) on every transfer frame for a delivery (unless the delivery is aborted)".
+
+  `.4` selects the `settled` choice and `.6` selects the `unsettled` one, so the two recorded
+  outcomes are opposite obligations on the same field and a single boolean cannot carry both: the
+  negotiation is three-valued (`unsettled`, `settled`, `mixed`), and the one-property-per-field
+  shape would make `.6`'s obligation fire under `settled`, which is the inversion `senderSettleMode`'s
+  own docstring records. A link whose attach has not been seen records neither, and the obligations
+  are then vacuous, which is what "before the negotiation" means. -/
+  senderSettleUnsettled : Bool := false
+  /-- Whether the settlement mode negotiated for this link's **receiver** side is the `second`
+  **choice** of the `receiver-settle-mode` element, which is what
+  `transfer/field:rcv-settle-mode.u1` turns on — "If the negotiated link value is «first», then it
+  is illegal to set this field to «second»".
+
+  The distinction is the same one `.4` and `.6` carry: `receiver-settle-mode` is the declared
+  *type* of `attach`'s `rcv-settle-mode` field, whose choices are `first` and `second`, and the
+  transfer's own `rcv-settle-mode` field names one of those choices. The attach field's declared
+  default is `first`, so a link whose attach leaves it unset is one this flag is `false` at —
+  absence is the `first` negotiation, and a transfer naming `second` against it is exactly the
+  refusal the clause states. -/
+  receiverSettleSecond : Bool := false
   /-- The delivery a transfer is carrying, while one is in progress. -/
   delivery : Option Delivery
   /-- The `delivery-tag` the transfer that *began* the delivery in progress carried, and the
@@ -539,6 +564,8 @@ def Session.initial : Session where
   peerCount := 0
   peerCredit := 0
   senderSettleMode := false
+  senderSettleUnsettled := false
+  receiverSettleSecond := false
   delivery := none
   deliveryTag := none
   deliveryFormat := none
@@ -634,29 +661,80 @@ def linkHandleOf (session : Session) (outbound : Bool) (typeName : String) (body
       (refusal unattachedHandle "illegalState"
         s!"the {typeName} names handle {handle}, and this endpoint's link is handle {mine}")
 
-/-- The delivery-count a `flow` must carry in each direction: `flow/field:delivery-count.2`
-— "When the handle identifies that the flow state is being sent from the sender link
-endpoint to receiver link endpoint this field MUST be set to the current delivery-count of
-the link endpoint" — and `.3`, the same field sent the other way, which "MUST be set to
-the last known value of the corresponding sending endpoint". -/
+/-- The delivery-count a `flow` must carry, in every direction and in both its halves:
+`flow/field:delivery-count.2` — "When the handle identifies that the flow state is being sent
+from the sender link endpoint to receiver link endpoint this field MUST be set to the current
+delivery-count of the link endpoint" — `.3`, the same field sent the other way, which "MUST be
+set to the last known value of the corresponding sending endpoint", and `.4`, its exception —
+"In the event that the receiving link endpoint has not yet seen the initial «attach» frame from
+the sender this field MUST NOT be set".
+
+One quantity answers all four directions, and that is why the rule is one function rather than
+one per direction: this endpoint's `position.deliveryCount` *is* "the current delivery-count of
+the link endpoint" when the issuing link endpoint is the sender, and *is* "the last known value
+of the corresponding sending endpoint" when it is the receiver — a receiver's count is its
+record of the sender's, advanced by the messages it receives. So a flow that names the link must
+carry the field, and what it carries must be that one value, whichever end issued the frame.
+
+`.4` is the one case where the field must be *absent*, and its subject is the receiving link
+endpoint that has not yet seen the sender's attach: the issuing end is the receiver and the
+link's sender has not attached yet, which is `session.role`/`session.peerRole` asked of the
+direction the frame travels. `none` is the field the body's list stops short of; a null the list
+*reaches* is a value the frame carries, which `valueNat` reports as not an integer, the reading
+`flow/field:delivery-count.2`'s null vector is refused by. -/
 def flowCountRefusal? (session : Session) (outbound : Bool) (body : Value) :
     Option Refusal :=
-  match session.position, fieldValue "flow" "delivery-count" body with
-  | some current, some value =>
-    let ours := if outbound then session.role == some LinkRole.sender
-                else session.role == some LinkRole.receiver
-    if !ours then none
+  if !fieldSet "flow" "handle" body then none
+  else
+    let issuing := if outbound then session.role else session.peerRole
+    let senderSeen := if outbound then session.peerRole.isSome else session.role.isSome
+    let receiverBeforeSender := issuing == some LinkRole.receiver && !senderSeen
+    match fieldValue "flow" "delivery-count" body with
+    | none =>
+      if receiverBeforeSender then none
+      else some (refusal invalidField "malformed"
+        "a flow that names the link MUST set its delivery-count, and this one omits it")
+    | some value =>
+      if receiverBeforeSender then
+        some (refusal invalidField "malformed"
+          "the receiving link endpoint has not yet seen the initial attach frame from the \
+            sender, so its flow MUST NOT set the delivery-count")
+      else
+        match session.position, valueNat value with
+        | none, _ => none
+        | some _, none => some (refusal invalidField "malformed"
+            "the flow's delivery-count is not an integer")
+        | some current, some carried =>
+          if carried == current.deliveryCount then none
+          else some (refusal invalidField "malformed"
+            s!"the flow carries delivery-count {carried}, and this endpoint's \
+              {if outbound then "current" else "last known"} count is \
+              {current.deliveryCount}")
+
+/-- The `link-credit` echo, in the direction the issuing end writes: `links/doc:flow-control.u1`
+— "Only the receiver can independently choose a value for this field" — `.u3` — "Only the receiver
+can independently modify this field" — and the flow field's own `link-credit.u1` — "Only the
+receiver endpoint can independently set this value" — which the doc's following sentence states the
+other half of: "The sender's value is always the last known value indicated by the receiver."
+
+The subject is the issuing link endpoint, so the rule is one function: a flow from the sender
+echoes the receiver's last known value — which is this endpoint's `position.credit`, whether the
+frame arrives from the peer's sender or is one this endpoint writes as its own sender — while a
+flow from the receiver sets it, which is why the rule is silent there. -/
+def flowCreditEchoRefusal? (session : Session) (outbound : Bool) (body : Value) :
+    Option Refusal :=
+  if !fieldSet "flow" "handle" body then none
+  else
+    let issuing := if outbound then session.role else session.peerRole
+    if issuing != some LinkRole.sender then none
     else
-      match valueNat value with
-      | none => some (refusal invalidField "malformed"
-          "the flow's delivery-count is not an integer")
-      | some carried =>
-        if carried == current.deliveryCount then none
+      match session.position, (fieldValue "flow" "link-credit" body).bind valueNat with
+      | some current, some credit =>
+        if credit == current.credit then none
         else some (refusal invalidField "malformed"
-          s!"the flow carries delivery-count {carried}, and this endpoint's \
-            {if outbound then "current" else "last known"} count is \
-            {current.deliveryCount}")
-  | _, _ => none
+          s!"a flow from the link's sender carries link-credit {credit}, and this endpoint's last \
+            known value for it is {current.credit}")
+      | _, _ => none
 
 /-- The attach exchange: the handle rules (`attach/field:handle.1` — "The handle MUST NOT
 be used for other open links" — with `.2`'s mandated close, and `begin/field:handle-max`
@@ -718,6 +796,19 @@ def attachLink (session : Session) (outbound : Bool) (body : Value) :
     -- the choice the artifact names.
     (fieldValue "attach" "snd-settle-mode" body).bind valueNat ==
       ((choiceValue? "sender-settle-mode" "settled").bind String.toNat?)
+  let senderUnsettled :=
+    -- `.6`'s antecedent is the *other* choice of the same element, `.4`'s is the `settled` one:
+    -- the negotiation is three-valued, so the two obligations are recorded separately rather
+    -- than collapsed into one flag. See `Session.senderSettleUnsettled`.
+    (fieldValue "attach" "snd-settle-mode" body).bind valueNat ==
+      ((choiceValue? "sender-settle-mode" "unsettled").bind String.toNat?)
+  let receiverSecond :=
+    -- `transfer/field:rcv-settle-mode.u1`'s antecedent, from the same element's receiver half:
+    -- "If the negotiated link value is «first», then it is illegal to set this field to
+    -- «second»". The attach field's declared default is `first`, so an attach that leaves the
+    -- field unset is `first`, which is what `none == some second` already answers.
+    (fieldValue "attach" "rcv-settle-mode" body).bind valueNat ==
+      ((choiceValue? "receiver-settle-mode" "second").bind String.toNat?)
   let position : Option Position :=
     match role with
     | LinkRole.sender => some ⟨initialCount, 0⟩
@@ -730,7 +821,9 @@ def attachLink (session : Session) (outbound : Bool) (body : Value) :
                handle := some handle, handles := handle :: session.handles,
                role := some role, position, peerCount := 0, peerCredit := 0, delivery := none,
                deliveryTag := none, deliveryFormat := none,
-               senderSettleMode := if role == LinkRole.sender then senderSettle else session.senderSettleMode }
+               senderSettleMode := if role == LinkRole.sender then senderSettle else session.senderSettleMode,
+               senderSettleUnsettled := if role == LinkRole.sender then senderUnsettled else session.senderSettleUnsettled,
+               receiverSettleSecond := if role == LinkRole.receiver then receiverSecond else session.receiverSettleSecond }
   else
     return { session with
                peerHandle := some handle, peerHandles := handle :: session.peerHandles,
@@ -747,7 +840,9 @@ def attachLink (session : Session) (outbound : Bool) (body : Value) :
                             else position),
                delivery := none,
                deliveryTag := none, deliveryFormat := none,
-               senderSettleMode := if role == LinkRole.sender then senderSettle else session.senderSettleMode }
+               senderSettleMode := if role == LinkRole.sender then senderSettle else session.senderSettleMode,
+               senderSettleUnsettled := if role == LinkRole.sender then senderUnsettled else session.senderSettleUnsettled,
+               receiverSettleSecond := if role == LinkRole.receiver then receiverSecond else session.receiverSettleSecond }
 
 /-- The flow exchange: the flow's own fields against the link's state. The windows'
 arithmetic lives at the session, above; what is here is the link's half of the doc's
@@ -776,13 +871,17 @@ def flowLink (session : Session) (outbound : Bool) (body : Value) :
   refuseUnless ((flowCountRefusal? session outbound body).isNone)
     ((flowCountRefusal? session outbound body).getD
       (refusal invalidField "malformed" "the flow's delivery-count is wrong"))
+  refuseUnless ((flowCreditEchoRefusal? session outbound body).isNone)
+    ((flowCreditEchoRefusal? session outbound body).getD
+      (refusal invalidField "malformed" "the flow's link-credit is wrong"))
   if !fieldSet "flow" "handle" body then
     -- a flow that names no link carries the session's windows and nothing of the link's:
     -- the four field clauses forbid it carrying the link's fields, so nothing here reads
     -- them and the link's own accounting is left where it was
     return session
   if outbound then
-    -- a receiver's or sender's flow carries its own grant; nothing here recomputes it
+    -- nothing here recomputes our own grant: a flow this endpoint writes as the receiver *sets*
+    -- the credit, and the echo rule above has already answered for the sender's direction
     return session
   else
     let receivedCredit ←
@@ -804,20 +903,61 @@ def flowLink (session : Session) (outbound : Bool) (body : Value) :
     else
       match session.position with
       | some current =>
-        -- the ownership sentence the doc's `link-credit` carries: "Only the receiver
-        -- endpoint can independently set this value. The sender endpoint sets this to the
-        -- last known value seen from the receiver" — so a flow from the sender that
-        -- names a different credit than this endpoint last granted is inventing the other
-        -- side's quantity rather than echoing it
-        refuseUnless (receivedCredit == current.credit)
-          (refusal invalidField "malformed"
-            s!"a flow from the link's sender carries link-credit {receivedCredit}, and               this receiver's last known value for it is {current.credit}: only the               receiver sets that quantity, and the sender echoes what it was sent")
         -- "The receiver's value is calculated based on the last known value from the
         -- sender and any subsequent messages received on the link"
         return { session with
                    position := some { current with deliveryCount := receivedCount },
                    peerCredit := receivedCredit }
       | none => return session
+
+/-- `transfer/field:rcv-settle-mode.u1` and `.u2`. `.u1` states the rule — "If the negotiated
+link value is «first», then it is illegal to set this field to «second»" — against a *choice* the
+attach fixed the link at, and `.u2` gives the exemption the field's own doc states: "If the
+message is being sent settled by the sender, the value of this field is ignored".
+
+So a transfer setting the field to the `second` choice is refused exactly when the link's
+receiver settled on the `first` choice — which is what an attach that leaves the field unset
+declares, the field's declared default being `first` — and the transfer does not carry `settled`
+true. The choice's number is read from the generated table, so neither the number nor the
+element's name is typed here. -/
+def rcvSettleRefusal? (session : Session) (body : Value) (settled : Bool) : Option Refusal :=
+  match (fieldValue "transfer" "rcv-settle-mode" body).bind valueNat with
+  | none => none
+  | some mode =>
+    if settled || session.receiverSettleSecond then none
+    else if some mode == ((choiceValue? "receiver-settle-mode" "second").bind String.toNat?) then
+      some (refusal invalidField "malformed"
+        "the transfer sets rcv-settle-mode to the second choice, and the link negotiated the \
+          first choice")
+    else none
+
+/-- `transfer/field:settled.6`: "If the negotiated value for snd-settle-mode at attachment is
+<xref name="sender-settle-mode" choice="unsettled"/>, then this field MUST be false (or unset) on
+every transfer frame for a delivery (unless the delivery is aborted)".
+
+The negotiation is the `unsettled` *choice* of the element `.4` selects the `settled` choice of —
+the two are opposite obligations on the one field, which is why the session records both — and the
+exemption is the transfer's own `aborted` flag, which voids the delivery the sentence is about. The
+flag is read by its *value*, so an explicit `false` is the conforming encoding as much as an absent
+field. -/
+def unsettledSettleRefusal? (session : Session) (settled aborted : Bool) : Option Refusal :=
+  if session.senderSettleUnsettled && settled && !aborted then
+    some (refusal invalidField "malformed"
+      "the link negotiated the unsettled choice of sender-settle-mode, so the settled flag MUST \
+        be false (or unset) on a transfer for a delivery unless the delivery is aborted")
+  else none
+
+/-- The two negotiated-settlement rules on a transfer's own fields, as the one guard `transferLink`
+runs: `rcv-settle-mode.u1`'s refusal — with `.u2`'s exemption — or, where that is silent,
+`settled.6`'s. Each sentence keeps its own predicate above, so a disposition names the declaration
+the clause it carries turns on; this is only the composition, and it is one guard rather than two
+because the two are the two halves of one negotiation: a link is `unsettled` on its sender's side
+or `second` on its receiver's, and a transfer can break at most one of the two sentences at once. -/
+def negotiatedSettleRefusal? (session : Session) (body : Value) (settled aborted : Bool) :
+    Option Refusal :=
+  match rcvSettleRefusal? session body settled with
+  | some reason => some reason
+  | none => unsettledSettleRefusal? session settled aborted
 
 /-- The transfer exchange. What is here is what the transfer clauses and the doc's
 `flow-control` make checkable per frame: the role the direction requires, the credit a
@@ -1302,6 +1442,15 @@ def step (session : Session) (outbound : Bool) (channel : Nat) (body : Value)
     let settled :=
       ((fieldValue "transfer" "settled" body).bind valueBool).getD
         ((session.delivery.map (fun delivery => delivery.settled)).getD false)
+    -- The negotiated-settlement rules the transfer's own fields carry — `rcv-settle-mode.u1` with
+    -- `.u2`'s exemption, and `settled.6` with `aborted`'s — answered here rather than inside
+    -- `transferLink`, because the fields they read are the *link's* negotiation and the frame's
+    -- own flags: this is the same gate that answers the flow's `next-incoming-id`, and it is where
+    -- a frame the session cannot accept is refused whatever the link's other rules would say.
+    let aborted := fieldBool "transfer" "aborted" body
+    match negotiatedSettleRefusal? session body settled aborted with
+    | some reason => .error (place reason)
+    | none => pure ()
     if outbound then do
       -- the two windows a sent transfer is charged against: ours, which "defines the
       -- maximum number of outgoing «transfer» frames that the endpoint can currently
