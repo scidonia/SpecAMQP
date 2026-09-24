@@ -2036,6 +2036,16 @@ shim was, under the same question of what gets credited, and would buy nothing t
   per-connection instance, and it is a kernel fact about disjoint state. It is also *why* the share-nothing shape is the provable one: a
   design sharing session or flow state across connections would owe a linearizability argument instead, in exactly the place where the state
   is unproved.
+
+**And the second item is not a rung: stating it as one would prove a property of a model rather than of the server.** Three facts, each checkable in the tree, decide that. The
+frozen interface carries **no connection index** — `Input` is `frame | api | tick`, `Contracts/Conformance.lean` — so there is no alphabet over which an interleaving of two
+connections could be written at all. The shipped shell serves **one connection per process**: `Shell/Driver.serveConn` accepts, runs the connection and closes it, and its own
+docstring says that a caller wanting more than one is *a later rung*. And the design gives each connection its own endpoint *value*, so there is no shared state for two steps to
+commute over — **the share-nothing shape makes the fact structural rather than modelled**, which is a stronger position than a theorem: a value cannot be interfered with, whereas a
+proof obligation can be discharged against the wrong model. To state commutation in Lean one would first have to model the dispatcher, and that model's relation to the shipped
+shell is exactly the unproved boundary §23.2 keeps the concurrency inside, so the theorem would add the appearance of rigour without moving the boundary. **What a server
+therefore owes is the first item, the delivery contract as a named hypothesis, and the dispatcher as a disclosed unproved dependency beside the socket boundary** — with
+`accept`-in-a-loop, fork or threads, staying where §23.2 put it: inside the shell, changing what the shell owes rather than what the proofs owe.
 **And a fourth value-layer statement belongs on that list, flagged from the receive-direction reconnaissance**: `Proofs/CodecFrameLaws.lean` carries
 `ValueConsumption` — that a read of an encoded value followed by an arbitrary tail stops at the value's own last octet — with
 `round_trip_on_encoded_values_of_consumption` deriving the contract's round trip from it. It is **stronger than the contract's dependency and it is what
