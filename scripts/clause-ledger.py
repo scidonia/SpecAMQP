@@ -124,7 +124,32 @@ UNKEYED_PHRASES = re.compile(
     r"|\btakes precedence\b|\bif and only if\b"
     r"|\bis not set\b|\bis not mandatory\b|\bis ineligible\b|\bare transitioned\b"
     r"|\bwill remain\b"
-    r"|\bwill be (?:discarded|deleted|chosen|cleared|applied|retained|rolled back)\b",
+    r"|\bwill be (?:discarded|deleted|chosen|cleared|applied|retained|rolled back)\b"
+    # A field's values, and the field definition they are read against, are the subjects of
+    # the sentences that give a `multiple` field its representation — and those had no clause
+    # id, so a vector could not cite the rule it rests on. The sentence that decides the
+    # reading, "Multiple values are represented by the use of an array where the type of the
+    # elements in the array is the type defined in the field definition", carries no keyword,
+    # and neither does the sentence beside it in the same paragraph that conditions the
+    # permitted element values on the type specification and multiplicity of the field
+    # definitions, nor Field Notation's sentence that a field's values are restricted to
+    # types providing a required archetype. A slice that moved a vector to the artifact's
+    # array form could cite only the pictures that declare and encode `book.authors`, because
+    # the sentence itself was not in the ledger at all.
+    #
+    # Measured against the pinned artifacts, this shape captures exactly three statements and
+    # no others: the two in §Composite Type Representation above, and the one in Field
+    # Notation. It is keyed on the subject rather than the verb because the verbs reach
+    # across the artifacts — "are restricted to" alone adds five statements about map keys
+    # and type derivation ("The keys of this map are restricted to be of type `string`…"),
+    # and "are determined by" adds "The TLS client peer and TLS server peer are determined by
+    # the TCP client peer and TCP server peer respectively" — while "are represented by"
+    # reaches only the one sentence that mattered. What stays out is stated rather than
+    # implied: Field Notation's own attribute entries (the `multiple` entry's `"true" iff the
+    # field can have multiple values of its specified type` and the `requires` entry's `A
+    # comma separated list of archetypes`) name an attribute's syntax, are reached by no shape
+    # here, and are left standing as a gap rather than widened into one.
+    r"|\bfield (?:values?|definitions?)\b",
     re.IGNORECASE,
 )
 
