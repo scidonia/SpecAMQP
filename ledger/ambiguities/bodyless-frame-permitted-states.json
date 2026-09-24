@@ -1,0 +1,30 @@
+{
+ "schema_version": 1,
+ "id": "bodyless-frame-permitted-states",
+ "question": "`picture.24` gives each state a receive column naming what may arrive, and `doc-idle-time-out.7` makes an empty frame the keepalive traffic a peer with nothing to send uses. Which states permit a frame with **no body**, in the AMQP layer: only those whose column is `-`, or only those whose column is `*`?",
+ "readings": [
+  {
+   "name": "The column's own semantics: a cell names the performative that may arrive, so a frame carrying none is permitted only where the cell is `*`",
+   "statement": "Adopted. `*` means any frame, `-` means none, and a cell naming a performative (`OPEN`, `HDR`, `BEGIN`, ...) names *that* performative — so a frame with no body, which carries none, is no more permitted under `OPEN` than under `-`. The keepalive does not contradict this: it acts where the column is `*`, because a connection with an established session is in OPENED, and the header states have no connection to keep alive. Measured reach, in both artefacts: a bodyless frame is now refused where it was admitted before in ten states — END and CLOSE_RCVD (column `-`), HDR_RCVD, HDR_EXCH, OPEN_SENT and CLOSE_PIPE (column `OPEN`), and START, HDR_SENT, OPEN_PIPE and OC_PIPE (column `HDR`) — of which the four `HDR`-column states are reached only on the offered/`readFrame` route, since `decodeHeader` answers first on the arriving route. The four `*` states (OPEN_RCVD, OPENED, CLOSE_SENT, DISCARDING) still admit it with the endpoint unchanged and nothing written, which is the idle-timeout half and is pinned by the committed empty-frame vectors."
+  },
+  {
+   "name": "The literal test: refuse where the column is `-`, and admit where it names any performative",
+   "statement": "Rejected: it reads `OPEN` as \"any frame without a body\", which no cell says, and it makes the column's value immaterial to the only frame whose arrival it cannot describe. A column exists to name what may arrive; a reading under which `OPEN` and `*` differ only in which bodyless frames they admit empties the distinction the table is drawn to make."
+  }
+ ],
+ "open": false,
+ "adopted": "The column's own semantics: a cell names the performative that may arrive, so a frame carrying none is permitted only where the cell is `*`",
+ "clauses": [
+  "amqp-core-transport-v1.0-os.xml#picture.24",
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:framing.4",
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections/doc:doc-idle-time-out.u1",
+  "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections/doc:doc-idle-time-out.7"
+ ],
+ "consequences": [
+  "The refusal's condition and class are `amqp:illegal-state` with class `illegalState` — the pair `exchange-frame-in-end-refused` and its receive step `refused_close_in_end` already pin, placed by the existing wrapper (END at END, DISCARDING otherwise), so the new refusals are not a new vocabulary.",
+  "The two artefacts answer alike in every state, which is what makes the staged vector `staged-bodyless-frame-in-end` promotable: 13 steps with 5 failures became 3, and the two that moved are the arrival and the offer, each refused with \"END does not permit a frame with no body to arrive: the table's legal receives column is -\". Its three remaining failures are the resume/unsettled vectors, untouched.",
+  "No committed vector moved in either direction: `s3_exchanges.sh` and `s4_flow.sh` carry numbers identical to their before-run, so the four `*` states' admissions are unchanged.",
+  "The offered empty frame has no corpus form at all — the step builders refuse to write one, in prose — so the send half of this rule remains evidenced by the theorem `frame_none_answers` and is named in the untestable list rather than tested."
+ ],
+ "evidence": "Four refs, and between them they carry the reading. `picture.24` is the state table whose receive column names what may arrive; `framing.4` is the clause that permits a frame with no body at all, as artificial traffic for a negotiated idle timeout; `doc-idle-time-out.7` is the MUST to be prepared to handle empty frames arriving; and `doc-idle-time-out.u1` says empty frames can only be sent **after** the `open` frame is sent — an unnumbered sentence, but a statement about the bodyless frame rather than about the table, and one that reading (b) satisfies and reading (a) does not: under the literal test an empty frame offered while a header exchange is in progress is admitted, and `u1` says empty frames are not for that moment. Reading (a) was rejected by a probe in `/tmp` rather than by argument."
+}
