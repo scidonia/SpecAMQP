@@ -52,15 +52,15 @@ stays small. `PLAN.md` §23.1 records the measurement, the decision and the reje
 built and passed before it was rejected. **The corpus does run against the
 endpoint over a socket as a third runner beside `amqp-spec` and `amqp-ref`** — that runner is R4, its rung is in
 the tree (`scripts/run-endpoint-wire-differential.sh` with `scripts/endpoint/WireApp/` and the wire peer), and it
-compares the shipped binary's per-step socket verdict against `amqp-spec`'s in-process verdict. **Measured by
-running the tier: three of `slice.ndjson`'s six vectors agree end to end — `slice-open-close-handshake`, and both
-SASL vectors, one of them including its refused step — and three diverge, every one attributed by the run itself
-to a property of the differential's application seam rather than to the core**: two vectors ask for two sends in a
-row with nothing arriving between them, and the shell prompts the application only after each unit of the peer's
-octets; the third has pre-state `START`, which is not the application's to play because the shell announces the
-protocol header itself. Those divergences are *expected at this tier*, and each is stated on its own line by the
-run rather than inferred by a reader. **R4 is not accepted**: what it still owes is the reach of its own seam,
-not an open question about the endpoint. **The protocol core's `Conforms` instance is no longer owed: R3 is discharged and the rung is accepted.**
+compares the shipped binary's per-step socket verdict against `amqp-spec`'s in-process verdict. **Its state is declared in the gate rather than transcribed here**, because a measurement moves and this paragraph
+has gone stale three times in one day: `tests/contracts/r4_wire_differential.sh` names the agreeing and diverging
+vectors per vector, requires every divergence to carry a cause drawn from the tier's own vocabulary, forbids an
+unattributed divergence, and treats a run that never tested anything as "not evidence". **What the state is: all six
+vectors of `vectors/slice.ndjson` agree at the socket, with no residual divergence** — three of them diverged when the
+gate was written, each because of a property of the differential's *own* application seam, and closing those seams
+(the shell re-asks the application after each step it takes; the protocol header is the application's opening move)
+moved all three to agreement. **That the closure left nothing over is the point**: those seams were hiding the
+endpoint, not excusing it. For the current state, run the gate; for what it means, read its declaration. **The protocol core's `Conforms` instance is no longer owed: R3 is discharged and the rung is accepted.**
 `Proofs/EndpointConformance.lean` proves `Contracts/EndpointConformance.lean`'s statement at exactly the type
 that file froze, and `Contracts/EndpointAcceptance.lean` binds it — so what is proved *about the endpoint* is now
 that its core is a forward simulation of the specification's connection endpoint over the unit alphabet the

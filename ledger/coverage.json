@@ -1,10 +1,10 @@
 {
  "by_disposition": {
-  "deferred": 234,
+  "deferred": 223,
   "environment": 12,
   "formalized": 102,
   "informative": 54,
-  "out-of-scope": 18,
+  "out-of-scope": 29,
   "superseded": 2,
   "test": 3,
   "underspecified": 3
