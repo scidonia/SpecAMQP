@@ -194,6 +194,8 @@ output rather than only in a diff. Right now that count is six.
   a ruling from it, and were both wrong in the same direction. A document describing a check must
   be derived from the check. Where they disagree, the check is the fact and the prose is the bug.
 
+- **Modules and executables are different targets, and a behaviour claim needs the second.** `lake build` builds the modules the globs reach; it does not relink `amqp-spec` or `amqp-ref`, which are `lake build amqp-spec amqp-ref` and are what actually run a corpus. So "the package builds, 598 jobs" is a statement about modules and proofs and says nothing about behaviour: a session that fixed a reader, built the package, and read the still-stale binary would conclude the fix did nothing. Every gate script builds its own executables before using them, which is why gate numbers are current and an ad-hoc run may not be. When the claim is what the artefacts *do*, name the executables.
+
 ## Commands
 
 Everything runs in the pinned shell; the first `nix develop` realizes the closure
