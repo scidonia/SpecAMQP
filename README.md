@@ -15,9 +15,7 @@ completeness and fidelity *measurable*.
 - **76 Lean modules**, and an endpoint in `lean/Impl/` compiled by Lean's own C backend whose protocol core
   is proved to conform to the specification.
 
-The specification is meant to be a target, not a description: conformance is defined as a state machine over
-an interface alphabet frozen before any implementation existed, and implementations prove their own
-instances of it. `PLAN.md` is the programme of record.
+The specification is meant to be a target, not a description: conformance is defined as a state machine over a fixed interface alphabet, and implementations prove their own instances of it. `PLAN.md` is the programme of record.
 
 ## What is here
 
