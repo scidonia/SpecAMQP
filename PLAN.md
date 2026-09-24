@@ -1471,6 +1471,16 @@ Acceptance: every section type round-trips; the outcome state machine is proved;
 setting `content-encoding` with a body that is not a data section, and `identity` as the encoding with a data body. The two are separate vectors on purpose — the first breaks only `.1` and the second
 only `.2`, so a decoder that refused either message for the *section* rather than for the *encoding* satisfies one and not the other, which is the difference between evidence and a refusal.
 
+**And a batch of entries I wrote this afternoon claimed carriage by declarations nothing calls, which is the one thing a `formalized:` must not mean.** The message layer's report gave `deserves: formalized:SpecAMQP.Spec.Message.checkTerminus` (and its four
+siblings) for eleven Part 3 addressing clauses, and I applied them without asking whether the step function **reaches** them. It does not: `terminusOfValue`'s own docstring says `attach` is the only caller they would ever have, and `attachLink` does not read the field. So
+for half an hour this ledger asserted that eleven clauses were carried by declarations that were *defined and never called* — the precise shape its own conventions forbid ("a missing carrier is recorded rather than covered by naming a declaration"), arrived at by taking a report's word for the carrier
+instead of checking it. The session window found it while disposing its own `attach/source`/`target` sentences, and the wiring it proposed is the fix: **`attachLink` reads a present terminus in both artefacts**, with the gates run before and after because verdict-safety is a claim to check rather than
+to assume, and a non-vacuity probe in `/tmp` handing the layer a violating terminus so the committed vector can be authored from what it reports.
+
+**The gap that let it through is worth naming, because the next batch will be written against it**: the ledger's check resolves a `formalized:` value to a *declaration* and never asks whether anything calls it. A cheap approximation exists — a declaration whose name
+appears nowhere in `lean/**` but its own definition is called by nothing — but it has false negatives (a declaration called only from a dead branch passes it) and it can only be a warning, and a warning is the "reported rather than asserted" shape this plan refuses elsewhere.
+So the rule is recorded and the check is not written: *a `formalized:` must name a declaration the step function reaches*, and until a check can assert that, the reachability is the reviewing reader's job rather than the gate's.
+
 **Two carried families have no corpus form at all, and the ruling is that the harness is extended rather than the declarations left as their evidence.** `Harness.MessageCodec` and `DeliveryCodec` cannot
 carry a terminus, and `Harness.DeliveryOutcome` has no field for a delivery's annotations, so the terminus field sets and `message-annotations.2`'s merged-annotation observable rest on declarations alone —
 which is *weaker* evidence in a repository whose corpus is the instrument, and the gap is in the runner rather than in either artefact. Extending it means a field on `DeliveryOutcome`, a terminus in the
