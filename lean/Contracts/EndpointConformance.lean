@@ -9,10 +9,11 @@ import Impl.Core
 layer. This module states the claim for the **endpoint's protocol core** — the rung that turns "the shipped
 endpoint is a driver over `Spec.Connection.step`" into a relation between two `Endpoint`s.
 
-It is a *declaration* and not yet an acceptance: the theorem establishing `EndpointConforms` does not exist,
-so this file freezes the statement before the proof is written, which is this repository's order — statement,
-then proof, then acceptance. A `Prop` with no proof compiles cleanly, which is what makes the statement
-frozen rather than promised.
+**The order this repository keeps — statement, then proof, then acceptance — is now complete here.** This file
+froze the statement while no proof of it existed, because a `Prop` with no proof compiles cleanly and a statement
+frozen before its proof is one nobody can quietly weaken to meet one. The proof is `Proofs/EndpointConformance.lean`
+and the acceptance is `Contracts/EndpointAcceptance.lean`, which applies it at exactly the type below; **this module
+still imports neither**, and that is the property the split exists for.
 
 ## What it claims, and where the two sides come from
 

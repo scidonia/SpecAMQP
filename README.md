@@ -60,9 +60,16 @@ row with nothing arriving between them, and the shell prompts the application on
 octets; the third has pre-state `START`, which is not the application's to play because the shell announces the
 protocol header itself. Those divergences are *expected at this tier*, and each is stated on its own line by the
 run rather than inferred by a reader. **R4 is not accepted**: what it still owes is the reach of its own seam,
-not an open question about the endpoint. The protocol
-core's `Conforms` instance is likewise R3 and undischarged: what is proved *about the endpoint* at this point
-is nothing, and what is proved *about its parts* is the framing laws in `lean/Proofs/CoreLaws.lean`.
+not an open question about the endpoint. **The protocol core's `Conforms` instance is no longer owed: R3 is discharged and the rung is accepted.**
+`Proofs/EndpointConformance.lean` proves `Contracts/EndpointConformance.lean`'s statement at exactly the type
+that file froze, and `Contracts/EndpointAcceptance.lean` binds it — so what is proved *about the endpoint* is now
+that its core is a forward simulation of the specification's connection endpoint over the unit alphabet the
+interface fixes, at the axiom set this repository accepts, with two of its lemmas resting on no axioms at all.
+The proof is the plumbing and says so rather than claiming more: three of the four equalities relating the two
+independently written constructions are `rfl`-level, so a defect inside `Spec.Connection.step` is inherited by
+both sides rather than caught here. **What remains unproved is unchanged and named**: the socket boundary, the
+compiler link, the stream corollary that waits on `ValuePrefixDetermined`, and the delivery contract a second
+connection would rest on.
 
 **`lean/Ref/` is not that proof, and it is not an implementation-acceptance mechanism.** It is a second
 *independent reading* of the same standard, because the dominant residual risk here is prose ambiguity: two

@@ -5,9 +5,9 @@ import Proofs.EndpointConformance
 # Acceptance: the endpoint's protocol core conforms
 
 `Contracts.EndpointConformance` freezes what the endpoint's core claims — `ConformsVia` over the relation
-`fun s i => i.conn = s`, between `Proofs.specConn` and `Impl.Core.implCore` — and says in its own words that
-it *"is a declaration and not yet an acceptance"*. This module is the acceptance: the proof is
-`Proofs/EndpointConformance.lean`, and the binding below applies it at the frozen type.
+`fun s i => i.conn = s`, between `Proofs.specConn` and `Impl.Core.implCore` — and recorded itself as a statement
+awaiting a proof. This module is the acceptance: the proof is `Proofs/EndpointConformance.lean`, and the binding
+below applies it at the frozen type.
 
 **Why this is a module rather than a paragraph.** `Contracts.EndpointConformance` imports the two sides the
 claim names, so the proof must import it back for the statement to be the one it proves, and a declaration
