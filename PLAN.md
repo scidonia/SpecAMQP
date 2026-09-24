@@ -2166,3 +2166,18 @@ where an implementer should look rather than here.
 **4. The real server belongs in another repository, and its first artefact is its own specification.** Queues, routing, an address grammar, an application format, concurrency and durability have no AMQP clauses to conform to, so they need a node model stated its own way; this repository's *method* is the transferable part — a clause ledger, dispositions, an ambiguity register, gates. What it draws from here is what this repository exists to supply: the specification, the corpus, and `r4_wire_differential.sh`, which checks any shipped binary in any language by running it. Its implementation should be Rust through TemperMint, whose own plan already names what it needs from here.
 
 **5. Order, if this is accepted.** The widening first (26 clauses, contracts before implementation), then S5's message layer, then the narrator demonstration. The node server leaves this tree entirely, and its specification becomes the next repository's first milestone rather than this one's last.
+
+
+### 23.5 The second repository — a name, a first artefact, and an interface
+
+**Recommended rather than adopted**, like §23.4.
+
+**The name: `SpecMQ`.** It follows this repository's convention of naming the *artefact* rather than the product — `SpecAMQP`, `TemperMint` — and it carries one ambiguity to resolve in its own first line: AMQP's M is *queueing* as well, so its description must say what it specifies, **the node layer above AMQP 1.0 core**, and what it is not, a replacement for the protocol. `SpecAMQP` stays the protocol; `SpecMQ` is what a server must *do* that the protocol leaves to it. If that ambiguity is unwelcome, `SpecNodes` is the accurate alternative and reads as jargon; `SpecBroker` reads as a product rather than a specification, which is the failure mode this repository's naming avoids.
+
+**Its first artefact is its own specification, not scaffolding** — the same rule `TemperMint` states about `bench/` and `certificates/`, applied to a repository's opening move. A clause-level ledger of the node model: what a queue is, how a delivery is offered, settled, released and redelivered at the node, what a subscription means, what an address names, and what a filter may say. Authored the way this repository authors its own — clauses with ids, dispositions, an ambiguity register for every reading taken, gates that fail loudly — because **that method is the transferable thing**; nothing else here transfers.
+
+**Its second artefact is a conformance interface in this repository's shape**: a state machine over a frozen interface alphabet, so a server can be *proved* against `SpecMQ` the way the endpoint here is proved against `SpecAMQP`. The relation is what a second repository should aim at, not the code.
+
+**Its interface to here is already built.** The corpus and `r4_wire_differential.sh`: the protocol half of any server is checked by running its binary against this specification's per-step verdicts over a socket, whatever language it is written in.
+
+**Smallest first, and the temptation to resist.** A queue with settlement at the node, and nothing else — no topics, no routing, no address hierarchy — until that much has a specification, a proof and a gate. The temptation to make `SpecMQ` a broker is the one thing that would stop it being a specification.
