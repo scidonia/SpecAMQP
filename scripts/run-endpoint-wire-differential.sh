@@ -22,25 +22,26 @@
 # endpoint disagrees with the specification" is not a finding — "it diverges at step 3, where the vector
 # expects the endpoint to write 20 octets and it wrote none" is.
 #
-# ## What this tier cannot yet reach, stated rather than hidden
+# ## The application seam, and what closing it changed
 #
 # The application the differential runs is `scripts/endpoint/WireApp`: a corpus-driven application at the
 # `Shell.Driver.App` seam, beside its peer `wire_peer.py` and shipped by neither. Two properties of *that
-# seam* keep some `send` steps out of the application's reach, and both are the seam's rather than either
-# artefact's:
+# seam* used to keep some `send` steps out of the application's reach, and both were the seam's rather than
+# either artefact's:
 #
-#   * a vector asking for two `send` steps in a row, with nothing arriving between them, has its second
-#     send never prompted: the shell asks the application after each **unit** of the peer's octets, and
-#     there is no unit to ask it after (measured at step 2 of `slice-open-missing-container-id` and
-#     `slice-open-channel-max-wrong-type`);
-#   * a step whose pre-state is `START` is not the application's to play at all, because the shell
-#     announces the protocol header itself before the core's first read (`Shell.Driver.runConnection`).
+#   * the shell asked the application only after a **unit** of the peer's octets arrived, so the second of
+#     two sends played from one state, with nothing arriving between them, was never prompted;
+#   * the shell announced the protocol header itself before the core's first read, so a step whose pre-state
+#     was `START` was not the application's to play.
 #
-# Those steps are expected to diverge here, and each divergence says which case it is **in its own line**:
-# the control's problem text names the seam property where the step's pre-state shows which one it is, and
-# stays silent where the cause is unknown. A limitation named in the run's output is one a reader of the
-# run can weigh; the same words kept in a commit message are archaeology, and the reviewer of this tier
-# found exactly that — three findings attributed where nobody running the script would look.
+# **Both are closed.** `Shell.Driver.serveApp` re-asks the application after each step it takes — bounded,
+# and loud when the bound is exhausted — and the protocol header is the application's opening move, with the
+# shell starting the connection at the specification's own `START`. The three vectors those two properties
+# kept out of reach now agree with the specification end to end. There is consequently no seam label left to
+# reach for: a divergence this run reports is a divergence of the **endpoint**, or of the harness in front of
+# it, and the report says so rather than naming a seam that no longer exists. Which is why the closed set of
+# causes below now holds `unknown` alone — a remaining divergence is one nobody has attributed, and the gate
+# is what catches it.
 #
 # ## The machine-readable report, and the closed set of causes
 #
@@ -58,11 +59,10 @@
 # table prints, so the two can be read against each other without the prose being re-derived here.
 #
 # A divergence's `cause` is drawn from a **closed set** rather than left to the sentence, because a
-# contract cannot assert over prose: `app-seam-prompt-after-read` and `app-seam-start-pre-state` are the
-# two seam properties named above, and `unknown` is a divergence this script cannot attribute — the case
-# the gate exists to catch. The `app-seam-` prefix is load-bearing: it says the cause is a property of the
-# differential's seam between the shell and the application rather than of the endpoint's protocol core,
-# so a `core-…` cause can be admitted later as a deliberate, reviewed addition rather than by accident.
+# contract cannot assert over prose. That set holds `unknown` alone now that the two `app-seam-` causes have
+# been closed — an unattributable divergence is exactly what the gate exists to catch, and a label invented
+# for one would hide it. A `core-…` cause can still be admitted later as a deliberate, reviewed addition
+# rather than by accident.
 #
 # A row that never ran — the port range exhausted, a listener that could not bind — carries
 # `"socket": "INVALID"` and a row-level `detail`, and **no** `divergences` at all: nothing diverged, so
@@ -397,27 +397,10 @@ def bare_state(name):
     """A corpus state name without its layer prefix: `connection:HDR_EXCH` is `HDR_EXCH`."""
     return name.split(":")[-1] if name else ""
 
-# The two reasons a `send` step can reach the application and still never be played. Both are properties
-# of the seam between the shell and the application, measured and written next to that seam
-# (`WireApp/Main.lean`'s header, `Shell.Driver`'s); naming them in the run's own output is what keeps a
-# known limitation distinguishable from a regression by somebody reading only the table.
-SEAM_HEADER_BEFORE_START = (
-    "the shell announces the protocol header itself, before the core's first read "
-    "(Shell.Driver.runConnection), so a step whose pre-state is START is not the application's to play — "
-    "a known seam limitation, not the endpoint's answer")
-SEAM_NO_UNIT_TO_PROMPT = (
-    "the shell asks the application after each unit the peer's octets complete (Shell.Driver.serveUnits), "
-    "so the second of two sends played from one state, with no octets arriving between them, has nothing "
-    "to prompt it — a known seam limitation, not the endpoint's answer")
-
 # The **closed set** a divergence's cause is drawn from, so a contract can assert over it rather than over
-# the sentence above. `unknown` is a divergence whose cause this script cannot show, and it is exactly what
-# the gate exists to catch; a divergence is attributed to a seam label by `seam_cause` below and to nothing
-# else. The `app-seam-` prefix says the cause is a property of the seam between the shell and the
-# application rather than of the endpoint's protocol core, so a `core-…` cause can be admitted later as a
-# deliberate, reviewed addition rather than by accident.
-CAUSE_START_PRE_STATE = "app-seam-start-pre-state"
-CAUSE_PROMPT_AFTER_READ = "app-seam-prompt-after-read"
+# the sentence above. It holds `unknown` alone: the two `app-seam-` causes this tier's docstring once named
+# are closed, and no other cause for a divergence has been established — an unattributed divergence is
+# exactly what the gate exists to catch, so a label invented for one would hide it rather than explain it.
 CAUSE_UNKNOWN = "unknown"
 
 
@@ -442,9 +425,9 @@ def divergence_lines(problems):
 
     A divergence is **per step**: a step whose divergence produced three sentences is one divergence of
     that step, not three, and its report `detail` is those sentences joined by newlines — the same text the
-    table prints, so the two can be read against each other. The step's `cause` is the seam label any of
-    its problems carried, or `unknown`: a divergence nothing attributable explains is what the gate exists
-    to catch, and a step whose only problems are un-attributable must not borrow a seam's name.
+    table prints, so the two can be read against each other. The step's `cause` is the structured cause any
+    of its problems carried, or `unknown`: a divergence nothing attributable explains is what the gate
+    exists to catch, and a step whose problems are unattributed says so rather than borrowing a cause.
     """
     lines = [f"step {number}: {text}" for number, text, _ in problems]
     divergences = []
@@ -491,38 +474,6 @@ for record in pathlib.Path(socket_log).read_text().splitlines():
     answers = narration(endpoint_lines)
     ended = ended_state(endpoint_lines)
 
-    # Every step plays from a state, and this is the application's own accounting (`WireApp.sendsOf`): the
-    # vector's `start`, then the state each step's expectation names — or the state the step before left,
-    # when it names none. The differential needs it to say *why* a `send` step was never attempted, which
-    # the endpoint's narration alone cannot say.
-    played_from = []
-    cursor = bare_state(vector.get("start") or "")
-    for step in steps:
-        played_from.append(cursor)
-        named = (step.get("expect") or {}).get("state")
-        cursor = bare_state(named) if named else cursor
-
-    def seam_cause(number):
-        """The known reason this `send` step was never the application's to play: a label and its prose.
-
-        A cause is named only where the step's own pre-state shows it: silence where the reason is
-        unknown is the honest output, and a plausible-sounding cause nothing supports would be worse than
-        none. The two are measured ones (`WireApp/Main.lean`'s header carries the reproduction), and both
-        are properties of the shell/application seam rather than of the endpoint's protocol core. The first
-        value is the structured cause the report carries (one of `CAUSE_*` above), the second the sentence
-        the table prints; a step the pre-state does not attribute gets `(None, "")`, and the caller labels
-        its divergence `unknown` rather than guessing at a seam it cannot show.
-        """
-        index = number - 1
-        if index >= len(steps) or steps[index].get("direction") != "send":
-            return None, ""
-        if played_from[index] == "START":
-            return CAUSE_START_PRE_STATE, f" [{SEAM_HEADER_BEFORE_START}]"
-        if index > 0 and steps[index - 1].get("direction") == "send" \
-                and played_from[index - 1] == played_from[index]:
-            return CAUSE_PROMPT_AFTER_READ, f" [{SEAM_NO_UNIT_TO_PROMPT}]"
-        return None, ""
-
     # What the endpoint narrated, and how it lines up with the vector's steps. A `took <state>` is one
     # answer to one step and names the state the peer is in after it. A **refusal is two answers** — the
     # protocol condition, then the reason class — because that is the vocabulary the corpus compares on,
@@ -556,7 +507,6 @@ for record in pathlib.Path(socket_log).read_text().splitlines():
         elif step["direction"] == "send":
             if not observed.get("matched"):
                 wrote = observed.get("got", "")
-                cause = None
                 detail = f"the vector expects the endpoint to write {len(step['bytes']) // 2} octets"
                 if wrote:
                     detail += (f"; it wrote {len(wrote) // 2}: {wrote[:64]}"
@@ -566,9 +516,7 @@ for record in pathlib.Path(socket_log).read_text().splitlines():
                 else:
                     detail += (f"; {observed.get('observed', 'no observation')} — the endpoint was in "
                                f"{in_state or 'no state it narrated'}, where the vector asks for no send")
-                    cause, prose = seam_cause(number)
-                    detail += prose
-                step_problems.append((detail, cause))
+                step_problems.append((detail, None))
         # the endpoint's own answer to this step
         if status == "refused":
             consumed = []
@@ -576,10 +524,9 @@ for record in pathlib.Path(socket_log).read_text().splitlines():
                 consumed.append(answers[answer_index][1])
                 answer_index += 1
             if not consumed:
-                cause, prose = seam_cause(number)
                 step_problems.append((
                     "the endpoint narrated no refusal: the vector expects it to offer these octets and be "
-                    "refused, and no refusal reached the wire" + prose, cause))
+                    "refused, and no refusal reached the wire", None))
             else:
                 said = " ".join(consumed)
                 if (expect.get("condition") or "") not in said:
@@ -648,9 +595,9 @@ print(f"{'vector':<46} {'socket':<7} {'in process':<22} divergence")
 agree = 0
 for row in rows:
     # Every problem is printed **in full**, one per line, where it used to be cut at seventy columns and
-    # capped at two: the part that says *which* it is — a seam limitation named with its cause, or the
-    # endpoint's own last word quoted — lands at the end of the line, and a fixed-width cut hides exactly
-    # that. Whoever reads this table and nothing else is the reader the attribution is for.
+    # capped at two: the part that says *which* it is — the endpoint's own last word quoted, the octets it
+    # wrote against the vector's — lands at the end of the line, and a fixed-width cut hides exactly that.
+    # Whoever reads this table and nothing else is the reader the report is for.
     lines = row["lines"]
     first = lines[0] if lines else row.get("detail", "")
     print(f"{row['vector']:<46} {row['socket']:<7} {row['in_process_text']:<22} {first}")

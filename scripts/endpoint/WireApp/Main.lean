@@ -7,44 +7,44 @@ wrong application for a differential: every `send` step of an exchange vector as
 frame on the wire, and with an application that sends nothing the differential can only report that
 nothing arrived. It would report it for every vector and prove nothing about the endpoint.
 
-This is the application that plays the corpus's send side: it reads a vector, works out which of its
-`send` steps are the application's (the shell announces the header itself, before the core's first read,
-so a step whose pre-state is `START` is not the application's to play), and emits a step's octets when the
-core is in the state that step is played from. Its counterpart is `scripts/endpoint/wire_peer.py`, which
-plays the vector's `receive` side over the socket; together they are a corpus-driven pair on the wire.
+This is the application that plays the corpus's send side: it reads a vector, works out the `send` steps the
+application plays — **all** of them, the protocol header included, because the shell announces nothing on a
+connection's behalf — and emits a step's octets when the core is in the state that step is played from. Its
+counterpart is `scripts/endpoint/wire_peer.py`, which plays the vector's `receive` side over the socket;
+together they are a corpus-driven pair on the wire.
 
-**It is harness, not a claim about an application.** It lives outside `lean/Shell/` for the same reason
-`EndpointProbe.Client` does: the shell is parameterised by `App` so that a different application is a
-different value rather than a different shell, and no test-only policy ships. Nothing here is proved, and
-nothing here is protocol logic — the octets come from the corpus, the core decides whether they may be
-sent, and the shell writes them.
+A vector that begins **before** the header exchange (`start: connection:START`) carries the whole exchange in
+its own steps, the header included, so the application plays them as they come. A vector that begins *after*
+it (`start: connection:HDR_EXCH`) does not, and the application supplies the header that exchange needs as an
+opening move of its own: the header is octets at the `App` seam like any other step, so the shell's `START` is
+simply where the application is first asked. The peer keys its own prologue on the same `start`, which is what
+keeps the two ends of a vector that begins mid-dialogue in step.
 
-Two properties are deliberate and load-bearing:
+**It is pure: the same state always gives the same answer, and it is asked as often as the shell needs to.**
+`App` is a function of the core's state and the outputs just produced, and the same state must always produce
+the same answer — the point of replaying a corpus is that the process does not depend on timing. What the
+shell adds is *how often* it is asked, and this application turns on that: `Shell.Driver.serveApp` asks it
+again after each step it takes, and a **refused** send is the one step that cannot move the core, so a
+re-prompt in the same state whose outputs carry a refusal is this application's signal that the step it just
+attempted is spent and the next step played from that state is due. That is what makes a vector's second send
+from one state playable at all — measured on `slice-open-missing-container-id` and
+`slice-open-channel-max-wrong-type` (two opens from `HDR_EXCH`, the first refused) and on
+`slice-open-before-header` (a refused open, then the header, both from `START`).
 
-* **It is pure: the same state always gives the same answer, and it is asked once per unit.** `App` is a
-  function of the core's state and the outputs just produced, and `Shell.Driver.serveUnits` asks it after
-  each unit a read completed — so a state the core reaches *inside* one read is one this application is
-  asked in, whatever the read size or how the kernel split the peer's writes, and a read that completes no
-  unit asks it nothing. Keying the choice on the *state* rather than on an internal counter is what makes
-  that safe for an **admitted** send: the core moves to the next state, and only the step played from that
-  state can be chosen next. A **refused** send does not move the core, so the same step is played again at
-  the next prompt — measured on `slice-sasl-challenge-from-client`, whose refused challenge is attempted
-  twice, once when the peer's header arrives and once when its `sasl-init` does, identically at a read of 8
-  octets and at a read of 64 with the peer's two frames written in one `sendall`. Attempted is not written:
-  the core refuses it both times, and not one octet of it reaches the wire.
 * **A state that matches no step sends nothing, and the differential reports that.** Silence here is a
   divergence with a name — "the vector expects the endpoint to write *n* octets and nothing arrived" — not
   a quiet success, which is why the observer is the differential rather than this module.
-* **It is asked once per unit the peer's octets complete, and that is the shell's loop rather than this
-  application's choice.** `Shell.Driver.serveUnits` asks the application after each unit a read completed — so
-  a state the core reaches *inside* one read is one this application is asked in, whatever the read size or
-  how the kernel split the peer's writes — and asks it nothing at all when a read completes no unit. The
-  consequence for this application is the one to know about: a vector asking for two `send` steps in a row,
-  with nothing arriving between them, produces no second unit and therefore **no second prompt**, so its
-  second send is never played and the endpoint sits in the state the first send left it in. Measured on
-  `slice-open-missing-container-id` and `slice-open-channel-max-wrong-type`, each at step 2. The differential's
-  output says so in the divergence line itself (its two named seam causes), rather than leaving it to be
-  rediscovered when a corpus family needs two sends in a row.
+* **A third `send` from one state is beyond this keying, and the shell's bound is what makes that loud.**
+  A pure function of `(state, outputs)` can tell the second of two same-state sends from the first — the
+  refusal in the outputs — but not the third from the second: both are re-prompts in one state with a
+  refusal in hand. Where a vector needs that, this application repeats the second step and
+  `Shell.Driver.serveApp`'s round bound throws, naming the bound, rather than looping or quietly stopping.
+  None of `vectors/slice.ndjson`'s vectors reaches it.
+* **It is asked once per unit the peer's octets complete, and again after each step it takes.** That is the
+  shell's loop rather than this application's choice (`Shell.Driver.serveUnits` asks it after each unit a read
+  completed, `Shell.Driver.serveApp` re-asks it while it returns work): a state the core reaches *inside* one
+  read is one this application is asked in, whatever the read size or how the kernel split the peer's writes,
+  and a read that completes no unit asks it nothing.
 -/
 
 import Shell.Driver
@@ -54,6 +54,7 @@ namespace WireApp
 
 open Lean
 open SpecAMQP.Shell
+open SpecAMQP.Contracts (Output)
 open SpecAMQP.Harness (Octets exchangeStepOf toHex)
 
 /-- A state name without the layer prefix the corpus writes: the corpus says `connection:HDR_EXCH` where
@@ -61,10 +62,17 @@ the core's own state name is `HDR_EXCH`. -/
 def bare (name : String) : String :=
   (name.splitOn ":").reverse.head?.getD name
 
-/-- One `send` step the application plays: the octets, and the state name it is played from. -/
+/-- One `send` step the application plays: the octets, the state name it is played from, and whether the
+vector expects the core to **refuse** it.
+
+The last field is what lets the application tell a re-prompt from a fresh prompt when two steps are played
+from one state: a refused send leaves the core exactly where it was, so the application is asked again in the
+same state, and the refusal in the outputs is the only thing that distinguishes the second ask from the
+first. -/
 structure Send where
   octets : Octets
   playedFrom : String
+  refused : Bool
 deriving Repr
 
 /-- The application's steps, in the vector's order, each with the state it is played from.
@@ -83,10 +91,12 @@ def sendsOf (startName : String) (steps : Array Json) : Except String (Array Sen
   for step in steps do
     let parsed ← exchangeStepOf step
     let expect := (step.getObjVal? "expect").toOption.getD (Json.mkObj [])
+    let status := (expect.getObjValAs? String "status").toOption.getD "admitted"
     let after := (expect.getObjValAs? String "state").toOption.getD playedFrom
     if parsed.send then
       match parsed.bytes with
-      | some bytes => out := out.push { octets := bytes, playedFrom := playedFrom }
+      | some bytes =>
+        out := out.push { octets := bytes, playedFrom := playedFrom, refused := status == "refused" }
       | none =>
         .error "this vector asks the endpoint to send a `value`, whose octets the implementation \
           chooses: a wire differential has nothing to compare, so this application refuses the vector \
@@ -94,27 +104,44 @@ def sendsOf (startName : String) (steps : Array Json) : Except String (Array Sen
     playedFrom := bare after
   return out
 
+/-- **The header this endpoint announces as its opening move, for a vector that begins after the header
+exchange.** A vector whose `start` is `START` carries the exchange in its own steps and is given nothing
+here; one that begins past it has no header step, so the application supplies the AMQP layer's header —
+the shell announces nothing of its own, and the core reads the layer out of whatever header it is handed. -/
+def prologueOf (startName : String) (header : Octets) : Array Send :=
+  if bare startName == SpecAMQP.Spec.Connection.State.start.name then
+    #[]
+  else
+    #[{ octets := header, playedFrom := SpecAMQP.Spec.Connection.State.start.name, refused := false }]
+
+/-- Whether the outputs just produced carry a **refusal**: the core's answer to a submission it would not
+send. `Impl.Core.refusedAnswer` emits the condition and the reason class, both with `ok := false`, and no
+other output in the vocabulary does. -/
+def refusedOutputs (outs : List Output) : Bool :=
+  outs.any fun out =>
+    match out with
+    | .api answer => !answer.ok
+    | .frame _ => false
+
 /-- **The application.** In the state a step is played from, send that step's octets; in any other state,
-send nothing. The first match in the vector's order wins, so two steps played from one state are played in
-the order the corpus writes them. -/
+send nothing.
+
+The first match in the vector's order wins, so two steps played from one state are played in the order the
+corpus writes them: the first, then — once the core has refused it and the shell asks again in the state the
+refusal left it in — the next. The refusal in the outputs is what marks the attempted step spent; an
+admitted step moves the core, so the first match in the *new* state is already the next step. -/
 def app (sends : Array Send) : App :=
-  fun core _ =>
-    match sends.find? (fun step => step.playedFrom == core.conn.state.name) with
-    | some step => { octets := #[step.octets], done := false }
-    | none => { octets := #[], done := false }
-
-/-- **The header this endpoint announces.** The shell plumbs the header and the core checks it — the
-application is what decides which one to offer — so the vector's own header is announced where the vector
-pushes it first, and the AMQP layer's otherwise.
-
-It matters because the header's protocol id *is* the layer the connection is in: the corpus is written for
-a peer that offers SASL first (protocol id 3), and an endpoint that announces the AMQP header for such a
-peer never enters the SASL layer at all, however correct its core is. -/
-def headerOf (sends : Array Send) (fallback : Octets) : Octets :=
-  match sends.find? (fun step => step.octets.size == 8 &&
-      toHex (step.octets.extract 0 4) == "414d5150") with
-  | some step => step.octets
-  | none => fallback
+  fun core outs =>
+    let playable := (sends.filter (fun step => step.playedFrom == core.conn.state.name)).toList
+    match playable with
+    | [] => { octets := #[], done := false }
+    | step :: rest =>
+      if refusedOutputs outs && step.refused then
+        match rest with
+        | next :: _ => { octets := #[next.octets], done := false }
+        | [] => { octets := #[], done := false }
+      else
+        { octets := #[step.octets], done := false }
 
 end WireApp
 
@@ -185,13 +212,14 @@ def main (args : List String) : IO UInt32 := do
         match sendsOf startName steps with
         | .ok sends => pure sends
         | .error message => throw (IO.userError message)
-      let header := headerOf sends (← announcedHeader .amqp)
+      let header ← announcedHeader .amqp
+      let plan := prologueOf startName header ++ sends
       let listener ← listenOn port
       try
         IO.println s!"endpoint: listening port={port} read-octets={readOctets.toNat} \
-          vector={id} send-steps={sends.size} header={toHex header}"
+          vector={id} send-steps={plan.size} header={toHex header}"
         (← IO.getStdout).flush
-        let core ← serveConn listener header (app sends) readOctets
+        let core ← serveConn listener (app plan) readOctets
         IO.println s!"endpoint: the connection ended in {core.conn.state.name}"
       finally
         listener.close

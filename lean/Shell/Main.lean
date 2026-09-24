@@ -5,17 +5,17 @@
 The endpoint as a process. Every protocol decision it makes is the specification's own, through the pure
 core (`Impl.Core`, `Impl.Stream`); what this file adds is the shape of a process — an argv, a socket's
 lifecycle, exit statuses — and the *application* the connection runs, which here is the smallest one that
-is still an endpoint: announce the protocol header (the shell does that on every connection, from
+is still an endpoint: announce the protocol header (the application's opening move, from
 `Impl.Core.announceHeaderFor`, at the layer `--layer=` names) and end the connection once both headers
 have been exchanged, so the process terminates instead of blocking for a peer that is only testing the
 transport.
 
 `--layer=` is the one configuration input this process has, and it names a single decision: the layer the
-endpoint offers. The announced header is built from it, and the connection starts in the layer that same
-header names, because the header is what the shell hands to the connection — so a peer that announces
-SASL and then speaks AMQP, which is what R4's SASL vectors measured before this switch existed, is not a
-state this process can reach. The default is AMQP, which is also the layer a peer with no switch at all
-announces.
+endpoint offers. The header is built from it by the *application* — the shell announces nothing on a
+connection's behalf — and the core reads the layer back out of the header the application supplies, so the
+layer announced and the layer spoken are the same one; a peer that announces SASL and then speaks AMQP,
+which is what R4's SASL vectors measured before this switch existed, is not a state this process can reach.
+The default is AMQP, which is also the layer a peer with no switch at all announces.
 
 This is the process R4's wire differential replays the corpus against, and the application it runs there
 is the runner's, not this one's: `Shell.Driver.App` is the seam, so a corpus-driven application is a
@@ -37,17 +37,25 @@ import Shell.Driver
 open SpecAMQP.Shell
 open SpecAMQP.Harness (Octets)
 
-/-- The application a **client** runs: announce nothing of its own (the shell announces the header on
-every connection, because it is the one frame §23.1 calls fixed) and finish once both protocol headers
-have been exchanged, so a client that has nothing to say closes the connection rather than blocking. -/
-def clientApp : App :=
-  fun core _ => { octets := #[], done := core.conn.state == SpecAMQP.Spec.Connection.State.hdrExch }
+/-- The application a **client** runs: announce the protocol header — the application's opening move, since
+the shell announces nothing of its own — and finish once both protocol headers have been exchanged, so a
+client that has nothing to say closes the connection rather than blocking. -/
+def clientApp (header : Octets) : App :=
+  fun core _ =>
+    if core.conn.state == SpecAMQP.Spec.Connection.State.start then
+      { octets := #[header], done := false }
+    else
+      { octets := #[], done := core.conn.state == SpecAMQP.Spec.Connection.State.hdrExch }
 
-/-- The application a **server** runs: announce nothing of its own and never finish of its own accord, so
+/-- The application a **server** runs: announce the protocol header and never finish of its own accord, so
 the connection ends when the peer closes the stream — which is the path that exercises
 `Shell.Driver.pump`'s orderly-close arm and `Impl.Stream.closed` in a live process. -/
-def serverApp : App :=
-  fun _ _ => { octets := #[], done := false }
+def serverApp (header : Octets) : App :=
+  fun core _ =>
+    if core.conn.state == SpecAMQP.Spec.Connection.State.start then
+      { octets := #[header], done := false }
+    else
+      { octets := #[], done := false }
 
 def usage : IO UInt32 := do
   IO.eprintln "usage: amqp-endpoint server <port> [read-octets] [--layer=amqp|sasl]"
@@ -116,12 +124,12 @@ def main (args : List String) : IO UInt32 := do
           -- reaches a caller that is waiting for the port to exist
           IO.println s!"endpoint: listening port={port} read-octets={readOctets.toNat}"
           (← IO.getStdout).flush
-          let core ← serveConn listener header serverApp readOctets
+          let core ← serveConn listener (serverApp header) readOctets
           IO.println s!"endpoint: the connection ended in {core.conn.state.name}"
         finally
           listener.close
       else
-        let core ← dial port header clientApp readOctets
+        let core ← dial port (clientApp header) readOctets
         IO.println s!"endpoint: the connection ended in {core.conn.state.name}"
       return (0 : UInt32)
     catch e =>

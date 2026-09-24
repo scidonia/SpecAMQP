@@ -42,6 +42,12 @@ import sys
 import time
 
 READ_TIMEOUT = 5.0  # a send step that does not arrive within this is reported, not waited for
+# How long a refused step waits for the endpoint's answer before it is read as "wrote nothing". It is
+# short because a refusal is acted on at once when it happens at all, and because the endpoint's
+# application may play a later step in the same breath — those octets are held, not attributed here.
+
+
+REFUSED_WINDOW = 0.4
 
 
 def connect(port: int, deadline: float = 10.0) -> socket.socket:
@@ -58,27 +64,6 @@ def connect(port: int, deadline: float = 10.0) -> socket.socket:
             last = error
             time.sleep(0.05)
     raise SystemExit(f"peer: could not connect to 127.0.0.1:{port}: {last}")
-
-
-def read_exactly(sock: socket.socket, count: int) -> tuple[bytes, bool]:
-    """Read up to `count` octets, returning what arrived and whether the read timed out.
-
-    A timeout is not an error here: it is the observation "the endpoint sent nothing", which
-    is exactly what a divergent step looks like, and reporting it as a crash would lose the
-    distinction between "sent the wrong octets" and "sent none".
-    """
-    got = bytearray()
-    while len(got) < count:
-        try:
-            chunk = sock.recv(count - len(got))
-        except socket.timeout:
-            return bytes(got), True
-        except OSError:
-            return bytes(got), False
-        if not chunk:
-            return bytes(got), False
-        got += chunk
-    return bytes(got), False
 
 
 def main(argv: list[str]) -> int:
@@ -99,6 +84,7 @@ def main(argv: list[str]) -> int:
     vector = vectors.get(args.vector)
     if vector is None:
         raise SystemExit(f"peer: {args.vector} is not in {args.corpus}")
+    start_name = vector.get("start") or ""
 
     report = pathlib.Path(args.report)
     lines: list[str] = []
@@ -128,35 +114,71 @@ def main(argv: list[str]) -> int:
                 index += 1
     sock = connect(args.port)
     try:
-        # The shell announces the protocol header on **every** connection, so it is on the wire
-        # before the vector's first step whatever the vector says. Reading it here, rather than
-        # letting the first step read it, is what keeps the two cases apart: a vector whose first
-        # step *is* the header compares against this read, and a vector that never mentions the
-        # header does not have an unexplained eight octets arrive mid-dialogue.
-        preamble, preamble_timeout = read_exactly(sock, 8)
-        lines.append(json.dumps({
-            "step": 0, "direction": "send", "status": "preamble", "observed": "endpoint header",
-            "got": preamble.hex(), "timed_out": preamble_timeout, "bytes": "414d515000010000",
-            "matched": preamble.hex() == "414d515000010000",
-        }, sort_keys=True))
-        # The header exchange is symmetric, and a vector may begin *after* it (`start: HDR_EXCH`): the
-        # in-process runner has already sent its own header by then, so a peer that only reads the
-        # endpoint's leaves the endpoint in HDR_SENT and the vector's first step unreachable. Send ours
-        # when no step of the vector does — the header is eight octets opening `AMQP`, and which protocol
-        # layer's header it is (the SASL layer's carries protocol id 3) is the vector's business, not this
-        # prologue's.
+        # What has arrived from the endpoint and has not been attributed to a step yet. A step's octets
+        # are read out of here, so a write that arrives **early** — the endpoint's application may play
+        # the next step the moment a previous one is refused, with nothing arriving in between — stays
+        # buffered for the step it belongs to instead of being misread as the step being checked.
+        pending = bytearray()
+
+        def fill(count: int, timeout: float = READ_TIMEOUT) -> bool:
+            """Read until `pending` holds `count` octets, or the window closes.
+
+            Returns `True` when the window closed with fewer than `count`: for a read that expects octets
+            that is the observation "nothing (more) arrived", which is a divergence to report rather than
+            a crash. A socket the endpoint has closed reads as a window that closed too.
+            """
+            deadline = time.monotonic() + timeout
+            while len(pending) < count:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return True
+                sock.settimeout(remaining)
+                try:
+                    chunk = sock.recv(65536)
+                except (socket.timeout, OSError):
+                    return True
+                if not chunk:
+                    return True
+                pending.extend(chunk)
+            return False
+
+        def take(count: int) -> bytes:
+            got = bytes(pending[:count])
+            del pending[:count]
+            return got
+
+        # The prologue is keyed on the vector's `start`, not played unconditionally. A vector whose `start`
+        # is `START` carries its own header exchange in its own steps — the endpoint's application
+        # announces the header as its opening move, and the vector says so — so this peer plays nothing
+        # before the vector's first step and expects nothing there. A vector that begins *after* the
+        # exchange (`start: connection:HDR_EXCH`) begins mid-dialogue: the exchange must be completed
+        # first, so the endpoint's announced header is read and this peer announces its own. The endpoint's
+        # application keys its opening move on the same `start`, which keeps the two ends in step.
         plain_header = "414d515000010000"
-        sends_own_header = any(
-            step.get("direction") == "receive" and (step.get("bytes") or "")[:8] == "414d5150"
-            and len(step["bytes"]) == 16
-            for step in vector.get("steps", []))
-        if not sends_own_header:
-            sock.sendall(bytes.fromhex(plain_header))
+        starts_at_start = not start_name or start_name.split(":")[-1] == "START"
+        if not starts_at_start:
+            timed_out = fill(8)
+            preamble = take(8)
             lines.append(json.dumps({
-                "step": 0, "direction": "receive", "status": "preamble", "observed": "sent own header",
-                "bytes": plain_header, "written": 8,
-                "note": "the vector begins after the header exchange; the peer sends its header first",
+                "step": 0, "direction": "send", "status": "preamble", "observed": "endpoint header",
+                "got": preamble.hex(), "timed_out": timed_out, "bytes": plain_header,
+                "matched": preamble.hex() == plain_header,
             }, sort_keys=True))
+            # The header exchange is symmetric, and a vector that begins after it has no header step of
+            # its own: send ours so the endpoint can reach the state the vector's first step is played
+            # from. Which protocol layer's header (the SASL layer's carries protocol id 3) is the
+            # vector's business, not this prologue's.
+            sends_own_header = any(
+                step.get("direction") == "receive" and (step.get("bytes") or "")[:8] == "414d5150"
+                and len(step["bytes"]) == 16
+                for step in vector.get("steps", []))
+            if not sends_own_header:
+                sock.sendall(bytes.fromhex(plain_header))
+                lines.append(json.dumps({
+                    "step": 0, "direction": "receive", "status": "preamble",
+                    "observed": "sent own header", "bytes": plain_header, "written": 8,
+                    "note": "the vector begins after the header exchange; the peer sends its header first",
+                }, sort_keys=True))
         for number, step in enumerate(vector.get("steps", []), 1):
             wire = bytes.fromhex(step["bytes"])
             expect = step.get("expect") or {}
@@ -178,26 +200,29 @@ def main(argv: list[str]) -> int:
                 elif number in group:
                     record["one_write_for_steps"] = alongside[number]
             elif direction == "send":
-                if number == 1 and len(wire) == 8 and preamble:
-                    # the vector's first step is the header, which was just read as the preamble
-                    record = {
-                        "step": number, "direction": direction,
-                        "status": expect.get("status", "admitted"), "state": expect.get("state"),
-                        "bytes": step["bytes"], "got": preamble.hex(),
-                        "matched": preamble == wire,
-                        "observed": "matched" if preamble == wire else "different octets",
-                    }
-                elif expect.get("status") == "refused":
-                    # the endpoint must decline to write these octets; it must not send them
-                    got, timed_out = read_exactly(sock, len(wire))
-                    record = {
-                        "step": number, "direction": direction, "status": "refused",
-                        "state": expect.get("state"), "bytes": step["bytes"],
-                        "got": got.hex(), "timed_out": timed_out,
-                        "observed": "no octets" if not got else "octets written",
-                    }
+                if expect.get("status") == "refused":
+                    # The endpoint must decline to write these octets. Its application may play a later
+                    # step at once, though, so a short window is read and the two are told apart by what
+                    # the octets **are**: a refusal writes none of the refused octets, so anything else
+                    # stays buffered for the step it belongs to.
+                    fill(len(wire), REFUSED_WINDOW)
+                    if bytes(pending).startswith(wire):
+                        got = take(len(wire))
+                        record = {
+                            "step": number, "direction": direction, "status": "refused",
+                            "state": expect.get("state"), "bytes": step["bytes"],
+                            "got": got.hex(), "timed_out": False,
+                            "observed": "octets written",
+                        }
+                    else:
+                        record = {
+                            "step": number, "direction": direction, "status": "refused",
+                            "state": expect.get("state"), "bytes": step["bytes"],
+                            "got": "", "timed_out": False, "observed": "no octets",
+                        }
                 else:
-                    got, timed_out = read_exactly(sock, len(wire))
+                    timed_out = fill(len(wire))
+                    got = take(len(wire))
                     record = {
                         "step": number, "direction": direction, "status": "admitted",
                         "state": expect.get("state"), "bytes": step["bytes"],

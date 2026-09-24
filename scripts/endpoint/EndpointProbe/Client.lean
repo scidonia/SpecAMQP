@@ -48,21 +48,27 @@ def bigOpen : Except String Octets := openWith containerId 65535 65535
 `max-frame-size` large enough that the peer's write of `bigOpen` is permitted. -/
 def permission : Except String Octets := openWith "probe" 65535 65535
 
-/-- The **client** application: send the large frame once the peer has declared a limit that permits it.
-The condition is the protocol's own — the frame is sent when the partner's `open` has said the peer accepts
-frames that large, which is the one thing that makes the write legal rather than refused. -/
-def clientApp (frame : Octets) : App :=
+/-- The **client** application: announce the protocol header (the shell announces nothing of its own, so the
+application's opening move is where the header comes from), then send the large frame once the peer has
+declared a limit that permits it. The condition is the protocol's own — the frame is sent when the partner's
+`open` has said the peer accepts frames that large, which is the one thing that makes the write legal rather
+than refused. -/
+def clientApp (header frame : Octets) : App :=
   fun core _ =>
-    if core.conn.remoteLimits.maxFrameSize ≥ frame.size then
+    if core.conn.state == SpecAMQP.Spec.Connection.State.start then
+      { octets := #[header], done := false }
+    else if core.conn.remoteLimits.maxFrameSize ≥ frame.size then
       { octets := #[frame], done := true }
     else
       { octets := #[], done := false }
 
-/-- The **server** application: declare the large limit once both headers have been exchanged, and then
-wait for the peer to close. -/
-def serverApp (declaration : Octets) : App :=
+/-- The **server** application: announce the protocol header, then declare the large limit once both headers
+have been exchanged, and then wait for the peer to close. -/
+def serverApp (header declaration : Octets) : App :=
   fun core _ =>
-    if core.conn.state == SpecAMQP.Spec.Connection.State.hdrExch then
+    if core.conn.state == SpecAMQP.Spec.Connection.State.start then
+      { octets := #[header], done := false }
+    else if core.conn.state == SpecAMQP.Spec.Connection.State.hdrExch then
       { octets := #[declaration], done := false }
     else
       { octets := #[], done := false }
@@ -130,14 +136,14 @@ def main (args : List String) : IO UInt32 := do
           IO.println s!"probe: listening port={port} read-octets={readOctets.toNat} \
             frame-of={frame.size} octets"
           (← IO.getStdout).flush
-          let core ← serveConn listener header (serverApp frame) readOctets
+          let core ← serveConn listener (serverApp header frame) readOctets
           IO.println s!"probe: the connection ended in {core.conn.state.name}"
         finally
           listener.close
       else
         IO.println s!"probe: client, frame of {frame.size} octets, read-octets={readOctets.toNat}"
         (← IO.getStdout).flush
-        let core ← dial port header (clientApp frame) readOctets
+        let core ← dial port (clientApp header frame) readOctets
         IO.println s!"probe: the connection ended in {core.conn.state.name}"
       return (0 : UInt32)
     catch e =>

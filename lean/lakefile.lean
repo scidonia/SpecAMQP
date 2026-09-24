@@ -221,9 +221,9 @@ R4's wire application: the corpus's *send* side, at the shell's `App` seam. `She
 announces the header and says nothing, which is the right smallest endpoint and the wrong application for
 a differential — every `send` step of an exchange vector asks the endpoint to put a frame on the wire, and
 an application that sends nothing makes the differential report "nothing arrived" for every vector without
-testing the endpoint at all. This application reads a vector, works out which of its `send` steps are the
-application's (the shell announces the header itself, so a step played from `START` is not), and emits a
-step's octets when the core is in the state that step is played from.
+testing the endpoint at all. This application reads a vector, works out the `send` steps it plays — all of
+them, the protocol header included, since the shell announces nothing of its own — and emits a step's
+octets when the core is in the state that step is played from.
 
 It lives beside `EndpointProbe/` and outside `lean/Shell/` for the same reason: the shell is
 parameterised by `App` so that a test application is a different value rather than a different shell, and

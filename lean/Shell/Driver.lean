@@ -48,14 +48,34 @@ that asks once has made the process depend on how the kernel split the peer's wr
 code over a proved step, which is why §10's relation can quantify past it, and it is named here rather than
 left to be rediscovered as a behaviour that changes with the read size.
 
+To that is now added **how often the application is asked for one state**: `serveApp` asks it again after each
+step it takes, because a step that the core *refuses* moves nothing — so a vector with two sends played from
+one state (the second only reachable because the first was refused) is a state the shell asks about twice.
+The re-asking is bounded (`maxApplicationRounds`) and a bound that bites is a loud failure naming it: an
+application that never stops asking is a defect, and a shell that quietly stopped would present it as a
+success. An empty reply ends the asking — that is an answer, not a stall.
+
+**The protocol header is the application's to announce, and the shell has no fixed act of its own.** The
+connection starts at `Impl.Core.initial` — the specification's own `START`, on the AMQP layer — and the
+application's first prompt is where a header comes from; the header is handed to `Impl.Core.submit` like any
+other submission and the core reads the layer out of it (`Spec.Connection.stepHeader` sets the layer from the
+header the peer supplied). This is the §23.1 policy ruling — the application owns the layer choice, the shell
+plumbs the octets, the core checks the header — and it is what lets a vector whose pre-state is `START` be the
+application's to play. `announcedHeader` remains a helper *for applications*: it builds the header for a layer
+from the generated tables and fails loudly where the artifact states no version for that layer, and the
+shipped process's `--layer=` switch and the differential's application are two callers of it. The layer on the
+wire and the layer the connection runs in cannot disagree, because the same header supplies both.
+
 ## The seam with the proved part, function by function
 
 The shell calls exactly these, and nothing else of the core:
 
-* `Impl.Core.announceHeader` — the fixed header this peer announces, laid out from the specification's
-  own protocol id and version (`Impl.Core.announceHeader`'s version comes from the generated constant
-  table). The shell resolves its `none` — the artifact stating no version for the AMQP layer — into a
-  loud failure.
+* `Impl.Core.announceHeaderFor` — the header for a layer, laid out from the specification's own protocol id
+  and the version the generated constant table states, reached through `announcedHeader`. The shell does not
+  call this on a connection's behalf: the header is the application's opening move, and `announcedHeader` is
+  the helper the *applications* use to build one (the shipped process from its `--layer=` switch, R4's
+  application from the vector). The helper resolves the tables' `none` — no version stated for that layer —
+  into a loud failure rather than announcing nothing.
 * `Impl.Stream.pending` — the octets a read returned, appended to the octets an earlier read left
   incomplete, which is all a read does to the stream before a unit is decided.
 * `Impl.Stream.nextUnit` — **one** unit of those octets and only one: the endpoint's next state, the outputs
@@ -146,23 +166,61 @@ def writeOutputs (conn : Conn) (outs : List Output) : IO Unit := do
     | .frame bytes => sendAll conn bytes
     | .api answer => reportAnswer answer
 
-/-- Ask the application what to send, put it through the core, and write what the core says. The core's
-refusal to read the octets as a send is a **loud** failure: the application asked for something this peer
-cannot send, and continuing would put nothing on the wire while the caller believed otherwise. -/
+/-- How many consecutive rounds `serveApp` will ask the application for before it declares the application
+defective.
+
+The bound is deliberately small, and it is a **loud** failure rather than a stop: the corpus-driven
+application (R4's `WireApp`) is asked again after a refused send, precisely so that a vector with two sends
+from one state can be played, and an application whose plan never advances would otherwise ask forever. A
+shell that stopped quietly at the bound would report a hung application as a connection that simply had
+nothing more to say, which is the one reading this must not be able to produce. -/
+def maxApplicationRounds : Nat := 8
+
+/-- **Ask the application what to send, put it through the core, write what the core says — and ask again
+while it keeps returning work.** The core's refusal to read the octets as a send is a **loud** failure: the
+application asked for something this peer cannot send, and continuing would put nothing on the wire while the
+caller believed otherwise.
+
+Asking **again** is what makes a step reachable whose pre-state the core stays in. A refused send moves
+nothing, so an application playing the second of two sends from one state is asked a second time in the same
+state — and that is the whole of the seam: one prompt per arriving unit could not reach it at all. The rounds
+are bounded by `maxApplicationRounds` and exhausting the bound throws, naming it, because an application that
+never stops asking is a defect and a silent stop would look like success. A reply with no octets, or one that
+reports `done`, ends the asking and is not a defect: an application with nothing to say in a state has said
+exactly that.
+
+`outs` is what the step just taken produced on the first ask, and the core's answer to the submission before
+it on each later ask — so an application can tell a re-prompt (the core refused, the state is where it was)
+from a fresh prompt, which is exactly the distinction a plan with two sends from one state turns on. -/
 def serveApp (conn : Conn) (core : State) (outs : List Output) (app : App) : IO (State × Bool) := do
-  let reply := app core outs
   let mut core := core
+  let mut outs := outs
   let mut live := true
-  for octets in reply.octets do
-    match SpecAMQP.Impl.Core.submit core octets with
-    | .error message =>
-      throw (IO.userError s!"the application asked to send octets the core cannot send: {message}")
-    | .ok (core', outs') =>
-      core := core'
-      writeOutputs conn outs'
-      if core'.conn.state == SpecAMQP.Spec.Connection.State.end then
-        live := false
-  return (core, live && !reply.done)
+  let mut rounds := 0
+  let mut asking := true
+  while asking do
+    let reply := app core outs
+    if !reply.octets.isEmpty then
+      rounds := rounds + 1
+      if rounds > maxApplicationRounds then
+        throw (IO.userError
+          s!"the application asked to send in more than {maxApplicationRounds} consecutive rounds \
+             without finishing, and the shell stops asking there")
+      for octets in reply.octets do
+        match SpecAMQP.Impl.Core.submit core octets with
+        | .error message =>
+          throw (IO.userError s!"the application asked to send octets the core cannot send: {message}")
+        | .ok (core', outs') =>
+          core := core'
+          writeOutputs conn outs'
+          outs := outs'
+          if core'.conn.state == SpecAMQP.Spec.Connection.State.end then
+            live := false
+    if reply.done then
+      live := false
+    if reply.done || reply.octets.isEmpty || !live then
+      asking := false
+  return (core, live)
 
 /-- **Serve one read's units**, the application asked after **each** unit rather than once per read.
 
@@ -177,6 +235,8 @@ the loop below is `feed`'s loop with an application consulted in between, over t
 layer the same octets. What the loop *adds* is the sequencing, and that is this module's part of the boundary
 rather than the core's. The outputs are written in the order the core produces them, as always, so a read that
 completes several units narrates them in order with the application's answers interleaved where they happened.
+And each unit's prompt is itself `serveApp`'s bounded re-asking, so between two units the application may have
+been asked several times — once per step it took — without any octets having arrived between them.
 Returns the state to continue from, and whether the application is still live. -/
 def serveUnits (conn : Conn) (core : State) (app : App) : IO (State × Bool) := do
   let mut core := core
@@ -227,31 +287,23 @@ def pump (conn : Conn) (core : State) (app : App)
       live := keepGoing
   return core
 
-/-- **The layer a protocol header names.** The header *is* the decision: `announcedHeader` builds it from
-the layer this peer offers, and the connection starts in `Spec.Connection.Endpoint.initialFor` at the
-layer that same header names, so announcing one layer and speaking the other is not a state this shell can
-reach — and the starting state is the specification's own, so an implementation's `init` is proved against
-a specification state rather than assumed equal to one. The protocol id is the field the
-layout draws at index 4 — `magic` is four octets — and anything that is not SASL's is read as AMQP, which
-is the conservative default rather than a third layer this peer does not speak. -/
-def layerOfHeader (header : Octets) : SpecAMQP.Spec.Connection.Layer :=
-  if header[4]? == some (SpecAMQP.Spec.Connection.octet
-      (SpecAMQP.Spec.Connection.Layer.protocolId SpecAMQP.Spec.Connection.Layer.sasl).code)
-  then .sasl else .amqp
+/-- **Run one connection from the application's opening move to the end**: ask the application once before
+the first read — its opening move is where the protocol header comes from, so the shell announces nothing of
+its own — then the loop, then the socket's close.
 
-/-- **Run one connection from the application's opening move to the end**: the announced header first
-(the shell's only protocol act of its own, and the one §23.1 calls "a fixed header"), then the loop, then
-the socket's close. -/
-def runConnection (conn : Conn) (header : Octets) (app : App)
+The starting state is `Impl.Core.initial`: the specification's own `START` on the AMQP layer, which is where
+`Endpoint.initial` puts a peer that has exchanged nothing. The header the application supplies decides the
+layer, not this function: `Impl.Core.submit` decodes it and `Spec.Connection.stepHeader` sets the layer from
+it, so the layer on the wire and the layer the connection runs in come from one and the same submission. That
+is why there is no `header` parameter here and no `layerOfHeader` to read one: which layer this peer offers is
+the application's decision (§23.1's policy ruling), and a shell that chose one itself would be announcing a
+layer the application never asked for. -/
+def runConnection (conn : Conn) (app : App)
     (readOctets : USize := defaultReadOctets) : IO State := do
-  let core : State :=
-    { conn := SpecAMQP.Spec.Connection.Endpoint.initialFor (layerOfHeader header), inbox := #[] }
-  match SpecAMQP.Impl.Core.submit core header with
-  | .error message =>
-    throw (IO.userError s!"this peer cannot announce its own header: {message}")
-  | .ok (core, outs) =>
-    writeOutputs conn outs
-    pump conn core app readOctets
+  let (core, live) ← serveApp conn SpecAMQP.Impl.Core.initial [] app
+  if !live then
+    return core
+  pump conn core app readOctets
 
 /-! ## The socket's lifecycle -/
 
@@ -263,11 +315,11 @@ def listenOn (port : UInt16) : IO Listener := listen port
 /-- **Serve one connection on a listening socket**: accept, run the connection, close it. The listener
 stays the caller's to close, so a caller that wants to serve more than one connection (a later rung)
 does not have to open the port twice. -/
-def serveConn (listener : Listener) (header : Octets) (app : App)
+def serveConn (listener : Listener) (app : App)
     (readOctets : USize := defaultReadOctets) : IO State := do
   let conn ← accept listener
   try
-    let core ← runConnection conn header app readOctets
+    let core ← runConnection conn app readOctets
     conn.close
     return core
   catch e =>
@@ -275,11 +327,11 @@ def serveConn (listener : Listener) (header : Octets) (app : App)
     throw e
 
 /-- **Dial one connection**: connect, run it, close the socket. -/
-def dial (port : UInt16) (header : Octets) (app : App)
+def dial (port : UInt16) (app : App)
     (readOctets : USize := defaultReadOctets) : IO State := do
   let conn ← connect port
   try
-    let core ← runConnection conn header app readOctets
+    let core ← runConnection conn app readOctets
     conn.close
     return core
   catch e =>
