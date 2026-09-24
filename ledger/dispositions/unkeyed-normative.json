@@ -5,7 +5,8 @@
   "informative": "Rationale or an address-level fact, with no wire obligation.",
   "invariant:": "A Lean declaration path naming the law that carries this clause: an invariant or preservation theorem about state, where nothing observable can pin it.",
   "underspecified:": "The artifact deliberately leaves behaviour open. Nothing is enforced, and tests must not assert either reading.",
-  "unkeyed": "A statement with no RFC 2119 keyword that is still normative, or an explicit silence the specification chooses. The keyword scan cannot see these, so each one is captured and decided explicitly; `check_unkeyed` refuses an omission."
+  "unkeyed": "A statement with no RFC 2119 keyword that is still normative, or an explicit silence the specification chooses. The keyword scan cannot see these, so each one is captured and decided explicitly; `check_unkeyed` refuses an omission.",
+  "formalized: names a declaration": "**A declaration, not a field.** A clause carried by *recording* a choice in a structure field is cited by the predicate that **reads** it, with the field named in the note: the check collects declarations, so a field is invisible to it, and the predicate is the part that enforces the sentence. `senderSettleMode`, `senderSettleUnsettled` and `receiverSettleSecond` are fields of `Session` for exactly this reason, cited as `negotiatedSettleRefusal`, `unsettledSettleRefusal` and `rcvSettleRefusal`."
  },
  "dispositions": {
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:addressing.u1": {
@@ -946,16 +947,16 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/type:sender-settle-mode/choice:settled.u1": {
    "clause_text": "The sender will send all deliveries settled to the receiver.",
-   "disposition": "deferred:S3-session",
+   "disposition": "formalized:Spec.Session.negotiatedSettleRefusal",
    "kind": "UNKEYED",
-   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes.",
+   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes. **Carried this session, and the reporter's own words for it**: formalized:Spec.Session.senderSettleMode. This is the choice's definition; the obligation that consumes it is settled.4's guard in transferLink, already dispositioned formalized. Recorded here so the pair is visible. The carrier is the predicate that enforces the settled choice, `Spec.Session.negotiatedSettleRefusal?`, which reads the field `Session.senderSettleMode` \u2014 a field is invisible to the ledger's check, so the predicate is what this entry names.",
    "text_sha256": "1519905bc28c6ec0268a901de9af7be8f667ce575059d5b68e43e9e11cd45260"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/type:sender-settle-mode/choice:unsettled.u1": {
    "clause_text": "The sender will send all deliveries initially unsettled to the receiver.",
-   "disposition": "deferred:S3-session",
+   "disposition": "formalized:Spec.Session.unsettledSettleRefusal",
    "kind": "UNKEYED",
-   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes.",
+   "note": "A declared choice's meaning, captured under the collector's choice rule: the meaning belongs in the ledger rather than the generated table, because a table entry cannot be dispositioned, reviewed against its text, or lost visibly when the artifact changes. **Carried this session, and the reporter's own words for it**: formalized:Spec.Session.senderSettleUnsettled (new field) consumed by Spec.Session.unsettledSettleRefusal. The negotiation is three-valued (unsettled/settled/mixed) and .4/.6 select opposite choices, so the two are recorded separately; this is the definition .6 consumes. As with the settled choice: the field `Session.senderSettleUnsettled` holds the negotiation and `Spec.Session.unsettledSettleRefusal?` is what enforces the sentence, so the predicate is named and the field recorded here.",
    "text_sha256": "24a5ce5f916ec87de0ec5fffaed54335e1e0649a31037abe17eae4a9124a031f"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/type:session-error/choice:errant-link.u1": {
@@ -1058,9 +1059,9 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:flow-control.u1": {
    "clause_text": "Only the receiver can independently choose a value for this field.",
-   "disposition": "deferred:S4",
+   "disposition": "formalized:Spec.Session.flowCreditEchoRefusal",
    "kind": "UNKEYED",
-   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement.",
+   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement. **Carried this session, and the reporter's own words for it**: formalized:Spec.Session.flowCreditEchoRefusal (new): the receiver's ownership of link-credit. It was enforced only on the receiving side (a peer's sender flow inventing a credit); the new predicate also answers the direction this endpoint writes, where step now refuses a sender's own flow that does not echo the receiver's last indicated value.",
    "text_sha256": "e82bbac840cf96fc557d7c34bedb58dd15b6660e939f69312f494031c542a243",
    "unkeyed_phrases": [
     "only the receiver can"
@@ -1078,9 +1079,9 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:flow-control.u3": {
    "clause_text": "Only the receiver can independently modify this field.",
-   "disposition": "deferred:S4",
+   "disposition": "formalized:Spec.Session.flowCreditEchoRefusal",
    "kind": "UNKEYED",
-   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement.",
+   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement. **Carried this session, and the reporter's own words for it**: formalized:Spec.Session.flowCreditEchoRefusal. Same sentence's second instance about link-credit; the same declaration carries both, as the artifact writes one rule twice.",
    "text_sha256": "676b3282b47443dbdebbe3844b4b14221023c2f3784765c6dce33dda55324d6d",
    "unkeyed_phrases": [
     "only the receiver can"
@@ -1157,9 +1158,9 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:flow/field:link-credit.u1": {
    "clause_text": "Only the receiver endpoint can independently set this value.",
-   "disposition": "deferred:S4",
+   "disposition": "formalized:Spec.Session.flowCreditEchoRefusal",
    "kind": "UNKEYED",
-   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement.",
+   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement. **Carried this session, and the reporter's own words for it**: formalized:Spec.Session.flowCreditEchoRefusal (the field's own form of the same ownership sentence).",
    "text_sha256": "6fbc87c70e1ea4132882bd9d10953d1e0407879f911a7c0dbbbaa211f4dca295",
    "unkeyed_phrases": [
     "only the receiver endpoint can"
@@ -1254,23 +1255,23 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:more.u1": {
    "clause_text": "Note that if both the more and aborted fields are set to true, the aborted flag takes precedence.",
-   "disposition": "deferred:S3-session",
+   "disposition": "formalized:Spec.Session.transferLink",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier. **Carried this session, and the reporter's own words for it**: formalized:Spec.Session.transferLink. Already implemented (more := !aborted && ...); this disposition is a reading, not a change, and the reference agrees.",
    "text_sha256": "ce51f7918874a6045b4057b97309d467151cf93a397ffc28a5c064f647e2ed58"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:rcv-settle-mode.u1": {
    "clause_text": "If the negotiated link value is \u00abfirst\u00bb, then it is illegal to set this field to \u00absecond\u00bb.",
-   "disposition": "deferred:S3-session",
+   "disposition": "formalized:Spec.Session.rcvSettleRefusal",
    "kind": "UNKEYED",
-   "note": "Setting the field to the negotiated link value is illegal: a transfer validation rule the link machine will state.",
+   "note": "Setting the field to the negotiated link value is illegal: a transfer validation rule the link machine will state. **Carried this session, and the reporter's own words for it**: formalized:Spec.Session.rcvSettleRefusal (new). The attach's rcv-settle-mode is now recorded as the choice it names (Session.receiverSettleSecond, default first), and a transfer naming the second choice against a link negotiated first is refused. Staged vector staged-link-rcv-settle-second-over-first now refuses; the committed complement exchange-link-rcv-settle-second-over-second still admits.",
    "text_sha256": "21e8ebd42fecf76f9f8f1c83e95306e873f4ff715a5d1ac242d01c1e9f061186"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:rcv-settle-mode.u2": {
    "clause_text": "If the message is being sent settled by the sender, the value of this field is ignored.",
-   "disposition": "deferred:S3-session",
+   "disposition": "formalized:Spec.Session.rcvSettleRefusal",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier. **Carried this session, and the reporter's own words for it**: formalized:Spec.Session.rcvSettleRefusal (the exemption half): a transfer that carries settled true makes the field ignored, so u1's refusal is gated on the frame's own flag.",
    "text_sha256": "b8e591b4a9a34a68eafb5c518058d35cf0a1d7460442e8b40b0a6a8e1dc4d360"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:rcv-settle-mode.u3": {
@@ -1282,9 +1283,9 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:sessions.u1": {
    "clause_text": "In this state an endpoint cannot send or receive frames.",
-   "disposition": "deferred:S4",
+   "disposition": "formalized:Spec.Session.State.maySend; formalized:Spec.Session.State.mayReceive",
    "kind": "UNKEYED",
-   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement.",
+   "note": "deferred: S4 \u2014 the session/link machine's milestone owns this statement. **Carried this session, and the reporter's own words for it**: formalized:Spec.Session.State.maySend; formalized:Spec.Session.State.mayReceive. It is UNMAPPED's description sentence (\"In this state an endpoint cannot send or receive frames\"), and both columns are false at unmapped; the reference's sendAllowed/receiveAllowed agree.",
    "text_sha256": "5f933d2322ca3a3f4c1b182df37647ca37885ac72595329650e513acb593d359",
    "unkeyed_phrases": [
     "cannot"

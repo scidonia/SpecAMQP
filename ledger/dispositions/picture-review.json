@@ -86,16 +86,16 @@
   },
   "amqp-core-transport-v1.0-os.xml#picture.57": {
    "clause_text": "+------------+ S:XFR(M=1,A=0) +------| NOT_SENT |------+ | +------------+ | | | | S:XFR(M=0,A=0) | | | S:XFR(M=1,A=0) | | +----------+ | | | | | \\|/ \\|/ | | ...",
-   "disposition": "deferred:S4",
+   "disposition": "formalized:Spec.Session.transferLink",
    "kind": "PICTURE",
-   "note": "The outgoing fragmentation state diagram: when a transfer may carry more, and what the sender must do at each point. Fragmentation is S4's scope, and this is its source.",
+   "note": "The outgoing fragmentation state diagram: when a transfer may carry more, and what the sender must do at each point. Fragmentation is S4's scope, and this is its source. **Carried this session, and the reporter's own words for it**: formalized:Spec.Session.transferLink. The outgoing fragmentation state machine: NOT_SENT/SENDING/SENT/ABORTED are delivery=none / delivery.isSome / cleared-on-completion / cleared-on-abort, which is exactly what transferLink computes, and vectors/flow.ndjson (34 vectors, all 29 interior split points) is the pin. Vacuous part: the diagram draws no NOT_SENT --A=1--> ABORTED arrow, which the model admits (a first transfer that aborts); that is a diagram gap, not a model gap.",
    "text_sha256": "707ce749628334e9b0129181b40eac6fc0f83db51d53468936cc291082dd8133"
   },
   "amqp-core-transport-v1.0-os.xml#picture.58": {
    "clause_text": "+------------+ R:XFR(M=1,A=0) +------| NOT_RCVD |------+ | +------------+ | | | | R:XFR(M=0,A=0) | | | R:XFR(M=1,A=0) | | +----------+ | | | | | \\|/ \\|/ | | ...",
-   "disposition": "deferred:S4",
+   "disposition": "formalized:Spec.Session.transferLink",
    "kind": "PICTURE",
-   "note": "The incoming fragmentation state diagram: the receiver's counterpart of picture.57, and the reason both exist \u2014 one side's obligation is not the other's.",
+   "note": "The incoming fragmentation state diagram: the receiver's counterpart of picture.57, and the reason both exist \u2014 one side's obligation is not the other's. **Carried this session, and the reporter's own words for it**: formalized:Spec.Session.transferLink. The receiver's counterpart, the same function in the receiving direction; the flow corpus is all receive steps, so it is the direction that corpus exercises.",
    "text_sha256": "7b963ba987b41317029fd4015ec4e3f9e3b7ea9acd7f7e1a09e36f0ea028ce53"
   },
   "amqp-core-types-v1.0-os.xml#picture.1": {
