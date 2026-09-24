@@ -75,7 +75,12 @@ kind is empty as the file stands — its last two members were aligned by `d50ab
 gaps only, which is what the file is for: holding the obligations a gate cannot yet
 require rather than being emptied. `staged_corpus` names which, with the clause and both
 observed answers, because the file is a fix slice's opening evidence rather than a corpus
-a gate runs.
+a gate runs. Since the widening slice it also holds the vectors for PLAN.md §24's 26
+`deferred:S4` clauses — the eight behaviours §25 groups them into — run against both
+artefacts and observed failing before the model that satisfies them exists; that
+function's docstring lists the eight with their vectors, and the clauses that are staged
+as findings because their subject is a frame an endpoint must *emit* rather than a step
+this vocabulary can judge.
 
 Runs offline; the only input is the vendored artifacts under `spec/oasis/`.
 """
@@ -173,6 +178,43 @@ TRANSFER_RCV_SETTLE_IGNORED = f"{TRANSPORT}#amqp:transport/section:performatives
 # an unsettled map the layer does not hold.
 TRANSFER_RESUME_SENDER_MUST_NOT = f"{TRANSPORT}#amqp:transport/section:performatives/type:transfer/field:resume.2"
 TRANSFER_RESUME_FIRST_TRANSFER = f"{TRANSPORT}#amqp:transport/section:performatives/type:transfer/field:resume.3"
+# ---- the widening's clauses ------------------------------------------------- #
+# The 26 clauses PLAN.md §24's closing sub-section groups into eight behaviours, each
+# cited at the sentence it states rather than at the section it lives in. None has a
+# carrier: they are the obligations the widened model owes, and `staged_corpus` holds the
+# vectors that state them before the model that satisfies them exists.
+#
+# A constant here exists because a vector cites it, so the clauses with no vector have no
+# constant: `links.2` (the steal, whose observable half is an emitted close carrying
+# `amqp:link:stolen`), `links/doc:closing-a-link.2`, `attach/field:unsettled.1`,
+# `attach/field:incomplete-unsettled.3`, `.u1`, `resuming-deliveries.3`-`.8` are named in
+# `staged_corpus`'s docstring and its notes instead, with what keeps each out.
+#
+# The link identity a name and a terminus give (`links.1`, `links.5`), and the two ways a
+# destroyed link can come back: resumed (`links.16`, `links.17`) or recognised as the
+# pipelined attach the session is terminated for (`links.18`).
+LINKS_NAME_UNIQUE = f"{TRANSPORT}#amqp:transport/section:links.1"
+LINKS_TERMINUS_CARRIES_UNSETTLED = f"{TRANSPORT}#amqp:transport/section:links.5"
+LINKS_DESTROYED_MUST_RESUME = f"{TRANSPORT}#amqp:transport/section:links.16"
+LINKS_RESUME_MAP_NON_NULL = f"{TRANSPORT}#amqp:transport/section:links.17"
+LINKS_PIPELINED_ATTACH = f"{TRANSPORT}#amqp:transport/section:links.18"
+LINKS_TAG_UNIQUE_AMONG_UNSETTLED = f"{TRANSPORT}#amqp:transport/section:links.23"
+# The map a re-attach must leave null (`.6`); `unsettled.5`, the map's null-key rule, is
+# `ATTACH_UNSETTLED_NULL_KEY` in the attachment block below.
+ATTACH_UNSETTLED_NULL_ON_REATTACH = f"{TRANSPORT}#amqp:transport/section:performatives/type:attach/field:unsettled.6"
+# The incomplete map's one sentence, declared twice — once MUST NOT and once MUST — which
+# puts a latch on the sending endpoint and a detach-with-an-error on the receiving one.
+ATTACH_INCOMPLETE_LATCH = f"{TRANSPORT}#amqp:transport/section:performatives/type:attach/field:incomplete-unsettled.1"
+ATTACH_INCOMPLETE_LATCH_MUST = f"{TRANSPORT}#amqp:transport/section:performatives/type:attach/field:incomplete-unsettled.2"
+# Resuming a delivery: the marked resend the receiver ignores (`resuming-deliveries.2`),
+# and the resumed delivery the receiver's own map does not hold (the transfer field's `.1`).
+RESUMING_MARKED_RESEND_IGNORED = f"{TRANSPORT}#amqp:transport/section:links/doc:resuming-deliveries.2"
+RESUME_RECEIVER_IGNORES_UNKNOWN = f"{TRANSPORT}#amqp:transport/section:performatives/type:transfer/field:resume.1"
+# The disposition that outlives the link it names: a disposition MAY refer to deliveries on
+# links no longer attached (`.3`), and while the links were not closed or detached with an
+# error the deliveries are still live and the updated state MUST be applied (`.4`).
+DISPOSITION_REFERS_TO_DETACHED = f"{TRANSPORT}#amqp:transport/section:performatives/type:disposition.3"
+DISPOSITION_STATE_STILL_APPLIES = f"{TRANSPORT}#amqp:transport/section:performatives/type:disposition.4"
 # The `more`/`aborted` pair: `.u1` is the precedence note ("the aborted flag takes
 # precedence") and `.2` the sender's SHOULD NOT, which a receiver cannot enforce and which
 # is why the vector that carries both states the precedence rather than the SHOULD NOT.
@@ -246,6 +288,9 @@ FRAMING_ERROR = "amqp:connection:framing-error"
 INVALID_FIELD = "amqp:invalid-field"
 WINDOW_VIOLATION = "amqp:session:window-violation"
 ILLEGAL_STATE = "amqp:illegal-state"
+# The session error `links.18` names for a pipelined attach, read from the generated
+# `session-error` choice table's `errant-link` value like the three beside it.
+ERRANT_LINK = "amqp:session:errant-link"
 
 
 def c(state: str) -> str:
@@ -363,16 +408,20 @@ def encode(value: dict) -> bytes:
             return b"\xC0" + bytes([size]) + bytes([len(value["items"])]) + items
         return b"\xC1" + be(size + 3, 4) + be(len(value["items"]), 4) + items
     if kind == "map":
-        entries = b"".join(encode(entry["key"]) + encode(entry["value"])
-                           for entry in value["entries"])
-        if not value["entries"]:
+        # The corpus spells a map as its pairs, in wire order — `pairs` is the vocabulary's
+        # name for them (`tests/contracts/value-vector.schema.json`), and both artefacts'
+        # value readers take it — rather than as `entries` objects, which is a shape no
+        # reader knows and which only a step the generator encodes itself could hide.
+        pairs = value["pairs"]
+        entries = b"".join(encode(key) + encode(item) for key, item in pairs)
+        if not pairs:
             # map8 with a count of zero: the size field counts the count field and the
             # items that follow it, so an empty map's size is one
             return b"\xC1\x01\x00"
         # the count field counts *items* rather than pairs — a map's keys and values are
         # its items, so a one-pair map declares two — which is why a pair count written
         # here is refused by both readers as an odd item count
-        count = len(value["entries"]) * 2
+        count = len(pairs) * 2
         size = len(entries) + 1
         if size < 256 and count < 256:
             return b"\xC1" + bytes([size]) + bytes([count]) + entries
@@ -612,7 +661,8 @@ class Corpus:
                     initial_delivery_count: int = 0,
                     snd_settle_mode: int | None = None,
                     rcv_settle_mode: int | None = None,
-                    unsettled: dict | None = None) -> dict:
+                    unsettled: dict | None = None,
+                    incomplete_unsettled: bool | None = None) -> dict:
         """An `attach`. The `role` field's declared type is a restricted `boolean` whose
         `sender` value is false and whose `receiver` value is true, and
         `initial-delivery-count` "MUST NOT be null if role is sender", so this carries it
@@ -625,6 +675,12 @@ class Corpus:
         here is a negotiation, and reading the element's *name* where a sentence selects a
         *choice* inverts which obligation is in force. `rcv_settle_mode` is the same shape
         for the receiver's half of the negotiation, whose choices are `first` and `second`.
+
+        `unsettled` and `incomplete_unsettled` are the widening's two fields: the map a
+        suspended link's state is resumed by, and the flag that says the map provided is
+        not the whole of that state. Both are declared optional and both are written only
+        where a vector sets them, so an attach that leaves them off is an attach whose
+        fields are the null the artifact's default applies to.
         """
         fields: dict[str, dict] = {"name": {"type": "string", "text": name},
                                    "handle": {"type": "uint", "value": handle},
@@ -638,15 +694,54 @@ class Corpus:
             fields["rcv-settle-mode"] = {"type": "ubyte", "value": rcv_settle_mode}
         if unsettled is not None:
             fields["unsettled"] = unsettled
+        if incomplete_unsettled is not None:
+            fields["incomplete-unsettled"] = {"type": "boolean",
+                                              "value": incomplete_unsettled}
         return self.body("attach", **fields)
+
+    def tag(self, octets: bytes) -> dict:
+        """A `delivery-tag` as a corpus value: what an unsettled map is keyed by, and the
+        field a transfer carries. Written through one place so that a vector's key and the
+        tag its transfer carries are the same value when they are meant to be."""
+        return {"type": "binary", "hex": octets.hex()}
+
+    def delivery_state(self, outcome: str) -> dict:
+        """A delivery state for an unsettled map's *values*: one of Part 3's outcomes, as
+        the described value its declared type is.
+
+        The descriptor code and each mandatory field's zero are read from the artifact's
+        own tables rather than typed, so the map a vector carries is the shape the field
+        declares (`delivery-tag` -> `delivery-state`) rather than a convenient value the
+        rule under test does not read. A field this writes no zero for raises instead of
+        being dropped, because a described composite short of a mandatory field is not the
+        outcome it names."""
+        element = declared_types(MESSAGING)[outcome]
+        zero = {"uint": {"type": "uint", "value": 0},
+                "ulong": {"type": "ulong", "value": 0}}
+        items: list[dict] = []
+        for field in element:
+            if not field.tag.endswith("field") or field.get("mandatory") != "true":
+                continue
+            declared = field.get("type")
+            if declared not in zero:
+                raise SystemExit(f"gen-exchange-vectors: {outcome}'s mandatory field "
+                                 f"{field.get('name')} is a {declared!r}, and this corpus "
+                                 f"writes no zero for it")
+            items.append(dict(zero[declared]))
+        return described(descriptor_code(element), items)
 
     def unsettled_map(self, entries: list[tuple[dict, dict]]) -> dict:
         """An `unsettled` field's value: a map of delivery-tag to delivery state. Part 3
         gives the states meanings and this layer does not read them, so a vector that
         exercises the map's own key rule carries values that are whatever the rule under
-        test does not look at."""
+        test does not look at.
+
+        Written as `pairs`, the corpus vocabulary's own spelling for a map, and not as a
+        list of `{key, value}` objects: the vocabulary is what both artefacts' value
+        readers take, so a map written any other way is a frame a *send* step cannot
+        express — the reader refuses it before any model sees it."""
         return {"type": "map",
-                "entries": [{"key": key, "value": value} for key, value in entries]}
+                "pairs": [[key, value] for key, value in entries]}
 
     def settle_mode(self, owner: str, name: str) -> int:
         """A settle-mode choice's number, from the artifact's own choice table: the
@@ -780,19 +875,27 @@ class Corpus:
         return step
 
     def send_frame(self, frame_type: int, body: dict, *, state: str, channel: int = 0,
-                   payload: bytes = b"") -> dict:
-        return {"direction": "send",
+                   payload: bytes = b"", note: str = "") -> dict:
+        """A frame this endpoint writes. `note` is the step-level prose the exchange
+        schema allows beside an admitted step — the widening's vectors use it to say what
+        the step is *for* where the clause's frame is otherwise unremarkable."""
+        step = {"direction": "send",
                 "value": frame_value(frame_type, body, channel=channel, payload=payload),
                 "expect": {"status": "admitted", "state": state}}
+        if note:
+            step["note"] = note
+        return step
 
     def receive_frame(self, frame_type: int, body: dict, *, state: str | None,
-                      channel: int = 0, payload: bytes = b"") -> dict:
+                      channel: int = 0, payload: bytes = b"", note: str = "") -> dict:
         step = {"direction": "receive",
                 "bytes": frame_octets(frame_type, body, channel=channel,
                                       payload=payload).hex(),
                 "expect": {"status": "admitted"}}
         if state is not None:
             step["expect"]["state"] = state
+        if note:
+            step["note"] = note
         return step
 
     def refused(self, direction: str, *, reason: str, state: str | None,
@@ -2810,7 +2913,7 @@ def staged_corpus(tables: Corpus) -> list[dict]:
     named. They are written to a path the caller names, outside `vectors/`, so the corpus
     a gate reads stays green while the finding stays in a file a fix slice can lift.
 
-    Every vector here is now a **shared gap**: a frame both artefacts admit (or refuse)
+    Every vector here is a **shared gap**: a frame both artefacts admit (or refuse)
     against the clause, so no differential can see it. The class it is not — a
     **divergence**, a frame the two artefacts answer differently, with neither side chosen
     here — held the aborted-credit pair and is empty since `d50abc1` and `1540777` aligned
@@ -2826,21 +2929,79 @@ def staged_corpus(tables: Corpus) -> list[dict]:
     the four the transfer-flag reading settled at `1a21b0a`, the five settlement and count
     readings `5624f16` carried, and the bodyless frame here, whose answer `cfc723f` keyed to
     the direction it is offered in, now that both artefacts consult the table's receive
-    column for it — and the three that remain are one subject: `resume.2`, `.3` and
-    `attach/field:unsettled.5` each name the local unsettled map or a resumed delivery, and
-    one link per session is the whole of the model's link state.
+    column for it.
+
+    **What the family is now.** The vectors authored for the widening PLAN.md §24 decides
+    on: its 26 `deferred:S4` clauses, which §25 groups into eight behaviours, each one a
+    behaviour the widened model makes *reachable* and which is run and observed failing
+    before that model exists. The alphabet does not change (§24's decision): every frame
+    below is legal AMQP that today's model answers wrongly, which is why each is a step
+    verdict — a refusal the peer does not give (`the peer admitted the step`), a refusal
+    the peer gives for a different rule, or a refusal due that it does not give — rather
+    than a frame it cannot read.
+
+    The eight, in the order §25 lists them, with the vector that pins each:
+
+    1. *a link is named, and its name identifies it* — `staged-link-second-attach-same-name`
+       (links.1, links.5).
+    2. *detach, re-attach and resume are three different things* —
+       `staged-link-pipelined-reattach` (links.16, links.17, links.18).
+    3. *the unsettled map on the attach* — `staged-link-attach-unsettled-null-key`
+       (unsettled.5), `staged-link-reattach-with-unsettled-map` (unsettled.6).
+    4. *an incomplete unsettled map latches the sender* —
+       `staged-link-incomplete-map-latch` (the sending endpoint's half of
+       incomplete-unsettled.1/.2),
+       `staged-link-incomplete-map-receipt` (the receiving endpoint's half of the same
+       sentence).
+    5. *resuming a delivery* — `staged-link-resume-sent-not-in-map` (resume.2),
+       `staged-link-resume-only-on-continuation` (resume.3),
+       `staged-link-resume-not-in-receiver-map` (resume.1, resuming-deliveries.2).
+    6. *the two sides reduce unsettled state together* — **no vector**, and the note below
+       says why.
+    7. *a delivery-tag is unique among the deliveries still unsettled* —
+       `staged-link-duplicate-delivery-tag` (links.23).
+    8. *settlement survives until the link does not* — `staged-disposition-after-detach`
+       (disposition.3, disposition.4, resume.2).
+
+    **What is staged as a finding rather than as a vector, and why.** Seven of the 26
+    clauses require the endpoint to *emit* a frame, or to hold a comparison whose outcome
+    nothing reads, and the corpus vocabulary is per-step verdicts over `send` and `receive`
+    steps with no step kind for "the peer must now produce this frame": links.2's second
+    half ("the first attach MUST then be closed with a link error of «stolen»"),
+    closing-a-link.2 ("the partner MUST signal that it has closed the link by reattaching
+    and then sending a closing detach"), unsettled.1 (compare the local and remote delivery
+    states), resuming-deliveries.5 and `.8` (the sender MUST resume, with the flag set —
+    the flag a peer *writes* is not something a vector can observe, since a `send` step's
+    value is the vector's), incomplete-unsettled.3 (detach and reattach at least once), and
+    resuming-deliveries.6/.7 (reduce the levels of unsettled state, then suspend and
+    re-attempt) — §25's behaviour 6, whose whole subject is an exchange between two
+    endpoints that this vocabulary can only observe one step at a time. They stay
+    `deferred:S4` with no vector, which is a finding about the harness rather than about the
+    clauses: a model can satisfy each of them and no corpus step can say so.
     """
     t = tables
     message = b"a message whose split points are the vector's business"
 
-    def link_up(role_sender: bool = False, credit: int = 1000) -> list:
+    def link_up(role_sender: bool = False, credit: int = 1000, name: str = "link",
+                handle: int = 0) -> list:
+        """The three steps that bring one link up: our attach, the peer's attach, and the
+        peer's flow.
+
+        `role_sender` says whether *our* endpoint is the link's sender, which is the role
+        our attach carries against the one the artifact's own `role` type gives the value
+        `false`. `name` and `handle` are the identity the widening's vectors turn on — the
+        name a link is recovered by, and the shorthand a frame references it with — so a
+        vector that needs them varies them here rather than assembling the three steps
+        again."""
         return [
-            t.send_frame(AMQP_FRAME, t.attach_body(role=not role_sender),
+            t.send_frame(AMQP_FRAME, t.attach_body(role=not role_sender, name=name,
+                                                   handle=handle),
                          state=s("MAPPED"), channel=1),
-            t.receive_frame(AMQP_FRAME, t.attach_body(role=role_sender),
+            t.receive_frame(AMQP_FRAME, t.attach_body(role=role_sender, name=name,
+                                                      handle=handle),
                             state=s("MAPPED"), channel=1),
             t.receive_frame(AMQP_FRAME, t.flow_body(
-                handle=0, delivery_count=0,
+                handle=handle, delivery_count=0,
                 link_credit=(credit if role_sender else 0)),
                 state=s("MAPPED"), channel=1)]
 
@@ -2910,6 +3071,297 @@ def staged_corpus(tables: Corpus) -> list[dict]:
                  "The map itself is well formed (an even item count, a null key, an "
                  "octet-string value), so the only rule this frame breaks is the one the "
                  "vector names"),
+
+        # -- the widening: PLAN.md §24's 26 clauses as §25's eight behaviours ---- #
+        #
+        # Each vector below is one behaviour the widened model makes reachable. The
+        # expectations are the clauses' — never an artefact's answer — and every note
+        # records what the two artefacts actually did with the step.
+
+        # 1. A link is named, and its name identifies it -- links.1, links.5.
+
+        exchange(
+            "staged-link-second-attach-same-name", start=s("MAPPED"),
+            clauses=[LINKS_NAME_UNIQUE, LINKS_TERMINUS_CARRIES_UNSETTLED],
+            steps=link_up() + [
+                t.refused("send", reason="malformed", condition=INVALID_FIELD,
+                          state=s("MAPPED"),
+                          body=t.attach_body(role=True, handle=1), channel=1,
+                          note="`links.1` makes a name identify the link among all links "
+                               "of the same direction, so this attach names the link this "
+                               "direction already holds rather than a second one; "
+                               "`links.5` then makes an attach for a link whose end is "
+                               "already associated with a terminus carry its unsettled "
+                               "delivery state, and this one carries none. The condition "
+                               "is the one a conditionally-required field's absence "
+                               "already carries in the corpus -- "
+                               "`attach/field:initial-delivery-count.1`'s reading")],
+            note="**Shared gap.** The two clauses that give a link an identity to be "
+                 "unique under and a state to be resumed by. **Both artefacts admit** the "
+                 "attach: the model reads no name, so a second attach naming this "
+                 "direction's link is a link of its own on a handle nothing has claimed, "
+                 "and the state `links.5` requires it to carry is a field no rule reads. "
+                 "What the vector cannot yet separate is which of the two the frame "
+                 "breaks -- a name colliding with a live link, or the absent map -- "
+                 "because neither artefact holds the identity that tells them apart"),
+
+        # 2. Detach, re-attach and resume are three different things -- links.16,
+        # links.17, links.18.
+
+        exchange(
+            "staged-link-pipelined-reattach", start=s("MAPPED"),
+            clauses=[LINKS_DESTROYED_MUST_RESUME, LINKS_RESUME_MAP_NON_NULL,
+                     LINKS_PIPELINED_ATTACH],
+            steps=link_up() + [
+                t.receive_frame(AMQP_FRAME, t.detach_body(handle=0, closed=True),
+                                state=s("MAPPED"), channel=1),
+                t.refused("receive", reason="illegalState", condition=ERRANT_LINK,
+                          state=s("DISCARDING"),
+                          body=t.attach_body(role=False, handle=1), channel=1,
+                          note="the peer's endpoint is destroyed, so this attach is the "
+                               "pipelined re-attach `links.16` forbids in place of a "
+                               "resume and `links.17` disambiguates by the `unsettled` "
+                               "field it does not carry: `links.18` names the answer -- "
+                               "the session terminated with an `errant-link` "
+                               "session-error")],
+            note="**Shared gap.** A closing detach destroys the link endpoint; `links.16` "
+                 "says the peer cannot reattach and MUST resume, `links.17` makes a "
+                 "non-null `unsettled` field the thing that tells a resume request from a "
+                 "pipelined re-attach, and `links.18` names the consequence when the field "
+                 "is absent. **Both artefacts admit** the attach and leave the session in "
+                 "MAPPED: neither reads the field, and the fresh handle is free. Near-miss, "
+                 "and why this vector names a fresh handle rather than the destroyed "
+                 "endpoint's: the same attach on that handle *is* refused, but as "
+                 "`attach/field:handle.2`'s immediate close carrying "
+                 "`amqp:session:handle-in-use` -- a different rule with a different "
+                 "condition, which is the distinction `s3_exchanges`'s per-step condition "
+                 "comparison exists to keep visible"),
+
+        # 3. The unsettled map on the attach -- unsettled.5 (the vector above),
+        # unsettled.6.
+
+        exchange(
+            "staged-link-reattach-with-unsettled-map", start=s("MAPPED"),
+            clauses=[ATTACH_UNSETTLED_NULL_ON_REATTACH],
+            steps=link_up() + [
+                t.receive_frame(AMQP_FRAME, t.detach_body(handle=0, closed=False),
+                                state=s("MAPPED"), channel=1),
+                t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                          state=s("DISCARDING"),
+                          body=t.attach_body(
+                              role=False, handle=1,
+                              unsettled=t.unsettled_map(
+                                  [(t.tag(b"tag"),
+                                    t.delivery_state("received"))])),
+                          channel=1,
+                          note="`unsettled.6`: \"When reattaching (as opposed to "
+                               "resuming), the unsettled map MUST be null.\" The peer "
+                               "detached with `closed=False`, so its link endpoint still "
+                               "exists and the link is not suspended -- a link is "
+                               "suspended when its termini exist and no endpoint is "
+                               "associated with them -- which makes the attach that "
+                               "follows a re-attach rather than a resume, and the map it "
+                               "carries the one the sentence forbids")],
+            note="**Shared gap.** The re-attach half of the map's own rules, paired with "
+                 "`staged-link-second-attach-same-name`'s missing-map half: the same "
+                 "identity and the same suspension state, with a map where the clause "
+                 "requires null. **Both artefacts admit** the attach -- the field is read "
+                 "nowhere, and the map itself is well formed, so nothing in either "
+                 "artefact's road from octets to a link sees it. The reading it rests on "
+                 "is the artifact's own definition of suspension: with the endpoint alive "
+                 "the link is not suspended, and only a resume carries a map "
+                 "(`links.17`)"),
+
+        # 4. An incomplete unsettled map latches the sender -- incomplete-unsettled.1,
+        # .2 (the same sentence declared twice, once MUST NOT and once MUST), which
+        # carries both ends' obligations; .3 is staged as a finding.
+
+        exchange(
+            "staged-link-incomplete-map-latch", start=s("MAPPED"),
+            clauses=[ATTACH_INCOMPLETE_LATCH, ATTACH_INCOMPLETE_LATCH_MUST],
+            steps=link_up(role_sender=True) + [
+                t.receive_frame(AMQP_FRAME, t.detach_body(handle=0, closed=True),
+                                state=s("MAPPED"), channel=1),
+                t.receive_frame(AMQP_FRAME,
+                                t.attach_body(
+                                    role=True, handle=1,
+                                    unsettled=t.unsettled_map(
+                                        [(t.tag(b"tag"),
+                                          t.delivery_state("received"))]),
+                                    incomplete_unsettled=True),
+                                state=s("MAPPED"), channel=1),
+                t.refused("send", reason="illegalState", condition=ILLEGAL_STATE,
+                          state=s("MAPPED"),
+                          body=t.transfer_body(handle=0, delivery_id=0,
+                                               delivery_tag=b"tag"),
+                          channel=1,
+                          note="the sending endpoint's half of the sentence: an "
+                               "incomplete unsettled map was received, so this endpoint "
+                               "MUST NOT send a new delivery -- one whose resume flag is "
+                               "not set -- and the transfer the vector asks it to write "
+                               "is exactly that. `illegal-state` is the reading: the "
+                               "condition the session's own refusals use for a "
+                               "well-formed frame at a moment the state does not permit")],
+            note="**Shared gap.** The peer resumes the link with an incomplete map, which "
+                 "is the flag `incomplete-unsettled.3` says is cleared only by detaching "
+                 "and reattaching again, and the sender is then asked for a new delivery. "
+                 "**Both artefacts admit** it: the flag is never read, so the latch has "
+                 "nothing behind it and `incomplete-unsettled.3`'s detach and reattach is "
+                 "an obligation no step can observe. The other end of the same sentence "
+                 "is `staged-link-incomplete-map-receipt`"),
+
+        exchange(
+            "staged-link-incomplete-map-receipt", start=s("MAPPED"),
+            clauses=[ATTACH_INCOMPLETE_LATCH, ATTACH_INCOMPLETE_LATCH_MUST,
+                     RESUME_RECEIVER_IGNORES_UNKNOWN],
+            steps=[t.send_frame(AMQP_FRAME,
+                                t.attach_body(
+                                    role=True,
+                                    unsettled=t.unsettled_map(
+                                        [(t.tag(b"tag"),
+                                          t.delivery_state("received"))]),
+                                    incomplete_unsettled=True),
+                                state=s("MAPPED"), channel=1),
+                   t.receive_frame(AMQP_FRAME, t.attach_body(role=False),
+                                   state=s("MAPPED"), channel=1),
+                   t.receive_frame(AMQP_FRAME,
+                                   t.flow_body(handle=0, delivery_count=0,
+                                               link_credit=0),
+                                   state=s("MAPPED"), channel=1),
+                   t.refused("receive", reason="illegalState", condition=ILLEGAL_STATE,
+                             state=s("DISCARDING"),
+                             body=t.transfer_body(handle=0, delivery_id=0,
+                                                  delivery_tag=b"tag"),
+                             channel=1,
+                             note="the receiving endpoint's half of the same sentence: "
+                                  "\"a receiving endpoint which sent an incomplete "
+                                  "unsettled map MUST detach with an error on receiving a "
+                                  "transfer which does not have the resume flag set to "
+                                  "true\", and this transfer does not set it")],
+            note="**Shared gap.** The sentence's other end: this endpoint sent the "
+                 "incomplete map, so a transfer that does not set the resume flag must be "
+                 "answered with a detach carrying an error. `resume.1` is cited beside it "
+                 "because the two rules meet on this frame -- a resumed delivery this "
+                 "endpoint's map does not hold is ignored, while a non-resumed one is an "
+                 "error -- and the vector carries the map so that both sides of the "
+                 "exchange are the widened model's own state rather than an absent field. "
+                 "**Both artefacts admit** the transfer: the end that *sent* the incomplete "
+                 "map has nothing that reads the flag it sent"),
+
+        # 5. Resuming a delivery -- resume.2 and resume.3 (the two vectors above this
+        # block), and resume.1 with the `resuming-deliveries` doc's marked resend.
+
+        exchange(
+            "staged-link-resume-not-in-receiver-map", start=s("MAPPED"),
+            clauses=[RESUME_RECEIVER_IGNORES_UNKNOWN, RESUMING_MARKED_RESEND_IGNORED,
+                     TRANSFER_FIRST_FIELDS],
+            steps=link_up() + [
+                t.receive_frame(AMQP_FRAME,
+                                t.body("transfer", handle={"type": "uint", "value": 0},
+                                       **{"delivery-id": {"type": "uint", "value": 0},
+                                          "delivery-tag": {"type": "binary",
+                                                           "hex": b"tag".hex()},
+                                          "message-format": {"type": "uint", "value": 0},
+                                          "resume": {"type": "boolean", "value": True},
+                                          "more": {"type": "boolean", "value": True}}),
+                                state=s("MAPPED"), channel=1,
+                                note="a resumed delivery this endpoint's local unsettled "
+                                     "map does not hold, which `resume.1` makes the "
+                                     "receiver ignore rather than process, and a `more` "
+                                     "flag so that ignoring it and absorbing it are two "
+                                     "different states rather than one"),
+                t.refused("receive", reason="malformed", condition=INVALID_FIELD,
+                          state=s("DISCARDING"),
+                          body=t.body("transfer", handle={"type": "uint", "value": 0}),
+                          channel=1,
+                          note="the observable of the ignore: a transfer carrying no "
+                               "delivery-id, delivery-tag or message-format is a "
+                               "continuation, and there is no delivery in progress to "
+                               "continue once the resumed one was ignored")],
+            note="**Shared gap.** `resume.1` and `resuming-deliveries.2`'s marked resend "
+                 "both say the receiver MUST ignore a resumed delivery its map does not "
+                 "hold, and *ignoring* is not a verdict of its own -- so this vector "
+                 "measures it one step later, where the states differ: a model that "
+                 "ignored the delivery holds no delivery in progress, and the "
+                 "identity-less transfer that follows is a first transfer missing its "
+                 "mandatory fields. **Both artefacts admit** that transfer: the resumed "
+                 "one began a delivery, so the ignore never happened and the continuation "
+                 "has something to continue"),
+
+        # 6. The two sides reduce unsettled state together -- resuming-deliveries.6,
+        # .7. No vector: the note below says why, and the module docstring records it
+        # with the other findings.
+
+        # 7. A delivery-tag is unique among the deliveries still unsettled -- links.23.
+
+        exchange(
+            "staged-link-duplicate-delivery-tag", start=s("MAPPED"),
+            clauses=[LINKS_TAG_UNIQUE_AMONG_UNSETTLED, TRANSFER_ONE_SECTION],
+            steps=link_up(role_sender=True) + [
+                t.send_frame(AMQP_FRAME,
+                             t.transfer_body(handle=0, delivery_id=0,
+                                             delivery_tag=b"tag"),
+                             state=s("MAPPED"), channel=1, payload=message),
+                t.refused("send", reason="malformed", condition=INVALID_FIELD,
+                          state=s("MAPPED"),
+                          body=t.transfer_body(handle=0, delivery_id=1,
+                                               delivery_tag=b"tag"),
+                          channel=1, payload=message,
+                          note="the second delivery reuses the tag the first one still "
+                               "has unsettled: the first transfer completed its delivery "
+                               "and settled nothing, so by `links.23` the tag is still "
+                               "unique-able -- \"amongst all deliveries that could be "
+                               "considered unsettled by either end of the link\"")],
+            note="**Shared gap.** `links.23`'s uniqueness, which today's model satisfies "
+                 "vacuously: `Session.delivery` holds one delivery, cleared when it "
+                 "completes or aborts (`ledger/ambiguities/"
+                 "interleaved-deliveries-absorbed.json`), so a tag is never among two. "
+                 "**Both artefacts admit** the second transfer -- with the slot empty the "
+                 "tag is in no set to be unique among, and neither artefact keeps the "
+                 "sender's record of what it has sent"),
+
+        # 8. Settlement survives until the link does not -- disposition.4, with
+        # disposition.3 and resume.2 as the clauses that make it observable.
+
+        exchange(
+            "staged-disposition-after-detach", start=s("MAPPED"),
+            clauses=[DISPOSITION_REFERS_TO_DETACHED, DISPOSITION_STATE_STILL_APPLIES,
+                     TRANSFER_RESUME_SENDER_MUST_NOT],
+            steps=link_up(role_sender=True) + [
+                t.send_frame(AMQP_FRAME,
+                             t.transfer_body(handle=0, delivery_id=0,
+                                             delivery_tag=b"tag", more=True),
+                             state=s("MAPPED"), channel=1, payload=message),
+                t.receive_frame(AMQP_FRAME, t.detach_body(handle=0, closed=False),
+                                state=s("MAPPED"), channel=1),
+                t.receive_frame(AMQP_FRAME,
+                                t.body("disposition",
+                                       role={"type": "boolean", "value": False},
+                                       first={"type": "uint", "value": 0},
+                                       last={"type": "uint", "value": 0},
+                                       settled={"type": "boolean", "value": True}),
+                                state=s("MAPPED"), channel=1,
+                                note="`disposition.3`: a disposition MAY refer to "
+                                     "deliveries on links that are no longer attached, and "
+                                     "`disposition.4`: as long as the link was not closed "
+                                     "or detached with an error the delivery is still live "
+                                     "and the updated state MUST be applied -- the "
+                                     "delivery this endpoint sent is settled here, from a "
+                                     "link that is detached but not closed"),
+                t.refused("send", reason="malformed", condition=INVALID_FIELD,
+                          state=s("MAPPED"),
+                          body=t.transfer_body(handle=0, delivery_id=0,
+                                               delivery_tag=b"tag", resume=True),
+                          channel=1, payload=message,
+                          note="the observable of that applied state: the delivery is "
+                               "settled, so it has left the sender's unsettled map, and "
+                               "`transfer/field:resume.2` forbids resuming a delivery "
+                               "that is not in it")],
+            note="**Shared gap.** Settlement outliving the link it was made on. "
+                 "**Both artefacts admit** the resumed transfer: the detach cleared the "
+                 "held delivery, so the state the clause requires to be applied was "
+                 "applied to nothing, and the transfer is a first one again rather than a "
+                 "resume of a delivery this endpoint has already forgotten"),
     ]
 
 
