@@ -3,6 +3,7 @@
 
     scripts/clause-ledger.py generate [--artifacts DIR] [--out DIR]
     scripts/clause-ledger.py check    [--artifacts DIR] [--out DIR] [--dispositions DIR]
+    scripts/clause-ledger.py check    [--suggest-citations PATH]
 
 `generate` walks the pinned XML in document order and emits one record per
 normative statement, plus a coverage report. `check` validates the disposition
@@ -11,6 +12,13 @@ clauses; it also resolves the declarations and vectors those dispositions name
 against `lean/**` and `vectors/*.ndjson`, so a claim about a carrier that does not
 exist fails rather than sitting in the record unnoticed. It exits non-zero on any
 problem.
+
+`check --suggest-citations PATH` is the correction half of the citation clause: it
+writes, for every citation that has drifted off the declaration its note names, the
+ledger file, the entries, the exact substring to find and its replacement, so the notes
+can be corrected by a plain textual replace rather than by a reader guessing at each
+note's wording. The mode applies its own file to a copy of the ledger before `check`
+returns, and reports a problem if a suggestion cannot be applied verbatim.
 
 Why a token-aware walk rather than a keyword grep (§6 of PLAN.md):
 
@@ -33,8 +41,11 @@ import argparse
 import hashlib
 import json
 import re
+import shutil
 import sys
+import tempfile
 from pathlib import Path
+from typing import NamedTuple
 from xml.etree import ElementTree
 
 # Prose-bearing leaf blocks. A block is a statement unit; blocks nested inside
@@ -1437,34 +1448,58 @@ CITATION_BACKTICKED_NAME_PATTERN = re.compile(r"`([^`\s]+)`$")
 CITATION_WRITTEN_NAME_PATTERN = re.compile(r"([A-Za-z_][\w.']*[?!]?)$")
 CAMEL_CASE_PATTERN = re.compile(r"[a-z][A-Z]")
 
+# How much of a note a correction quotes around the citation it moves. A correction is applied
+# by a plain textual replace, so the substring it names has to occur in the file exactly where
+# the drifted citations are and nowhere else, and the citation alone does not always manage
+# that: `lean/Spec/Transactions.lean:313` occurs seven times in part4-transactions.json, three
+# of them as the head of `:313-324`, and `lean/Spec/Connection.lean:1015` five times in
+# part2-connection-establishment.json, four of them as the head of `:1015-1050` or
+# `:1015-1030`. The ladder widens the quoted substring — right first, then left — until the
+# file holds it exactly as often as the drifted citations put it there, so the correction
+# carries the least context that is unambiguous and no window is a prefix of another. The
+# window never crosses another citation's lines in the same note, which is what keeps a
+# widened substring from taking a neighbour with it when it is replaced.
+CITATION_WINDOW_LADDER = (
+    (0, 0), (1, 0), (0, 1), (1, 1), (2, 0), (0, 2), (2, 1), (1, 2), (2, 2),
+    (3, 0), (0, 3), (4, 0), (0, 4), (4, 4),
+)
 
-def ledger_strings(root: Path):
-    """Every string in every JSON document under `root`, with file and JSON path.
+
+def document_strings(path: Path):
+    """Every string in one JSON document, with file and JSON path.
 
     The ledger's documents have several shapes — a list of clauses, a mapping of refs, a
     document with a file-level conventions block — and the record that started this check
     lived in two of them at once: a per-clause `note` and a file-level
     `design_consequences`. Walking the documents rather than a schema is what lets the
     check see all of a ledger's prose, and the trail it carries is what a report quotes.
+
+    The walk is per document as well as per tree because a correction has to name the file
+    it belongs to, and a whole-tree walk cannot recover the file from the path it quotes.
     """
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return  # a malformed file is another check's problem
+
+    def walk(node, trail: tuple[str, ...]):
+        if isinstance(node, str):
+            yield trail, node
+        elif isinstance(node, list):
+            for index, item in enumerate(node):
+                yield from walk(item, (*trail, str(index)))
+        elif isinstance(node, dict):
+            for key, item in node.items():
+                yield from walk(item, (*trail, str(key)))
+
+    for trail, text in walk(document, (str(path),)):
+        yield "/".join(trail), text
+
+
+def ledger_strings(root: Path):
+    """Every string in every JSON document under `root`, with file and JSON path."""
     for path in sorted(root.rglob("*.json")):
-        try:
-            document = json.loads(path.read_text(encoding="utf-8"))
-        except json.JSONDecodeError:
-            continue  # a malformed file is another check's problem
-
-        def walk(node, trail: tuple[str, ...]):
-            if isinstance(node, str):
-                yield trail, node
-            elif isinstance(node, list):
-                for index, item in enumerate(node):
-                    yield from walk(item, (*trail, str(index)))
-            elif isinstance(node, dict):
-                for key, item in node.items():
-                    yield from walk(item, (*trail, str(key)))
-
-        for trail, text in walk(document, (str(path),)):
-            yield "/".join(trail), text
+        yield from document_strings(path)
 
 
 def corpus_ids(vectors_dir: Path) -> dict[str, set[str]]:
@@ -1596,16 +1631,19 @@ def check_note_names(root: Path, vectors_dir: Path, lean_root: Path, report: dic
     return problems
 
 
-def lean_declaration_extents(root: Path) -> dict[Path, dict[str, list[tuple[int, int]]]]:
-    """Every declaration under `lean/**`, as the lines it occupies.
+def lean_declaration_sites(root: Path) -> dict[Path, list[tuple[str, int, int]]]:
+    """Every declaration under `lean/**`, as the name it is written under and the lines it occupies.
 
     A declaration occupies its own line and every line after it until the next
     declaration at the same or a shallower indentation — the indentation is what keeps a
     `where` clause's local definition inside the declaration that owns it rather than
-    ending it. Only the last segment of a qualified name is keyed, which is the reading
-    `check_note_names` already gives a backticked token, so `attachLink` and
-    `Spec.Session.attachLink` both resolve against the module the citation names, and a
-    name resolves against no other module's namesake.
+    ending it. The name is the one written in the source, qualification included: the
+    citation clause looks a declaration up by the last segment of the name a note writes, and
+    a correction has to choose between two declarations that share that segment
+    (`cited_extent`), which a scan that kept the last segment alone could not do — this module
+    holds `Layer.coordinatorCapabilities` and `coordinatorCapabilities`, and only the written
+    names tell them apart. The module is what keeps a name from resolving against another
+    module's namesake.
 
     The documentation above a declaration is **not** part of its extent. The ledger's
     citations to documentation are written without a name beside them — "(its module doc,
@@ -1614,7 +1652,7 @@ def lean_declaration_extents(root: Path) -> dict[Path, dict[str, list[tuple[int,
     and this boundary is never reached; a citation that *does* name a declaration is a
     citation to the declaration, and what is checked is that the lines land on it.
     """
-    modules: dict[Path, dict[str, list[tuple[int, int]]]] = {}
+    modules: dict[Path, list[tuple[str, int, int]]] = {}
     for path in sorted(root.rglob("*.lean")):
         if ".lake" in path.parts:
             continue
@@ -1623,16 +1661,16 @@ def lean_declaration_extents(root: Path) -> dict[Path, dict[str, list[tuple[int,
         for number, (indent, code) in enumerate(lines, 1):
             declaration = LEAN_DECLARATION_PATTERN.match(code)
             if declaration is not None:
-                written.append((number, indent, declaration.group(2).rsplit(".", 1)[-1]))
-        extents: dict[str, list[tuple[int, int]]] = {}
+                written.append((number, indent, declaration.group(2)))
+        sites: list[tuple[str, int, int]] = []
         for index, (number, indent, name) in enumerate(written):
             end = len(lines)
             for later, later_indent, _ in written[index + 1:]:
                 if later_indent <= indent:
                     end = later - 1
                     break
-            extents.setdefault(name, []).append((number, end))
-        modules[path] = extents
+            sites.append((name, number, end))
+        modules[path] = sites
     return modules
 
 
@@ -1666,8 +1704,95 @@ def citation_attribution(text: str, position: int) -> str | None:
     return None
 
 
-def check_line_citations(root: Path, lean_root: Path) -> tuple[list[str], int, int]:
-    """Every `lean/….lean:A[-B]` citation must land on the declaration it is attributed to.
+class CitationReading(NamedTuple):
+    """What the citation clause reads about one `lean/….lean:A[-B]` citation.
+
+    One traversal produces these, and both halves of the clause are taken from them:
+    `check_line_citations` reports the problem a reading carries and `citation_suggestions`
+    builds the correction for the same reading. Reading a citation twice — once to report it
+    and once to correct it — would be a second implementation of the rule, and the two would
+    drift apart the way the notes did, which is the failure this clause exists to catch.
+    """
+
+    path: Path                                   # the ledger document the citation is written in
+    where: str                                   # that document and the string's path inside it
+    text: str                                    # the string itself, for a correction's context
+    spans: tuple[tuple[int, int], ...]           # every citation in that string
+    match: re.Match[str]                         # this citation
+    problem: str | None                          # what `check` reports, or None when it is sound
+    drift: bool                                  # it misses the declaration the note attributes it to
+    name: str | None                             # the declaration the note writes beside it
+    declared: tuple[tuple[str, int, int], ...]   # that name's declarations: (written, first, last)
+    correction: str | None                       # the citation as it should read, when it drifted
+    rule: str | None                             # which rule chose the declaration it names
+
+
+def declared_sites(sites: tuple[tuple[str, int, int], ...], name: str) -> tuple[tuple[str, int, int], ...]:
+    """The declarations a citation of `name` could mean, in the module the citation names.
+
+    Looked up by the last segment of the name, which is the reading a backticked token already
+    gets: `attachLink` and `Spec.Session.attachLink` both find the declaration written
+    `attachLink`. A name resolves against no other module's namesake, because the module
+    consulted is the one the citation itself names.
+    """
+    last = name.rsplit(".", 1)[-1]
+    return tuple(site for site in sites if site[0].rsplit(".", 1)[-1] == last)
+
+
+def cited_extent(
+    declared: tuple[tuple[str, int, int], ...], name: str
+) -> tuple[str, int, int, str] | None:
+    """Which of a name's declarations a drifted citation is corrected to, and the rule that chose.
+
+    A module may write one last segment twice. `Spec/Transactions.lean` declares
+    `Layer.coordinatorCapabilities` at 297-305 and `coordinatorCapabilities` at 306-323, and the
+    four notes citing the name write the bare `coordinatorCapabilities`. The attribution is by
+    the name the note writes beside the citation, so the declaration whose *written* name is the
+    one the note wrote is the one its lines are corrected to: either other choice would move the
+    note onto a declaration it does not name, which is the error the clause reads for. Where the
+    written names do not match, a name matching as a suffix is taken, because a note naming
+    `Spec.Session.attachLink` for a declaration written `attachLink` is naming that declaration.
+    Where neither holds the correction is refused — this returns None — and
+    `citation_suggestions` reports which declarations it could not choose between rather than
+    picking one.
+    """
+    if len(declared) == 1:
+        return (*declared[0], "declared extent")
+    exact = [site for site in declared if site[0] == name]
+    if len(exact) == 1:
+        return (*exact[0], "declared extent, written name matched")
+    suffixes = [
+        site for site in declared if name.endswith("." + site[0]) or site[0].endswith("." + name)
+    ]
+    if len(suffixes) == 1:
+        return (*suffixes[0], "declared extent, qualified name matched")
+    return None
+
+
+def extent_text(start: int, end: int) -> str:
+    """A declaration's lines as a citation writes them: one line, or a range."""
+    return f"{start}" if start == end else f"{start}-{end}"
+
+
+def corrected_citation(citation: str, start: int, end: int) -> str:
+    """The citation as it should read: the module spelling the note used, the declaration's lines.
+
+    The module is left exactly as the note wrote it — `lean/Spec/Connection.lean` keeps its prefix
+    and `Spec/Connection.lean` stays bare — because the correction is applied by replacing this
+    string in the file, and a spelling the note did not write would be a second change riding on
+    the first.
+    """
+    return f"{citation.rsplit(':', 1)[0]}:{extent_text(start, end)}"
+
+
+def entry_path(reading: CitationReading) -> str:
+    """Where inside its file a citation is written: the entry path a report quotes."""
+    prefix = f"{reading.path}/"
+    return reading.where[len(prefix):] if reading.where.startswith(prefix) else reading.where
+
+
+def lean_citation_readings(root: Path, lean_root: Path):
+    """Every `lean/….lean:A[-B]` citation in the ledger's prose, and what the clause makes of it.
 
     A disposition note cites the tree, and nothing read the citation. The S4 triage found
     the batch's citations drifted: `attachLink` cited at `lean/Spec/Session.lean:656-736`
@@ -1706,52 +1831,250 @@ def check_line_citations(root: Path, lean_root: Path) -> tuple[list[str], int, i
     for, and two wider readings were measured and rejected for exactly that
     (`citation_attribution`).
 
-    Unlike the existence gates this one is not gated on the repository's own ledger: it
-    compares a ledger's prose with a tree, and both are readable from a fixture, so a
-    planted citation exercises it. Returns the problems and the two counts the summary
-    prints — citations read, and citations attributed to a declaration.
+    Unlike the existence gates this clause is not gated on the repository's own ledger: it
+    compares a ledger's prose with a tree, and both are readable from a fixture, so a planted
+    citation exercises it. Yields a reading per citation, in the order the documents are walked,
+    with the correction a drifted one needs and the rule that chose it.
     """
-    extents = lean_declaration_extents(lean_root)
+    sites = lean_declaration_sites(lean_root)
     lengths: dict[Path, int] = {}
+    for path in sorted(root.rglob("*.json")):
+        for where, text in document_strings(path):
+            matches = list(LEAN_CITATION_PATTERN.finditer(text))
+            spans = tuple(match.span() for match in matches)
+            for match in matches:
+                relative = match.group(1)
+                first = int(match.group(2))
+                last = int(match.group(3)) if match.group(3) is not None else first
+                module = lean_root / relative
+                if not module.is_file():
+                    yield CitationReading(
+                        path, where, text, spans, match,
+                        f"{where}: cites {relative}:{first}-{last}, which is no module under "
+                        f"{lean_root.name}/",
+                        False, None, (), None, None,
+                    )
+                    continue
+                if module not in lengths:
+                    lengths[module] = len(module.read_text(encoding="utf-8").splitlines())
+                if not 1 <= first <= last <= lengths[module]:
+                    yield CitationReading(
+                        path, where, text, spans, match,
+                        f"{where}: cites {relative}:{first}-{last}, and the module has "
+                        f"{lengths[module]} line(s)",
+                        False, None, (), None, None,
+                    )
+                    continue
+                name = citation_attribution(text, match.start())
+                declared = declared_sites(sites.get(module, ()), name) if name else ()
+                if not declared:
+                    # Unattributed, or a name this module does not declare: not a claim this
+                    # clause reads, so not a citation a correction can be owed for either.
+                    yield CitationReading(
+                        path, where, text, spans, match, None, False, name, (), None, None
+                    )
+                    continue
+                if any(start <= last and first <= end for _, start, end in declared):
+                    yield CitationReading(
+                        path, where, text, spans, match, None, False, name, declared, None, None
+                    )
+                    continue
+                occupied = ", ".join(extent_text(start, end) for _, start, end in declared)
+                chosen = cited_extent(declared, name)
+                yield CitationReading(
+                    path, where, text, spans, match,
+                    f"{where}: cites {relative}:{first}-{last} for {name}, which that module "
+                    f"declares at {occupied}",
+                    True, name, declared,
+                    corrected_citation(match.group(0), chosen[1], chosen[2]) if chosen else None,
+                    chosen[3] if chosen else None,
+                )
+
+
+def check_line_citations(root: Path, lean_root: Path) -> tuple[list[str], int, int]:
+    """Every `lean/….lean:A[-B]` citation must land on the declaration it is attributed to.
+
+    The rule the clause applies is stated in `lean_citation_readings`, which reads the ledger and
+    the tree once; this is the half of it that `check` reports. Returns the problems, and the two
+    counts the summary prints — citations read, and citations attributed to a declaration.
+    """
     problems: list[str] = []
     citations = 0
     attributed = 0
-    for where, text in ledger_strings(root):
-        for match in LEAN_CITATION_PATTERN.finditer(text):
-            relative = match.group(1)
-            first = int(match.group(2))
-            last = int(match.group(3)) if match.group(3) is not None else first
-            citations += 1
-            module = lean_root / relative
-            if not module.is_file():
-                problems.append(
-                    f"{where}: cites {relative}:{first}-{last}, which is no module under "
-                    f"{lean_root.name}/"
-                )
-                continue
-            if module not in lengths:
-                lengths[module] = len(module.read_text(encoding="utf-8").splitlines())
-            if not 1 <= first <= last <= lengths[module]:
-                problems.append(
-                    f"{where}: cites {relative}:{first}-{last}, and the module has "
-                    f"{lengths[module]} line(s)"
-                )
-                continue
-            name = citation_attribution(text, match.start())
-            if name is None:
-                continue
-            declared = extents.get(module, {}).get(name.rsplit(".", 1)[-1])
-            if not declared:
-                continue  # a name this module does not declare: not a claim this check reads
+    for reading in lean_citation_readings(root, lean_root):
+        citations += 1
+        if reading.problem is not None:
+            problems.append(reading.problem)
+        # A name is only declared when the module resolved and held the citation's lines, so this
+        # counts the same set the clause attributes: readings that drifted included, since a
+        # citation that misses its declaration is still attributed to one.
+        if reading.declared:
             attributed += 1
-            if any(start <= last and first <= end for start, end in declared):
-                continue
-            occupied = ", ".join(f"{start}-{end}" for start, end in declared)
-            problems.append(
-                f"{where}: cites {relative}:{first}-{last} for {name}, which that module "
-                f"declares at {occupied}"
-            )
     return problems, citations, attributed
+
+
+def citation_window(
+    members: list[CitationReading], corrected: str, text: str
+) -> dict[str, list[tuple[CitationReading, str]]] | None:
+    """The substring a group of drifted citations is replaced by, and its replacement.
+
+    The smallest window in `CITATION_WINDOW_LADDER` for which two things hold, and None when no
+    window does — which puts the correction beyond a textual replace and is reported rather than
+    guessed at:
+
+    * the file holds the window exactly as often as the group's citations put it there, so
+      replacing every occurrence of it changes the drifted citations and nothing else; and
+    * the window names one replacement, never two, so the file's own order is not a judgement.
+
+    A window never crosses a *different* citation's lines in the same note. That is what stops a
+    widened substring from taking a neighbouring citation with it: `lean/Spec/Connection.lean:1015`
+    is a head of `:1015-1050` in four other notes of the same file, and a correction that ate the
+    first digits of one of those would leave prose no citation clause reads.
+    """
+    for right, left in CITATION_WINDOW_LADDER:
+        windows: dict[str, list[tuple[CitationReading, str]]] = {}
+        widened = False
+        for member in members:
+            start = member.match.start() - left
+            end = member.match.end() + right
+            if start < 0 or end > len(member.text):
+                widened = True
+                break
+            if any(s < end and start < e for s, e in member.spans if (s, e) != member.match.span()):
+                widened = True
+                break
+            window = member.text[start:end]
+            replacement = (
+                member.text[start:member.match.start()]
+                + corrected
+                + member.text[member.match.end():end]
+            )
+            windows.setdefault(window, []).append((member, replacement))
+        if widened:
+            continue
+        if any(len({replacement for _, replacement in found}) != 1 for found in windows.values()):
+            continue  # one substring, two replacements: a replace cannot express both
+        if any(text.count(window) != len(found) for window, found in windows.items()):
+            continue  # the substring occurs where this group is not
+        return windows
+    return None
+
+
+def citation_suggestions(root: Path, lean_root: Path) -> tuple[list[dict], list[str]]:
+    """The correction every drifted citation needs, as a textual replacement, and the ones it cannot have.
+
+    A suggestion carries the ledger file; the entries it covers; the citation as written
+    (`cited`); the declaration the correction cites and the rule that chose it (`declaration`,
+    `rule`, plus `considered` listing the candidates when the name has more than one, so a reader
+    can see which reading was taken rather than reconstruct it); the names the notes write beside
+    the citation (`attributed`, usually a shorter spelling of the same declaration); the lines the
+    correction cites (`declared`); and the substitution itself (`current`, `replacement`).
+
+    The substitution is the whole of it: a reader — or a `str.replace` — applies the file without
+    deciding anything, which is what the mode is for, and the file lists each file's suggestions
+    longest substring first so that no order of application can matter. What makes that safe is
+    checked rather than assumed (`citation_window`), and the mode applies the file to a copy of
+    the ledger before `check` returns (`verify_citation_suggestions`).
+
+    Returns the suggestions, and the problems of the drifted citations that have no correction —
+    a name whose module declares it twice with no written-name or suffix reading to choose
+    between. Those are reported rather than resolved: a correction that moves a note onto a
+    declaration it does not name is worse than the drift it repairs.
+    """
+    readings = [reading for reading in lean_citation_readings(root, lean_root) if reading.drift]
+    problems = [
+        f"{reading.where}: cites {reading.match.group(0)} for {reading.name}, whose module "
+        f"declares it at {' and '.join(f'{written} at {extent_text(start, end)}' for written, start, end in reading.declared)}: "
+        "no rule chooses between them, so no correction is offered"
+        for reading in readings
+        if reading.correction is None
+    ]
+    groups: dict[tuple[Path, str, str], list[CitationReading]] = {}
+    for reading in readings:
+        if reading.correction is None:
+            continue
+        key = (reading.path, reading.match.group(0), reading.correction)
+        groups.setdefault(key, []).append(reading)
+
+    contents: dict[Path, str] = {}
+    suggestions: list[dict] = []
+    for (path, cited, corrected), members in groups.items():
+        text = contents.setdefault(path, path.read_text(encoding="utf-8"))
+        windows = citation_window(members, corrected, text)
+        if windows is None:
+            problems.append(
+                f"{path}: no substring around {cited} occurs in the file only where its "
+                f"{len(members)} drifted citation(s) are, so no correction of it can be applied "
+                "verbatim"
+            )
+            continue
+        for window, found in windows.items():
+            member = found[0][0]
+            chosen = cited_extent(member.declared, member.name)
+            suggestion = {
+                "file": str(path),
+                "entries": sorted({entry_path(reading) for reading, _ in found}),
+                "cited": cited,
+                "declaration": chosen[0],
+                "attributed": sorted({reading.name for reading, _ in found}),
+                "rule": member.rule,
+                "declared": extent_text(chosen[1], chosen[2]),
+                "current": window,
+                "replacement": found[0][1],
+            }
+            if len(member.declared) > 1:
+                suggestion["considered"] = [
+                    f"{written} at {extent_text(start, end)}"
+                    for written, start, end in member.declared
+                ]
+            suggestions.append(suggestion)
+    # Longest substring first within a file, so an applier that takes the file in order cannot
+    # replace a short substring inside a longer one it has not reached yet.
+    suggestions.sort(key=lambda suggestion: (suggestion["file"], -len(suggestion["current"]), suggestion["current"]))
+    return suggestions, problems
+
+
+def verify_citation_suggestions(
+    root: Path, lean_root: Path, suggestions: list[dict], citations: int
+) -> list[str]:
+    """Apply the suggestions the way the record says they are applied, and read the clause again.
+
+    The application is the naive one a reader would type — for each file, replace every occurrence
+    of `current` with `replacement`, in the order the file lists them — and it runs against a copy
+    of the ledger rather than the ledger, so the mode proves its own output without writing to the
+    record. A suggestion that is not verbatim applicable is a problem here rather than a wrong
+    citation in the ledger: a substring the file does not hold, a replacement that leaves a
+    citation missing the declaration it names, and — counted rather than inferred — a window that
+    took a neighbouring citation's lines with it, which shows up as the clause reading fewer
+    citations on the copy than it read on the ledger.
+    """
+    by_file: dict[Path, list[dict]] = {}
+    for suggestion in suggestions:
+        by_file.setdefault(Path(suggestion["file"]), []).append(suggestion)
+    problems: list[str] = []
+    with tempfile.TemporaryDirectory() as directory:
+        copy = Path(directory) / root.name
+        shutil.copytree(root, copy)
+        for file, wanted in sorted(by_file.items()):
+            patched = copy / file.relative_to(root)
+            text = patched.read_text(encoding="utf-8")
+            for suggestion in wanted:
+                if suggestion["current"] not in text:
+                    problems.append(
+                        f"{file}: the substring a suggestion replaces is not in the file, so it "
+                        f"cannot be applied: {suggestion['current']!r}"
+                    )
+                    continue
+                text = text.replace(suggestion["current"], suggestion["replacement"])
+            patched.write_text(text, encoding="utf-8")
+        remaining, read, _ = check_line_citations(copy, lean_root)
+    problems.extend(problem.replace(str(copy), str(root)) for problem in remaining)
+    if read != citations:
+        problems.append(
+            f"{root}: applying the suggestions leaves {read} citation(s) in the ledger where it "
+            f"read {citations}: a substring took a neighbouring citation's lines with it"
+        )
+    return problems
 
 
 def check_ambiguities(report: dict, dispositions: dict[str, dict], path: Path) -> list[str]:
@@ -1921,6 +2244,23 @@ def command_check(args: argparse.Namespace) -> int:
         Path(args.out), repository / "lean"
     )
     problems.extend(citation_problems)
+    # The correction half of the clause. `--suggest-citations` writes what each drifted citation
+    # should say, in the form the notes are corrected in — a textual replacement — and applies the
+    # file to a copy of the ledger before `check` returns, so a suggestion that cannot be applied
+    # verbatim is a problem here rather than a wrong citation in the record.
+    suggestions: list[dict] = []
+    verification: list[str] = []
+    if args.suggest_citations:
+        suggestions, uncorrected = citation_suggestions(Path(args.out), repository / "lean")
+        Path(args.suggest_citations).write_text(
+            json.dumps({"suggestions": suggestions}, indent=1, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        verification = verify_citation_suggestions(
+            Path(args.out), repository / "lean", suggestions, citations
+        )
+        problems.extend(uncorrected)
+        problems.extend(verification)
 
     for name, entry in sorted(report["per_artifact"].items()):
         audit = entry["audit"]
@@ -1985,6 +2325,12 @@ def command_check(args: argparse.Namespace) -> int:
             "attributed to a declaration"
         )
 
+    if args.suggest_citations:
+        print(
+            f"citations: {len(suggestions)} suggestion(s) written to {args.suggest_citations}, "
+            f"applied to a copy of {args.out} with {len(verification)} problem(s) left"
+        )
+
     if problems:
         print("")
         for problem in problems:
@@ -2002,7 +2348,16 @@ def main(argv: list[str]) -> int:
     parser.add_argument("--artifacts", default=str(root / "spec" / "oasis"))
     parser.add_argument("--out", default=str(root / "ledger"))
     parser.add_argument("--dispositions", default=str(root / "ledger" / "dispositions"))
+    parser.add_argument(
+        "--suggest-citations",
+        metavar="PATH",
+        default=None,
+        help="check only: write the textual correction every drifted lean line citation needs "
+        "to PATH, and prove the suggestions on a copy of the ledger",
+    )
     args = parser.parse_args(argv)
+    if args.command == "generate" and args.suggest_citations:
+        parser.error("--suggest-citations writes the citation clause's corrections: it belongs to check")
     return command_generate(args) if args.command == "generate" else command_check(args)
 
 
