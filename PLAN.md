@@ -2101,67 +2101,21 @@ hidden from the reader the inventory exists for. Independence between two *readi
 
 **What this track does not claim.** Not that the binary is verified — the compiler link above is trusted and disclosed. Not that the shell is proved; it is the named hole, and it is kept small enough to read. Not performance: the endpoint is a reference to compare against, and measurement belongs to TemperMint where it is scheduled. And not that the endpoint replaces the second reading in `lean/Ref/`: the differential between two independent readings of the standard is a check on *the specification*, and adding a third runner over the same corpus does not make it redundant.
 
-### 23.2 The demonstration server — proposed, not scheduled
+### 23.2 The demonstration server — scoped proposal, not scheduled
 
-**What it is.** A node layer written as a pure `App` at the shell's existing seam — the shape R4's wire application already has — with a narration mode and a demo script. The endpoint's socket lifecycle, loop and proved core are unchanged, so it adds **no new unproved surface**.
+**Goal.** A server that demonstrates the three properties this repository has and nothing else in this space has together: a ledger in which every clause's status is measured, a second independent reading that catches the first one's misreadings, and an implementation proved to conform to the first. It is a *presentation* of those, and the gates remain the evidence.
 
-**What it demonstrates, which is the reason to build it rather than another broker.** A broker demo shows a broker. This one shows the three things that exist here together and nowhere else: a ledger in which every clause's status is measured, a second independent reading that catches the first one's misreadings, and an implementation proved to conform to the first. The node app makes the first visible in what it announces (each frame's verdict, condition, class and the rule in words — the refusals already quote their clause), the two-reading mode makes the second visible by replaying one client's traffic through both artefacts, and the proof is what the server accepts without checking at runtime.
+**The application format is not ours to invent, and this is the first thing the proposal fixes.** The payload is **CloudEvents 1.0.2 as expressed by its own AMQP 1.0 protocol binding**, which is a published, versioned CNCF specification with a worked mapping onto this protocol: structured content mode puts the event attributes and data in the message's application-data section and mandates JSON support, binary content mode maps the attributes onto the message properties with `datacontenttype` carried as the AMQP `content-type`. Its scope statement is the seam that makes the pair coherent — *"this specification does not prescribe rules constraining transfer or settlement of event messages with AMQP; it solely defines how CloudEvents are expressed as AMQP 1.0 messages"* — so the protocol rules are this specification's and the event format is that one's, each pinned to its own source. It must be vendored the way `spec/oasis/` is: a fetched artifact with its byte identity in `toolchain/sources.toml`, referenced by clause id in the ledger, never paraphrased into the code.
 
-**Scope, stated because the demo sits on a line the ledger already draws.** Address syntax, routing, fan-out and durability are the *application's*, which is what the 26 `out-of-scope: node-and-filter-behaviour` clauses and their neighbours say: AMQP 1.0 gives `distribution-mode: copy`, an opaque `filter`, `dynamic` and `capabilities`, and defines no node semantics. The server should say which behaviours are the standard's and which are ours, in the same stream as the traffic.
+**Deliverables.** (D1) A node layer written as a pure `App` at the shell's existing seam — the shape `scripts/endpoint/WireApp/Main.lean` already has — with a queue and a topic, where the topic fans out under `distribution-mode: copy` and the queue is credit-gated so the flow-control clauses do work that is visible. (D2) A CloudEvents codec in the application tree, **not** in `lean/Spec` or `lean/Ref`: it is the application's format, and putting it in the specification would be a category error the ownership rules exist to prevent. (D3) A narration mode emitting, beside each protocol answer, the verdict, the condition, the class and the rule in words — the refusals already quote their clause — optionally replaying the same traffic through both artefacts for the differential made visible. (D4) A demo script whose committed transcript is the artefact and whose mutation client — one non-conforming frame, refused with the rule named — is its gate.
 
-**Shape of the work, smallest first.** (i) The node app: one credit-gated queue, one topic fanning out via `copy`, and request/reply through `properties.reply-to` — pure Lean at the seam, with the message layer's 37 deferred clauses the dependency if messages are to carry properties rather than a `data` body. (ii) A narration mode: per-frame output beside the protocol answer. (iii) A demo script whose committed transcript is the artefact and whose mutation client — one non-conforming frame, refused with the clause named — is its gate. **That transcript is presentation and not evidence**: the gates remain the evidence, and a demonstration that looked like proof would be worse than none.
+**A requirement that may exceed the application, measured rather than assumed.** The shipped shell serves **one connection at a time**: `Shell.Driver.serveConn` (`:318`) takes a listener, accepts once (`:320`), and runs that connection's lifetime through `pump`/`runConnection`. Fan-out to two live subscribers cannot be expressed that way, and the shell's synchronous single-connection shape is a deliberate property this repository states in its own README. So the scope has two shapes and must choose one: **(i) a sequential demo** — subscribe, detach, publish, reconnect, fetch — which needs no new shell surface but *cannot* show live fan-out, or **(ii) live fan-out**, which needs concurrency in the shell and therefore adds unproved surface that must be *named* in the same breath as the socket boundary and the process loop. I would take (i) first and treat (ii) as a decision with its own cost, because a demo is not worth widening the trust base for.
 
-**A naming collision to fix in the plan before this is scheduled.** The implementation track's rungs are `R1`–`R4` and the codec work's rounds are also `R1`, `R4`, `R5` — "R1 to R4 each proved an equality between a write and a read-back; R5 proves an inequality between two encodings" is the codec's, and a reader meeting "R5" cannot tell which track is meant. The endpoint rungs are additionally pinned by their gates' filenames (`r1_transport_shell.sh`, `r4_wire_differential.sh`), so the cheapest repair is to cite those filenames where a rung is meant and give the codec's rounds their own label in a later pass rather than renaming either track's history.
+**Non-goals.** No broker: no persistence, no routing language, no address grammar beyond what CloudEvents' binding and the demo need, no TLS, no SASL over the socket. No performance claim. No new proof: the core is already proved and the demo must not be presented as extending it. And no rule invented where CloudEvents or this specification already has one — where neither does, the demo says so and the ledger's `out-of-scope: node-and-filter-behaviour` clauses are the record of that boundary.
 
-### 23.2 The concurrent server: what is settled, what is proposed, and what must be proved
+**Behaviour contracts, written before implementation.** The demo's transcript as a scenario at the harness boundary: a client publishes a CloudEvents event, a subscriber receives it with its attributes intact, the queue's credit gates a delivery, and the mutation's refusal names the rule it broke. Plus the binding's own MUSTs — structured mode's JSON support is the one that binds a reader.
 
-Three things are called "concurrency" here and they need separating, because only the third is a design question.
-
-**Protocol concurrency is spec content already.** Sessions on channels, links on sessions, interleaved transfers: the specification's
-step is *per frame* and its `choose` is *set-valued*, so an interleaving of frames across channels **is** a sequence the relation admits.
-The corpus already drives multi-channel dialogues, and nothing new is needed to prove anything about it — it *is* the protocol.
-
-**Server concurrency — many connections — is where §23.1's existing decision applies.** `Std/Async/TCP` exists, and this plan refused it
-on trust grounds: it would credit "libuv's asynchronous machinery and Lean's async runtime, thousands of lines doing protocol-adjacent
-work with no name in our tree", where the chosen 236-line POSIX shim is small enough to name and **"keeps the endpoint's frame loop
-synchronous, which is the shape the core actually has"**. That last clause is the architecture: **one proved core per connection, sharing
-nothing.**
-
-**So the server is a dispatcher inside the unproved shell, and the concurrency lives there.** The proposed shape is deliberately boring:
-`accept` in a loop, and hand the socket to a fresh sequential endpoint. **Fork-per-connection is recommended over thread-per-connection**,
-because it makes the interleaving *host-level*: each process is a sequential endpoint of exactly the shape R3 relates to the specification,
-so there is no intra-program interleaving for a proof to reason about at all. Threads would need a pthread shim authored the way the socket
-shim was, under the same question of what gets credited, and would buy nothing the proofs can see.
-
-**What that leaves to prove: one theorem and one hypothesis, over the instance already in hand.**
-
-* **Per connection, R3** — the simulation the relation asks for. This is the rung under construction.
-* **Across connections, commutation** — two endpoints sharing no state commute, so any interleaving of their steps is equivalent to some
-  sequential composition of them. That is what makes "the server's behaviour projected onto connection *k* is spec-admitted" follow from the
-  per-connection instance, and it is a kernel fact about disjoint state. It is also *why* the share-nothing shape is the provable one: a
-  design sharing session or flow state across connections would owe a linearizability argument instead, in exactly the place where the state
-  is unproved.
-
-**And the second item is not a rung: stating it as one would prove a property of a model rather than of the server.** Three facts, each checkable in the tree, decide that. The
-frozen interface carries **no connection index** — `Input` is `frame | api | tick`, `Contracts/Conformance.lean` — so there is no alphabet over which an interleaving of two
-connections could be written at all. The shipped shell serves **one connection per process**: `Shell/Driver.serveConn` accepts, runs the connection and closes it, and its own
-docstring says that a caller wanting more than one is *a later rung*. And the design gives each connection its own endpoint *value*, so there is no shared state for two steps to
-commute over — **the share-nothing shape makes the fact structural rather than modelled**, which is a stronger position than a theorem: a value cannot be interfered with, whereas a
-proof obligation can be discharged against the wrong model. To state commutation in Lean one would first have to model the dispatcher, and that model's relation to the shipped
-shell is exactly the unproved boundary §23.2 keeps the concurrency inside, so the theorem would add the appearance of rigour without moving the boundary. **What a server
-therefore owes is the first item, the delivery contract as a named hypothesis, and the dispatcher as a disclosed unproved dependency beside the socket boundary** — with
-`accept`-in-a-loop, fork or threads, staying where §23.2 put it: inside the shell, changing what the shell owes rather than what the proofs owe.
-**And a fourth value-layer statement belongs on that list, flagged from the receive-direction reconnaissance**: `Proofs/CodecFrameLaws.lean` carries
-`ValueConsumption` — that a read of an encoded value followed by an arbitrary tail stops at the value's own last octet — with
-`round_trip_on_encoded_values_of_consumption` deriving the contract's round trip from it. It is **stronger than the contract's dependency and it is what
-the frame layer's `SIZE` accounting actually needs**, which is exactly the kind of obligation that goes unlisted until someone audits the acceptance side.
-
-* **The delivery contract, as a named hypothesis** — each connection's octets are delivered in order and only to its own core. That is the
-  shell's obligation rather than the core's, it is not provable here, and it is what R4's differential exists to observe. The fairness
-  obligations attached to the specification's `SHOULD`s already have a home in the conformance interface.
-
-**What is genuinely open** is the dispatcher's mechanism — fork or threads — and that sits inside the named unproved boundary, so it changes
-what the *shell* owes rather than what the *proofs* owe. That is the point of putting the concurrency there.
+**Acceptance.** The demo script exits zero and the transcript matches; the mutation is refused with the clause named; every existing gate still passes; no module under `lean/Impl` imports the boundary; and the trust gate's printed boundary count is unchanged, which is how a new unproved surface would show up if one were added.
 
 ### 23.3 The server's remaining obligations: what is a gap and what is the standard's boundary
 
