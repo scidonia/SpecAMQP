@@ -20,14 +20,14 @@
    "clause_text": "Note that a null value and a zero-length array (with a correct type for its elements) both describe an absence of a value and MUST be treated as semantically identical.",
    "disposition": "deferred:S1",
    "kind": "MUST",
-   "note": "deferred: S1 — uncarried: the identity this sentence states is maintained nowhere. The model's own notion of absence is `isNullValue` (lean/Spec/Message.lean:483-490), which counts `null` and nothing else, and the mandatory rule is stated through it (lean/Spec/Message.lean:372-383). The divergence is reachable rather than theoretical: a field the declared surface marks mandatory and that carries a zero-length array is admitted where the same field carrying null is refused, which is the difference this sentence forbids. A carrier would be a declaration that treats the two encodings alike; none exists, and an entry naming one would be false. **And it now has an instance in another layer**: the message layer's `multiple`-field reader treats a zero-length array as unset (`Spec.Message.terminusFieldIsSet`, `Terminus.isSet`), which decides \"a null and a zero-length array both describe an absence of a value\" for the fields it reads. The clause stays deferred to S1 — an instance is not the general statement — and the instance is recorded so the next slice does not have to find it again.",
+   "note": "Blocked: the composite check's mandatory rule: `checkFieldList` judges a field with `isNullValue` (lean/Spec/Message.lean line 483-490), which counts `null` alone, so a mandatory field carrying a zero-length array is admitted where the same field carrying null is refused — the identity itself is now carried, but not at the site that decides mandatory presence",
    "text_sha256": "3f852cb7656e61c4f02e9bfa280f4b459e089a7bcf03f8a9017c10525bb31d0c"
   },
   "amqp-core-types-v1.0-os.xml#amqp:types/section:composite-type-representation.3": {
    "clause_text": "A field which is defined as both multiple and mandatory MUST contain at least one value (i.e. for such a field both null and an array with no entries are invalid).",
    "disposition": "deferred:S1",
    "kind": "MUST",
-   "note": "deferred: S1 — uncarried: the flag is declared and never read. `FieldDecl.multiple` is generated from the artifact (lean/Generated/Oasis/Fields.lean:19), and no declaration under `lean/Spec`, `lean/Contracts` or `lean/Harness` consults it — the mandatory half of this sentence is checked (`checkFieldList`), the multiple half is not, so a field both multiple and mandatory may carry an empty array and be admitted. The general rule belongs in the composite check; until a declaration reads the flag there is nothing for this clause to name.",
+   "note": "Blocked: a refusal of an empty array for a field both multiple and mandatory: the flag is read now (`checkField` at lean/Spec/Message.lean line 460-481, `checkFields` at lean/Ref/Message.lean line 372-398), but `multipleAccepts` (lean/Spec/Message.lean line 361-363) accepts `.array _ []` via `allM`, so such a field may carry an empty array and be admitted; only the omitted and the null halves are refused",
    "text_sha256": "675774f9c45167eea07ac413203e18760cee7f439cf373b3a3f33d66a0dfe34e"
   },
   "amqp-core-types-v1.0-os.xml#amqp:types/section:encodings.1": {

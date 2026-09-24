@@ -257,9 +257,9 @@
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:delivery-state/type:rejected.u1": {
    "clause_text": "At the target, the rejected outcome is used to indicate that an incoming message is invalid and therefore unprocessable.",
-   "disposition": "deferred:S3-outcomes",
+   "disposition": "formalized:SpecAMQP.Spec.Message.allowedOf; formalized:SpecAMQP.Spec.Message.recordState",
    "kind": "UNKEYED",
-   "note": "Describes what the `rejected` outcome means at the target (the incoming message was invalid). The obligation belongs to the messaging layer's outcome semantics, not to the codec: the codec carries outcomes as symbols and neither produces nor inspects them. Dispositioned with the S3 messaging work, which is where an outcome acquires meaning.",
+   "note": "Spec.Message.allowedOf carries it — lean/Spec/Message.lean:1281 declares SpecAMQP.Spec.Message.allowedOf. lean/Spec/Message.lean line 1277-1284 the doc (\"`accepted` retires it at the node and `rejected` makes it unprocessable\") and `allowedOf`, which answers `false` for `.rejected`; :1243-1247 the `Delivery.redeliveryAllowed` field that consumes it (\"rejected makes it unprocessable\"); :1303-1313 `recordState` applies it to the delivery.",
    "text_sha256": "75c6ce68b99884a1d0b241250be3b3d0bde23a7edc9c85a8cbbaf761853c1da4",
    "unkeyed_phrases": [
     "is invalid"
@@ -326,9 +326,9 @@
   },
   "amqp-core-messaging-v1.0-os.xml#amqp:messaging/section:message-format/type:delivery-annotations.u2": {
    "clause_text": "The symbolic key \"rejected\" is reserved for the use of communicating error information regarding rejected messages.",
-   "disposition": "deferred:S3-annotations",
+   "disposition": "formalized:SpecAMQP.Spec.Message.checkAnnotationPair",
    "kind": "UNKEYED",
-   "note": "A reservation on the symbolic key `rejected` inside the delivery-annotations map. This is a rule about annotation content, and the codec deliberately does not interpret annotations — it decodes the map and leaves its meaning to the layer that reads the keys. Enforced where annotations are interpreted, not at the wire.",
+   "note": "Spec.Message.checkAnnotationPair carries it — lean/Spec/Message.lean:904 declares SpecAMQP.Spec.Message.checkAnnotationPair. lean/Spec/Message.lean line 42-45 the module doc names this clause as the reason the `rejected` key is read (`delivery-annotations.2`); :901-918 `checkAnnotationPair` — for a delivery-annotations pair whose key is the symbol `rejected`, the value must be of type `error` and is refused otherwise; :920-926 `checkAnnotationPairs` applies it.",
    "text_sha256": "63e1cd744372b1d10f32cb9f73b51fe9966d4bb3756f48996e4c33897f14e238",
    "unkeyed_phrases": [
     "is reserved"
@@ -371,9 +371,9 @@
   },
   "amqp-core-overview-v1.0-os.xml#amqp:overview/section:conformance.u1": {
    "clause_text": "AMQP does not define a wire-level distinction between \"clients\" and \"brokers\", the protocol is symmetric.",
-   "disposition": "deferred:scope",
+   "disposition": "informative",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "The whole section is `informative` in the ledger: part0-conformance-and-transport-lifecycle.json carries conformance.1, .2, .4, .6, .7, .8, .9, .10 and .15 as `informative`, and the one formalized member is conformance.3 (`formalized:SpecAMQP.Contracts.ConstructorGrammarConforms`). No occurrence of \"broker\" under lean/Spec, lean/Ref or lean/Contracts; the alphabet has one step for both ends (lean/Spec/Connection.lean line 1390 `step` with `outbound : Bool`).",
    "text_sha256": "f992836220f277e8e27c5372df885c75d0b4e4f16ff2916b4854b91e0f5c3087"
   },
   "amqp-core-security-v1.0-os.xml#amqp:security/section:sasl.u1": {
@@ -656,9 +656,9 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:connections.u1": {
    "clause_text": "The use of pipelined frames by a peer cannot be distinguished by the peer's partner from non-pipelined use so long as the pipelined frames conform to the partner's capabilities and limitations.",
-   "disposition": "deferred:S2",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.State; formalized:SpecAMQP.Spec.Connection.Endpoint.afterFrame; formalized:SpecAMQP.Spec.Connection.State.sendClass; formalized:SpecAMQP.Spec.Connection.State.receiveClass",
    "kind": "UNKEYED",
-   "note": "An epistemic statement about a partner's inability to distinguish pipelined from non-pipelined frames. It belongs to the connection and frame layer rather than to any session obligation, and the model embodies it without stating it: the table's pipe rows (Spec.Connection.State.openPipe/closePipe/ocPipe, :187-189, with sendClass/receiveClass at :279-281 and :296-298) are exactly the claim that those states are reachable only by a peer that chose to pipeline. Re-milestoned from S4 to S2, which owns that layer; that S2's slice landed does not make the obligation met, because what is owed is the statement rather than the behaviour.",
+   "note": "Spec.Connection.State carries it — lean/Spec/Connection.lean:180 declares SpecAMQP.Spec.Connection.State. lean/Spec/Connection.lean line 187-189 the three pipe states; :1021-1024 the `open` send arm (`| .hdrSent => .openPipe`) and :1132-1136 the received-header arm (`| .openPipe => .openSent`, `| .ocPipe => .closePipe`) — the transitions that exist only because a peer sent before it received; :279-281 and :296-298 the pipe rows' send/receive columns.",
    "text_sha256": "b0b58ff0fc6da36b46eeef908f4f6bfb4c49fad936800bd204b9ac5bb41b5d90",
    "unkeyed_phrases": [
     "cannot"
@@ -721,9 +721,9 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:definitions/type:amqp-error/choice:illegal-state.u1": {
    "clause_text": "The peer sent a frame that is not permitted in the current state.",
-   "disposition": "deferred:S3-state-machine",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.illegalState; formalized:SpecAMQP.Spec.Connection.stateRefusal; formalized:SpecAMQP.Spec.Connection.permitsSend; formalized:SpecAMQP.Spec.Connection.permitsReceive",
    "kind": "UNKEYED",
-   "note": "This is the description of the `illegal-state` error code, whose condition is the state machine's frame-permission rule (which frame is permitted in which state). The codec only transports the code, so the rule is dispositioned with the S3 state machine work rather than here.",
+   "note": "Spec.Connection.illegalState carries it — lean/Spec/Connection.lean:385 declares SpecAMQP.Spec.Connection.illegalState. lean/Spec/Connection.lean line 375-384 the doc quotes the choice's definition verbatim and reads it from the generated `amqp-error` table; :385-389 `illegalState`; :392-394 `stateRefusal` carries it; :984 `permitsSend` / :994 `permitsReceive` are the frame-permission rule the definition names; :1097-1100, :1121-1124, :1296-1300 the refusals that raise it.",
    "text_sha256": "7c1778d47fd8955faec50cbf915b74ddae59d2ce8928dcb8a9956e085a05966f",
    "unkeyed_phrases": [
     "is not permitted"
@@ -1168,9 +1168,9 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:desired-capabilities.u1": {
    "clause_text": "If the receiver of the desired-capabilities offers extension capabilities which are not present in the desired-capabilities list it received, then it can be sure those (undesired) capabilities will not be used on the connection.",
-   "disposition": "deferred:S3-connection",
+   "disposition": "out-of-scope:extension-capabilities",
    "kind": "UNKEYED",
-   "note": "What a peer may conclude from the capabilities list it receives: the connection layer's negotiation.",
+   "note": "The four keyed clauses of the same field already carry this class: ledger/dispositions/part2-connection-establishment.json (open/field:desired-capabilities.1 and .2), part2-performatives-remainder.json (attach/...1), part0-conformance-and-transport-lifecycle.json (begin/...1). `desired-capabilities` appears nowhere under lean/ but the generated field table (lean/Generated/Oasis/Fields.lean line 98, :106, :138).",
    "text_sha256": "b8e64314b90c87ddc8a3e943d29111cd6c4988f5d4e8f5aaf51df359063b03cf"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:hostname.u1": {
@@ -1192,9 +1192,9 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:idle-time-out.u1": {
    "clause_text": "If the value is not set, then the sender does not have an idle time-out.",
-   "disposition": "deferred:S3-connection",
+   "disposition": "environment:implementation-idle-policy",
    "kind": "UNKEYED",
-   "note": "Timing is a named assumption with nothing behind it in either tree, read from the code rather than assumed: Submission has no tick constructor, step dispatches on header/frame/arriving only, and no field the artifact's timer clauses hang off is read anywhere in either connection layer. The conformance alphabet has the tick channel and the layers hold no timer, threshold or expected-peer behaviour, so an endpoint gets no answer for a tick — which is its actual behaviour and not a modelling choice. A proof's doc comment is where this would be lost, so it is recorded here and in the plan as one of the obligations a simulation cannot check.",
+   "note": "lean/Contracts/Conformance.lean line 31-36 (\"timers as explicit ticks ... named assumptions rather than modelled subsystems\") and the opaque `Tick` structure (:53-56); no declaration under lean/Spec or lean/Ref reads `idle-time-out` (hits only in lean/Generated/Oasis/Fields.lean line 134 and in doc comments); the field's siblings carry the same class in part2-connection-establishment.json (idle-time-out.2, .3, .4).",
    "text_sha256": "41026e18bfc29fb56c9f8ac59cc7458ee248ed733bae93001209f2c7d3067d46"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:open/field:incoming-locales.u1": {
@@ -1316,7 +1316,7 @@
    "clause_text": "A map in which there exist two identical key values is invalid.",
    "disposition": "deferred:map-duplicate-keys",
    "kind": "UNKEYED",
-   "note": "Both artefacts decode a map whose keys repeat and admit it, so the rule is not enforced; `vectors/value-boundary-negatives.ndjson` carries two vectors for it (`boundary-negative-map-duplicate-string-keys` and `boundary-negative-map-duplicate-null-keys`) with a differing-keys control beside them, so the gap is recorded by vectors rather than by this note alone. Left deferred rather than dispositioned by test: a `test:` names a vector that pins the behaviour, and these pin a rejection neither artefact gives.",
+   "note": "Blocked: a duplicate-key comparison in the map reader: `pairUp` pairs keys with values and never compares keys (lean/Spec/Codec.lean line 398-400, lean/Ref/Value.lean line 405-408), and `readCompound`/`readMap` admit the result (lean/Spec/Codec.lean line 448-466, lean/Ref/Value.lean line 385-398), so a map with two identical key values decodes and is admitted by both artefacts",
    "text_sha256": "9b2b112f06fbceb126af8f873361d7e623832a136d936d5814d7c502544132d6",
    "unkeyed_phrases": [
     "is invalid"
@@ -1324,16 +1324,16 @@
   },
   "amqp-core-types-v1.0-os.xml#amqp:types/section:type-notation.u1": {
    "clause_text": "A composite type does not have a new encoding, but is sent on the wire as a list annotated by a specific descriptor value that identifies it as a representation of the defined composite type.",
-   "disposition": "deferred:S2-types",
+   "disposition": "formalized:SpecAMQP.Spec.Message.compositeOfValue; formalized:SpecAMQP.Ref.Message.checkFields",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Spec.Message.compositeOfValue carries it — lean/Spec/Message.lean:1065 declares SpecAMQP.Spec.Message.compositeOfValue. lean/Spec/Message.lean line 1063-1064 the doc; :1065-1085 the definition — a `.described` value whose descriptor names a declared type and whose body is a `.list`, refused otherwise (\"is a composite whose body is a field list and the value carries a ...\"); :1048-1056 the `Composite` structure. Second reading: lean/Ref/Message.lean line 362-366 (\"is a composite and its body is a {typeName body} rather than a field list\").",
    "text_sha256": "27cef2d13a029b2ea13bb325fc3420febf05369da18af470c1ea2537c14e5395"
   },
   "amqp-core-types-v1.0-os.xml#amqp:types/section:type-notation.u2": {
    "clause_text": "The source attribute of a composite type will always be \"list\", other values are reserved for future use.",
-   "disposition": "deferred:S2-types",
+   "disposition": "formalized:SpecAMQP.Spec.Message.shapeOfType",
    "kind": "UNKEYED",
-   "note": "Captured by the keyword-free vocabulary's third extension. The layer this belongs to has not been written, so the disposition names it rather than claiming a carrier.",
+   "note": "Spec.Message.shapeOfType carries it — lean/Spec/Message.lean:195 declares SpecAMQP.Spec.Message.shapeOfType. lean/Spec/Message.lean line 176-180 the `SectionShape` doc (\"a composite declares a field list\"); :195-197 `shapeOfType` answers `fieldList` for every composite before it consults `decl.source`, so a composite is read as a list whatever the source column says; :189 the generated table fixes `source := some \"list\"` for every composite (lean/Generated/Oasis/Types.lean line 40, 47-50, 54).",
    "text_sha256": "18678c39411025bdad63771b077d9c985f7863ffd35e4e87ba2cc7c8195fa806"
   }
  }

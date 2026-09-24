@@ -29,16 +29,16 @@
   },
   "amqp-core-transport-v1.0-os.xml#picture.10": {
    "clause_text": "Frame Connection Session Link ======================================== open H begin I H attach I H flow I H transfer I H disposition I H detach I H end I H c...",
-   "disposition": "deferred:S3",
+   "disposition": "formalized:SpecAMQP.Spec.Session.Performative.ofBody; formalized:SpecAMQP.Spec.Session.isDisposition; formalized:SpecAMQP.Spec.Connection.stepAmqpFrame",
    "kind": "PICTURE",
-   "note": "The Frame Dispatch Table: which endpoint handles which performative (open and close at the connection, begin/attach/flow/transfer/disposition/detach/end intercepted at the connection and handled at the session). It is the dispatch dimension of the slice and has no clause behind it.",
+   "note": "Spec.Session.Performative.ofBody carries it — lean/Spec/Session.lean:152 declares SpecAMQP.Spec.Session.Performative.ofBody. lean/Spec/Session.lean line 118-120 the `Performative` doc comment states the dispatch table's session column; :121-128 the inductive (begin/end/attach/detach/flow/transfer + `other`); :152 `Performative.ofBody` reads the descriptor's declared type; :1147 `isDisposition` gives `disposition` to the session; :1392 `step` dispatches on it. The connection side of the same table: lean/Spec/Connection.lean line 1003 (\"Only `open` and `close` move the state: every other frame is one the dispatch table hands to another endpoint\") and :1296-1300.",
    "text_sha256": "da4e1a2660c63ab5d65421f1be7a2c618e0f9a94cabeb09db2ae57d895f2a5db"
   },
   "amqp-core-transport-v1.0-os.xml#picture.11": {
    "clause_text": "4 OCTETS 1 OCTET 1 OCTET 1 OCTET 1 OCTET +----------+---------+---------+---------+----------+ | \"AMQP\" | %d0 | major | minor | revision | +----------+------...",
-   "disposition": "deferred:S3",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.ProtocolHeader.octets; formalized:SpecAMQP.Spec.Connection.decodeHeader",
    "kind": "PICTURE",
-   "note": "The Protocol Header Layout: four octets of \"AMQP\", a protocol id octet, then major, minor and revision. The section states the exchange in prose and the mandated error conditions nowhere, so this layout is the header's definition. S3 formalizes it as the negotiation's first four fields; the version-mismatch condition is an ambiguity recorded in the register.",
+   "note": "Spec.Connection.ProtocolHeader.octets carries it — lean/Spec/Connection.lean:162 declares SpecAMQP.Spec.Connection.ProtocolHeader.octets. lean/Spec/Connection.lean line 161-164 the layout as code (`magic ++ #[octet protocolId.code, octet version.major, octet version.minor, octet version.revision]`); :153 `octet` wraps a version octet explicitly; :167 `beAt`; :148 `magic` is the four ASCII octets; :443-471 `decodeHeader` checks width, magic, protocol id and version in the layout's order. Transcribed from picture 11 and picture 3 (module header, :14-15).",
    "text_sha256": "0e1b6a81fb0a2fca0ad3dd8c10a50c1e64c566139c83d7a5b73d0b59e9d12213"
   },
   "amqp-core-transport-v1.0-os.xml#picture.14": {
@@ -64,16 +64,16 @@
   },
   "amqp-core-transport-v1.0-os.xml#picture.23": {
    "clause_text": "R:HDR @=======@ S:HDR R:HDR[!=S:HDR] +--------| START |-----+ +--------------------------------+ | @=======@ | | | \\|/ \\|/ | | @==========@ @==========@ S:OP...",
-   "disposition": "deferred:S3",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.stepHeader; formalized:SpecAMQP.Spec.Connection.Endpoint.afterFrame",
    "kind": "PICTURE",
-   "note": "The Connection State Diagram: the same machine as picture.24 drawn as transitions, and its value is the transitions rather than the states \u2014 which is why both are dispositioned rather than one being called a duplicate of the other.",
+   "note": "Spec.Connection.stepHeader carries it — lean/Spec/Connection.lean:1088 declares SpecAMQP.Spec.Connection.stepHeader. lean/Spec/Connection.lean line 1132-1137 the header-exchange arrows of the diagram as a transition table; :1014-1049 `Endpoint.afterFrame` carries the `open`/`close` arrows (`.hdrSent => .openPipe` at :1021, `.hdrExch => .openSent` at :1022, `.openRcvd => .opened` at :1023, `.hdrExch => .openRcvd` at :1029); :1003 the doc says only `open` and `close` move the state, every other frame being relayed; :1080-1087 the header arrows' doc names the mismatch row the diagram draws to END.",
    "text_sha256": "714f1c54e6c206b00463bb66299f7d3c7350637c3f12e2b25c4d768281b788ca"
   },
   "amqp-core-transport-v1.0-os.xml#picture.24": {
    "clause_text": "State Legal Sends Legal Receives Legal Connection Actions ======================================================================= START HDR HDR HDR_RCVD HDR ...",
-   "disposition": "deferred:S3",
+   "disposition": "formalized:SpecAMQP.Spec.Connection.State.sendClass; formalized:SpecAMQP.Spec.Connection.State.receiveClass; formalized:SpecAMQP.Spec.Connection.State.action",
    "kind": "PICTURE",
-   "note": "The Connection State Table: fourteen states with the frames each permits and the connection action each implies. It is the only normative statement of the connection lifecycle anywhere in the artifacts \u2014 the section has clauses for individual rules (channel zero, close ordering, idle timeouts) and no clause for the state dimension itself \u2014 so it is not a diagram to be summarised but the machine's source. S3 formalizes it as the state type and its transition relation, and this disposition moves to a `formalized:` path then.",
+   "note": "Spec.Connection.State.sendClass carries it — lean/Spec/Connection.lean:272 declares SpecAMQP.Spec.Connection.State.sendClass. lean/Spec/Connection.lean line 180-192 the fourteen states in the table's own names; :198-200 `State.all` in the table's order; :203-215 `State.name` spells each row; :271-286 \"Legal Sends, row by row\"; :288-303 \"Legal Receives\"; :305-315 \"Legal Connection Actions\"; :984 `permitsSend` and :994 `permitsReceive` read the columns.",
    "text_sha256": "89f7ebaafe83027e033673a5ae7982a24e08e69a127608d15f02e60a6d4c5c64"
   },
   "amqp-core-transport-v1.0-os.xml#picture.30": {
