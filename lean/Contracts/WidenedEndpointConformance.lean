@@ -26,9 +26,9 @@ non-null delivery tag, the incomplete-map latch, and the sender's delivery recor
 * No step function, frame parser, writer, proof, acceptance theorem, or ledger promotion lands here.
 * No routing, queue, address grammar, durability, application policy, or interpretation of link
   names is introduced.
-* This contract does not choose whether part 4 widens the shipped core or binds a second
-  implementation. `WidenedEndpointConforms` is parameterized by the two endpoints so either choice
-  must meet the same frozen state relation.
+* The relation does not hard-code an implementation function: `WidenedEndpointConforms` remains
+  parameterized by two endpoints. Part 4 nevertheless makes the shipped-core choice recorded below,
+  and must prove that endpoint meets this frozen relation.
 * The ten clauses the current harness cannot observe are not represented as pretend vectors. They
   remain proof obligations or explicitly untestable obligations in part 4.
 
@@ -38,15 +38,14 @@ Parts 1 and 2 add only this module: `WidenedLink`, `WidenedSession`,
 `WidenedProtocolState`, `WidenedImplementationState`, `WidenedEndpointRelation`,
 `WidenedEndpointConforms`, and `WideningProjectsEndpointRelation`.
 
-Part 3 changes `scripts/gen-exchange-vectors.py` and its committed
-`vectors/generated-exchanges.ndjson` output, then regenerates the planner manifest. The existing
-`tests/contracts/s3_exchanges.sh` remains the boundary unless its current verdict report cannot
-express one of the named outcomes; no parallel runner is added.
+Part 3 moved the eleven scenarios into `scripts/gen-exchange-vectors.py` and its committed
+`vectors/generated-exchanges.ndjson` output, then regenerated the planner manifest. The existing
+`tests/contracts/s3_exchanges.sh` remains the boundary; no parallel runner was added.
 
 Part 4 changes the session state and dispatch in `Spec.Session` and `Ref.Session`, their session
 codecs where the attach and transfer fields enter, and adds proof and acceptance modules for the
-two statements below. The selected implementation target may additionally change `Impl.Core`; that
-is the one user decision recorded at the end. The 26 entries in
+two statements below. The selected one-core implementation target also changes `Impl.Core`; its
+cutover obligations are recorded at the end.
 `ledger/dispositions/part2-links.json`, `part2-performatives-link-state.json`, and
 `unkeyed-normative.json`, plus generated coverage and the planner manifest, move only after their
 carriers exist.
@@ -112,10 +111,10 @@ assertion mismatch is retained as the failure-first evidence for each scenario:
 | `staged-link-duplicate-delivery-tag` | `links.23` | reused unsettled tag is admitted, not refused as malformed |
 | `staged-disposition-after-detach` | `disposition.4` | the settled delivery can be resumed, so the final send is admitted rather than refused |
 
-These eleven scenarios pin sixteen of the 26 clauses. Their notes must name the nearest shadow for
-each of the unpinnable ten and say that it is not coverage. The planner owns the promoted vectors
-and their manifest lines; the coder owns the generator change. The first failing run occurs with
-the planner-authored expected verdicts already present and before any model change.
+These eleven scenarios pin sixteen of the 26 clauses. Their notes name the nearest shadow for each
+of the unpinnable ten and say that it is not coverage. The planner-authored expected verdicts were
+present before either model changed; replay then produced the named assertion mismatches above.
+Part 4 must satisfy those verdicts rather than changing them.
 
 ## Part 4 plan: a new implementation rung
 

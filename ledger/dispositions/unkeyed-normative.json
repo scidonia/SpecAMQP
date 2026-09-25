@@ -1264,7 +1264,7 @@
    "clause_text": "If the negotiated link value is «first», then it is illegal to set this field to «second».",
    "disposition": "formalized:Spec.Session.rcvSettleRefusal",
    "kind": "UNKEYED",
-   "note": "Setting the field to the negotiated link value is illegal: a transfer validation rule the link machine will state. **Carried this session, and the reporter's own words for it**: formalized:Spec.Session.rcvSettleRefusal (new). The attach's rcv-settle-mode is now recorded as the choice it names (Session.receiverSettleSecond, default first), and a transfer naming the second choice against a link negotiated first is refused. Promoted vector `staged-link-rcv-settle-second-over-first` in vectors/generated-exchanges.ndjson now refuses; the committed complement `exchange-link-rcv-settle-second-over-second` still admits.",
+   "note": "Setting the field to the negotiated link value is illegal: a transfer validation rule the link machine will state. **Carried this session, and the reporter's own words for it**: formalized:Spec.Session.rcvSettleRefusal (new). The attach's rcv-settle-mode is now recorded as the choice it names (Session.receiverSettleSecond, default first), and a transfer naming the second choice against a link negotiated first is refused. Promoted vector `exchange-link-rcv-settle-second-over-first` in vectors/generated-exchanges.ndjson now refuses; the committed complement `exchange-link-rcv-settle-second-over-second` still admits.",
    "text_sha256": "21e8ebd42fecf76f9f8f1c83e95306e873f4ff715a5d1ac242d01c1e9f061186"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:performatives/type:transfer/field:rcv-settle-mode.u2": {

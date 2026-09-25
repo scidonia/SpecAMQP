@@ -15,7 +15,7 @@ f1b824c9c4aeae571c20a0acb2e7ff06d1b50741  lean/Contracts/Sasl.lean
 a20b89eb67ba868de68a1412a939495c29c965bb  lean/Contracts/Settlement.lean
 7a52a63a35cda512b63a483e43af4799ae81beea  lean/Contracts/Transaction.lean
 c5ee92929caed5a244bae9a85cea9d0af5e7749a  lean/Contracts/TypeSystem.lean
-7ba6462d11b70c3c7a6c790d1a2267dd6a2baa07  lean/Contracts/WidenedEndpointConformance.lean
+e4557db8b0c20d3dda474ad0a9238f8bd8a56721  lean/Contracts/WidenedEndpointConformance.lean
 5b3e3c8addbc30c129a450e4efd896015400c13c  lean/Spec/Codec.lean
 c6a4e53394d07c4bb462c2b734c70e80f4a635f1  lean/Spec/Connection.lean
 2a205f752ad6833b88e2064a498eba8b86193fba  lean/Spec/ConnectionCodec.lean
@@ -62,7 +62,7 @@ a47d58fab7d42a568f0634c4422e340d97817795  ledger/coverage.json
 31d0862cd32b2264c02015dd1f24ffe5443aadac  ledger/dispositions/part1-types.json
 16fb859aa3aeea5c550c1a9f8d8a78b32ff25901  ledger/dispositions/part2-connection-establishment.json
 2ad0b7bd62931d88f9281244d20599c74e35f4a1  ledger/dispositions/part2-links.json
-dce89db37db258f577fd51bc162fcba806d34284  ledger/dispositions/part2-performatives-link-state.json
+41c35877022ad3af8b8b3cc12aad23676def1567  ledger/dispositions/part2-performatives-link-state.json
 77685884ffa42a3ea031608eef46bcc6b7aaa035  ledger/dispositions/part2-performatives-remainder.json
 acc85c05868948d2f8fedfb0dd935c52a76e9af8  ledger/dispositions/part2-performatives-settle-mode.json
 7f284ab7ed95408641030f546e00e1b91d7303d9  ledger/dispositions/part3-addressing.json
@@ -74,7 +74,7 @@ f79a6ce2d7a200ac94ef278489fc16a9b1b32314  ledger/dispositions/part3-message-sect
 bace5eb9d1579438ac37e9ca2e48630387793d32  ledger/dispositions/part5-sasl.json
 c36967feb16eedb417605418dbcd8fb455785e36  ledger/dispositions/part5-security-layers.json
 281117d421db981a5d7091aab0ce2882d43d458a  ledger/dispositions/picture-review.json
-9f419ddcfdeab300376a7983949fe1a547739f1c  ledger/dispositions/unkeyed-normative.json
+7baec9980d2770eb505df8d56b6beb1c47d03466  ledger/dispositions/unkeyed-normative.json
 fd83990fdb34dca23fc732e566fa109c98af71b5  ledger/lowercase-keywords.json
 bade00376950e4a224326e89498494519b4c5452  ledger/pictures.json
 9866f8e45f15cbcd1663a08f6d9b2afc6232f1fb  ledger/reconciliation.json
