@@ -15,6 +15,7 @@ f1b824c9c4aeae571c20a0acb2e7ff06d1b50741  lean/Contracts/Sasl.lean
 a20b89eb67ba868de68a1412a939495c29c965bb  lean/Contracts/Settlement.lean
 7a52a63a35cda512b63a483e43af4799ae81beea  lean/Contracts/Transaction.lean
 c5ee92929caed5a244bae9a85cea9d0af5e7749a  lean/Contracts/TypeSystem.lean
+ddc94e58662db73f4052c4183c61f50338760f50  lean/Contracts/WidenedEndpointConformance.lean
 5b3e3c8addbc30c129a450e4efd896015400c13c  lean/Spec/Codec.lean
 c6a4e53394d07c4bb462c2b734c70e80f4a635f1  lean/Spec/Connection.lean
 2a205f752ad6833b88e2064a498eba8b86193fba  lean/Spec/ConnectionCodec.lean
