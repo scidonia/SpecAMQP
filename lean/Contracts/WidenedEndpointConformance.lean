@@ -1,6 +1,5 @@
 import Contracts.EndpointConformance
-import Spec.Message
-import Spec.Session
+import Spec.WidenedState
 
 /-!
 # The widened endpoint conformance contract
@@ -18,8 +17,9 @@ alphabet, and need memory rather than a new event.
 ## Goal
 
 Give the 26 `deferred:S4` clauses enough state to be stated without weakening the old endpoint
-contract: multiple links, link identity and lifetime, local and remote unsettled state keyed by a
-non-null delivery tag, the incomplete-map latch, and the sender's delivery record.
+contract: stable logical-link identity, independent local and remote handle spaces and endpoint
+lifetimes, one shared unsettled history, per-endpoint incomplete-map latches, and per-link flow,
+settlement, transaction-control, and delivery state.
 
 ## Non-goals
 
@@ -34,18 +34,24 @@ non-null delivery tag, the incomplete-map latch, and the sender's delivery recor
 
 ## Affected files and symbols
 
-Parts 1 and 2 add only this module: `WidenedLink`, `WidenedSession`,
-`WidenedProtocolState`, `WidenedImplementationState`, `WidenedEndpointRelation`,
-`WidenedEndpointConforms`, and `WideningProjectsEndpointRelation`.
+Parts 1 and 2 own a declaration module and this relation module. `Spec.WidenedState` is the
+dependency-neutral state below every consumer: `LinkId`, `WidenedLinkEndpoint`, `WidenedLink`,
+`WidenedSession`, `WidenedProtocolState`, `LinkNamesUnique`, `RegistryKeysComplete`, and
+`HandlesResolveLinks`. This module aliases those public state names, aliases
+`WidenedImplementationState` to `Impl.Core.State`, and freezes `WidenedEndpointRelation`,
+`WidenedEndpointConforms`, and
+`WideningProjectsEndpointRelation`.
 
-Part 3 moved the eleven scenarios into `scripts/gen-exchange-vectors.py` and its committed
+Part 3 moved the eleven scenarios into `scripts/gen/slices.py` and its committed
 `vectors/generated-exchanges.ndjson` output, then regenerated the planner manifest. The existing
 `tests/contracts/s3_exchanges.sh` remains the boundary; no parallel runner was added.
 
-Part 4 changes the session state and dispatch in `Spec.Session` and `Ref.Session`, their session
+Part 4 adds widened protocol dispatch in `Spec.Protocol` and `Ref.Protocol`, changes the session
 codecs where the attach and transfer fields enter, and adds proof and acceptance modules for the
-two statements below. The selected one-core implementation target also changes `Impl.Core`; its
-cutover obligations are recorded at the end.
+two statements below. The existing `Spec.Session` and `Ref.Session` link transitions remain only
+the restricted model used by the frozen old contracts. The selected one-core target makes
+`Impl.Core.State` exactly `WidenedImplementationState`; its cutover obligations are recorded at the
+end. The 26 entries in
 `ledger/dispositions/part2-links.json`, `part2-performatives-link-state.json`, and
 `unkeyed-normative.json`, plus generated coverage and the planner manifest, move only after their
 carriers exist.
@@ -55,29 +61,35 @@ carriers exist.
 The ledger, not this summary, is authoritative for the text and hashes. The shorthand below is the
 ledger anchor suffix. The 26 entries are partitioned once, with no duplicate counting:
 
-1. **A link is named and identified** — `links.1`, `links.5`. Carried by `WidenedLink.name`,
-   `WidenedLink.role`, `WidenedLink.terminusAssociated`, the multi-link table, and
-   `LinkNamesUnique`.
+1. **A link is named and identified** — `links.1`, `links.5`. Carried structurally by `LinkId`
+   (name plus local role), the stable `WidenedSession.links` registry, and its key-integrity law
+   `LinkNamesUnique`. `linkKeys` is its complete, duplicate-free finite traversal index;
+   `localHandles` and `remoteHandles` resolve the two independent handle spaces.
 2. **Detach, re-attach, and resume differ** — `links.2`, `.16`, `.17`, `.18`, and
-   `closing-a-link.2`. Carried by identity plus `LinkLife`; the two MUST-emit rules are among the
-   unpinnable ten below.
+   `closing-a-link.2`. Carried by the local and remote `WidenedLinkEndpoint` lives plus the two
+   handle maps; either endpoint can lose or change its handle while the logical link survives. The
+   two MUST-emit rules are among the unpinnable ten below.
 3. **The attach carries unsettled state** — `incomplete-unsettled.u1`, `unsettled.1`, `.5`, `.6`.
-   Carried by `UnsettledDelivery` and `WidenedLink.unsettled`. A `DeliveryTag` is binary rather than
-   optional, so a null key is unrepresentable; local and remote states are both retained so their
-   comparison is stateable.
-4. **An incomplete map latches the sender** — `incomplete-unsettled.1`, `.2`, `.3`. Carried by
-   `WidenedLink.incompleteUnsettled`; the latch remains set until the detach and complete re-attach
-   sequence lifts it.
+   Carried by `UnsettledDelivery` and the one shared `WidenedLink.unsettled` table. A `DeliveryTag`
+   is binary rather than optional, so a null key is unrepresentable; local and remote states are
+   retained in each entry so their comparison is stateable. There is deliberately no second table:
+   the two handle spaces cannot drift into two histories the differential would never compare.
+4. **An incomplete map latches the sender** — `incomplete-unsettled.1`, `.2`, `.3`. Carried
+   separately on the local and remote `WidenedLinkEndpoint`; each latch remains set until that
+   endpoint's detach and complete re-attach sequence lifts it.
 5. **A delivery resumes** — `resuming-deliveries.2`, `.3`, `.4`, `.5`, `.8`, and
-   `transfer/field:resume.1`, `.2`, `.3`. Carried by the unsettled table, each entry's
-   `deliveryId`, and `nextDeliveryId`.
+   `transfer/field:resume.1`, `.2`, `.3`. Carried by the shared unsettled table, each entry's
+   `deliveryId`, `nextDeliveryId`, and the in-progress `WidenedDelivery.resumed` bit.
 6. **Both ends reduce unsettled state** — `resuming-deliveries.6`, `.7`. The two endpoint states
-   in each unsettled entry make the reduction stateable; both clauses are unpinnable at the current
-   harness boundary.
-7. **A delivery tag is unique while either end may consider it unsettled** — `links.23`. The
-   function keyed by `DeliveryTag` makes this structural: one key denotes at most one entry.
+   in each shared unsettled entry make the reduction stateable; both clauses are unpinnable at the
+   current harness boundary.
+7. **A delivery tag is unique while either end may consider it unsettled** — `links.23`. The one
+   shared function keyed by `DeliveryTag` makes this structural: one key denotes at most one
+   delivery, while retransfers carrying that delivery's same id and tag remain representable.
 8. **Settlement survives while its link does** — `disposition.4`. The unsettled entry is owned by
-   a `WidenedLink`, and `LinkLife` states when that owner still exists.
+   the stable logical-link record, and the two endpoint lives state when that owner still exists.
+   Because a disposition carries a role and delivery-id range but no handle, it traverses every
+   `linkKeys` entry whose `LinkId.localRole` matches, including links whose endpoint is detached.
 
 The ten entries no corpus step can pin are: `links.2`, `closing-a-link.2`,
 `incomplete-unsettled.u1`, `unsettled.1`, and `resuming-deliveries.3`, `.4`, `.5`, `.6`, `.7`,
@@ -116,20 +128,68 @@ of the unpinnable ten and say that it is not coverage. The planner-authored expe
 present before either model changed; replay then produced the named assertion mismatches above.
 Part 4 must satisfy those verdicts rather than changing them.
 
+The resume pair has an additional observable precondition. The conforming
+`exchange-link-resume-on-first-transfer` and refusing `staged-link-resume-only-on-continuation`
+first establish an ordinary unsettled delivery, destroy the peer endpoint without settling that
+delivery, and resume the same logical link with the delivery in both directional unsettled maps.
+Only then do they vary whether the first resumed transfer carries `resume=true`.
+`staged-link-resume-not-in-receiver-map` deliberately omits that entry and remains the
+counterexample: `resume.1` requires the receiver to ignore it. Before this contract correction,
+payload-insensitive replay gave the conforming and absent-map scenarios identical protocol inputs
+followed by opposite verdicts; that contradiction is the expected pre-correction failure, not an
+implementation result to preserve.
+
+One pre-existing positive credit scenario also needed its input corrected once tag uniqueness
+became observable. `exchange-link-credit-regranted` had reused delivery zero's still-unsettled tag
+for delivery one, while `staged-link-duplicate-delivery-tag` requires exactly that input to refuse.
+The intervening flow grants credit but does not settle the first delivery. The credit scenario
+therefore uses a distinct tag for delivery one and keeps its admitted verdict. Before that
+correction, the correctly widened model refused it for `links.23`; that one-vector mismatch is the
+expected pre-correction failure, not permission to weaken tag uniqueness.
+
+The hand-authored transaction corpora had the same kind of latent one-link assumption: most vectors
+used `txn-ctl` on one attach and `txn-ctrl` on its intended peer. The restricted model ignored
+names; the widened registry correctly treated them as two links, so the following flow named a link
+whose local endpoint had never attached. Eighteen of 36 transaction verdicts then failed per
+artefact. Each mismatching structured send attach now uses the name already present in its peer's
+valid encoded frame; no encoded frame bytes or length fields change. That mismatch is the expected
+pre-correction failure; delivery-count remains a rule about the resolved link endpoint, not the
+session.
+
+The same transaction pass exposed one independent role error:
+`txn-payload-on-a-link-that-is-not-a-control-link` attached both endpoints as receivers and then
+expected this endpoint to receive a transfer. The widened direction check correctly refused it.
+The peer attach is re-authored through the frame builder as the sender, with the sender's mandatory
+initial delivery count; the scenario's non-control-link payload and admitted verdict are unchanged.
+The pre-correction failure is the direction refusal, not permission for a link to have two
+receivers.
+
 ## Part 4 plan: a new implementation rung
 
-1. Add the widened link/session state to both independent readings and to the existing
-   `Impl.Core.State`, preserving the old state through explicit projections. Use one lookup/update
-   convention in each tree. The old single-link fields leave `Impl.Core.State` as sources of truth
-   at cutover; they are not retained and updated alongside the widened representation.
+1. Add the dependency-neutral widened state to both independent readings and make
+   `WidenedImplementationState` exactly `Impl.Core.State`. The core keeps its real `conn` and
+   `inbox` fields, adds the channel-indexed sessions with an empty default for old literals, and
+   exposes the computed `protocol` view the widened relation reads. Use one stable functional link
+   registry, its complete duplicate-free `linkKeys` traversal index, two directional handle maps,
+   and one shared unsettled history in each reading. The index carries no link state, is appended
+   only on first registration, and is never removed or reordered. The old single-link fields remain
+   only in the restricted legacy model that its frozen contracts quantify over. The widened codecs
+   neither dispatch through nor synchronize those fields; the registry is their sole link-state
+   source. With the contract written first, the old core has no widened `protocol` view; that
+   unresolved exact-state binding is the expected pre-implementation failure. The coder closes it
+   and must not add an adapter.
 2. Implement the eight behaviours in dependency order: identity and lifetime; unsettled decoding
    and structural invariants; incomplete-map latch; resume checks; joint reduction; tag uniqueness;
    disposition lifetime. Keep the three §24 readings: field-rule failures are malformed,
    forbidden-moment failures are illegal-state, and the pipelined re-attach uses the artifact's
    errant-link session condition.
 3. After each behaviour, rerun only its new scenario(s), recording the expected failure before and
-   the passing observation after. For each of the unpinnable ten, add a theorem or place it on the
-   interface's explicit untestable-obligation list; never count a shadow vector as its carrier.
+   the passing observation after. Name all ten unpinnable obligations in `Proofs` and prove each
+   state facet the widened model can state. A theorem about a comparison, reduction, or required
+   condition is not proof that the endpoint emitted a required frame: keep every unrepresented
+   action explicitly deferred, especially `links.2` and `closing-a-link.2`, whose emission is
+   outside the widened protocol step's result. Never substitute a shadow vector, a tautological
+   content constant, or a second untestable-obligation vocabulary for the full clause.
 4. Prove `WideningProjectsEndpointRelation` at exactly the type frozen below, then prove the widened
    `ConformsVia` instance for the existing `Impl.Core` endpoint. Add proof and acceptance modules
    rather than editing R3 or `Contracts.EndpointConformance`, and keep the original
@@ -149,11 +209,22 @@ Part 4 must satisfy those verdicts rather than changing them.
 
 * `EndpointConformance.lean` is extended only by importing it here; it is not edited.
 * `Input` and `Output` are unchanged. The widening is state-only.
-* A link name is an uninterpreted `String` and identity is name plus role.
+* A link identity is the uninterpreted name plus the local role. The registry key makes uniqueness
+  by name and direction structural.
+* Local and remote numeric handles occupy independent maps and resolve to the stable identity.
+  `HandlesResolveLinks` forbids stale mappings and attached endpoints with no directional handle.
+* `linkKeys` contains exactly the occupied registry keys with no duplicates. Its order has no
+  protocol meaning. Handle-less disposition applies its delivery-id range to every registered link
+  whose local role matches the frame role, even when that link endpoint is detached.
+* One logical link owns one unsettled table. Local and remote delivery states are fields of the same
+  entry, never separate histories.
+* Flow control, settlement modes, transaction-control state, and the in-progress delivery are
+  per-link quantities, not session-wide slots. `WidenedDelivery.resumed` records whether the first
+  transfer made the resume claim.
 * An unsettled entry stores both endpoint states and the sender's delivery id. The table key is a
-  non-null binary delivery tag; key uniqueness and the null-key prohibition are structural.
-* Link lifetime is explicit rather than inferred from handle presence, because attached, detached,
-  suspended, and destroyed have different attach rules.
+  non-null binary delivery tag; tag uniqueness and the null-key prohibition are structural.
+* Local and remote link lifetimes and incomplete-map latches are explicit, because the endpoints
+  detach and resume independently.
 * The widened implementation relation ignores the stream inbox exactly as the old endpoint relation
   does.
 * No compatibility alias, replacement of R3, descriptor literal, trusted declaration, or executable
@@ -161,9 +232,9 @@ Part 4 must satisfy those verdicts rather than changing them.
 
 ## Implementation target decision for part 4
 
-There is one shipped core. Part 4 widens `Impl.Core.State` in place, proves
-`WidenedEndpointConforms` for the existing `Impl.Core` endpoint, and uses
-`WideningProjectsEndpointRelation` to preserve the old R3 claim.
+There is one shipped core. Part 4 makes `Impl.Core.State` exactly the dependency-neutral
+`WidenedImplementationState`, proves `WidenedEndpointConforms` for the existing `Impl.Core`
+endpoint, and uses `WideningProjectsEndpointRelation` to preserve the old R3 claim.
 
 A second implementation was considered and refused. It would isolate the current core, but would
 leave two shipped-state shapes to keep in step — drift the differential could measure only after it
@@ -171,83 +242,39 @@ occurred rather than a single representation preventing it.
 
 The choice creates two acceptance obligations. First, the statement in
 `Contracts.EndpointConformance` remains proved at its own frozen type after cutover; being merely
-recoverable through the projection is not enough. Second, the legacy single-link fields leave
-`Impl.Core.State` as sources of truth rather than being updated beside the widened fields.
+recoverable through the projection is not enough. Second, the legacy single-link fields remain
+only as the state of the restricted model the old Settlement and SessionCredit contracts name.
+They are neither read nor updated beside the widened registry on the shipped path.
 
-The ten clauses the harness cannot pin remain theorem obligations or entries on the explicit
-untestable-obligation list. Their nearest shadow vectors remain useful evidence, but are never
-coverage for those clauses.
+The ten clauses the harness cannot pin remain named proof obligations. `Proofs` proves their
+formalizable state facets and explicitly names every emission or action the widened protocol result
+cannot represent; it does not count a required condition as the required output frame. Their nearest
+shadow vectors remain useful evidence, but are never coverage or carriers for those full clauses.
 -/
 
 namespace SpecAMQP.Contracts
 
-/-- A delivery tag is the binary key the link uses for unsettled delivery state. It has no null
-constructor; null-key exclusion is therefore a property of the representation. -/
-abbrev DeliveryTag := ByteArray
+/-- State names are re-exported at the contract boundary without restating their representation. -/
+abbrev DeliveryTag := SpecAMQP.Spec.DeliveryTag
+abbrev UnsettledDelivery := SpecAMQP.Spec.UnsettledDelivery
+abbrev WidenedDelivery := SpecAMQP.Spec.WidenedDelivery
+abbrev LinkId := SpecAMQP.Spec.LinkId
+abbrev LinkLife := SpecAMQP.Spec.LinkLife
+abbrev WidenedLinkEndpoint := SpecAMQP.Spec.WidenedLinkEndpoint
+abbrev WidenedLink := SpecAMQP.Spec.WidenedLink
+abbrev WidenedSession := SpecAMQP.Spec.WidenedSession
+abbrev LinkNamesUnique := SpecAMQP.Spec.LinkNamesUnique
+abbrev RegistryKeysComplete := SpecAMQP.Spec.RegistryKeysComplete
+abbrev HandlesResolveLinks := SpecAMQP.Spec.HandlesResolveLinks
+abbrev WidenedProtocolState := SpecAMQP.Spec.WidenedProtocolState
+abbrev WidenedProtocolStateValid := SpecAMQP.Spec.WidenedProtocolStateValid
+abbrev WidenedImplementationState := SpecAMQP.Impl.Core.State
 
-/-- The two observations that must be compared when a delivery is in doubt, plus the sender's id for
-that delivery. One state would make `unsettled.1` unstateable. -/
-structure UnsettledDelivery where
-  deliveryId : Nat
-  localState : Option SpecAMQP.Spec.Message.DeliveryState
-  remoteState : Option SpecAMQP.Spec.Message.DeliveryState
-
-/-- The four lives distinguished by the attach rules. A detached endpoint remains a link endpoint;
-a suspended or destroyed endpoint can only be restored by resume. -/
-inductive LinkLife where
-  | attached
-  | detached
-  | suspended
-  | destroyed
-
-/-- The per-link state read by the 26 clauses, and no application or node state. -/
-structure WidenedLink where
-  name : String
-  role : SpecAMQP.Spec.Session.LinkRole
-  terminusAssociated : Bool
-  life : LinkLife
-  unsettled : DeliveryTag → Option UnsettledDelivery
-  incompleteUnsettled : Bool
-  nextDeliveryId : Nat
-
-/-- A session with a handle-indexed table capable of holding more than one link. `legacy` is the old
-session projection during cutover; part 4 removes its single-link fields as sources of truth rather
-than updating two representations independently. -/
-structure WidenedSession where
-  legacy : SpecAMQP.Spec.Session.Session
-  links : Nat → Option WidenedLink
-
-/-- Link names identify at most one link of the same role. A resumed link may move to a new handle,
-but a valid state cannot retain both the old and new handle entries. -/
-def LinkNamesUnique (session : WidenedSession) : Prop :=
-  ∀ (leftHandle rightHandle : Nat) (leftLink rightLink : WidenedLink),
-    session.links leftHandle = some leftLink →
-    session.links rightHandle = some rightLink →
-    leftLink.role = rightLink.role →
-    leftLink.name = rightLink.name →
-    leftHandle = rightHandle
-
-/-- The specification-side widened endpoint state. Sessions are indexed by channel; each session's
-link table is independently indexed by handle. -/
-structure WidenedProtocolState where
-  connection : SpecAMQP.Spec.Connection.Endpoint
-  sessions : Nat → Option WidenedSession
-
-/-- Every stored session satisfies the link-name identity invariant. This is part of the widened
-relation rather than an optional proof about a state the endpoint may nevertheless reach. -/
-def WidenedProtocolStateValid (state : WidenedProtocolState) : Prop :=
-  ∀ (channel : Nat) (session : WidenedSession),
-    state.sessions channel = some session → LinkNamesUnique session
-
-/-- The implementation-side shape mirrors `Impl.Core.State`: protocol state plus pending stream
-input. The conformance relation intentionally ignores `inbox`. -/
-structure WidenedImplementationState where
-  protocol : WidenedProtocolState
-  inbox : SpecAMQP.Harness.Octets
 
 /-- The widened relation, in the same shape as the old relation `fun s i => i.conn = s`: the
-implementation's protocol field is exactly the specification state, buffering is outside the
-protocol step, and the link-name identity invariant holds in every related state. -/
+implementation's protocol view is exactly the specification state, buffering is outside the
+protocol step, and registry-key, finite-registry, and handle-resolution invariants hold in every
+related state. -/
 def WidenedEndpointRelation
     (specification : WidenedProtocolState) (implementation : WidenedImplementationState) : Prop :=
   implementation.protocol = specification ∧ WidenedProtocolStateValid specification
@@ -266,7 +293,7 @@ def projectSpecification (state : WidenedProtocolState) : SpecAMQP.Spec.Connecti
 
 /-- Project widened implementation state onto the state named by the frozen endpoint contract. -/
 def projectImplementation (state : WidenedImplementationState) : SpecAMQP.Impl.Core.State :=
-  { conn := state.protocol.connection, inbox := state.inbox }
+  state
 
 /-- The fragment represented by the old endpoint rung: connection state and buffering, with no
 widened session table on either side. -/

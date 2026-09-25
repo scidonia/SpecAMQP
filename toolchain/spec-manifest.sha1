@@ -15,7 +15,7 @@ f1b824c9c4aeae571c20a0acb2e7ff06d1b50741  lean/Contracts/Sasl.lean
 a20b89eb67ba868de68a1412a939495c29c965bb  lean/Contracts/Settlement.lean
 7a52a63a35cda512b63a483e43af4799ae81beea  lean/Contracts/Transaction.lean
 c5ee92929caed5a244bae9a85cea9d0af5e7749a  lean/Contracts/TypeSystem.lean
-e4557db8b0c20d3dda474ad0a9238f8bd8a56721  lean/Contracts/WidenedEndpointConformance.lean
+d9202a02b2ac008fea771b21ac3827d29c1e2ec3  lean/Contracts/WidenedEndpointConformance.lean
 5b3e3c8addbc30c129a450e4efd896015400c13c  lean/Spec/Codec.lean
 c6a4e53394d07c4bb462c2b734c70e80f4a635f1  lean/Spec/Connection.lean
 2a205f752ad6833b88e2064a498eba8b86193fba  lean/Spec/ConnectionCodec.lean
@@ -23,11 +23,13 @@ c92c679a91d5a504610bbd47f27ffe33f7776971  lean/Spec/Frame.lean
 31e43aed7900e071a7a1615d739be50f716b5b74  lean/Spec/FrameCodec.lean
 7c2fc8950376880dfbba4beb86a052316ea8b589  lean/Spec/Main.lean
 21c5e1497a86cc4d5e35e9073aab3a993e1cd660  lean/Spec/Message.lean
+80fa3347570d1137b9da00edde6a0f4458575e0b  lean/Spec/Protocol.lean
 9fa46bb63a4e3b09f04c9d89689b74a676356783  lean/Spec/ReadLaws.lean
-eb9cfb001d3ae1417d6c5def00a8ce6ef6568fa2  lean/Spec/Session.lean
-0d21912c7627dddca29799f8b7a224fe91907b05  lean/Spec/SessionCodec.lean
+7602e979885d4242b67db86318ff1a95ce30dcd2  lean/Spec/Session.lean
+e1c4a858b089019208d93ca0b275051df398314d  lean/Spec/SessionCodec.lean
 9824a25e7b937000c8f8c16a9986f6bda2869632  lean/Spec/Transactions.lean
 d4de8144b2390024ff98ef4bb5a6ddc34ad5d2d4  lean/Spec/Value.lean
+f6b5cbdf8c4b6d893803832373afef4765b3694b  lean/Spec/WidenedState.lean
 c80948aad7c0afaa70330570dd2624f60982d0b6  ledger/ambiguities/attach-retains-link-flow-state.json
 36cfbc505afafffd0cd014672c25a8b81ac16231  ledger/ambiguities/bodyless-frame-permitted-states.json
 973e66b7a1143546319dedc4b165a4f508747c78  ledger/ambiguities/channel-zero-layering.json
@@ -109,7 +111,7 @@ af7bb1f7da0bf50c65238f43394e42eb3d248ae7  vectors/constructor-disagreement.ndjso
 240d04abf05f593c59062c75e2ed16a2ac6185ed  vectors/flow.ndjson
 0f123312d720c0282d52ceb90467270f289dc6ed  vectors/frames-negative.ndjson
 860b8160aeeff3a1c8033f86292924a99e797a9c  vectors/frames.ndjson
-37c0dfe204a13ba6c33c8c34db1240ea0d6afd14  vectors/generated-exchanges.ndjson
+164c39e5483dff8750ce9f36224cbe69c2bbeb75  vectors/generated-exchanges.ndjson
 8a192591a2dd0907664c3501963469af085e88ac  vectors/generated-frames.ndjson
 4a842a5f63cacefa036e922f31581432817c3228  vectors/generated.ndjson
 f7fe109975981669f41c09b08c16c1ff72e4eb97  vectors/isolation.md
@@ -125,7 +127,7 @@ c876f69bb22065b406c11b423b5ffb93d4d18426  vectors/message/sections.ndjson
 83e65ce3be13bc89cad800751b93a5055bd58f6e  vectors/sasl-negative.ndjson
 55ad0e4cee3056c52933498cdee784fa1f941b3c  vectors/sasl.ndjson
 ce11efb0f70ae9b5357e08894bff4b02455a3376  vectors/slice.ndjson
-ec3cf6d8a9e27b0110cb99eac8539425cd0adbca  vectors/txn-negative.ndjson
-70736979c0a73758f1d9896de8924032bc3583c2  vectors/txn.ndjson
+1f7bba8bedf80fe5f90ea8d2f0698bb1057dfdc2  vectors/txn-negative.ndjson
+b814b3ba8c07dfb0ae61661cbad98de0c6e8c4a2  vectors/txn.ndjson
 f51ef1e616215fd42bcfc9c7e0839f3ba9cf8db0  vectors/value-boundaries.ndjson
 c7bb623f572834175ae864a74a8196b9353b7a97  vectors/value-boundary-negatives.ndjson
