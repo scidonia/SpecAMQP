@@ -64,7 +64,9 @@ structure WidenedLinkEndpoint where
 /-- One logical link. Local and remote endpoint lives are independent, but flow control, settlement
 negotiation, the in-progress delivery, transaction-control state, and unsettled history belong to
 the logical link rather than the session. The one unsettled table is shared: two records here would
-permit the two handle spaces to disagree about one delivery. -/
+permit the two handle spaces to disagree about one delivery. Its finite tag index carries no
+delivery state; it makes the functional table traversable by a disposition that names ids, not
+tags. -/
 structure WidenedLink where
   id : LinkId
   localEndpoint : WidenedLinkEndpoint
@@ -79,6 +81,7 @@ structure WidenedLink where
   deliveryTag : Option DeliveryTag
   deliveryFormat : Option Nat
   transactions : Option SpecAMQP.Spec.Transactions.Layer
+  unsettledKeys : List DeliveryTag
   unsettled : DeliveryTag → Option UnsettledDelivery
   nextDeliveryId : Nat
 
@@ -107,6 +110,13 @@ def RegistryKeysComplete (session : WidenedSession) : Prop :=
   session.linkKeys.Nodup ∧
     ∀ id, id ∈ session.linkKeys ↔ ∃ link, session.links id = some link
 
+/-- The finite tag index contains each and only each occupied slot in one link's shared unsettled
+table, exactly once. Its order has no protocol meaning and it carries no delivery state of its own;
+it exists because a disposition names a delivery-id range while the table itself is functional. -/
+def UnsettledKeysComplete (link : WidenedLink) : Prop :=
+  link.unsettledKeys.Nodup ∧
+    ∀ tag, tag ∈ link.unsettledKeys ↔ ∃ entry, link.unsettled tag = some entry
+
 /-- A mapped handle resolves to an attached endpoint; every attached endpoint has a handle in its
 own directional space; and one endpoint cannot retain both its old and resumed handles. This
 prevents stale handles, ghost attached endpoints, and duplicate directional bindings while still
@@ -133,13 +143,14 @@ structure WidenedProtocolState where
   connection : SpecAMQP.Spec.Connection.Endpoint
   sessions : Nat → Option WidenedSession
 
-/-- Every stored session satisfies identity, finite-registry, and handle-resolution invariants.
-They are part of the widened relation rather than optional proofs about states an endpoint may
-nevertheless reach. -/
+/-- Every stored session satisfies identity, finite-registry, finite-unsettled-table, and
+handle-resolution invariants. They are part of the widened relation rather than optional proofs
+about states an endpoint may nevertheless reach. -/
 def WidenedProtocolStateValid (state : WidenedProtocolState) : Prop :=
   ∀ (channel : Nat) (session : WidenedSession),
     state.sessions channel = some session →
-      LinkNamesUnique session ∧ RegistryKeysComplete session ∧ HandlesResolveLinks session
+      LinkNamesUnique session ∧ RegistryKeysComplete session ∧ HandlesResolveLinks session ∧
+        ∀ id link, session.links id = some link → UnsettledKeysComplete link
 
 
 end SpecAMQP.Spec

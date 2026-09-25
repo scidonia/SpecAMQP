@@ -36,15 +36,15 @@ settlement, transaction-control, and delivery state.
 
 Parts 1 and 2 own a declaration module and this relation module. `Spec.WidenedState` is the
 dependency-neutral state below every consumer: `LinkId`, `WidenedLinkEndpoint`, `WidenedLink`,
-`WidenedSession`, `WidenedProtocolState`, `LinkNamesUnique`, `RegistryKeysComplete`, and
-`HandlesResolveLinks`. This module aliases those public state names, aliases
+`WidenedSession`, `WidenedProtocolState`, `LinkNamesUnique`, `RegistryKeysComplete`,
+`UnsettledKeysComplete`, and `HandlesResolveLinks`. This module aliases those public state names,
 `WidenedImplementationState` to `Impl.Core.State`, and freezes `WidenedEndpointRelation`,
 `WidenedEndpointConforms`, and
 `WideningProjectsEndpointRelation`.
 
-Part 3 moved the eleven scenarios into `scripts/gen/slices.py` and its committed
-`vectors/generated-exchanges.ndjson` output, then regenerated the planner manifest. The existing
-`tests/contracts/s3_exchanges.sh` remains the boundary; no parallel runner was added.
+Part 3 moved all twelve scenarios into `scripts/gen/slices.py` and its committed
+`vectors/generated-exchanges.ndjson` output. The existing `tests/contracts/s3_exchanges.sh`
+remains the boundary, with no parallel runner.
 
 Part 4 adds widened protocol dispatch in `Spec.Protocol` and `Ref.Protocol`, changes the session
 codecs where the attach and transfer fields enter, and adds proof and acceptance modules for the
@@ -70,10 +70,12 @@ ledger anchor suffix. The 26 entries are partitioned once, with no duplicate cou
    handle maps; either endpoint can lose or change its handle while the logical link survives. The
    two MUST-emit rules are among the unpinnable ten below.
 3. **The attach carries unsettled state** — `incomplete-unsettled.u1`, `unsettled.1`, `.5`, `.6`.
-   Carried by `UnsettledDelivery` and the one shared `WidenedLink.unsettled` table. A `DeliveryTag`
-   is binary rather than optional, so a null key is unrepresentable; local and remote states are
-   retained in each entry so their comparison is stateable. There is deliberately no second table:
-   the two handle spaces cannot drift into two histories the differential would never compare.
+   Carried by `UnsettledDelivery` and the one shared `WidenedLink.unsettled` table. A
+   duplicate-free `unsettledKeys` index makes the functional table traversable without becoming a
+   second history. A `DeliveryTag` is binary rather than optional, so a null key is unrepresentable;
+   local and remote states are retained in each entry so their comparison is stateable. There is
+   deliberately no second table: the two handle spaces cannot drift into two histories the
+   differential would never compare.
 4. **An incomplete map latches the sender** — `incomplete-unsettled.1`, `.2`, `.3`. Carried
    separately on the local and remote `WidenedLinkEndpoint`; each latch remains set until that
    endpoint's detach and complete re-attach sequence lifts it.
@@ -88,8 +90,9 @@ ledger anchor suffix. The 26 entries are partitioned once, with no duplicate cou
    delivery, while retransfers carrying that delivery's same id and tag remain representable.
 8. **Settlement survives while its link does** — `disposition.4`. The unsettled entry is owned by
    the stable logical-link record, and the two endpoint lives state when that owner still exists.
-   Because a disposition carries a role and delivery-id range but no handle, it traverses every
-   `linkKeys` entry whose `LinkId.localRole` matches, including links whose endpoint is detached.
+   Because a disposition carries a role and delivery-id range but no handle or delivery tag, it
+   traverses every `linkKeys` entry whose `LinkId.localRole` matches and every exact
+   `unsettledKeys` entry on those links, including links whose endpoint is detached.
 
 The ten entries no corpus step can pin are: `links.2`, `closing-a-link.2`,
 `incomplete-unsettled.u1`, `unsettled.1`, and `resuming-deliveries.3`, `.4`, `.5`, `.6`, `.7`,
@@ -104,10 +107,13 @@ boundary action is one corpus replay; the observable is each step's admitted/ref
 condition, reason class, and resulting session state. No scenario calls a network, clock, model, or
 filesystem outside the gate's temporary directory.
 
-Promotion is complete: the exchange-vector generator carries the eleven authored inputs in
-`vectors/generated-exchanges.ndjson`, with no second corpus convention. Before either model changed,
-both artefacts were observed admitting every step whose expectation requires refusal; that named
-assertion mismatch is retained as the failure-first evidence for each scenario:
+Promotion is complete: the exchange-vector generator carries all twelve scenarios in
+`vectors/generated-exchanges.ndjson`, with no second corpus convention. Before either original
+model changed, both artefacts were observed admitting every step whose expectation requires
+refusal. For the twelfth, replay against the committed pre-index reference observed step 7 admitted
+in the mapped session instead of the required refusal. The
+specification at that commit cannot elaborate against this amendment's required index field, so no
+synthetic hybrid state is claimed as a second pre-implementation observation:
 
 | scenario | clauses pinned | expected pre-implementation failure |
 |---|---|---|
@@ -122,11 +128,15 @@ assertion mismatch is retained as the failure-first evidence for each scenario:
 | `staged-link-resume-not-in-receiver-map` | `resume.1`, `resuming-deliveries.2` | the follow-up continuation is admitted, showing the resumed delivery was not ignored |
 | `staged-link-duplicate-delivery-tag` | `links.23` | reused unsettled tag is admitted, not refused as malformed |
 | `staged-disposition-after-detach` | `disposition.4` | the settled delivery can be resumed, so the final send is admitted rather than refused |
+| `staged-disposition-completed-after-detach` | `disposition.4` | after a completed unsettled delivery is detached and settled by disposition, its resumed send is admitted instead of refused as malformed |
 
-These eleven scenarios pin sixteen of the 26 clauses. Their notes name the nearest shadow for each
-of the unpinnable ten and say that it is not coverage. The planner-authored expected verdicts were
-present before either model changed; replay then produced the named assertion mismatches above.
-Part 4 must satisfy those verdicts rather than changing them.
+These twelve scenarios pin sixteen of the 26 clauses. Their notes name the nearest shadow for each
+of the unpinnable ten and say that it is not coverage. The completed-delivery scenario's reference
+failure was observed before its index implementation; the specification-side pre-index tree became
+structurally non-elaborating when this declaration-only contract added the required field. After
+implementation, both artefacts were observed refusing step 7 with the invalid-field condition and
+malformed reason class, with byte-identical verdicts. The original eleven retain their recorded
+assertion mismatches. Part 4 must satisfy the verdicts rather than changing them.
 
 The resume pair has an additional observable precondition. The conforming
 `exchange-link-resume-on-first-transfer` and refusing `staged-link-resume-only-on-continuation`
@@ -171,8 +181,10 @@ receivers.
    `inbox` fields, adds the channel-indexed sessions with an empty default for old literals, and
    exposes the computed `protocol` view the widened relation reads. Use one stable functional link
    registry, its complete duplicate-free `linkKeys` traversal index, two directional handle maps,
-   and one shared unsettled history in each reading. The index carries no link state, is appended
-   only on first registration, and is never removed or reordered. The old single-link fields remain
+   and one shared unsettled history with its complete duplicate-free `unsettledKeys` traversal
+   index in each reading. Neither index carries protocol state: it gains a key exactly once when
+   its functional table first gains that key, removes the key when its table removes the entry
+   where applicable, and has no observable order. The old single-link fields remain
    only in the restricted legacy model that its frozen contracts quantify over. The widened codecs
    neither dispatch through nor synchronize those fields; the registry is their sole link-state
    source. With the contract written first, the old core has no widened `protocol` view; that
@@ -184,8 +196,10 @@ receivers.
    forbidden-moment failures are illegal-state, and the pipelined re-attach uses the artifact's
    errant-link session condition.
 3. After each behaviour, rerun only its new scenario(s), recording the expected failure before and
-   the passing observation after. Name all ten unpinnable obligations in `Proofs` and prove each
-   state facet the widened model can state. A theorem about a comparison, reduction, or required
+   the passing observation after. In particular, observe
+   `staged-disposition-completed-after-detach` admitting its final resume before changing the
+   completed-entry traversal. Name all ten unpinnable obligations in `Proofs` and prove each state
+   facet the widened model can state. A theorem about a comparison, reduction, or required
    condition is not proof that the endpoint emitted a required frame: keep every unrepresented
    action explicitly deferred, especially `links.2` and `closing-a-link.2`, whose emission is
    outside the widened protocol step's result. Never substitute a shadow vector, a tautological
@@ -198,7 +212,7 @@ receivers.
 5. Update all 26 ledger dispositions only when their carriers exist, classifying each as checked,
    structural, or still deferred. Regenerate the generated corpus, coverage, and
    `toolchain/spec-manifest.sha1` in the same accepted movement.
-6. Acceptance is: all eleven scenarios pass in both artefacts with pinned conditions/classes; the
+6. Acceptance is: all twelve scenarios pass in both artefacts with pinned conditions/classes; the
    widened acceptance module binds the existing `Impl.Core` endpoint; the projection and widened
    conformance statements are accepted at their frozen types; `EndpointConforms` remains proved at
    its unchanged type; the old R3 and R4 contracts stay green; package build, proof-integrity,
@@ -218,6 +232,9 @@ receivers.
   whose local role matches the frame role, even when that link endpoint is detached.
 * One logical link owns one unsettled table. Local and remote delivery states are fields of the same
   entry, never separate histories.
+* `unsettledKeys` contains exactly the occupied unsettled tags with no duplicates. Its order has no
+  protocol meaning. A handle-less, tag-less disposition applies its delivery-id range to every
+  indexed entry on every matching-role link, including completed deliveries on detached links.
 * Flow control, settlement modes, transaction-control state, and the in-progress delivery are
   per-link quantities, not session-wide slots. `WidenedDelivery.resumed` records whether the first
   transfer made the resume claim.
@@ -265,6 +282,7 @@ abbrev WidenedLink := SpecAMQP.Spec.WidenedLink
 abbrev WidenedSession := SpecAMQP.Spec.WidenedSession
 abbrev LinkNamesUnique := SpecAMQP.Spec.LinkNamesUnique
 abbrev RegistryKeysComplete := SpecAMQP.Spec.RegistryKeysComplete
+abbrev UnsettledKeysComplete := SpecAMQP.Spec.UnsettledKeysComplete
 abbrev HandlesResolveLinks := SpecAMQP.Spec.HandlesResolveLinks
 abbrev WidenedProtocolState := SpecAMQP.Spec.WidenedProtocolState
 abbrev WidenedProtocolStateValid := SpecAMQP.Spec.WidenedProtocolStateValid
@@ -273,8 +291,8 @@ abbrev WidenedImplementationState := SpecAMQP.Impl.Core.State
 
 /-- The widened relation, in the same shape as the old relation `fun s i => i.conn = s`: the
 implementation's protocol view is exactly the specification state, buffering is outside the
-protocol step, and registry-key, finite-registry, and handle-resolution invariants hold in every
-related state. -/
+protocol step, and registry-key, finite-registry, finite-unsettled-table, and handle-resolution
+invariants hold in every related state. -/
 def WidenedEndpointRelation
     (specification : WidenedProtocolState) (implementation : WidenedImplementationState) : Prop :=
   implementation.protocol = specification ∧ WidenedProtocolStateValid specification

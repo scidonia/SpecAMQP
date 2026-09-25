@@ -8,8 +8,10 @@ implementation** of the same standard. The second implementation catches misread
 same OASIS artifacts without reference to the specification, the two run the same vectors, and a disagreement
 between them means one has misread the standard.
 
-- **579 clauses** of the standard, each with a recorded disposition: 238 formalized, 105 covered by test
-  vectors, 180 deferred to a named milestone, and the rest informative, out of scope or superseded.
+- **582 extracted clauses** across Parts 0–5; all 230 MUST-class clauses and all 181 captured
+  unkeyed normative statements are dispositioned. Of 431 dispositioned entries, 194 are
+  formalized, 81 out of scope, 73 deferred, 59 informative, 14 environmental, 5 test-carried,
+  3 underspecified and 2 superseded.
 - **24 test corpora**, replayed step by step against the specification's executable semantics and against the
   reference implementation, comparing each step's verdict and the condition behind every refusal.
 - **20 gates** in `tests/contracts/`, each a script with a pass/fail exit status, runnable offline.
@@ -40,14 +42,16 @@ Conformance is defined as a state machine over a fixed interface alphabet, so an
 
 What is done:
 
-- Every clause of the standard (Parts 0–5; 579 clauses) has a disposition: 238 formalized, 105 covered by
-  test vectors, 180 deferred to named work, and the rest informative, out of scope or superseded.
+- The ledger extracts 582 clauses across Parts 0–5. All 230 MUST-class clauses and all 181 captured
+  unkeyed normative statements are dispositioned; `ledger/coverage.json` records the 431 entries as
+  194 formalized, 81 out of scope, 73 deferred, 59 informative, 14 environmental, 5 test-carried,
+  3 underspecified and 2 superseded.
 - Every ambiguity found so far is written down in `ledger/ambiguities/`, with the reading and the alternatives it was
   chosen over.
 - The specification (`lean/Spec/`) and the reference implementation (`lean/Ref/`) agree with each
-  other across the committed corpora. `vectors/generated-exchanges.ndjson` also carries eleven
-  failure-first widening vectors whose named refusal steps both artefacts currently admit; those
-  retained failures are the contract for the widened model, not a differential between the artefacts.
+  other across the committed corpora. `vectors/generated-exchanges.ndjson` carries the widening's
+  failure-first boundary scenarios; their named verdicts and recorded pre-implementation failures
+  are the contract for the widened model, not merely a differential between the two artefacts.
 - The endpoint's protocol core is proved to conform: `Proofs/EndpointConformance.lean` proves the statement
   frozen in `Contracts/EndpointConformance.lean`, bound by `Contracts/EndpointAcceptance.lean`. Its framing
   laws are proved too.
