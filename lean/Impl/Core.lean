@@ -92,6 +92,7 @@ quiet change of behaviour.
 import Contracts.Conformance
 import Spec.Connection
 import Spec.Frame
+import Spec.WidenedState
 import Harness.Runner
 
 namespace SpecAMQP.Impl.Core
@@ -118,6 +119,54 @@ structure State where
   conn : Conn
   /-- Octets read from the transport that do not yet make a complete wire unit. -/
   inbox : Octets
+  /-- The channel-indexed widened session table, `PLAN.md` §24 part 4. It defaults to the empty table so
+  that a literal written before the field existed still elaborates; the *default* is a convenience, not a
+  licence to drop the table, so every site that already holds a state updates through `{ state with … }`
+  rather than rebuilding a literal (`Impl/Stream.lean`'s read path is the one that matters).
+
+  The core's own `step` never writes it: this rung's protocol decisions are the connection layer's, and
+  the session table is the state the *conformance* claim ranges over. It is here rather than in a second
+  state type because `Contracts/WidenedEndpointConformance` fixes `WidenedImplementationState` to this
+  structure and `WideningProjectsEndpointRelation` to the connection projection of it. -/
+  sessions : Nat → Option SpecAMQP.Spec.WidenedSession := fun _ => none
+
+/-- The core's state as the widened protocol state the conformance contract reads: the real `conn` field
+as the connection endpoint and the real `sessions` table as the session table. This is a *view* rather
+than a field, so it cannot drift from the two fields it is computed from. -/
+def State.protocol (state : State) : SpecAMQP.Spec.WidenedProtocolState :=
+  { connection := state.conn, sessions := state.sessions }
+
+/-- The view's connection half is the `conn` field. -/
+theorem protocol_connection (state : State) : state.protocol.connection = state.conn := rfl
+
+/-- The view's session half is the `sessions` field. -/
+theorem protocol_sessions (state : State) : state.protocol.sessions = state.sessions := rfl
+
+/-- Two states with the same `conn` and the same `sessions` are the same state: `inbox` is the stream
+front end's pending octets and is outside every protocol claim. -/
+theorem state_eq_of_conn_sessions {left right : State} (hconn : left.conn = right.conn)
+    (hsessions : left.sessions = right.sessions) (hbox : left.inbox = right.inbox) :
+    left = right := by
+  cases left
+  cases right
+  cases hconn
+  cases hsessions
+  cases hbox
+  rfl
+
+/-- The computed view is the pair of fields it is built from, which is the form every proof about it
+uses: `State.protocol` reads `conn` and `sessions` and nothing else. -/
+theorem protocol_eq_iff (state : State) (spec : SpecAMQP.Spec.WidenedProtocolState) :
+    state.protocol = spec ↔ state.conn = spec.connection ∧ state.sessions = spec.sessions := by
+  constructor
+  · intro h
+    exact ⟨by simpa only [State.protocol] using
+             congrArg SpecAMQP.Spec.WidenedProtocolState.connection h,
+           by simpa only [State.protocol] using
+             congrArg SpecAMQP.Spec.WidenedProtocolState.sessions h⟩
+  · rintro ⟨hconn, hsessions⟩
+    cases spec
+    simp only [State.protocol, hconn, hsessions]
 
 /-- A peer that has exchanged nothing and has read nothing. -/
 def initial : State :=
@@ -341,6 +390,28 @@ theorem step_api (core : State) (call : ApiCall)
 /-- A tick is not a step this layer takes. -/
 theorem step_tick (core : State) (tick : SpecAMQP.Contracts.Tick) :
     step core (.tick tick) = none := rfl
+
+/-- **The core's step never touches the session table.** A frame is the connection layer's and a
+readable call is its send direction, so the widened view's session half is carried through every
+step this endpoint takes; that is what lets the widened conformance claim relate the two sides
+without this rung having to decide anything about sessions. -/
+theorem step_preserves_sessions (core : State) (inp : Input) (out : State × List Output)
+    (h : step core inp = some out) : out.1.sessions = core.sessions := by
+  cases inp with
+  | frame bytes =>
+    have h' := h
+    rw [step_frame] at h'
+    exact (Option.some.inj h') ▸ rfl
+  | api call =>
+    cases hsub : submissionOf call with
+    | none => exact absurd h (by simp [step, hsub])
+    | some submission =>
+      have h' := h
+      rw [step_api core call submission hsub] at h'
+      have h'' := Option.some.inj h'
+      subst h''
+      rfl
+  | tick t => exact absurd h (by simp [step])
 
 /-- `submit` fails exactly where the octets are not a send: the failure is the reading's own `none`,
 not a second judgement made by the shell's path. -/

@@ -1,5 +1,6 @@
 import Harness.Runner
 import Ref.ConnectionCodec
+import Ref.Protocol
 import Ref.Session
 import Ref.Vectors
 
@@ -24,12 +25,15 @@ namespace SpecAMQP.Ref.SessionCodec
 open Lean
 open SpecAMQP.Harness
 open SpecAMQP.Ref.Connection (Bounds Peer)
+open SpecAMQP.Ref.Protocol (WidenedSession)
 open SpecAMQP.Ref.Session (Endpoint)
 
-/-- One peer in an exchange: the connection's endpoint and the session's. -/
+/-- One peer in an exchange: the connection's endpoint and the session's. The session is the widened
+one — a registry of named links with two endpoint-local handle spaces and one shared unsettled
+history — whose session-scope state is the restricted endpoint's. -/
 structure Both where
   connection : Peer
-  session : Endpoint
+  session : WidenedSession
 
 /-- The bounds an `open` whose fields are unset declares, from the generated field
 table. -/
@@ -118,9 +122,9 @@ def stepOf (both : Both) (step : ExchangeStep) : Except String (StepOutcome × B
     -- answered is discarded with it
     if connection.state == SpecAMQP.Ref.Connection.State.discard then
       return (asConnection relayed, { both with connection := connection })
-    match SpecAMQP.Ref.Session.step both.session step.send channel body payload with
+    match SpecAMQP.Ref.Protocol.step both.session step.send channel body payload with
     | .ok session =>
-      let state := s!"session:{session.state.label}"
+      let state := s!"session:{session.legacy.state.label}"
       return ({ relayed with state, detail := s!"admitted; the peer is in {state}" },
               { both with connection := connection, session := session })
     | .error reason =>
@@ -134,8 +138,10 @@ def stepOf (both : Both) (step : ExchangeStep) : Except String (StepOutcome × B
         return (⟨false, none, state, some reason.condition,
                  s!"{reason.detail}; the peer closes the connection, and is in {state}"⟩,
                 { both with connection := connection })
-      let session := { both.session with state := reason.place.getD both.session.state }
-      let state := s!"session:{session.state.label}"
+      let session :=
+        SpecAMQP.Ref.Protocol.withState both.session
+          (reason.place.getD both.session.legacy.state)
+      let state := s!"session:{session.legacy.state.label}"
       return (⟨false, none, state, some reason.condition,
                s!"{reason.detail}; the peer is in {state}"⟩,
               { both with connection := connection, session := session })
@@ -145,11 +151,12 @@ def start (name : String) : Except String Both := do
   match name.splitOn ":" with
   | ["connection", state] =>
     let connection ← SpecAMQP.Ref.ConnectionCodec.refExchangeCodec.start state
-    return { connection := connection, session := Endpoint.atState .unmapped }
+    return { connection := connection,
+             session := SpecAMQP.Ref.Protocol.sessionOf (Endpoint.atState .unmapped) }
   | ["session", state] =>
     let session ←
       match SpecAMQP.Ref.Session.State.lookup state with
-      | some state => pure (Endpoint.atState state)
+      | some state => pure (SpecAMQP.Ref.Protocol.sessionOf (Endpoint.atState state))
       | none => .error s!"'{state}' is not a session state the artifact declares"
     return { connection := establishedConnection, session := session }
   | _ =>

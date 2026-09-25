@@ -1376,6 +1376,86 @@ def Session.afterEnd (session : Session) (outbound : Bool) (withError : Bool) : 
                      peerBegun := false }
     | _ => { session with state := .endRcvd, incoming := none, peerBegun := true }
 
+/-! ## The checks every frame passes before the session reads it
+
+The session machine's prologue — the frame's performative and the field list's name for it, the
+DISCARDING short-circuit, the channel map, the state's column and the mandatory fields — is the
+same for the restricted single-link step below and for the widened step in `Spec.Protocol`. It
+is written once here rather than twice: the two steps are readings of one machine, and a rule
+added to one copy and not the other would be a divergence no gate could attribute to a layer.
+-/
+
+/-- The field list's name for the performative a body carries, or the empty string for a body
+that is not one of this layer's frames. -/
+def typeNameOf (body : Value) : String :=
+  match Performative.ofBody body with
+  | .begin => "begin"
+  | .end => "end"
+  | .attach => "attach"
+  | .detach => "detach"
+  | .flow => "flow"
+  | .transfer => "transfer"
+  | .other => if isDisposition body then "disposition" else ""
+
+/-- Whether this endpoint silently discards the frame: "any incoming frames on the session MUST
+be silently discarded until the peer's end frame is received", so in the error-triggered close
+of DISCARDING what arrives is discarded without being looked at, and only the peer's end is
+answered. -/
+def frameDiscarded (session : Session) (outbound : Bool) (body : Value) : Bool :=
+  !outbound && session.state == .discarding && Performative.ofBody body != .end
+
+/-- The placement of a refusal the session raises before it reads the frame's own fields: a
+receive it cannot process is answered by the END the section mandates, which the diagram draws
+as `MAPPED --S:END(error)--> DISCARDING`, and a state that cannot send at all cannot issue the
+END, so the state stands and the refusal says so (`sessions.5`, `sessions.6`). A refusal a
+*send* earns is simply not taken, and leaves the state where it was. -/
+def placed (session : Session) (outbound : Bool) (condition reasonClass prose : String) : Refusal :=
+  if outbound then refusal condition reasonClass prose
+  else
+    { refusal condition reasonClass prose with
+        state := if session.state.mayReceive then some State.discarding else none }
+
+/-- The same placement for a refusal a link rule raises. It differs from `placed` in one way: a
+refusal that mandates the *connection*'s close is not answered by an END, so it is passed
+through untouched. -/
+def place (session : Session) (outbound : Bool) (reason : Refusal) : Refusal :=
+  if reason.closesConnection || outbound then reason
+  else
+    { reason with
+        state := if session.state.mayReceive then some State.discarding else reason.state }
+
+/-- The channel the frame must carry, the state's own permission column, and the mandatory
+fields the generated table states: everything a frame passes before the session reads what it
+carries. A frame whose bytes are not one of this layer's performatives is read by the
+performative's name, which is the empty field list, and the mandatory check is vacuous for it;
+such a frame is carried rather than judged, which is what the `.other` arm of both steps does
+with it. -/
+def gate (session : Session) (outbound : Bool) (channel : Nat) (body : Value) :
+    Except Refusal Unit := do
+  let performative := Performative.ofBody body
+  -- the channel this session answers on: the two begins are what establish the mapping, so
+  -- they are the frames that arrive and leave before it exists
+  let mapped := if outbound then session.outgoing else session.incoming
+  refuseUnless (performative == .begin || mapped == some channel)
+    (refusal wireCondition "illegalState"
+      s!"channel {channel} is not mapped to this session, whose \
+        {if outbound then "outgoing" else "incoming"} channel is {mapped}")
+  -- what the state's own description permits: every frame but the begin, whose rule is the
+  -- diagram's arrows rather than the permission column, since a session that is UNMAPPED
+  -- "cannot send or receive frames" and the begin is the frame that maps it
+  let permitted :=
+    performative == .begin ||
+      (if outbound then session.state.maySend else session.state.mayReceive)
+  refuseUnless permitted
+    (placed session outbound illegalStateCondition "illegalState"
+      s!"{session.state.name} does not permit this session to \
+        {if outbound then "send" else "receive"} a {performative.name} frame")
+  -- the mandatory fields the generated field table states
+  refuseUnless ((missingMandatory (typeNameOf body) body).isEmpty)
+    (placed session outbound invalidField "malformed"
+      s!"the {typeNameOf body} performative does not carry \
+        {missingMandatory (typeNameOf body) body}, and the declared surface marks it mandatory")
+
 /-- One frame the session layer answers for.
 
 The checks are the artifact's: the frame must be one this session's channel carries (the
@@ -1388,75 +1468,32 @@ send it cannot take is simply not taken, leaving the state where it was.
 `payload` is the octets after the performative, which the frame layer calls "the remaining
 bytes in the frame body" whose meaning "is defined by the semantics of the given
 performative": opaque for every performative but the transfer, whose payload a session
-with a transaction layer reads as the transaction message it may carry. -/
+with a transaction layer reads as the transaction message it may carry.
+
+Three sites place a refusal, and each behaves differently, which is worth knowing before
+adding a rule: a *wire-level* refusal (the channel map, and the frames the decoder cannot
+read at all) is raised outside this path and leaves the state where it is; a *session-level*
+one goes through `placed` here; and a *link-level* one — the rules `flowLink`, `transferLink`
+and `detachLink` raise — goes through `place`. The corpus reached this third site only once
+it had a vector whose refusal a channel map could not answer, so a rule added at the link
+level wants a vector keyed on that rule rather than on the channel it arrives by. -/
 def step (session : Session) (outbound : Bool) (channel : Nat) (body : Value)
     (payload : Octets) : Except Refusal Session := do
-  let performative := Performative.ofBody body
-  let typeName :=
-    match performative with
-    | .begin => "begin" | .end => "end" | .attach => "attach" | .detach => "detach"
-    | .flow => "flow" | .transfer => "transfer"
-    | .other => if isDisposition body then "disposition" else ""
   -- "any incoming frames on the session MUST be silently discarded until the peer's end
   -- frame is received": in the error-triggered close of DISCARDING what arrives is
   -- discarded without being looked at, and only the peer's end is answered
-  if !outbound && session.state == .discarding && performative != .end then
+  if frameDiscarded session outbound body then
     return session
-  -- the channel this session answers on: the two begins are what establish the mapping,
-  -- so they are the frames that arrive and leave before it exists
-  let mapped := if outbound then session.outgoing else session.incoming
-  refuseUnless (performative == .begin || mapped == some channel)
-    (refusal wireCondition "illegalState"
-      s!"channel {channel} is not mapped to this session, whose \
-        {if outbound then "outgoing" else "incoming"} channel is {mapped}")
-  -- what the state's own description permits: every frame but the begin, whose rule is
-  -- the diagram's arrows rather than the permission column, since a session that is
-  -- UNMAPPED "cannot send or receive frames" and the begin is the frame that maps it
-  let permitted :=
-    performative == .begin ||
-      (if outbound then session.state.maySend else session.state.mayReceive)
+  -- the channel map, the state's column and the mandatory fields, which every performative
+  -- passes before this machine reads it
+  let _ ← gate session outbound channel body
+  -- the two placements, fixed at the state this step was handed: the arms below shadow
+  -- `session` as they go, and a refusal is placed for the session the frame arrived in
   let placed (condition reasonClass prose : String) : Refusal :=
-    if outbound then refusal condition reasonClass prose
-    else
-      -- the section's answer to input it cannot process: an END with an error, which the
-      -- diagram draws from MAPPED to DISCARDING, and which a state that cannot send at
-      -- all cannot issue
-      -- `sessions.5` obliges an END with an error and `sessions.6` then obliges the
-      -- session to discard incoming frames until the peer's end, so the phase is reached
-      -- from every state that can still *receive*, not only from MAPPED: `END_SENT` may
-      -- receive and so must reach it, while the states that cannot receive cannot issue
-      -- the END at all and so stand where they are
-      { refusal condition reasonClass prose with
-          state := if session.state.mayReceive then some State.discarding else none }
-  -- a refusal the link raises is placed the way every session refusal is: the section
-  -- answers input it cannot process with the END an error, which is the diagram's
-  -- MAPPED --S:END(error)--> DISCARDING arrow
-  -- Three sites place a refusal, and each behaves differently, which is worth knowing
-  -- before adding a rule: a *wire-level* refusal (the channel map, and the frames the
-  -- decoder cannot read at all) is raised outside this path and leaves the state where it
-  -- is; a *session-level* one goes through `placed` below; and a *link-level* one — the
-  -- rules `flowLink`, `transferLink` and `detachLink` raise — goes through `place` here.
-  -- The corpus reached this third site only once it had a vector whose refusal a channel
-  -- map could not answer, so a rule added at the link level wants a vector keyed on that
-  -- rule rather than on the channel it arrives by.
+    SpecAMQP.Spec.Session.placed session outbound condition reasonClass prose
   let place (reason : Refusal) : Refusal :=
-    if reason.closesConnection || outbound then reason
-    else
-      -- the same phase rule as `placed` below, for the refusals the link raises: a link
-      -- refusal is input this session cannot process, so `sessions.6`'s discard reaches it
-      -- from every state that can receive, not only from MAPPED
-      { reason with
-          state := if session.state.mayReceive then some State.discarding else reason.state }
-  refuseUnless permitted
-    (placed illegalStateCondition "illegalState"
-      s!"{session.state.name} does not permit this session to \
-        {if outbound then "send" else "receive"} a {performative.name} frame")
-  -- the mandatory fields the generated field table states
-  refuseUnless ((missingMandatory typeName body).isEmpty)
-    (placed invalidField "malformed"
-      s!"the {typeName} performative does not carry {missingMandatory typeName body}, \
-        and the declared surface marks it mandatory")
-  match performative with
+    SpecAMQP.Spec.Session.place session outbound reason
+  match Performative.ofBody body with
   | .begin => stepBegin session outbound channel body
   | .attach =>
     match attachLink session outbound body with

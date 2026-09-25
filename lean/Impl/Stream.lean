@@ -397,7 +397,7 @@ entry point is `feed`, and because the inbox the loop threads back is what a par
 -/
 def drain (state : State) : State × List Output :=
   let (conn, inbox, outs) := run state.conn state.inbox
-  ({ conn := conn, inbox := inbox }, outs)
+  ({ state with conn := conn, inbox := inbox }, outs)
 
 /--
 **Feed the endpoint the octets a read returned**, and take back what it answers.
@@ -411,7 +411,7 @@ The outputs are the interface's own — the octets the layer wrote, and the answ
 state's name, or a refusal's condition and class) — in the order the steps produced them.
 -/
 def feed (state : State) (bytes : ByteArray) : State × List Output :=
-  drain { conn := state.conn, inbox := state.inbox ++ toOctets bytes }
+  drain { state with inbox := state.inbox ++ toOctets bytes }
 
 /-- Feeding nothing drains what is already pending: the loop's own answer, not a special case here. (A
 zero-length read does not happen through `Impl.Transport` — it *is* the peer's orderly close, for which
@@ -422,7 +422,7 @@ theorem feed_empty (state : State) : feed state ByteArray.empty = drain state :=
 
 /-- Feeding is draining what has arrived: the append is the whole of the difference. -/
 theorem feed_eq (state : State) (bytes : ByteArray) :
-    feed state bytes = drain { conn := state.conn, inbox := state.inbox ++ toOctets bytes } := rfl
+    feed state bytes = drain { state with inbox := state.inbox ++ toOctets bytes } := rfl
 
 /-- What the loop leaves, a partial read keeps: feeding octets that complete no unit answers nothing and
 keeps every octet. -/
@@ -439,7 +439,7 @@ theorem feed_some {state : State} {bytes : ByteArray} {n : Nat}
     feed state bytes =
       let buffer := state.inbox ++ toOctets bytes
       let answer := arriving state.conn buffer
-      let (state', outs') := drain { conn := answer.1, inbox := buffer.extract n buffer.size }
+      let (state', outs') := drain { state with conn := answer.1, inbox := buffer.extract n buffer.size }
       (state', answer.2 ++ outs') := by
   unfold feed drain
   rw [run_some h]
@@ -526,7 +526,7 @@ def nextUnit (state : State) : Option (State × List Output) :=
   | none => none
   | some n =>
     let answer := arriving state.conn state.inbox
-    some ({ conn := answer.1, inbox := state.inbox.extract n state.inbox.size }, answer.2)
+    some ({ state with conn := answer.1, inbox := state.inbox.extract n state.inbox.size }, answer.2)
 
 /-- **`nextUnit` is `run`'s own iteration, spelled with the tail kept instead of recursed on.** The shell
 that drives `nextUnit` and asks its application after each unit is running the loop whose laws are proved
@@ -538,12 +538,12 @@ theorem run_some_nextUnit {state state' : State} {outs : List Output}
       let (conn'', inbox'', outs'') := run state'.conn state'.inbox
       (conn'', inbox'', outs ++ outs'') := by
   unfold nextUnit at h
-  split at h
-  · exact absurd h (by simp)
-  · rename_i n hn
+  cases hn : nextUnitLength state.conn.state state.inbox with
+  | none => simp [hn] at h
+  | some n =>
+    rw [hn] at h
     have hpair := Option.some.inj h
-    have hstate : state' = { conn := (arriving state.conn state.inbox).1,
-                             inbox := state.inbox.extract n state.inbox.size } :=
+    have hstate : state' = { state with conn := (arriving state.conn state.inbox).1, inbox := state.inbox.extract n state.inbox.size } :=
       ((Prod.mk.injEq _ _ _ _).mp hpair).1.symm
     have houts : outs = (arriving state.conn state.inbox).2 :=
       ((Prod.mk.injEq _ _ _ _).mp hpair).2.symm

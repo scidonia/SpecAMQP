@@ -805,15 +805,22 @@ class Corpus:
         return self.body("flow", **values)
 
     def fragment_body(self, index: int, count: int, delivery_id: int = 0,
-                      handle: int = 0, settled: bool | None = None) -> dict:
+                      handle: int = 0, settled: bool | None = None,
+                      delivery_tag: bytes = b"tag") -> dict:
         """One transfer of a delivery split into `count` transfers. `delivery-id`,
         `delivery-tag` and `message-format` are specified for the first and omitted on
         continuations, which is what the three clauses require of them; `more` is set on
-        every transfer but the last, which is what makes the delivery continue."""
+        every transfer but the last, which is what makes the delivery continue.
+
+        `delivery_tag` is the first transfer's tag, and it is a parameter because a vector
+        that begins a *second* delivery while the first is still unsettled must not reuse
+        the first one's: `links.23` makes a tag unique among the deliveries either end
+        could still consider unsettled, so a scenario about the credit is not also a
+        scenario about the tag."""
         fields: dict[str, dict] = {"handle": {"type": "uint", "value": handle}}
         if index == 0:
             fields["delivery-id"] = {"type": "uint", "value": delivery_id}
-            fields["delivery-tag"] = {"type": "binary", "hex": b"tag".hex()}
+            fields["delivery-tag"] = {"type": "binary", "hex": delivery_tag.hex()}
             fields["message-format"] = {"type": "uint", "value": 0}
         if index < count - 1:
             fields["more"] = {"type": "boolean", "value": True}
@@ -1565,6 +1572,50 @@ def corpus(tables: Corpus) -> list[dict]:
     return vectors
 
 
+def resumed_link(t: Corpus, established: list, *, tag: bytes = b"tag",
+                 peer_handle: int = 0, resume_handle: int = 1, own_handle: int = 1) -> list:
+    """`established` — a link's three setup steps — followed by the four that leave one
+    delivery in the *receiver's* local unsettled map and put the link back up with both
+    ends' directional maps on their attaches.
+
+    `transfer/field:resume.1` makes the receiver ignore a resumed delivery its local map
+    does not hold, and `resume.3` is only observable on a delivery the receiver does hold,
+    so a vector about the flag's place on a resumed delivery must first get a delivery into
+    that map. The only way in is to receive one and leave it unsettled, and the only way to
+    suspend and resume without closing the session is `detach(closed=true)`, which destroys
+    the peer's endpoint: `unsettled.6` forbids a map on a plain re-attach, which
+    `staged-link-reattach-with-unsettled-map` pins as a refusal.
+
+    Written once and shared by the two families that need it, because the negative and the
+    positive vector have to stand on *the same* prior state for the pair to separate the
+    flag's place from the ignore rule.
+
+    `established` is the family's own `link_up`, whose callers differ: our endpoint is the
+    link's receiver when it is `link_up(role_sender=False)`, so the ordinary delivery and
+    the resumed one both arrive from the peer.
+    """
+    maps = t.unsettled_map([(t.tag(tag), t.delivery_state("received"))])
+    return established + [
+        # one ordinary delivery: `more` and `settled` both unset, so it completes and stays
+        # unsettled, which is the entry the receiver's local map is about
+        t.receive_frame(AMQP_FRAME, t.transfer_body(handle=peer_handle, delivery_id=0,
+                                                     delivery_tag=tag),
+                        state=s("MAPPED"), channel=1),
+        # the peer destroys its endpoint: `links.16` makes its next attach a resume, and
+        # `unsettled.6` is why this cannot be a plain (closed=false) detach
+        t.receive_frame(AMQP_FRAME, t.detach_body(handle=peer_handle, closed=True),
+                        state=s("MAPPED"), channel=1),
+        # the resume, carrying the peer's own map: `links.17`'s non-null unsettled field is
+        # what tells a resume request from a pipelined re-attach
+        t.receive_frame(AMQP_FRAME, t.attach_body(role=False, handle=resume_handle,
+                                                  unsettled=maps),
+                        state=s("MAPPED"), channel=1),
+        # our end's map on a fresh handle: an attach for a link this end is still associated
+        # with, which is `links.5`'s requiring case — the map is not optional here
+        t.send_frame(AMQP_FRAME, t.attach_body(role=True, handle=own_handle, unsettled=maps),
+                     state=s("MAPPED"), channel=1)]
+
+
 def session_corpus(tables: Corpus) -> list[dict]:
     """The session family: `begin`/`end`, `attach`/`detach`, `flow` and `transfer` on a
     channel, from the session section's state descriptions, its transitions picture and
@@ -1938,8 +1989,8 @@ def session_corpus(tables: Corpus) -> list[dict]:
                          payload=message),
             t.receive_frame(AMQP_FRAME, t.flow_body(handle=0, delivery_count=1, link_credit=1),
                             state=s("MAPPED"), channel=1),
-            t.send_frame(AMQP_FRAME, t.fragment_body(0, 1, delivery_id=1), state=s("MAPPED"),
-                         channel=1, payload=message)],
+            t.send_frame(AMQP_FRAME, t.fragment_body(0, 1, delivery_id=1, delivery_tag=b"tag-1"),
+                         state=s("MAPPED"), channel=1, payload=message)],
         note="the doc's formula for a sender: link-credit_snd := delivery-count_rcv + "
              "link-credit_rcv - delivery-count_snd — so a flow that raises the receiver's "
              "credit by one raises the sender's by one, and the delivery the exhausted "
@@ -2769,17 +2820,29 @@ def session_corpus(tables: Corpus) -> list[dict]:
     vectors.append(exchange(
         "exchange-link-resume-on-first-transfer", start=s("MAPPED"),
         clauses=[TRANSFER_RESUME_FIRST_TRANSFER, TRANSFER_FIRST_FIELDS,
-                 TRANSFER_ONE_SECTION],
-        steps=link_up(role_sender=False) + [
-            t.receive_frame(AMQP_FRAME, t.transfer_body(resume=True, more=True),
+                 TRANSFER_ONE_SECTION, LINKS_TERMINUS_CARRIES_UNSETTLED],
+        steps=resumed_link(t, link_up(role_sender=False)) + [
+            t.receive_frame(AMQP_FRAME,
+                            t.transfer_body(handle=1, delivery_id=0, delivery_tag=b"tag",
+                                            resume=True, more=True),
                             state=s("MAPPED"), channel=1, payload=message[:10]),
-            t.receive_frame(AMQP_FRAME, t.transfer_body(identity=False),
+            t.receive_frame(AMQP_FRAME,
+                            t.transfer_body(handle=1, identity=False),
                             state=s("MAPPED"), channel=1, payload=message[10:])],
         note="`resume.3` and `.4` read together: the flag MUST be set on the *first* "
-             "transfer of a resumed delivery, and on a subsequent transfer it MAY be set "
-             "or omitted — so a resumed delivery named on its first transfer and left "
-             "unnamed on its continuation is the conforming case, and admission is the "
-             "observable"))
+             "transfer of a resumed delivery, and on a subsequent transfer it MAY be set or "
+             "omitted — so a resumed delivery named on its first transfer and left unnamed "
+             "on its continuation is the conforming case, and admission is the observable. "
+             "The delivery is one the receiver holds: it arrived unsettled before the link "
+             "was suspended, which is what makes `resume.1`'s ignore inapplicable — a "
+             "resumed delivery absent from that map is "
+             "`staged-link-resume-not-in-receiver-map`'s case, and would be ignored rather "
+             "than resumed. `links.5` is pinned in the same vector: the two resume attaches "
+             "carry each end's own map, and an attach for a link whose end is already "
+             "associated with a terminus MUST include it — the refusal for omitting it is "
+             "`staged-link-second-attach-same-name`'s. The map's values are Part 3 "
+             "outcomes that neither layer reads (`unsettled.1`'s comparison is held, not "
+             "emitted), so they are written as the widening family writes them"))
 
     # -- the fields an attach's own clauses make it carry or omit -------------------- #
 
@@ -3036,21 +3099,25 @@ def widening_corpus(tables: Corpus) -> list[dict]:
         exchange(
             "staged-link-resume-only-on-continuation", start=s("MAPPED"),
             clauses=[TRANSFER_RESUME_FIRST_TRANSFER, TRANSFER_FIRST_FIELDS],
-            steps=link_up() + [
-                t.receive_frame(AMQP_FRAME, t.transfer_body(more=True),
+            steps=resumed_link(t, link_up()) + [
+                t.receive_frame(AMQP_FRAME,
+                                t.transfer_body(handle=1, delivery_id=0, delivery_tag=b"tag",
+                                                more=True),
                                 state=s("MAPPED"), channel=1, payload=message[:10]),
                 t.refused("receive", reason="malformed", condition=INVALID_FIELD,
                           state=s("DISCARDING"),
-                          body=t.transfer_body(identity=False, resume=True), channel=1,
-                          payload=message[10:])],
+                          body=t.transfer_body(handle=1, identity=False, resume=True),
+                          channel=1, payload=message[10:])],
             note="**Shared gap.** `resume.3`: \"If a resumed delivery spans more than one "
                  "transfer performative, then the resume flag MUST be set to true on the "
-                 "*first* transfer of the resumed delivery.\" The delivery here is "
-                 "resumed — its continuation says so — while the first transfer that "
-                 "began it did not. **Both artefacts admit** both steps. The corpus's "
-                 "admitted half (`exchange-link-resume-on-first-transfer`) has the flag "
-                 "where the clause requires it, and the pair is what separates \"the flag "
-                 "is read\" from \"the flag is required in a place\""),
+                 "*first* transfer of the resumed delivery.\" The delivery here is the one "
+                 "the receiver holds, so `resume.1` does not ignore it and the flag's place "
+                 "is the only thing left to judge: its continuation claims to be a resumed "
+                 "delivery while the transfer that began it did not say so. **Both "
+                 "artefacts admit** both steps. The admitted half "
+                 "(`exchange-link-resume-on-first-transfer`) stands on the same prior "
+                 "state, and the pair is what separates \"the flag is read\" from \"the "
+                 "flag is required in a place\""),
 
         exchange(
             "staged-link-attach-unsettled-null-key", start=s("MAPPED"),
