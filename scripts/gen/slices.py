@@ -873,14 +873,22 @@ class Corpus:
             step["expect"]["state"] = state
         return step
 
-    def send_frame(self, frame_type: int, body: dict, *, state: str, channel: int = 0,
+    def send_frame(self, frame_type: int, body: dict, *, state: str | None, channel: int = 0,
                    payload: bytes = b"", note: str = "") -> dict:
-        """A frame this endpoint writes. `note` is the step-level prose the exchange
-        schema allows beside an admitted step — the widening's vectors use it to say what
-        the step is *for* where the clause's frame is otherwise unremarkable."""
+        """A frame this endpoint writes. A `state` names the layer's state after the step;
+        `None` omits it, which is how the runner reads a step that leaves its own layer
+        where it was rather than one that pins a state — `rememberedState?` compares the
+        omitted name against the layer's remembered one, and rejects the step only when
+        that layer was never named (`lean/Harness/Runner.lean`). `expect.state` is a
+        string in the schema, so `None` is written as omission, never as JSON null, which
+        is what `receive_frame` and `refused` already do. `note` is the step-level prose
+        the exchange schema allows beside an admitted step — the widening's vectors use it
+        to say what the step is *for* where the clause's frame is otherwise unremarkable."""
         step = {"direction": "send",
                 "value": frame_value(frame_type, body, channel=channel, payload=payload),
-                "expect": {"status": "admitted", "state": state}}
+                "expect": {"status": "admitted"}}
+        if state is not None:
+            step["expect"]["state"] = state
         if note:
             step["note"] = note
         return step
