@@ -138,6 +138,7 @@ structure Link where
   deliveryFormat : Option Nat
   transactions : Option Layer
   unsettled : DeliveryTag → Option UnsettledDelivery
+  unsettledKeys : List DeliveryTag := []
   nextDeliveryId : Nat
 
 /-- A session: the restricted endpoint for its session-scope state, a stable registry keyed by
@@ -180,11 +181,21 @@ def HandlesResolveLinks (session : WidenedSession) : Prop :=
     session.remoteHandles leftHandle = some id →
     session.remoteHandles rightHandle = some id → leftHandle = rightHandle)
 
-/-- The three invariants together, which every widened session a step produces satisfies. They are
-properties of the state rather than optional proofs about it: a step that left a stale binding or a
-key naming someone else's record would falsify one of them. -/
+/-- The finite tag index contains each and only each occupied slot in one link's shared unsettled
+table, exactly once. Its order has no protocol meaning and it carries no delivery state of its own;
+it exists because a disposition names a delivery-id range while the table itself is functional. -/
+def UnsettledKeysComplete (link : Link) : Prop :=
+  link.unsettledKeys.Nodup ∧
+    ∀ tag, tag ∈ link.unsettledKeys ↔ ∃ entry, link.unsettled tag = some entry
+
+/-- The four invariants together, which every widened session a step produces satisfies: registry
+identity, the finite registry index, the link-level finite tag index, and handle resolution. They are
+properties of the state rather than optional proofs about it: a step that left a stale binding, a key
+naming someone else's record, or an index naming a tag the table does not hold would falsify one of
+them. -/
 def WidenedSessionValid (session : WidenedSession) : Prop :=
-  LinkNamesUnique session ∧ RegistryKeysComplete session ∧ HandlesResolveLinks session
+  LinkNamesUnique session ∧ RegistryKeysComplete session ∧ HandlesResolveLinks session ∧
+    ∀ id link, session.links id = some link → UnsettledKeysComplete link
 
 /-! ## Identity and the two handle spaces -/
 
@@ -248,14 +259,17 @@ def putLink (session : WidenedSession) (link : Link) : WidenedSession :=
 /-! ## The shared unsettled table -/
 
 /-- One key's entry. -/
-def setEntry (table : DeliveryTag → Option UnsettledDelivery) (key : DeliveryTag)
-    (entry : UnsettledDelivery) : DeliveryTag → Option UnsettledDelivery :=
-  fun k => if k == key then some entry else table k
+def setEntry (link : Link) (key : DeliveryTag) (entry : UnsettledDelivery) : Link :=
+  { link with
+      unsettled := fun k => if k == key then some entry else link.unsettled k,
+      unsettledKeys := if link.unsettledKeys.contains key then link.unsettledKeys
+                       else key :: link.unsettledKeys }
 
-/-- Drop one key. -/
-def clearEntry (table : DeliveryTag → Option UnsettledDelivery) (key : DeliveryTag) :
-    DeliveryTag → Option UnsettledDelivery :=
-  fun k => if k == key then none else table k
+/-- Drop one key, and its entry in the index with it. -/
+def clearEntry (link : Link) (key : DeliveryTag) : Link :=
+  { link with
+      unsettled := fun k => if k == key then none else link.unsettled k,
+      unsettledKeys := link.unsettledKeys.filter (fun k => k != key) }
 
 /-! ## Reading the attach's two widening fields -/
 
@@ -477,6 +491,7 @@ def linkAfterDetach (base : Link) (outbound closed withError : Bool) : Link :=
         deliveryTag := (if withError then none else base.deliveryTag),
         deliveryFormat := (if withError then none else base.deliveryFormat),
         unsettled := (if withError then fun _ => none else base.unsettled),
+        unsettledKeys := (if withError then [] else base.unsettledKeys),
         transactions := base.transactions.map Layer.retiredAll }
   else
     { base with
@@ -487,6 +502,7 @@ def linkAfterDetach (base : Link) (outbound closed withError : Bool) : Link :=
         deliveryTag := (if withError then none else base.deliveryTag),
         deliveryFormat := (if withError then none else base.deliveryFormat),
         unsettled := (if withError then fun _ => none else base.unsettled),
+        unsettledKeys := (if withError then [] else base.unsettledKeys),
         transactions := base.transactions.map Layer.retiredAll }
 
 /-- The link a transfer leaves: the delivery it carries or completes, the tag and format recorded
@@ -756,14 +772,21 @@ def applyDisposition (session : WidenedSession) (link : Link) (first last : Nat)
     WidenedSession :=
   if !settled then putLink session link
   else
-    match link.delivery, link.deliveryTag with
-    | some delivery, some tag =>
+    let cleared :=
+      link.unsettledKeys.foldl
+        (fun carried tag =>
+          match carried.unsettled tag with
+          | some entry =>
+            if first ≤ entry.deliveryId && entry.deliveryId ≤ last then clearEntry carried tag
+            else carried
+          | none => carried)
+        link
+    match cleared.delivery with
+    | some delivery =>
       if first ≤ delivery.id && delivery.id ≤ last then
-        putLink session
-          { link with delivery := none, deliveryTag := none, deliveryFormat := none,
-                      unsettled := clearEntry link.unsettled tag }
-      else putLink session link
-    | _, _ => putLink session link
+        putLink session { cleared with delivery := none, deliveryTag := none, deliveryFormat := none }
+      else putLink session cleared
+    | none => putLink session cleared
 
 /-- The disposition exchange: `disposition.1`/`.2`'s directionality, the range `first`/`last` name,
 and the settlement a disposition carries. A disposition declares no `handle` field, so the link it is
@@ -948,19 +971,19 @@ def transferLink (session : WidenedSession) (outbound : Bool) (body : Value) :
                credit := if sender && starting then current.credit - 1 else current.credit,
                count := if starting then current.count + 1 else current.count }
     | none => link.position
-  let table :=
+  let recorded :=
     match tag with
-    | none => link.unsettled
+    | none => link
     | some key =>
-      if settled || aborted then clearEntry link.unsettled key
+      if settled || aborted then clearEntry link key
       else
-        setEntry link.unsettled key
+        setEntry link key
           { deliveryId := deliveryId,
             localState := (link.unsettled key).bind (fun held => held.localState),
             remoteState := (link.unsettled key).bind (fun held => held.remoteState) }
   let nextDeliveryId := if outbound && starting then deliveryId + 1 else link.nextDeliveryId
   return putLink session
-    (linkAfterTransfer link position delivery tagOut formatOut nextDeliveryId table)
+    (linkAfterTransfer recorded position delivery tagOut formatOut nextDeliveryId recorded.unsettled)
 
 /-- The session a transfer leaves, with the session-scope rules the restricted reading places around
 it: the two windows a sent transfer is charged against, the settlement the transfer's own fields

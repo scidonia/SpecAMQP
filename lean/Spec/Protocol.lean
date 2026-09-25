@@ -57,8 +57,8 @@ open SpecAMQP.Spec.Connection
    valueOctets)
 open SpecAMQP.Spec
   (DeliveryTag UnsettledDelivery WidenedDelivery LinkId LinkLife WidenedLinkEndpoint WidenedLink
-   WidenedSession LinkNamesUnique RegistryKeysComplete HandlesResolveLinks WidenedProtocolState
-   WidenedProtocolStateValid)
+   WidenedSession LinkNamesUnique RegistryKeysComplete UnsettledKeysComplete HandlesResolveLinks
+   WidenedProtocolState WidenedProtocolStateValid)
 
 /-! ## Link identity and the two handle spaces -/
 
@@ -114,6 +114,7 @@ def blankLink (id : LinkId) : WidenedLink where
   deliveryFormat := none
   transactions := none
   unsettled := fun _ => none
+  unsettledKeys := []
   nextDeliveryId := 0
 
 /-- Write a link record at its own key, which is the only slot it can occupy: `LinkNamesUnique`
@@ -127,19 +128,27 @@ def putLink (session : WidenedSession) (link : WidenedLink) : WidenedSession :=
 
 /-! ## The shared unsettled table
 
-One table keyed by `DeliveryTag`, with the two observations an in-doubt delivery is resolved from.
-Adding and dropping a key are the only two things a step does to it, and both are keyed, so the
-table needs no traversal. -/
+One table keyed by `DeliveryTag`, with the two observations an in-doubt delivery is resolved from,
+and `unsettledKeys`, the finite index of the tags the table holds. A transfer adds a key through
+`setEntry` and drops one through `clearEntry`, and those are the only two things a step does to the
+table; a `disposition` names neither a link nor a tag, so it walks that index to reach every entry
+the delivery-id range it carries covers. -/
 
-/-- One key's entry. -/
-def setEntry (table : DeliveryTag → Option UnsettledDelivery) (key : DeliveryTag)
-    (entry : UnsettledDelivery) : DeliveryTag → Option UnsettledDelivery :=
-  fun k => if k == key then some entry else table k
+/-- One key's entry, with the link's finite index kept in step: a tag enters the index when the
+table first holds it. The index is what makes the table walkable, which is what a `disposition` —
+a frame that names no link and no tag — needs in order to reach a delivery the link no longer holds
+in progress (`disposition.3`'s case). -/
+def setEntry (link : WidenedLink) (key : DeliveryTag) (entry : UnsettledDelivery) : WidenedLink :=
+  { link with
+      unsettled := fun k => if k == key then some entry else link.unsettled k,
+      unsettledKeys := if link.unsettledKeys.contains key then link.unsettledKeys
+                       else key :: link.unsettledKeys }
 
-/-- Drop one key. -/
-def clearEntry (table : DeliveryTag → Option UnsettledDelivery) (key : DeliveryTag) :
-    DeliveryTag → Option UnsettledDelivery :=
-  fun k => if k == key then none else table k
+/-- Drop one key, and its entry in the index with it. -/
+def clearEntry (link : WidenedLink) (key : DeliveryTag) : WidenedLink :=
+  { link with
+      unsettled := fun k => if k == key then none else link.unsettled k,
+      unsettledKeys := link.unsettledKeys.filter (fun k => k != key) }
 
 /-! ## Reading the attach's two widening fields -/
 
@@ -342,6 +351,7 @@ def linkAfterDetach (base : WidenedLink) (outbound closed withError : Bool) : Wi
         deliveryTag := (if withError then none else base.deliveryTag),
         deliveryFormat := (if withError then none else base.deliveryFormat),
         unsettled := (if withError then fun _ => none else base.unsettled),
+        unsettledKeys := (if withError then [] else base.unsettledKeys),
         transactions := base.transactions.map Transactions.Layer.retireAll }
   else
     { base with
@@ -352,21 +362,21 @@ def linkAfterDetach (base : WidenedLink) (outbound closed withError : Bool) : Wi
         deliveryTag := (if withError then none else base.deliveryTag),
         deliveryFormat := (if withError then none else base.deliveryFormat),
         unsettled := (if withError then fun _ => none else base.unsettled),
+        unsettledKeys := (if withError then [] else base.unsettledKeys),
         transactions := base.transactions.map Transactions.Layer.retireAll }
 
 /-- The link a transfer leaves: the delivery it carries or completes, the identity recorded with
-it, the sender's next id, and the credit or count the transfer moves. -/
+it, the sender's next id, and the credit or count the transfer moves. The unsettled table and its
+index travel in `base`, because a transfer is what writes them. -/
 def linkAfterTransfer (base : WidenedLink) (position : Option Position)
     (delivery : Option WidenedDelivery) (deliveryTag : Option DeliveryTag)
-    (deliveryFormat : Option Nat) (nextDeliveryId : Nat)
-    (unsettled : DeliveryTag → Option UnsettledDelivery) : WidenedLink :=
+    (deliveryFormat : Option Nat) (nextDeliveryId : Nat) : WidenedLink :=
   { base with
       position := position,
       delivery := delivery,
       deliveryTag := deliveryTag,
       deliveryFormat := deliveryFormat,
-      nextDeliveryId := nextDeliveryId,
-      unsettled := unsettled }
+      nextDeliveryId := nextDeliveryId }
 
 /-- The session with its session-scope windows replaced. The window arithmetic lives on the
 restricted session state, and this is the one place the widened step writes it. -/
@@ -583,21 +593,31 @@ def detachStep (session : WidenedSession) (outbound : Bool) (body : Value) :
 
 /-! ## The disposition exchange -/
 
-/-- One link's share of a disposition: the delivery the link holds in progress is released when its
-id lies in the named range, and the entry at that delivery's tag leaves the unsettled table, which
-is `disposition.4`'s "the updated state MUST be applied". An entry whose delivery the link no longer
-holds in progress is not reachable from the frame — a disposition names no link and no tag, and the
-table is keyed by tag — which is a limit of what the vocabulary can address rather than a rule. -/
+/-- One link's share of a disposition: **every** unsettled entry whose delivery the range covers
+leaves the table, and the link's in-progress delivery is released when it is one of them. The
+traversal is exact because the link carries a finite index of the tags its table holds — which is
+what lets a disposition reach a delivery the link no longer holds in progress, `disposition.3`'s
+case, where the link is detached but the delivery is still live and `disposition.4` still requires
+the updated state to be applied. -/
 def applyDisposition (session : WidenedSession) (link : WidenedLink) (first last : Nat)
     (settled : Bool) : WidenedSession :=
   if !settled then putLink session link
   else
-    match link.delivery, link.deliveryTag with
-    | some delivery, some tag =>
+    let cleared :=
+      link.unsettledKeys.foldl
+        (fun carried tag =>
+          match carried.unsettled tag with
+          | some entry =>
+            if first ≤ entry.deliveryId && entry.deliveryId ≤ last then clearEntry carried tag
+            else carried
+          | none => carried)
+        link
+    match cleared.delivery with
+    | some delivery =>
       if first ≤ delivery.id && delivery.id ≤ last then
-        putLink session { link with delivery := none, deliveryTag := none, deliveryFormat := none, unsettled := clearEntry link.unsettled tag }
-      else putLink session link
-    | _, _ => putLink session link
+        putLink session { cleared with delivery := none, deliveryTag := none, deliveryFormat := none }
+      else putLink session cleared
+    | none => putLink session cleared
 
 /-- The disposition exchange: `disposition.1`/`.2`'s directionality, the range `first`/`last` name,
 and the settlement a disposition carries. A disposition declares no `handle` field, so the link it
@@ -756,19 +776,19 @@ def transferLink (session : WidenedSession) (outbound : Bool) (body : Value) :
                deliveryCount := if starting then current.deliveryCount + 1
                                 else current.deliveryCount }
     | none => link.position
-  let table :=
+  let recorded :=
     match tag with
-    | none => link.unsettled
+    | none => link
     | some key =>
-      if settled || aborted then clearEntry link.unsettled key
+      if settled || aborted then clearEntry link key
       else
-        setEntry link.unsettled key
+        setEntry link key
           { deliveryId := deliveryId,
             localState := (link.unsettled key).bind (fun held => held.localState),
             remoteState := (link.unsettled key).bind (fun held => held.remoteState) }
   let nextDeliveryId := if outbound && starting then deliveryId + 1 else link.nextDeliveryId
   return putLink session
-    (linkAfterTransfer link position delivery tagOut formatOut nextDeliveryId table)
+    (linkAfterTransfer recorded position delivery tagOut formatOut nextDeliveryId)
 
 /-- The session a transfer leaves, with the session-scope rules the legacy reading places around it:
 the two windows a sent transfer is charged against, the settlement the transfer's own fields carry,
