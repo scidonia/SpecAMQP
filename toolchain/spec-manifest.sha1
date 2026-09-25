@@ -59,12 +59,12 @@ c661a0341ee5572bd716861459bcfbedbae36a7f  ledger/ambiguities/unmapped-begin.json
 2dd54d7eeae541a3df93bd52a17aae4d8cff5a6e  ledger/ambiguities/version-mismatch-condition.json
 003cbf78615e5a2c39ff63ce21b19ef4ab0b6b68  ledger/ambiguities/zero-width-array-count.json
 a713fbf4e03ad80112e701e2e7dfabe6dbb53623  ledger/clauses.json
-a47d58fab7d42a568f0634c4422e340d97817795  ledger/coverage.json
+809752542b4701a2fc64b65676038e03d6fe861d  ledger/coverage.json
 14a36a38e585c6d19918615f3a1ce4600a8ed6af  ledger/dispositions/part0-conformance-and-transport-lifecycle.json
 31d0862cd32b2264c02015dd1f24ffe5443aadac  ledger/dispositions/part1-types.json
 16fb859aa3aeea5c550c1a9f8d8a78b32ff25901  ledger/dispositions/part2-connection-establishment.json
-2ad0b7bd62931d88f9281244d20599c74e35f4a1  ledger/dispositions/part2-links.json
-41c35877022ad3af8b8b3cc12aad23676def1567  ledger/dispositions/part2-performatives-link-state.json
+da74f017a7197c84a494b3253be1d3ad99d80b70  ledger/dispositions/part2-links.json
+64e81554dcf3f216709d4592fd35e2ee3be03bef  ledger/dispositions/part2-performatives-link-state.json
 77685884ffa42a3ea031608eef46bcc6b7aaa035  ledger/dispositions/part2-performatives-remainder.json
 acc85c05868948d2f8fedfb0dd935c52a76e9af8  ledger/dispositions/part2-performatives-settle-mode.json
 7f284ab7ed95408641030f546e00e1b91d7303d9  ledger/dispositions/part3-addressing.json
@@ -76,7 +76,7 @@ f79a6ce2d7a200ac94ef278489fc16a9b1b32314  ledger/dispositions/part3-message-sect
 bace5eb9d1579438ac37e9ca2e48630387793d32  ledger/dispositions/part5-sasl.json
 c36967feb16eedb417605418dbcd8fb455785e36  ledger/dispositions/part5-security-layers.json
 281117d421db981a5d7091aab0ce2882d43d458a  ledger/dispositions/picture-review.json
-7baec9980d2770eb505df8d56b6beb1c47d03466  ledger/dispositions/unkeyed-normative.json
+5897699271ff70ff7b32e0b75e9d4300769cc351  ledger/dispositions/unkeyed-normative.json
 fd83990fdb34dca23fc732e566fa109c98af71b5  ledger/lowercase-keywords.json
 bade00376950e4a224326e89498494519b4c5452  ledger/pictures.json
 9866f8e45f15cbcd1663a08f6d9b2afc6232f1fb  ledger/reconciliation.json

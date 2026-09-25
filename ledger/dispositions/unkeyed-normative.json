@@ -1091,7 +1091,7 @@
    "clause_text": "When the map is incomplete the recipient of the map cannot take the absence of a delivery tag from the map as evidence of settlement.",
    "disposition": "deferred:S4",
    "kind": "UNKEYED",
-   "note": "deferred: S4 — the session/link machine's milestone owns this statement.",
+   "note": "Still deferred as an endpoint obligation, with its state facet named. `Spec.Protocol.absentDeliveryState` returns no state for a tag absent from the shared unsettled table, and `SpecAMQP.Proofs.absent_is_not_settlement` proves that absence cannot become a terminal settlement value (lean/Proofs/WidenedClauses.lean:71-83). No executable transition consults that declaration when acting on an incomplete map, so the theorem is recorded as the clause's formal vocabulary rather than promoted as proof of the recipient's required restraint.",
    "text_sha256": "855b0b16cac7d0e0da82f57a639c82423ed8f8892eccb2b63d21fc05d02a7c19",
    "unkeyed_phrases": [
     "cannot"

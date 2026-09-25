@@ -7,20 +7,18 @@
   "uncarried": "No declaration and no vector carries the clause's requirement. A declaration that only recognises the vocabulary a clause is written in — reading a field without acting on it — is not a carrier; where one of those exists the note names it as the near-miss so a reader can see why it was not counted, and a finding is stated where the model admits what the clause forbids."
  },
  "design_consequences": [
-  "This file holds all thirty-two must-class clauses of the `links` family: the seventeen of the anchor and the fifteen of its three child docs (`doc:flow-control` 7, `doc:resuming-deliveries` 7, `doc:closing-a-link` 1). Twenty-three are uncarried and say so, eight are carried by declarations in the session layer with the case each misses named in its note, and one is decided by the register.",
-  "Uncarried (deferred:S4), twenty-three: the anchor's .1, .2, .4, .5, .7, .8, .10, .13, .16, .17, .18, .23; `doc:flow-control`'s .4, .7, .11; all seven of `doc:resuming-deliveries`; and `doc:closing-a-link`.2. They are the same object seen from every side: the model has one link per session with a handle registry (lean/Spec/Session.lean:446-448) and no link name, no terminus properties, no unsettled map, no link-error family, no read of the attach's `unsettled` or the transfer's `resume`, and no sending side. Twenty-three clauses, one shape.",
-  "Carried, eight: .14 by `detachLink`'s release (the destruction; the error case and any record of it are the gap), .15 by `linkHandleOf` and the placement in `step` (the handle half; the delivery-ids half is not carried), .22 by `transferLink`'s first-transfer requirement (that a tag is present, not who chose it), .33 by `transferLink`'s abort branch (the delivery's record, because a payload is opaque here), and the flow-control doc's .2, .3, .5 and .9 by the credit arithmetic — `Position.creditFor`, its use in `flowLink` and `transferLink`, and the state law `SenderCreditState`. Those four are the family's well-covered corner: the credit is the one per-link quantity the model keeps, and its clauses are the ones that have both a declaration and a vector.",
-  "Decided by the register: .31, by `interleaved-deliveries-absorbed`, whose clause list names it and whose adopted reading — the second delivery's first transfer absorbed as a continuation — is what `transferLink`'s continuation branch implements. The entry is the reason no carrier is owed: the clause constrains the sender, and the artifact says nothing about a receiver's answer to a peer that interleaves.",
-  "Three clauses are vacuous in this model rather than missing, for the same single-link, single-delivery shape: .1's name uniqueness and .23's delivery-tag uniqueness, because only one link and one delivery exist at a time, and `doc:flow-control.4`'s assumption, which the model answers with a zero rather than with the count the sentence names, indistinguishably under the flow rule's own count check. That shape is what `interleaved-deliveries-absorbed` and `link-uniqueness-vacuous` record; neither entry's clause list names these clauses, so neither is cited, and widening either is the planner's decision.",
-  "The nearest neighbour of `links.2` is implemented and is a different clause: `attachLink` refuses an attach whose handle is already claimed (lean/Spec/Session.lean:696-699) under `attach/field:handle.2`, where `links.2` says a second attach for a non-suspended link may succeed and the first attach be closed with `link-error`. A register entry would be the record if the model ever expresses stealing; today the model cannot ask the question.",
-  "`links.4` is the family's one behavioural finding: an inbound attach whose terminus is null is admitted and keeps its link, where the sentence requires the newly created endpoint to be detached. `links.13`, `.16`, `.17`, `.18`, the resumption doc and the closing-a-link doc are the same missing object seen from further sides — the error detach that is never built, the reattach that cannot be forbidden because a resume cannot be recognised, the `unsettled` field that is never read, the pipelined attach that cannot be told from either, the seven sentences about unsettled maps the session does not hold, and the closing detach whose `closed` flag is never read."
+  "This file holds all thirty-two must-class clauses of the `links` family: the seventeen of the anchor and the fifteen of its three child docs (`doc:flow-control` 7, `doc:resuming-deliveries` 7, `doc:closing-a-link` 1). Fifteen now name formal declarations, one is decided by the register, and sixteen remain deferred or outside the frame-construction boundary.",
+  "The widening's checked and structural carriers live in `Spec.Protocol`, not in the restricted `Spec.Session` model: `LinkId` plus `LinkNamesUnique` carry name-and-direction identity; `attachStep` distinguishes attached, detached and destroyed endpoint lives; `unsettledKeys` supplies the resume discriminator; and `transferLink` enforces tag uniqueness and the receiver-ignore rule. Their promoted scenarios name the observable refusal or ignored delivery.",
+  "The widening does not make a state facet into an endpoint action. `links.2` and `doc:closing-a-link.2` still require emitted close/detach frames that `Spec.Protocol.step` cannot return. `doc:resuming-deliveries.3`–`.8` have named predicates, reductions and theorems in `Proofs/WidenedClauses`, but the sender/receiver actions and resume emissions those sentences require remain deferred.",
+  "The old `Spec.Session` declarations remain carriers only for the restricted single-link contracts that already name them. The widened codecs dispatch through `Spec.Protocol` and do not synchronize the old name-less link slots, so each disposition below identifies which model actually carries it.",
+  "The register still decides `links.31` through `interleaved-deliveries-absorbed`: the clause constrains the sender, and the artifact states no receiver refusal for a peer that interleaves."
  ],
  "dispositions": {
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.1": {
    "clause_text": "Link names MUST uniquely identify the link amongst all links of the same direction between the two participating containers.",
-   "disposition": "deferred:S4",
+   "disposition": "formalized:SpecAMQP.Spec.LinkNamesUnique; formalized:SpecAMQP.Spec.Protocol.identityOf; formalized:SpecAMQP.Spec.Protocol.putLink; test:staged-link-second-attach-same-name",
    "kind": "MUST",
-   "note": "deferred: S4 — uncarried: the model stores no link name and holds one link per session, so the uniqueness this sentence requires has no subject. `attachLink` (lean/Spec/Session.lean:768-887) reads an attach's role, handle, initial-delivery-count, snd-settle-mode and target and never its `name`, and the session keeps one handle registry for its one link (lean/Spec/Session.lean:446-448). This is the shape the register calls vacuous for `sessions.1` (`link-uniqueness-vacuous`), but that entry's text and clause list name `sessions.1` alone, so it is not cited here; widening it, or registering a name-uniqueness reading, is the planner's pen.",
+   "note": "Carried structurally by the widened registry. `identityOf` keys a link by its uninterpreted name and this endpoint's role (lean/Spec/Protocol.lean:75-79); `putLink` writes a record only at that identity and adds the key once (lean/Spec/Protocol.lean:119-126); `LinkNamesUnique` states that every occupied slot contains a record of its own identity (lean/Spec/WidenedState.lean). Opposite-direction links may share a name because role is part of the key. `staged-link-second-attach-same-name` observes that the second attach resolves the existing same-direction identity rather than creating an anonymous one.",
    "text_sha256": "13cc11d74778e2dfd2caf315599aae0ef534a4f7261f2fbbb532271f67c8275e"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.10": {
@@ -53,30 +51,30 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.16": {
    "clause_text": "Since the link endpoint has been destroyed, the peer cannot reattach, and MUST resume the link in order to restore communication.",
-   "disposition": "deferred:S4",
+   "disposition": "formalized:SpecAMQP.Spec.Protocol.attachStep; test:staged-link-pipelined-reattach",
    "kind": "MUST",
-   "note": "deferred: S4 — uncarried: the sentence both forbids a reattach and requires a resume, and the model can express neither. With no link name, no terminus and no read of the attach's `unsettled` field (`.17`), an attach after a release that names a fresh handle is admitted by `attachLink` (lean/Spec/Session.lean:768-887) and creates a new link rather than restoring one, so there is no distinction between reattaching and resuming to enforce. The restriction `interleaved-deliveries-absorbed` records — one held delivery, no link registry — is the same shape: a resume would have to restore into something the session does not keep.",
+   "note": "Carried by the widened attach transition. `attachStep` recovers the stable name-and-role identity and reads that endpoint's life; a destroyed endpoint is admitted only through the resume case carrying a non-null unsettled map (lean/Spec/Protocol.lean:419-440), while `putLink` restores the same logical record on its new directional handle. `staged-link-pipelined-reattach` pins the destroyed-endpoint refusal rather than permitting a fresh re-attach.",
    "text_sha256": "e0926f88699e41138bfc126c110866cb72d72f8e295cf53dbd870a5192c42d2c"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.17": {
    "clause_text": "In order to disambiguate the resume request from a pipelined re-attach the resuming «attach» performative MUST contain a non-null value for its unsettled field.",
-   "disposition": "deferred:S4",
+   "disposition": "formalized:SpecAMQP.Spec.Protocol.attachStep; formalized:SpecAMQP.Spec.Protocol.unsettledKeys; test:staged-link-pipelined-reattach",
    "kind": "MUST",
-   "note": "deferred: S4 — uncarried: nothing reads the attach's `unsettled` field, which is the whole of the discriminator this sentence names. `attachLink` (lean/Spec/Session.lean:768-887) reads an attach's role, handle, initial-delivery-count, snd-settle-mode and target, and the session holds one delivery in progress (`Session.delivery`, lean/Spec/Session.lean:474) rather than a map of unsettled deliveries, so a non-null value has nothing to be true of. This is `.5`'s gap read from the resuming side: the same field, required to be absent-to-present in one case and present in the other.",
+   "note": "Carried by `unsettledKeys` and `attachStep`. The former distinguishes an absent/null unsettled field from a present map (lean/Spec/Protocol.lean:146-164); the latter uses that presence as the discriminator, requiring it for a destroyed endpoint and forbidding it for an ordinary detached-endpoint re-attach (lean/Spec/Protocol.lean:423-440). `staged-link-pipelined-reattach` pins the missing discriminator.",
    "text_sha256": "053cdb007b98d30f96c73894c15d308c61233b531d6fb3bbea72ff519609c11a"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.18": {
    "clause_text": "Receipt of a pipelined «attach» MUST result in the session being terminated with an «errant-link» session-error.",
-   "disposition": "deferred:S4",
+   "disposition": "formalized:SpecAMQP.Spec.Protocol.attachStep; test:staged-link-pipelined-reattach",
    "kind": "MUST",
-   "note": "deferred: S4 — uncarried: with no link name, no terminus and no `unsettled` read (`.16`, `.17`), a pipelined attach is indistinguishable from a resume, so the model cannot recognise the input this sentence answers. Near-miss: the one re-attach the model does refuse is a second attach on a handle already claimed, and that refusal is `attachLink`'s `handleInUse` branch (lean/Spec/Session.lean:696-699), which is `attach/field:handle.2`'s immediate connection close, not this sentence's termination of the session with a session-error.",
+   "note": "Carried by `attachStep`'s destroyed-endpoint branch: an attach that names the stable identity but does not carry the non-null map required to resume is refused with the artifact's `errant-link` session condition and the `illegalState` class (lean/Spec/Protocol.lean:419-440). `staged-link-pipelined-reattach` pins that exact refusal.",
    "text_sha256": "e37ed3aa09b4f038432ae6582af8ae39beacf77fb26a7a0ea75e42c2e267de32"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.2": {
    "clause_text": "If an attempt is made to attach the link subsequently when it is not suspended, then the link can be 'stolen', i.e., the second attach succeeds and the first attach MUST then be closed with a link error of «stolen».",
    "disposition": "deferred:S4",
    "kind": "MUST",
-   "note": "deferred: S4 — uncarried: nothing carries the stealing rule. The nearest behaviour is the opposite clause's: `attachLink` refuses an attach whose handle is already claimed with an immediate close carrying `handle-in-use` (lean/Spec/Session.lean:696-699), which is `attach/field:handle.2`, while this sentence says a second attach for a non-suspended link succeeds and the first attach is closed with `link-error`. The model has no link-error family, no link-name identity to steal under and no second-attach path, so which of the two applies is not a question it can ask.",
+   "note": "Still deferred in its emission half. The widened registry and `attachStep` now identify the already-attached same-direction link, and the second attach may reach that identity, but the clause requires the endpoint to emit a closing frame for the first attach carrying the `stolen` link error. `Spec.Protocol.step` returns only `Except Refusal WidenedSession`; it has no output frame result. `lean/Proofs/WidenedClauses.lean:20-27` names this unresolved obligation and explicitly refuses to count a refusal-condition shadow as the required frame.",
    "text_sha256": "7f5a409c32ee9925c6a6a226f2c8c6f3fde9cfbe66bce21a6e31f831ae140349"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.22": {
@@ -88,9 +86,9 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.23": {
    "clause_text": "The delivery-tag MUST be unique amongst all deliveries that could be considered unsettled by either end of the link.",
-   "disposition": "deferred:S4",
+   "disposition": "formalized:SpecAMQP.Spec.Protocol.transferLink; test:staged-link-duplicate-delivery-tag",
    "kind": "MUST",
-   "note": "deferred: S4 — uncarried, and vacuous in this model rather than missing: at most one delivery is ever in flight — `Session.delivery` is a single optional delivery (lean/Spec/Session.lean:474), cleared when the delivery completes or is aborted (lean/Spec/Session.lean:887, :875-889) — so no two deliveries can be unsettled at once and uniqueness has no pair to constrain. A tag may be reused by a later delivery, but never concurrently. This is the restriction `interleaved-deliveries-absorbed` records for `.31` and `link-uniqueness-vacuous` records for sessions.1; neither entry's clause list names this clause, so neither is cited. The register would be the record if the session ever held a delivery map.",
+   "note": "Carried structurally and checked at the transfer boundary. A logical link owns one `unsettled : DeliveryTag → Option UnsettledDelivery` table, so one tag denotes at most one entry. `transferLink` refuses a new delivery when that tag already names a different delivery id, while admitting a retransfer of the same id (lean/Spec/Protocol.lean:739-750). `staged-link-duplicate-delivery-tag` pins the `invalid-field`/`malformed` refusal.",
    "text_sha256": "3ec1b94651075d7c4b6f6f5b31d3e536a5af58d47d1bbe866e046c2bb5d41f68"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.31": {
@@ -116,9 +114,9 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.5": {
    "clause_text": "If either end of the link is already associated with a terminus, the «attach» frame MUST include its unsettled delivery state.",
-   "disposition": "deferred:S4",
+   "disposition": "formalized:SpecAMQP.Spec.Protocol.attachStep; test:staged-link-second-attach-same-name",
    "kind": "MUST",
-   "note": "deferred: S4 — uncarried: the attach's `unsettled` field is read nowhere, and the model holds no unsettled delivery state to put in it. The fields `attachLink` reads are those listed under `.1`; the session's one delivery (lean/Spec/Session.lean:474) is a delivery in progress rather than a map of unsettled deliveries, which `Contracts/Settlement.lean`'s closing section records. The subject of the sentence does not exist in the model, so it is uncarried rather than unimplemented, and it is the resumption family's — `links.17`'s non-null `unsettled` for a resuming attach has the same gap.",
+   "note": "Carried by `attachStep` over the stable link record. When the named endpoint is already attached, an outbound attach must carry a non-null unsettled map; omission is refused as `invalid-field`/`malformed` (lean/Spec/Protocol.lean:423-433). `staged-link-second-attach-same-name` pins that conditionally required field on the same name-and-direction identity.",
    "text_sha256": "d18d8ad10bdab5db49bf291b674a8a74e938714bcc576f2e9265dec791e873cd"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links.7": {
@@ -139,7 +137,7 @@
    "clause_text": "In this case, the partner MUST signal that it has closed the link by reattaching and then sending a closing detach.",
    "disposition": "deferred:S4",
    "kind": "MUST",
-   "note": "Its subject is the `closed` flag of the detach exchange, and `closed` is read nowhere in lean/Spec or lean/Ref (grep: zero hits). Its two halves need different things: 'by reattaching' needs the widening's link identity, and 'sending a closing detach' needs a detach frame to be built, which the frame-construction exclusion recorded elsewhere covers. Deferred to S4 for the first half.",
+   "note": "Still deferred in its emission half. `detachStep` now reads `closed`, preserves the stable link identity, releases only the directional handle, and records the endpoint life (lean/Spec/Protocol.lean:559-582), so the re-attach subject exists. The remaining MUST is to emit a re-attach followed by a closing detach, but `Spec.Protocol.step` has no output-frame result. `lean/Proofs/WidenedClauses.lean:20-27` names that unresolved action; no condition or shadow vector is counted as its carrier.",
    "text_sha256": "3a94fc488b9d45e3455f4d1948066a3530555e70c039c699b9fa208bb56e8d75"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:flow-control.11": {
@@ -193,51 +191,51 @@
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:resuming-deliveries.2": {
    "clause_text": "If the sending application marks the resend attempt as a resumed delivery then it MUST be ignored by the receiver.",
-   "disposition": "deferred:S4",
+   "disposition": "formalized:SpecAMQP.Spec.Protocol.resumable; formalized:SpecAMQP.Spec.Protocol.transferLink; test:staged-link-resume-not-in-receiver-map",
    "kind": "MUST",
-   "note": "deferred: S4 — uncarried: nothing reads the `resume` flag, which is the whole of the discriminator this sentence turns on. `transferLink` reads the transfer's delivery-id, delivery-tag, message-format, settled, more and aborted (lean/Spec/Session.lean:819-921) and no `resume`; the session holds one delivery rather than a map of unsettled ones (`Session.delivery`, lean/Spec/Session.lean:474), which is the restriction `Contracts/Settlement.lean:185-189` records for exactly this family — 'the clauses that talk about *entries* — resumption, in-doubt resolution, `unsettled`'s completeness — have no state to range over'. Near-miss: the message layer's `received` state keeps the resume point such a rule would consult (`Spec.Message.DeliveryState.received`, lean/Spec/Message.lean:886-890), with no flag read and no data ignored, because a payload is opaque to that layer too. **And it is blocked rather than merely pending**: D4's fourth trigger — \"a normative S5 clause the model cannot represent\" — has fired on this family, so no clause batch reaches it until the model holds a link identity, an unsettled map and the sender's delivery bookkeeping. It is unreachable work rather than unfinished work.",
+   "note": "Carried by the shared unsettled table and the widened transfer step. `resumable` is exactly membership of the delivery tag in that table (lean/Spec/Protocol.lean:173-178). On a received transfer marked `resume`, `transferLink` returns the session unchanged when the tag is absent, so the delivery is ignored rather than recorded (lean/Spec/Protocol.lean:691-701). `staged-link-resume-not-in-receiver-map` pins that admitted-but-ignored case.",
    "text_sha256": "6586802c1a7e4cafe69f8e8d56cb4a84998157746cb05ba25a18cd18bca99577"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:resuming-deliveries.3": {
    "clause_text": "Deliveries in this category MUST be ignored by the sender, and MUST be considered settled by the receiver.",
    "disposition": "deferred:S4",
    "kind": "MUST",
-   "note": "deferred: S4 — uncarried: one of the three categories the resume set is divided into, and the model has none of them: it holds no unsettled map at either end, so there are no deliveries to ignore at the sender or to consider settled at the receiver. `Contracts/Settlement.lean:185-189` records the restriction. The ledger keys this sentence twice, at `.3` and `.4`, with one digest — the artifact writes it as the `dd` of a term and then again as the following paragraph — so both entries decide the same words, which the mechanism requires of a duplicated statement. **And it is blocked rather than merely pending**: D4's fourth trigger — \"a normative S5 clause the model cannot represent\" — has fired on this family, so no clause batch reaches it until the model holds a link identity, an unsettled map and the sender's delivery bookkeeping. It is unreachable work rather than unfinished work.",
+   "note": "Still deferred as a full endpoint obligation. The widened state now represents the category and `SpecAMQP.Proofs.resumable_iff_holds` plus `not_resumable_of_absent` prove the `resumable` predicate is exactly unsettled-table membership (lean/Proofs/WidenedClauses.lean:85-115); `transferLink` reads it for the pinned receiver-ignore and sender-refusal rules. This clause additionally requires the sender to ignore and the receiver to consider settled, actions the current step result does not express. The duplicated `.4` entry carries the same disposition.",
    "text_sha256": "8090195c3cd5a31eb135415871625cd1179613656edf955a650858b67de2c9fa"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:resuming-deliveries.4": {
    "clause_text": "Deliveries in this category MUST be ignored by the sender, and MUST be considered settled by the receiver.",
    "disposition": "deferred:S4",
    "kind": "MUST",
-   "note": "deferred: S4 — uncarried: one of the three categories the resume set is divided into, and the model has none of them: it holds no unsettled map at either end, so there are no deliveries to ignore at the sender or to consider settled at the receiver. `Contracts/Settlement.lean:185-189` records the restriction. The ledger keys this sentence twice, at `.3` and `.4`, with one digest — the artifact writes it as the `dd` of a term and then again as the following paragraph — the `.3` entry beside this one and this entry decide the same words, which the mechanism requires of a duplicated statement. **And it is blocked rather than merely pending**: D4's fourth trigger — \"a normative S5 clause the model cannot represent\" — has fired on this family, so no clause batch reaches it until the model holds a link identity, an unsettled map and the sender's delivery bookkeeping. It is unreachable work rather than unfinished work.",
+   "note": "Still deferred by the same boundary as `.3`, whose text and digest this entry duplicates. `SpecAMQP.Proofs.resumable_iff_holds` and `not_resumable_of_absent` formalize the category's state facet (lean/Proofs/WidenedClauses.lean:85-115), but no theorem claims the sender action or receiver settlement the sentence requires. Both duplicate ledger keys therefore remain deferred.",
    "text_sha256": "8090195c3cd5a31eb135415871625cd1179613656edf955a650858b67de2c9fa"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:resuming-deliveries.5": {
    "clause_text": "Deliveries in this category MUST be resumed by the sender.",
    "disposition": "deferred:S4",
    "kind": "MUST",
-   "note": "deferred: S4 — uncarried: 'resumed by the sender' is an action over the source's unsettled map, and the model holds one delivery in progress rather than a map of them (lean/Spec/Session.lean:474), so there is nothing to resume. No declaration reads the transfer's `resume` field (`.8`) and none records a delivery tag across deliveries, which is what a resume would be keyed on. **And it is blocked rather than merely pending**: D4's fourth trigger — \"a normative S5 clause the model cannot represent\" — has fired on this family, so no clause batch reaches it until the model holds a link identity, an unsettled map and the sender's delivery bookkeeping. It is unreachable work rather than unfinished work.",
+   "note": "Still deferred as a MUST-send. The shared unsettled table makes the category stateable, and `SpecAMQP.Proofs.resumable_of_holds` proves that an entry the link holds is classified resumable (lean/Proofs/WidenedClauses.lean:103-108). That predicate is a state facet, not evidence that the sender emitted resumed transfers; the current widened protocol result carries no generated output frame, so the full clause remains unresolved.",
    "text_sha256": "98f676cfbe0604ac1be5911a3281c37e99f946c73f6b6f52742775cdd7ee6161"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:resuming-deliveries.6": {
    "clause_text": "In this case the two endpoints MUST reduce the levels of unsettled state as much as they can by the sender resuming and/or settling transfers that it observes that the receiver considers unsettled.",
    "disposition": "deferred:S4",
    "kind": "MUST",
-   "note": "deferred: S4 — uncarried: the sentence's quantity — the *levels* of unsettled state at the two ends, to be reduced by resuming and settling what the other side still holds — has no representation. The session holds one delivery and no map from delivery-tags to states (lean/Spec/Session.lean:474; `Contracts/Settlement.lean:185-189`), so there is no level to reduce, and the reduce-and-suspend cycle this sentence begins is not modelled either. **And it is blocked rather than merely pending**: D4's fourth trigger — \"a normative S5 clause the model cannot represent\" — has fired on this family, so no clause batch reaches it until the model holds a link identity, an unsettled map and the sender's delivery bookkeeping. It is unreachable work rather than unfinished work.",
+   "note": "Still deferred as a two-endpoint action. `Spec.Protocol.reduce` states the reduction state, and `SpecAMQP.Proofs.reduce_is_idempotent` plus `reduce_clears_the_latches` prove its stable state facet (lean/Proofs/WidenedClauses.lean:117-132). No executable transition invokes that declaration to resume or settle the transfers the other endpoint observes, so the theorem is not counted as the clause's carrier.",
    "text_sha256": "8ee8d112237f08018d868e50a2cc6ecd6861a6ea78b8369feecaa49d25bf0ec6"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:resuming-deliveries.7": {
    "clause_text": "Upon completion of this reduction of state, the two parties MUST suspend and re-attempt to resume the link.",
    "disposition": "deferred:S4",
    "kind": "MUST",
-   "note": "deferred: S4 — uncarried: the model has no suspend-and-resume cycle — an attach after a release creates a fresh link rather than restoring one (see `links.16`), and nothing distinguishes a resume from a re-attach because the attach's `unsettled` field is read nowhere (`links.17`). The sentence is the second half of the reduction `.6` states, and both are over state the session does not hold. **And it is blocked rather than merely pending**: D4's fourth trigger — \"a normative S5 clause the model cannot represent\" — has fired on this family, so no clause batch reaches it until the model holds a link identity, an unsettled map and the sender's delivery bookkeeping. It is unreachable work rather than unfinished work.",
+   "note": "Still deferred in its re-attempt action. `Spec.Protocol.reduce` suspends both endpoint lives after clearing their incomplete-map latches, and `SpecAMQP.Proofs.reduce_suspends_both_endpoints` states that state facet (lean/Proofs/WidenedClauses.lean:117-138). The required subsequent resume attempt is an endpoint emission the widened protocol result does not represent, so the full clause remains unresolved.",
    "text_sha256": "a9ae474a75ac5888fc00e64eb031b04489a1c413941591aa259d6e59f1ac9d2b"
   },
   "amqp-core-transport-v1.0-os.xml#amqp:transport/section:links/doc:resuming-deliveries.8": {
    "clause_text": "The resume flag of the «transfer» frame MUST be set to true when resuming a delivery.",
    "disposition": "deferred:S4",
    "kind": "MUST",
-   "note": "deferred: S4 — uncarried: the `resume` flag is read nowhere, as in `.2`, so a resuming transfer is not distinguishable from a continuing one. Near-miss worth naming precisely: the model does carry the *interpretation* of the neighbouring flag — `Delivery.step` accumulates `settled` across a delivery's transfers (lean/Spec/Session.lean:405-414) — which shows the shape a `resume` reader would take, and nothing reads `resume`. **And it is blocked rather than merely pending**: D4's fourth trigger — \"a normative S5 clause the model cannot represent\" — has fired on this family, so no clause batch reaches it until the model holds a link identity, an unsettled map and the sender's delivery bookkeeping. It is unreachable work rather than unfinished work.",
+   "note": "Still deferred as a MUST-send. `deliveryStep` records the first transfer's resume claim, `transferLink` refuses a continuation that first introduces the claim, and `SpecAMQP.Proofs.resumed_is_the_first_transfers_claim` proves a continuation cannot change it (lean/Spec/Protocol.lean:180-187, :691-701; lean/Proofs/WidenedClauses.lean:140-150). Those declarations make omission detectable but do not prove that the sender emitted a resumed transfer with the flag set.",
    "text_sha256": "58237b6cb7fb26634fa92d0afd2699289360b0ebcfc71af32aaeea8ef6c210d6"
   }
  }
