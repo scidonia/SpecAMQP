@@ -59,8 +59,8 @@ What is done:
 
 What is not done:
 
-- 180 clauses are deferred. The largest groups are sessions and links (49), transactions (44), messages
-  (37) and session state (32); the rest are spread across the other layers.
+- 73 clauses are deferred (`ledger/coverage.json`); the ledger names each one's milestone, so the obligation is
+  visible rather than conflated with work decided out of scope.
 - `lean/Impl/Transport.lean`, the socket boundary, and `lean/Shell/`, the process loop above it, are not
   proved. The shipped binary therefore rests on Lean's compiler and runtime, which are not verified.
 - The stream corollary that waits on `ValuePrefixDetermined`, and the delivery contract a second connection

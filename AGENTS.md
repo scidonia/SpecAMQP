@@ -215,16 +215,21 @@ shell bash tests/contracts/s0_generator_fidelity.sh  # each corpus is what its g
 shell bash tests/contracts/s1_proof_integrity.sh     # no sorry, no native_decide; axiom inventories per theorem
 shell bash tests/contracts/s1_ref_vectors.sh         # the reference builds native from Lean; both its corpora pass
 shell bash tests/contracts/s1_differential.sh        # specification and reference agree on the wire
+shell bash tests/contracts/value_boundaries.sh       # the value layer's rule-boundary sweep; the pinned duplicate-key failure
+shell bash tests/contracts/value_class_agreement.sh  # the value layer's reason-class agreement
 shell bash tests/contracts/s2_frame_vectors.sh       # the frame layer's corpus
 shell bash tests/contracts/s3_exchanges.sh           # the exchange corpora, both artefacts, per-step refusals
+shell bash tests/contracts/s4_flow.sh                # the flow layer's corpus: fragmentation, continuation fields
 shell bash tests/contracts/s5_messages.sh            # the message layer's differential
 shell bash tests/contracts/s6_transactions.sh        # the transaction layer's differential
 shell bash tests/contracts/s7_sasl.sh                # the security layer: both corpora, per-step refusals, the four codes
 
-# the implementation track: R1's transport shell (PLAN.md §23.1)
+# the implementation track (PLAN.md §23.1)
 shell bash scripts/run-transport-loopback.sh         # two Lean processes over loopback; shim evidence
 shell bash scripts/run-transport-loopback.sh --mutant NAME   # one control: truncating-recv | reordering-recv | short-send
 shell bash tests/contracts/r1_transport_shell.sh     # R1's evidence, and each control's pinned reach
+shell bash tests/contracts/r2_endpoint_shell.sh      # the shipped shell's forced obligations: short reads, iterated writes, orderly close
+shell bash tests/contracts/r4_wire_differential.sh   # the corpus replayed against the endpoint over a socket, per vector
 
 shell python3 scripts/clause-ledger.py check         # ledger + audit + reconciliation
 shell python3 scripts/gen-oasis-lean.py --check      # generated tables current
