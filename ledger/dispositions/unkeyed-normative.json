@@ -1314,9 +1314,9 @@
   },
   "amqp-core-types-v1.0-os.xml#amqp:types/section:primitive-type-definitions/type:map.u1": {
    "clause_text": "A map in which there exist two identical key values is invalid.",
-   "disposition": "deferred:map-duplicate-keys",
+   "disposition": "formalized:SpecAMQP.Spec.Codec.keysRepeat",
    "kind": "UNKEYED",
-   "note": "Blocked: a duplicate-key comparison in the map reader: `pairUp` pairs keys with values and never compares keys (lean/Spec/Codec.lean line 398-400, lean/Ref/Value.lean line 405-408), and `readCompound`/`readMap` admit the result (lean/Spec/Codec.lean line 448-466, lean/Ref/Value.lean line 385-398), so a map with two identical key values decodes and is admitted by both artefacts",
+   "note": "Both artefacts refuse a map carrying two identical key values, on read and on write: `keysRepeat` sits beside `pairUp` in each and is asked in `readCompound`'s map branch before the size comparison, while the writers refuse the same map rather than emitting it — the writer's half is what keeps `RoundTripOnEncodedValues` and `ValueConsumption` true as stated, since a reader-only refusal leaves the law's premise reachable. The comparison is written out rather than derived: `deriving BEq` produces an instance the kernel cannot unfold, so the agreement the duplicate path needs between the two readings was unprovable rather than unproved. The two readings agree on 143,632 verdict lines over all 24 corpora and on a 114,225-buffer class sweep with zero mismatches, which is the evidence that the hand-written comparison computes what the instance it replaced computed.",
    "text_sha256": "9b2b112f06fbceb126af8f873361d7e623832a136d936d5814d7c502544132d6",
    "unkeyed_phrases": [
     "is invalid"

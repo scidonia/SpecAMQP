@@ -41,7 +41,7 @@
    "clause_text": "Map encodings MUST contain an even number of items (i.e. an equal number of keys and values).",
    "disposition": "formalized:SpecAMQP.Spec.Codec.readCompound; formalized:SpecAMQP.Spec.Codec.pairUp",
    "kind": "MUST",
-   "note": "An odd item count is refused before any pair is formed, in `readCompound`'s map branch: a map that declares an odd count is a decode error with the reason in the message (lean/Spec/Codec.lean:460-462). `pairUp` (lean/Spec/Codec.lean:398-400) is the pairing itself, and its docstring records that the refusal is what makes an unpaired tail unreachable.",
+   "note": "An odd item count is refused before any pair is formed, in `readCompound`'s map branch: a map that declares an odd count is a decode error with the reason in the message (lean/Spec/Codec.lean:460-462). `pairUp` (lean/Spec/Codec.lean:463-482) is the pairing itself, and its docstring records that the refusal is what makes an unpaired tail unreachable.",
    "text_sha256": "76ee953c6c5d7366525472d7e6a40a006b69d537b0bcecb07cb2138a649c1bb4"
   },
   "amqp-core-types-v1.0-os.xml#amqp:types/section:primitive-type-definitions/type:map.2": {

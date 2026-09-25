@@ -39,11 +39,8 @@ readonly corpora=("$admitted" "$refusals")
 # The vectors that are expected to fail, because the rule they pin is stated by the artifact and
 # enforced by neither artefact. Named individually rather than counted, so a second one appearing
 # fails this gate instead of being absorbed.
-readonly known_unenforced=(
-  "boundary-negative-map-duplicate-string-keys"
-  "boundary-negative-map-duplicate-null-keys"
-)
-
+# Closed: the duplicate-key rule is enforced in both artefacts since 22a9189, so these two ids are no
+# longer allowances. They pass, and the checker below reports it if they stop.
 die() { printf 'value_boundaries: FAIL: %s\n' "$1" >&2; exit 1; }
 note() { printf 'ok   %s\n' "$1"; }
 
@@ -73,11 +70,10 @@ for corpus in "${corpora[@]}"; do
   capture amqp-spec "$corpus" "$tmp/spec-$name.log"
 done
 
-python3 - "$admitted" "$refusals" "$tmp" "${known_unenforced[@]}" <<'COMPARE' || exit 1
+python3 - "$admitted" "$refusals" "$tmp" <<'COMPARE' || exit 1
 import json, pathlib, re, sys
 
 admitted, refusals, tmp = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]), pathlib.Path(sys.argv[3])
-unenforced = set(sys.argv[4:])
 problems = []
 
 
@@ -94,11 +90,27 @@ def verdicts(path):
     return out
 
 
+def expected_class(corpus):
+    """The reason class each vector expects, from the corpus rather than from a verdict."""
+    out = {}
+    for line in corpus.read_text().splitlines():
+        if line.strip():
+            entry = json.loads(line)
+            want = (entry.get("expectError") or {}).get("reason")
+            if want:
+                out[entry["vector"]] = want
+    return out
+
+
 def klass(detail):
     """The class token a verdict's detail leads with, when it leads with one."""
     head = detail.split(":")[0].strip()
     return head if re.fullmatch(r"[A-Za-z]+", head) else ""
 
+
+expected = {}
+expected.update(expected_class(admitted))
+expected.update(expected_class(refusals))
 
 family = {}
 for corpus in (admitted, refusals):
@@ -114,7 +126,7 @@ for corpus in (admitted, refusals):
         if reference[ident]["status"] != specification[ident]["status"]:
             problems.append(f"{name}: {ident} is {reference[ident]['status']} to the reference and "
                             f"{specification[ident]['status']} to the specification")
-        elif reference[ident]["status"] == "fail" and ident not in unenforced:
+        elif reference[ident]["status"] == "fail":
             pass  # reported below, as a failing set, rather than twice
         else:
             left, right = klass(reference[ident].get("detail", "")), klass(specification[ident].get("detail", ""))
@@ -133,28 +145,30 @@ for side in ("ref", "spec"):
 # Family-level non-vacuity: across the pair, the family must both admit and refuse.
 admitting = any(v["status"] == "pass" and k.startswith("boundary-") and not k.startswith("boundary-negative-")
                 for (_, k), v in family.items())
-refusing = any(k in unenforced for (_, k) in family)
+refusing = any(v["status"] == "pass" and k.startswith("boundary-negative-") for (_, k), v in family.items())
 if not admitting:
     problems.append("no admitted vector passes, so the family cannot show a rule being satisfied")
 if not refusing:
     problems.append("the family's negatives are absent, so the comparison cannot see a refusal")
 
-# Clause 4: the known-unenforced pair must fail, by name.
-for ident in sorted(unenforced):
+# Clause 4: the two rules that were once deferred are enforced, by name. Naming them is what catches a
+# weakened vector or a reopened gap: a duplicate-key vector that stops being refused fails here, and the
+# clause is stated over the negative corpus because that is where a refusal is the expected outcome.
+for ident in ("boundary-negative-map-duplicate-string-keys", "boundary-negative-map-duplicate-null-keys"):
     for side, label in (("ref", "reference"), ("spec", "specification")):
         entry = family.get((side, ident))
         if entry is None:
             problems.append(f"{ident} is missing from the {label}'s verdicts")
-        elif entry["status"] != "fail":
-            problems.append(f"{ident} now *passes* against the {label}: the duplicate-key rule is enforced or the "
-                            f"vector was weakened, and either way `ledger/dispositions/unkeyed-normative.json` "
-                            f"and this gate have to change together")
-        elif "expected rejection" not in entry.get("detail", ""):
-            problems.append(f"{ident} fails against the {label} for a different reason than the rule: "
-                            f"{entry.get('detail', '')[:80]}")
+        elif entry["status"] != "pass":
+            problems.append(f"{ident} is not refused by the {label} any more: the duplicate-key rule went "
+                            f"unenforced again, or the vector was weakened, and either way "
+                            f"`ledger/dispositions/unkeyed-normative.json` and this gate have to change together")
+        elif expected.get(ident) and klass(entry.get("detail", "")) != expected[ident]:
+            problems.append(f"{ident} is refused by the {label} as {klass(entry.get('detail', ''))!r}, not the "
+                            f"{expected[ident]!r} the vector expects: the rule is enforced, but not as its clause says")
 
 # Clause 5: nothing else fails.
-others = sorted({k for (_, k), v in family.items() if v["status"] != "pass" and k not in unenforced})
+others = sorted({k for (_, k), v in family.items() if v["status"] != "pass"})
 if others:
     problems.append(f"{len(others)} vector(s) fail outside the known pair: {others[:6]}")
 
@@ -166,8 +180,8 @@ if problems:
 
 total = {k for (_, k) in family}
 print(f"     {len(total)} vectors: every one identical in status from both artefacts, "
-      f"the {len(unenforced)} known-unenforced pair failing by name and nothing else")
+      f"the the two duplicate-key vectors refused by name, and nothing else failing")
 COMPARE
 
-note "the sweep agrees across both artefacts, and the one stated-but-unenforced rule is pinned as failing"
+note "the sweep agrees across both artefacts, and the two rules that were once deferred are pinned as refused"
 echo "value_boundaries: PASS"
