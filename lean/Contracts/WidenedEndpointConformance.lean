@@ -119,9 +119,10 @@ the planner-authored expected verdicts already present and before any model chan
 
 ## Part 4 plan: a new implementation rung
 
-1. Add the widened link/session state to both independent readings, preserving the old state through
-   explicit projections. Use one lookup/update convention in each tree; do not retain the old
-   single-link fields as a second source of truth after cutover.
+1. Add the widened link/session state to both independent readings and to the existing
+   `Impl.Core.State`, preserving the old state through explicit projections. Use one lookup/update
+   convention in each tree. The old single-link fields leave `Impl.Core.State` as sources of truth
+   at cutover; they are not retained and updated alongside the widened representation.
 2. Implement the eight behaviours in dependency order: identity and lifetime; unsettled decoding
    and structural invariants; incomplete-map latch; resume checks; joint reduction; tag uniqueness;
    disposition lifetime. Keep the three §24 readings: field-rule failures are malformed,
@@ -131,16 +132,19 @@ the planner-authored expected verdicts already present and before any model chan
    the passing observation after. For each of the unpinnable ten, add a theorem or place it on the
    interface's explicit untestable-obligation list; never count a shadow vector as its carrier.
 4. Prove `WideningProjectsEndpointRelation` at exactly the type frozen below, then prove the widened
-   `ConformsVia` instance. Add proof and acceptance modules rather than editing R3 or
-   `Contracts.EndpointConformance`.
+   `ConformsVia` instance for the existing `Impl.Core` endpoint. Add proof and acceptance modules
+   rather than editing R3 or `Contracts.EndpointConformance`, and keep the original
+   `EndpointConforms` statement proved at its own frozen type rather than merely recoverable through
+   the projection.
 5. Update all 26 ledger dispositions only when their carriers exist, classifying each as checked,
    structural, or still deferred. Regenerate the generated corpus, coverage, and
    `toolchain/spec-manifest.sha1` in the same accepted movement.
 6. Acceptance is: all eleven scenarios pass in both artefacts with pinned conditions/classes; the
-   projection and widened conformance statements are accepted at their frozen types; the old R3 and
-   R4 contracts stay green; package build, proof-integrity, ledger, generator-fidelity, citation,
-   manifest, exchange, and wire-differential gates pass in the pinned shell with
-   `LAKE_NO_CACHE=1`.
+   widened acceptance module binds the existing `Impl.Core` endpoint; the projection and widened
+   conformance statements are accepted at their frozen types; `EndpointConforms` remains proved at
+   its unchanged type; the old R3 and R4 contracts stay green; package build, proof-integrity,
+   ledger, generator-fidelity, citation, manifest, exchange, and wire-differential gates pass in the
+   pinned shell with `LAKE_NO_CACHE=1`.
 
 ## Constraints and resolved decisions
 
@@ -156,18 +160,24 @@ the planner-authored expected verdicts already present and before any model chan
 * No compatibility alias, replacement of R3, descriptor literal, trusted declaration, or executable
   placeholder is permitted.
 
-## Design question before part 4
+## Implementation target decision for part 4
 
-The user must choose the implementation target before step 1 of part 4:
+There is one shipped core. Part 4 widens `Impl.Core.State` in place, proves
+`WidenedEndpointConforms` for the existing `Impl.Core` endpoint, and uses
+`WideningProjectsEndpointRelation` to preserve the old R3 claim.
 
-* **Recommended:** widen `Impl.Core.State` in place and prove the second relation for it. This keeps
-  one shipped core while the projection preserves the old R3 claim.
-* Add a second implementation targeting the widened state. This isolates the current core but
-  duplicates endpoint plumbing and leaves two shipped-state shapes to maintain.
+A second implementation was considered and refused. It would isolate the current core, but would
+leave two shipped-state shapes to keep in step — drift the differential could measure only after it
+occurred rather than a single representation preventing it.
 
-Parts 1–3 do not depend on that choice; the parameterized statement below is deliberate. The choice
-changes the implementation and proof symbols bound by the later acceptance module, not this
-contract or the vectors.
+The choice creates two acceptance obligations. First, the statement in
+`Contracts.EndpointConformance` remains proved at its own frozen type after cutover; being merely
+recoverable through the projection is not enough. Second, the legacy single-link fields leave
+`Impl.Core.State` as sources of truth rather than being updated beside the widened fields.
+
+The ten clauses the harness cannot pin remain theorem obligations or entries on the explicit
+untestable-obligation list. Their nearest shadow vectors remain useful evidence, but are never
+coverage for those clauses.
 -/
 
 namespace SpecAMQP.Contracts
