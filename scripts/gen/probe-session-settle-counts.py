@@ -3,7 +3,7 @@
 
     python3 scripts/gen/probe-session-settle-counts.py
 
-The probe family exercises the sentences this slice carried that the staged corpus either does not
+The probe family exercises the sentences this slice carried that the widening corpus either does not
 reach at all or reaches in one direction only:
 
   * `flow/field:delivery-count.4` — a receiver whose flow sets the field before the link's sender

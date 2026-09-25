@@ -93,10 +93,10 @@ boundary action is one corpus replay; the observable is each step's admitted/ref
 condition, reason class, and resulting session state. No scenario calls a network, clock, model, or
 filesystem outside the gate's temporary directory.
 
-Promote the eleven authored inputs from `scripts/staged-exchange-divergences.ndjson` through the
-existing exchange-vector generator into `vectors/generated-exchanges.ndjson`; do not add a second
-corpus convention. Before changing either model, run `tests/contracts/s3_exchanges.sh` in the pinned
-shell with `LAKE_NO_CACHE=1` and retain the named assertion mismatch for each scenario:
+Promotion is complete: the exchange-vector generator carries the eleven authored inputs in
+`vectors/generated-exchanges.ndjson`, with no second corpus convention. Before either model changed,
+both artefacts were observed admitting every step whose expectation requires refusal; that named
+assertion mismatch is retained as the failure-first evidence for each scenario:
 
 | scenario | clauses pinned | expected pre-implementation failure |
 |---|---|---|

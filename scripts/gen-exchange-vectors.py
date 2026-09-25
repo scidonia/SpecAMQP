@@ -2,20 +2,23 @@
 """The exchange corpus: the connection lifecycle as ordered steps.
 
     scripts/gen-exchange-vectors.py [--out vectors/generated-exchanges.ndjson]
-                                    [--mutations PATH] [--staged PATH]
+                                    [--mutations PATH]
 
 This script is the corpus's command line and nothing else: it owns the flags, the output
 paths and the report, and dispatches the families — the connection and session families,
-the mutation controls that are meant to fail, and the staged vectors the artefacts do not
-both meet — to `scripts/gen/slices.py`. The split exists so that two slices can add
-corpus families in the same wave without editing one file: a family is a module there
-plus one dispatch line here.
+the widening family the corpus carries, and the mutation controls that are meant to fail —
+to `scripts/gen/slices.py`. The split exists so that two slices can add corpus families in
+the same wave without editing one file: a family is a module there plus one dispatch line
+here.
 
-`--out` is the corpus a gate runs, so every vector in it passes in both artefacts.
-`--mutations` and `--staged` are the two families that are meant *not* to pass, for
-opposite reasons: a control asserts what the artifact forbids, and a staged vector
-asserts what the artifact requires and an artefact does not do. Both are written where
-the caller asks rather than into the corpus, so the corpus stays a contract.
+`--out` is the corpus a gate runs: the connection and session families pass in both
+artefacts, and the widening family is the failure-first evidence for PLAN.md §24's
+`deferred:S4` obligations — red in both until the widened model lands, and deliberately not
+weakened to keep a gate green.
+
+`--mutations` writes the control family to a path the caller names rather than into the
+corpus: a control asserts what the artifact forbids and is meant to fail, so it cannot live
+in a corpus a gate requires to pass.
 
 What the exchange expectations are authored from, and which artifact tables they read,
 is stated in the module that holds the family.
@@ -45,14 +48,10 @@ def main(argv: list[str]) -> int:
                         help="also write the mutation controls — vectors that assert "
                              "what the artifact does not permit and are therefore meant "
                              "to fail — to PATH")
-    parser.add_argument("--staged", default=None, metavar="PATH",
-                        help="also write the staged vectors — authored from the artifact, "
-                             "but not met by both artefacts, so they cannot live in a "
-                             "corpus a gate runs — to PATH")
     args = parser.parse_args(argv)
 
     tables = slices.Corpus()
-    vectors = slices.corpus(tables) + slices.session_corpus(tables)
+    vectors = slices.corpus(tables) + slices.session_corpus(tables) + slices.widening_corpus(tables)
     digest = write_ndjson(pathlib.Path(args.out), vectors)
     starts: dict[str, int] = {}
     reasons: dict[str, int] = {}
@@ -72,12 +71,6 @@ def main(argv: list[str]) -> int:
         control_digest = write_ndjson(pathlib.Path(args.mutations), controls)
         print(f"generated {len(controls)} mutation controls into {args.mutations}")
         print(f"  sha256: {control_digest}")
-
-    if args.staged is not None:
-        staged = slices.staged_corpus(tables)
-        staged_digest = write_ndjson(pathlib.Path(args.staged), staged)
-        print(f"generated {len(staged)} staged vectors into {args.staged}")
-        print(f"  sha256: {staged_digest}")
     return 0
 
 

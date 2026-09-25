@@ -66,21 +66,15 @@ and a vector whose own expected state is wrong so that the harness's failure pat
 exercised. Those are controls, not corpus: they are meant to fail, so they are written
 where the operator asks for them rather than into the passing corpus.
 
-`--staged` writes the third family to a path of the caller's choosing: vectors authored
-from the artifact that at least one artefact does not meet. Each is a *divergence* (the
-two artefacts answer the same step differently, and neither side is chosen) or a *shared
-gap* (both admit what a clause forbids, so no differential can see it); the divergence
-kind is empty as the file stands — its last two members were aligned by `d50abc1` and
-`1540777`, five more by `5624f16`, and all seven were promoted — so the family is shared
-gaps only, which is what the file is for: holding the obligations a gate cannot yet
-require rather than being emptied. `staged_corpus` names which, with the clause and both
-observed answers, because the file is a fix slice's opening evidence rather than a corpus
-a gate runs. Since the widening slice it also holds the vectors for PLAN.md §24's 26
-`deferred:S4` clauses — the eight behaviours §25 groups them into — run against both
-artefacts and observed failing before the model that satisfies them exists; that
-function's docstring lists the eight with their vectors, and the clauses that are staged
-as findings because their subject is a frame an endpoint must *emit* rather than a step
-this vocabulary can judge.
+The widening family is carried, not staged: `widening_corpus` holds the eleven vectors for
+PLAN.md §24's 26 `deferred:S4` clauses — the eight behaviours §25 groups them into — each
+authored from the clause and run against both artefacts, and observed failing before the
+model that satisfies them exists. They are the corpus's failure-first evidence for the
+widening, red in both artefacts until the widened model lands, and that function's
+docstring lists the eight with their vectors and the clauses carried as findings because
+their subject is a frame an endpoint must *emit* rather than a step this vocabulary can
+judge. Nothing emits this family twice: the shared gaps it was written as are part of the
+carried corpus now, and no second output holds them.
 
 Runs offline; the only input is the vendored artifacts under `spec/oasis/`.
 """
@@ -181,14 +175,14 @@ TRANSFER_RESUME_FIRST_TRANSFER = f"{TRANSPORT}#amqp:transport/section:performati
 # ---- the widening's clauses ------------------------------------------------- #
 # The 26 clauses PLAN.md §24's closing sub-section groups into eight behaviours, each
 # cited at the sentence it states rather than at the section it lives in. None has a
-# carrier: they are the obligations the widened model owes, and `staged_corpus` holds the
+# carrier: they are the obligations the widened model owes, and `widening_corpus` holds the
 # vectors that state them before the model that satisfies them exists.
 #
 # A constant here exists because a vector cites it, so the clauses with no vector have no
 # constant: `links.2` (the steal, whose observable half is an emitted close carrying
 # `amqp:link:stolen`), `links/doc:closing-a-link.2`, `attach/field:unsettled.1`,
 # `attach/field:incomplete-unsettled.3`, `.u1`, `resuming-deliveries.3`-`.8` are named in
-# `staged_corpus`'s docstring and its notes instead, with what keeps each out.
+# `widening_corpus`'s docstring and its notes instead, with what keeps each out.
 #
 # The link identity a name and a terminus give (`links.1`, `links.5`), and the two ways a
 # destroyed link can come back: resumed (`links.16`, `links.17`) or recognised as the
@@ -2906,44 +2900,39 @@ def session_corpus(tables: Corpus) -> list[dict]:
     return vectors
 
 
-def staged_corpus(tables: Corpus) -> list[dict]:
-    """Vectors whose expectations the artefacts do not both meet, staged rather than
-    carried.
+def widening_corpus(tables: Corpus) -> list[dict]:
+    """The widening family: the link, attach and settlement behaviours PLAN.md §24 decides
+    on, carried in the corpus rather than staged beside it.
 
-    An exchange corpus is a contract, and every vector in `vectors/` has to pass in both
-    artefacts or the gate that runs it is red. These vectors are the ones authored from
-    the artifact whose expectation at least one artefact refuses to meet: each note names
-    the clause the expectation comes from, which of the two classes it is, and what each
-    artefact actually did — the buffer it was given, the answer it gave, and the class it
-    named. They are written to a path the caller names, outside `vectors/`, so the corpus
-    a gate reads stays green while the finding stays in a file a fix slice can lift.
+    These are the eleven vectors authored for the widening's 26 `deferred:S4` clauses, which
+    §25 groups into eight behaviours, each one a behaviour the widened model makes
+    *reachable*. They were staged while both artefacts answered against the clause, and each
+    was run and observed failing before that model existed; they are carried now, as the
+    corpus's failure-first evidence, red in both artefacts until the widened model lands
+    rather than weakened to keep a gate green. Each note names the clause the expectation
+    comes from and what the artefacts actually did when the vector was authored — the buffer
+    it was given, the answer it gave, and the class it named.
 
-    Every vector here is a **shared gap**: a frame both artefacts admit (or refuse)
-    against the clause, so no differential can see it. The class it is not — a
-    **divergence**, a frame the two artefacts answer differently, with neither side chosen
-    here — held the aborted-credit pair and is empty since `d50abc1` and `1540777` aligned
-    them; both are in `vectors/`, with the two flag readings the same commits settled.
+    Every vector here is a **shared gap**: a frame both artefacts admit (or refuse) against
+    the clause, so no differential can see it, and this corpus is the only instrument that
+    can — which is why the family is carried rather than left to a comparison. The class it
+    is not — a **divergence**, a frame the two artefacts answer differently, with neither
+    side chosen — held the aborted-credit pair and is empty since `d50abc1` and `1540777`
+    aligned them; both are in `vectors/`, with the two flag readings the same commits
+    settled. Carrying a shared gap is what makes it a rule an artefact must meet rather than
+    a backlog of defects for one side to fix.
 
-    Shared gaps only is the stronger statement, and the one worth carrying: every vector
-    staged here is a rule neither artefact enforces, so no comparison between the two can
-    see any of them, and this corpus is the only instrument that can. What is staged is the
-    ledger's deferred obligations made visible rather than a backlog of defects for one side
-    to fix.
+    Twelve members have left the family since it was first written — the two `61c0430`
+    aligned, the four the transfer-flag reading settled at `1a21b0a`, the five settlement and
+    count readings `5624f16` carried, and the bodyless frame here, whose answer `cfc723f`
+    keyed to the direction it is offered in, now that both artefacts consult the table's
+    receive column for it.
 
-    Twelve members have left since the family was first written — the two `61c0430` aligned,
-    the four the transfer-flag reading settled at `1a21b0a`, the five settlement and count
-    readings `5624f16` carried, and the bodyless frame here, whose answer `cfc723f` keyed to
-    the direction it is offered in, now that both artefacts consult the table's receive
-    column for it.
-
-    **What the family is now.** The vectors authored for the widening PLAN.md §24 decides
-    on: its 26 `deferred:S4` clauses, which §25 groups into eight behaviours, each one a
-    behaviour the widened model makes *reachable* and which is run and observed failing
-    before that model exists. The alphabet does not change (§24's decision): every frame
-    below is legal AMQP that today's model answers wrongly, which is why each is a step
-    verdict — a refusal the peer does not give (`the peer admitted the step`), a refusal
-    the peer gives for a different rule, or a refusal due that it does not give — rather
-    than a frame it cannot read.
+    The alphabet does not change (§24's decision): every frame below is legal AMQP that the
+    pre-widening model answers wrongly, which is why each is a step verdict — a refusal the
+    peer does not give (`the peer admitted the step`), a refusal the peer gives for a
+    different rule, or a refusal due that it does not give — rather than a frame it cannot
+    read.
 
     The eight, in the order §25 lists them, with the vector that pins each:
 
@@ -2971,7 +2960,7 @@ def staged_corpus(tables: Corpus) -> list[dict]:
     8. *settlement survives until the link does not* — `staged-disposition-after-detach`
        (disposition.3, disposition.4, resume.2).
 
-    **What is staged as a finding rather than as a vector, and why.** Sixteen of the 26
+    **What is carried as a finding rather than as a vector, and why.** Sixteen of the 26
     clauses are pinned by a vector above — several of them through a consequence, since a
     clause about a state rather than about a frame is observable one step later. The other
     ten require the endpoint to *emit* a frame, or to hold a comparison whose outcome

@@ -44,9 +44,10 @@ What is done:
   test vectors, 180 deferred to named work, and the rest informative, out of scope or superseded.
 - Every ambiguity found so far is written down in `ledger/ambiguities/`, with the reading and the alternatives it was
   chosen over.
-- The specification (`lean/Spec/`) and the reference implementation (`lean/Ref/`) agree on every committed
-  corpus. `scripts/staged-exchange-divergences.ndjson` lists the vectors that do not yet pass, with their
-  failing steps.
+- The specification (`lean/Spec/`) and the reference implementation (`lean/Ref/`) agree with each
+  other across the committed corpora. `vectors/generated-exchanges.ndjson` also carries eleven
+  failure-first widening vectors whose named refusal steps both artefacts currently admit; those
+  retained failures are the contract for the widened model, not a differential between the artefacts.
 - The endpoint's protocol core is proved to conform: `Proofs/EndpointConformance.lean` proves the statement
   frozen in `Contracts/EndpointConformance.lean`, bound by `Contracts/EndpointAcceptance.lean`. Its framing
   laws are proved too.
