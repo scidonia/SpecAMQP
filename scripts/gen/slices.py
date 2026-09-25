@@ -66,15 +66,23 @@ and a vector whose own expected state is wrong so that the harness's failure pat
 exercised. Those are controls, not corpus: they are meant to fail, so they are written
 where the operator asks for them rather than into the passing corpus.
 
-The widening family is carried, not staged: `widening_corpus` holds the eleven vectors for
+The widening family is carried, not staged: `widening_corpus` holds the twelve vectors for
 PLAN.md §24's 26 `deferred:S4` clauses — the eight behaviours §25 groups them into — each
-authored from the clause and run against both artefacts, and observed failing before the
-model that satisfies them exists. They are the corpus's failure-first evidence for the
-widening, red in both artefacts until the widened model lands, and that function's
-docstring lists the eight with their vectors and the clauses carried as findings because
-their subject is a frame an endpoint must *emit* rather than a step this vocabulary can
-judge. Nothing emits this family twice: the shared gaps it was written as are part of the
-carried corpus now, and no second output holds them.
+authored from the clause and run against both artefacts. Eleven of them were observed
+failing before the model that satisfies them exists, which is the corpus's failure-first
+evidence for the widening, red in both artefacts until the widened model lands. The twelfth,
+`staged-disposition-completed-after-detach`, was authored after the traversal it pins had
+landed, so its red is the pre-index tree (`68562be`'s `Spec/Protocol.lean` and
+`Ref/Protocol.lean`, restored over the working files): the reference admitted the final
+resumed send — `staged-disposition-completed-after-detach#7`, "the peer admitted the step" —
+while the specification reading did not elaborate there (`Spec/Protocol.lean:102:42: Fields
+missing: `unsettledKeys``, `blankLink`'s record literal against the amended frozen state), so
+the reference's admission is the whole of that red and no spec red exists to claim. On the
+widened tree both refuse that step with the pinned condition. The function's docstring lists
+the eight with their vectors and the clauses carried as findings because their subject is a
+frame an endpoint must *emit* rather than a step this vocabulary can judge. Nothing emits
+this family twice: the shared gaps it was written as are part of the carried corpus now, and
+no second output holds them.
 
 Runs offline; the only input is the vendored artifacts under `spec/oasis/`.
 """
@@ -2975,23 +2983,32 @@ def widening_corpus(tables: Corpus) -> list[dict]:
     """The widening family: the link, attach and settlement behaviours PLAN.md §24 decides
     on, carried in the corpus rather than staged beside it.
 
-    These are the eleven vectors authored for the widening's 26 `deferred:S4` clauses, which
+    These are the twelve vectors authored for the widening's 26 `deferred:S4` clauses, which
     §25 groups into eight behaviours, each one a behaviour the widened model makes
-    *reachable*. They were staged while both artefacts answered against the clause, and each
-    was run and observed failing before that model existed; they are carried now, as the
-    corpus's failure-first evidence, red in both artefacts until the widened model lands
-    rather than weakened to keep a gate green. Each note names the clause the expectation
-    comes from and what the artefacts actually did when the vector was authored — the buffer
-    it was given, the answer it gave, and the class it named.
+    *reachable*. They were staged while both artefacts answered against the clause, and
+    eleven of them were run and observed failing before that model existed. The twelfth,
+    `staged-disposition-completed-after-detach`, was authored after the traversal it pins had
+    landed, so its red is the pre-index tree rather than the pre-widening one: the reference
+    admitted the final resumed send (`#7`, "the peer admitted the step") and the specification
+    reading did not elaborate there (`Spec/Protocol.lean:102:42: Fields missing:
+    `unsettledKeys``) — the reference's admission is the whole of that red, and no spec red
+    was observed. They are carried now, as the corpus's failure-first evidence, red until the
+    widened model lands rather than weakened to keep a gate green. Each note names the clause
+    the expectation comes from and what the artefacts actually did when the vector was
+    authored — the buffer it was given, the answer it gave, and the class it named.
 
-    Every vector here is a **shared gap**: a frame both artefacts admit (or refuse) against
-    the clause, so no differential can see it, and this corpus is the only instrument that
-    can — which is why the family is carried rather than left to a comparison. The class it
-    is not — a **divergence**, a frame the two artefacts answer differently, with neither
-    side chosen — held the aborted-credit pair and is empty since `d50abc1` and `1540777`
-    aligned them; both are in `vectors/`, with the two flag readings the same commits
-    settled. Carrying a shared gap is what makes it a rule an artefact must meet rather than
-    a backlog of defects for one side to fix.
+    Every vector here was authored as a **shared gap**: a frame both artefacts admit (or
+    refuse) against the clause, so no differential can see it, and this corpus is the only
+    instrument that can — which is why the family is carried rather than left to a
+    comparison. That framing is a description of the pre-widening tree, and the twelfth is
+    the one member whose pre-fix answer is not a shared admission: the pre-index reference
+    admitted the resumed send while the pre-index specification did not elaborate, and the
+    widened tree has both refuse it with the pinned condition. The class it is not — a
+    **divergence**, a frame the two artefacts answer differently, with neither side chosen —
+    held the aborted-credit pair and is empty since `d50abc1` and `1540777` aligned them;
+    both are in `vectors/`, with the two flag readings the same commits settled. Carrying a
+    shared gap is what makes it a rule an artefact must meet rather than a backlog of defects
+    for one side to fix.
 
     Twelve members have left the family since it was first written — the two `61c0430`
     aligned, the four the transfer-flag reading settled at `1a21b0a`, the five settlement and
@@ -3029,7 +3046,9 @@ def widening_corpus(tables: Corpus) -> list[dict]:
     7. *a delivery-tag is unique among the deliveries still unsettled* —
        `staged-link-duplicate-delivery-tag` (links.23).
     8. *settlement survives until the link does not* — `staged-disposition-after-detach`
-       (disposition.3, disposition.4, resume.2).
+       (disposition.3, disposition.4, resume.2) and
+       `staged-disposition-completed-after-detach` (the same three clauses reached through
+       a completed delivery rather than the delivery in progress).
 
     **What is carried as a finding rather than as a vector, and why.** Sixteen of the 26
     clauses are pinned by a vector above — several of them through a consequence, since a
@@ -3504,6 +3523,57 @@ def widening_corpus(tables: Corpus) -> list[dict]:
                  "held delivery, so the state the clause requires to be applied was "
                  "applied to nothing, and the transfer is a first one again rather than a "
                  "resume of a delivery this endpoint has already forgotten"),
+
+        # 8b. The same behaviour's second settlement case: the settled disposition reaches
+        # a delivery the link no longer holds in progress, which isolates the traversal
+        # from the in-progress slot the scenario above exercises.
+
+        exchange(
+            "staged-disposition-completed-after-detach", start=s("MAPPED"),
+            clauses=[DISPOSITION_REFERS_TO_DETACHED, DISPOSITION_STATE_STILL_APPLIES,
+                     TRANSFER_RESUME_SENDER_MUST_NOT],
+            steps=link_up(role_sender=True) + [
+                t.send_frame(AMQP_FRAME,
+                             t.transfer_body(handle=0, delivery_id=0,
+                                             delivery_tag=b"tag"),
+                             state=s("MAPPED"), channel=1, payload=message,
+                             note="a completed transfer that settles nothing: no `more`, "
+                                  "so the delivery is not in progress, and no `settled`, "
+                                  "so the link holds it unsettled in the shared table -- "
+                                  "the one state a disposition's delivery-id range has to "
+                                  "reach through the table's own keys"),
+                t.receive_frame(AMQP_FRAME, t.detach_body(handle=0, closed=False),
+                                state=s("MAPPED"), channel=1),
+                t.receive_frame(AMQP_FRAME,
+                                t.body("disposition",
+                                       role={"type": "boolean", "value": False},
+                                       first={"type": "uint", "value": 0},
+                                       last={"type": "uint", "value": 0},
+                                       settled={"type": "boolean", "value": True}),
+                                state=s("MAPPED"), channel=1,
+                                note="`disposition.4`: the link is detached but neither "
+                                     "closed nor detached with an error, so the completed "
+                                     "delivery is still live and the updated state MUST be "
+                                     "applied -- to a delivery the link holds in no "
+                                     "in-progress slot, which only the table's key index "
+                                     "can name"),
+                t.refused("send", reason="malformed", condition=INVALID_FIELD,
+                          state=s("MAPPED"),
+                          body=t.transfer_body(handle=0, delivery_id=0,
+                                               delivery_tag=b"tag", resume=True),
+                          channel=1, payload=message,
+                          note="the observable of that applied state: the completed "
+                               "delivery has left the sender's unsettled map, so "
+                               "`transfer/field:resume.2` forbids resuming it. Without the "
+                               "traversal this step is admitted, because the disposition "
+                               "found no in-progress delivery to release and the table "
+                               "entry at the tag survived it")],
+            note="**Completed-entry traversal.** `disposition.4` for the delivery the "
+                 "link has already finished: the in-progress slot is empty, so an "
+                 "implementation that settles only the delivery in progress leaves the "
+                 "unsettled entry in place and admits the resumed send. The flip side of "
+                 "`staged-disposition-after-detach`, which reaches the same clause through "
+                 "the in-progress delivery"),
     ]
 
 

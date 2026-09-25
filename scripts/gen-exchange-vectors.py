@@ -13,8 +13,10 @@ here.
 
 `--out` is the corpus a gate runs: the connection and session families pass in both
 artefacts, and the widening family is the failure-first evidence for PLAN.md §24's
-`deferred:S4` obligations — red in both until the widened model lands, and deliberately not
-weakened to keep a gate green.
+`deferred:S4` obligations — eleven of its twelve vectors red in both artefacts before the
+widened model landed, `staged-disposition-completed-after-detach` red in the reference
+against the pre-index tree while the specification reading did not elaborate there, and the
+family deliberately not weakened to keep a gate green.
 
 `--mutations` writes the control family to a path the caller names rather than into the
 corpus: a control asserts what the artifact forbids and is meant to fail, so it cannot live
