@@ -3023,6 +3023,268 @@ theorem pairUp_agrees (zs : List (SpecAMQP.Ref.Value × SpecAMQP.Ref.Value)) :
                 unfold BodiesAgreePairs
                 exact ⟨hxy, hx', ih xs' ys' hrest hp⟩
 
+/-! ## The map key comparison, and the agreement it owes
+
+The map reader's duplicate-key rule asks each artefact to compare two key values, and the claim the
+differential makes about a refused map is that both readings refuse it *in the same class*. That is a
+claim about what the comparison answers — the reference's `keysRepeat` answers `true` exactly where
+the specification's does — and not merely about where the question is asked.
+
+Both artefacts therefore carry the comparison as three structurally recursive definitions
+(`SpecAMQP.Spec.Codec.sameValue` and `SpecAMQP.Ref.sameValue`, with their item-list and pair-list
+forms) rather than as a derived `BEq` instance, which the kernel cannot unfold: an opaque instance
+answers the question at runtime and refuses to answer it to any proof, which is exactly what the
+duplicate case needs. These lemmas are what the written-out comparison buys, and
+`readCompound_map_body` spends it.
+
+`BodiesAgree` is the relation between the two representations, so it also relates the comparisons:
+`value_beq_agrees` is that statement, `list_beq_agrees` and `pairs_beq_agrees` are its item-list and
+pair-list forms, and they are mutually recursive because a value's items are values.
+
+Two things keep the proof out of the pairing analysis a second time — the analysis that pairs two
+reference values up, which is what an agreement between two *readings* needs and what a comparison
+between two *shapes* does not. `valueTag_agrees` says a paired body is paired at the same tag, so a
+goal whose two specification values are of different constructors is settled by the two artefacts'
+shapes alone (`sameValue_eq_false_of_tag_ne`, `refValue_eq_false_of_refTag_ne`) and never looks at
+the reference's pairing at all. Only where the two readings share a constructor are values paired up
+against each other, and there the fields' own relations carry the case: the projections the carriers
+publish (`toNat_inj`, `toInt_inj`, `Array.isEqv_toList`) close the scalar and opaque shapes in one
+step, and the item and pair lists are the mutual lemmas. -/
+
+/-- The constructor a value is, as a number: the first thing a comparison compares, and the
+reason two values of different constructors answer `false` without either payload being consulted.
+The two artefacts number the constructors identically — the number is this module's, not either
+artefact's — so the same tag is a claim about the same shape. -/
+def valueTag : SpecAMQP.Spec.Codec.Value → Nat
+  | .null => 0
+  | .boolean _ => 1
+  | .ubyte _ => 2
+  | .ushort _ => 3
+  | .uint _ => 4
+  | .ulong _ => 5
+  | .byte _ => 6
+  | .short _ => 7
+  | .int _ => 8
+  | .long _ => 9
+  | .float _ => 10
+  | .double _ => 11
+  | .decimal32 _ => 12
+  | .decimal64 _ => 13
+  | .decimal128 _ => 14
+  | .char _ => 15
+  | .timestamp _ => 16
+  | .uuid _ => 17
+  | .binary _ => 18
+  | .string _ => 19
+  | .symbol _ => 20
+  | .list _ => 21
+  | .map _ => 22
+  | .array _ _ => 23
+  | .described _ _ => 24
+
+/-- The reference's constructors under the same numbering: `valueTag`'s companion. -/
+def refTag : SpecAMQP.Ref.Value → Nat
+  | .null => 0
+  | .boolean _ => 1
+  | .ubyte _ => 2
+  | .ushort _ => 3
+  | .uint _ => 4
+  | .ulong _ => 5
+  | .byte _ => 6
+  | .short _ => 7
+  | .int _ => 8
+  | .long _ => 9
+  | .string _ => 19
+  | .symbol _ => 20
+  | .binary _ => 18
+  | .char _ => 15
+  | .timestamp _ => 16
+  | .float _ => 10
+  | .double _ => 11
+  | .decimal32 _ => 12
+  | .decimal64 _ => 13
+  | .decimal128 _ => 14
+  | .uuid _ => 17
+  | .list _ => 21
+  | .map _ => 22
+  | .array _ _ => 23
+  | .described _ _ => 24
+
+/-- **A paired body is paired at the same tag.** The two numberings agree under `BodiesAgree`,
+which is what lets a goal about two *different* constructors be settled without pairing the
+reference's readings up a second time. -/
+theorem valueTag_agrees {a : SpecAMQP.Spec.Codec.Value} {b : SpecAMQP.Ref.Value}
+    (h : BodiesAgree a b) : valueTag a = refTag b := by
+  cases a <;> cases b <;> simp only [BodiesAgree] at h <;> rfl
+
+/-- Two values of different constructors are different values to the specification's comparison,
+whatever their payloads. -/
+theorem sameValue_eq_false_of_tag_ne {a a' : SpecAMQP.Spec.Codec.Value}
+    (h : valueTag a ≠ valueTag a') : SpecAMQP.Spec.Codec.sameValue a a' = false := by
+  cases a <;> cases a' <;> simp only [SpecAMQP.Spec.Codec.sameValue, valueTag] at h ⊢
+  all_goals first | rfl | exact absurd rfl h
+
+/-- ... and to the reference's, the same way. -/
+theorem refValue_eq_false_of_refTag_ne {b b' : SpecAMQP.Ref.Value}
+    (h : refTag b ≠ refTag b') : SpecAMQP.Ref.sameValue b b' = false := by
+  cases b <;> cases b' <;> simp only [SpecAMQP.Ref.sameValue, refTag] at h ⊢
+  all_goals first | rfl | exact absurd rfl h
+
+-- The case analyses below walk a 25-constructor value type on both sides, and one `whnf` of the
+-- well-founded comparison inside them is over the default budget; the budget is raised here so the
+-- block reports about the comparison rather than about the elapsed heartbeats.
+set_option maxHeartbeats 4000000 in
+mutual
+
+/-- **The two readings compare values the same way.** Values the frame layer's relation calls the
+same value are the same value to each artefact's own comparison, constructor against constructor and
+payload against payload. -/
+theorem value_beq_agrees : ∀ (a a' : SpecAMQP.Spec.Codec.Value) (b b' : SpecAMQP.Ref.Value),
+    BodiesAgree a b → BodiesAgree a' b' →
+    SpecAMQP.Spec.Codec.sameValue a a' = SpecAMQP.Ref.sameValue b b'
+  | a, a', b, b', h, h' => by
+    cases a <;> cases b <;> simp only [BodiesAgree] at h
+    all_goals (cases a' <;> first
+      | -- `a'` is not the constructor the reference's reading paired with `a`, so it is not the
+        -- constructor `b'` carries either: both comparisons answer `false` because the shapes differ.
+        -- This arm reads no reference payload, which is why it needs no pairing of its own
+        (rw [sameValue_eq_false_of_tag_ne (a := a) (a' := a') (by simp only [valueTag]; decide),
+          refValue_eq_false_of_refTag_ne (b := b) (b' := b')
+            (by
+              intro hcon
+              have hne : valueTag a ≠ valueTag a' := by simp only [valueTag]; decide
+              exact hne ((valueTag_agrees h).trans (hcon.trans (valueTag_agrees h').symm)))])
+      | (cases b' <;> simp only [BodiesAgree] at h' <;>
+          simp only [SpecAMQP.Spec.Codec.sameValue, SpecAMQP.Ref.sameValue] <;>
+          first
+            | rfl
+            -- the containers first: each is a case whose two parts are settled by the mutual lemma,
+            -- and each of these steps fails outright on a body that is not that container
+            | (exact list_beq_agrees _ _ _ _ h h')
+            | (exact pairs_beq_agrees _ _ _ _ h h')
+            -- an array: its constructor octet is the same octet on both sides once the relation is
+            -- used as a rewrite rule, and its elements are the item list's own case
+            | (rw [h.1, h'.1, list_beq_agrees _ _ _ _ h.2 h'.2]; done)
+            -- a described body: both of its two parts are values
+            | (rw [value_beq_agrees _ _ _ _ h.1 h'.1, value_beq_agrees _ _ _ _ h.2 h'.2]; done)
+            -- a scalar, a `String` or an opaque payload: the field relations rewrite and both sides
+            -- become the same comparison, which is the projection the carriers publish —
+            -- `toNat_inj`/`toInt_inj` where a `Nat` or an `Int` meets a `UIntNN` or an `IntNN`
+            | (simp only [h, h', BEq.beq, UInt8.toNat_inj, UInt16.toNat_inj, UInt32.toNat_inj,
+                 UInt64.toNat_inj, Int8.toInt_inj, Int16.toInt_inj, Int32.toInt_inj,
+                 Int64.toInt_inj]; done)
+            -- a binary payload: the one shape where the two carriers are different containers —
+            -- `Array UInt8` against `List UInt8` — so the octet list is what the two comparisons
+            -- have in common, which is what `h` says the payloads are
+            | (simp only [h.symm, h'.symm, BEq.beq, List.beq_eq_isEqv, Array.isEqv_toList]; done)))
+termination_by a a' b b' => sizeOf a + sizeOf a' + sizeOf b + sizeOf b'
+
+/-- **Item lists compare item by item**, in order: the value comparison's own form at a list. -/
+theorem list_beq_agrees : ∀ (xs xs' : List SpecAMQP.Spec.Codec.Value)
+    (ys ys' : List SpecAMQP.Ref.Value),
+    BodiesAgreeList xs ys → BodiesAgreeList xs' ys' →
+    SpecAMQP.Spec.Codec.sameValues xs xs' = SpecAMQP.Ref.sameValues ys ys'
+  | xs, xs', ys, ys', h, h' => by
+    cases xs <;> cases ys <;> simp only [BodiesAgreeList] at h
+    all_goals (cases xs' <;> cases ys' <;> simp only [BodiesAgreeList] at h')
+    all_goals simp only [SpecAMQP.Spec.Codec.sameValues, SpecAMQP.Ref.sameValues]
+    all_goals (first
+      | rfl
+      | (rw [value_beq_agrees _ _ _ _ h.1 h'.1, list_beq_agrees _ _ _ _ h.2 h'.2]))
+termination_by xs xs' ys ys' => sizeOf xs + sizeOf xs' + sizeOf ys + sizeOf ys'
+
+/-- **Pair lists compare pair by pair**, key against key and value against value, in the order the
+wire carried them: the value comparison's own form at a map's pairing. -/
+theorem pairs_beq_agrees : ∀ (ps ps' : List (SpecAMQP.Spec.Codec.Value × SpecAMQP.Spec.Codec.Value))
+    (qs qs' : List (SpecAMQP.Ref.Value × SpecAMQP.Ref.Value)),
+    BodiesAgreePairs ps qs → BodiesAgreePairs ps' qs' →
+    SpecAMQP.Spec.Codec.samePairs ps ps' = SpecAMQP.Ref.samePairs qs qs'
+  -- The pairing relation and the comparison are both written on a pair-headed list, so a variable
+  -- head leaves neither of them unfoldable and the pair has to be destructured. It is destructured
+  -- in the clause patterns, not by a tactic, because this recursion is well-founded: a tactic
+  -- `rcases` on one of the *parameters* leaves the pattern out of the termination goal, which then
+  -- asks `sizeOf (tail) < sizeOf (parameter)` for a parameter nothing constrains - an obligation no
+  -- tactic can close. With the pair in the clause pattern the obligation is `sizeOf` on a
+  -- constructor's argument against `sizeOf` on the constructor (`List.cons.sizeOf_spec`,
+  -- `Prod.mk.sizeOf_spec`), which arithmetic closes. The first four clauses are the cases where one
+  -- of the four lists is empty: the relation makes one of the two hypotheses `False` there, or both
+  -- comparisons answer `false`.
+  | [], ps', qs, qs', h, h' => by
+    cases ps' <;> cases qs <;> cases qs' <;>
+      simp_all only [BodiesAgreePairs, SpecAMQP.Spec.Codec.samePairs, SpecAMQP.Ref.samePairs]
+  | ps, [], qs, qs', h, h' => by
+    cases ps <;> cases qs <;> cases qs' <;>
+      simp_all only [BodiesAgreePairs, SpecAMQP.Spec.Codec.samePairs, SpecAMQP.Ref.samePairs]
+  | ps, ps', [], qs', h, h' => by
+    cases ps <;> cases ps' <;> cases qs' <;>
+      simp_all only [BodiesAgreePairs, SpecAMQP.Spec.Codec.samePairs, SpecAMQP.Ref.samePairs]
+  | ps, ps', qs, [], h, h' => by
+    cases ps <;> cases ps' <;> cases qs <;>
+      simp_all only [BodiesAgreePairs, SpecAMQP.Spec.Codec.samePairs, SpecAMQP.Ref.samePairs]
+  | (k, v) :: ps, (k', v') :: ps', (l, w) :: qs, (l', w') :: qs', h, h' => by
+    simp only [BodiesAgreePairs, SpecAMQP.Spec.Codec.samePairs, SpecAMQP.Ref.samePairs] at h h' ⊢
+    rw [value_beq_agrees _ _ _ _ h.1 h'.1, value_beq_agrees _ _ _ _ h.2.1 h'.2.1,
+        pairs_beq_agrees _ _ _ _ h.2.2 h'.2.2]
+termination_by ps ps' qs qs' => sizeOf ps + sizeOf ps' + sizeOf qs + sizeOf qs'
+end
+
+/-- **A key occurs in a pair list exactly where its counterpart occurs in the other's.** The `any`
+of a pair list is what `keysRepeat` asks of a map's keys, so this is the step that lets the two
+artefacts' answers be compared: each pair's key is compared against the key in hand on its own side,
+and `value_beq_agrees` says those two comparisons are the same comparison. -/
+theorem any_key_agrees : ∀ (sp : List (SpecAMQP.Spec.Codec.Value × SpecAMQP.Spec.Codec.Value))
+    (rp : List (SpecAMQP.Ref.Value × SpecAMQP.Ref.Value)),
+    BodiesAgreePairs sp rp → ∀ (k : SpecAMQP.Spec.Codec.Value) (k' : SpecAMQP.Ref.Value),
+      BodiesAgree k k' →
+      (sp.any (fun p => p.1 == k)) = (rp.any (fun q => q.1 == k')) := by
+  intro sp
+  induction sp with
+  | nil =>
+    intro rp h k k' _
+    cases rp with
+    | nil => rfl
+    | cons q rp => simp only [BodiesAgreePairs] at h
+  | cons p ps ih =>
+    obtain ⟨a, b⟩ := p
+    intro rp h k k' hk
+    cases rp with
+    | nil => simp only [BodiesAgreePairs] at h
+    | cons q rp =>
+      obtain ⟨a', b'⟩ := q
+      simp only [BodiesAgreePairs] at h
+      obtain ⟨ha, -, hrest⟩ := h
+      simp only [List.any_cons]
+      rw [show (a == k) = SpecAMQP.Spec.Codec.sameValue a k from rfl,
+        show (a' == k') = SpecAMQP.Ref.sameValue a' k' from rfl,
+        value_beq_agrees _ _ _ _ ha hk, ih rp hrest k k' hk]
+
+/-- **A repeated key is a repeated key in both readings.** The rule Part 1 states of a map — "a map
+in which there exist two identical key values is invalid" — is asked of each artefact's own key
+comparison, and the two answers are the same answer. This is the lemma the duplicate case of
+`readCompound_map_body` needs: the reference's refusal and the specification's are the same refusal
+about the same map, and so they name the same class. -/
+theorem keysRepeat_agrees : ∀ (sp : List (SpecAMQP.Spec.Codec.Value × SpecAMQP.Spec.Codec.Value))
+    (rp : List (SpecAMQP.Ref.Value × SpecAMQP.Ref.Value)), BodiesAgreePairs sp rp →
+    SpecAMQP.Spec.Codec.keysRepeat sp = SpecAMQP.Ref.keysRepeat rp := by
+  intro sp
+  induction sp with
+  | nil =>
+    intro rp h
+    cases rp with
+    | nil => rfl
+    | cons q rp => simp only [BodiesAgreePairs] at h
+  | cons p ps ih =>
+    obtain ⟨a, b⟩ := p
+    intro rp h
+    cases rp with
+    | nil => simp only [BodiesAgreePairs] at h
+    | cons q rp =>
+      obtain ⟨a', b'⟩ := q
+      simp only [BodiesAgreePairs] at h
+      obtain ⟨ha, -, hrest⟩ := h
+      simp only [SpecAMQP.Spec.Codec.keysRepeat, SpecAMQP.Ref.keysRepeat,
+        any_key_agrees ps rp hrest a a' ha, ih rp hrest]
+
 /-! ## The specification's array element, as a reader of its own
 
 An array's elements are read by `readElementsLoop`, whose one element is a *decision* on the element
@@ -3257,10 +3519,14 @@ theorem readRows_data : ∀ (fuel : Nat),
         · obtain ⟨⟨items, c₃⟩, h3, h⟩ := exists_of_bind_ok h
           try dsimp only at h
           have d3 := hItems count c₂ items c₃ h3
+          -- the duplicate-key check, which is a rule on the map's items and so runs before the
+          -- declared size is compared with the octets measured
           split at h
-          · simp only [Except.ok.injEq, Prod.mk.injEq] at h
-            rw [← h.2, d3, d2, d1]
           · exact absurd h (by simp)
+          · split at h
+            · simp only [Except.ok.injEq, Prod.mk.injEq] at h
+              rw [← h.2, d3, d2, d1]
+            · exact absurd h (by simp)
       · exact absurd h (by simp)
     have hArrayData : ∀ (decl : EncodingDecl) (c : Cursor) (v : Value) (c' : Cursor),
         readArrayData 0 decl c = .ok (v, c') → c'.data = c.data := by
@@ -3378,10 +3644,14 @@ theorem readRows_data : ∀ (fuel : Nat),
         · obtain ⟨⟨items, c₃⟩, h3, h⟩ := exists_of_bind_ok h
           try dsimp only at h
           have d3 := hItems count c₂ items c₃ h3
+          -- the duplicate-key check, which is a rule on the map's items and so runs before the
+          -- declared size is compared with the octets measured
           split at h
-          · simp only [Except.ok.injEq, Prod.mk.injEq] at h
-            rw [← h.2, d3, d2, d1]
           · exact absurd h (by simp)
+          · split at h
+            · simp only [Except.ok.injEq, Prod.mk.injEq] at h
+              rw [← h.2, d3, d2, d1]
+            · exact absurd h (by simp)
       · exact absurd h (by simp)
     have hArrayData : ∀ (decl : EncodingDecl) (c : Cursor) (v : Value) (c' : Cursor),
         readArrayData (n + 1) decl c = .ok (v, c') → c'.data = c.data := by
@@ -3519,11 +3789,15 @@ theorem readRows_le_size : ∀ (fuel : Nat),
         · obtain ⟨⟨items, c₃⟩, h3, h⟩ := exists_of_bind_ok h
           try dsimp only at h
           have p3 := hItems count c₂ items c₃ h3 p2
+          -- the duplicate-key check, which is a rule on the map's items and so runs before the
+          -- declared size is compared with the octets measured
           split at h
-          · simp only [Except.ok.injEq, Prod.mk.injEq] at h
-            rw [← h.2]
-            exact p3
           · exact absurd h (by simp)
+          · split at h
+            · simp only [Except.ok.injEq, Prod.mk.injEq] at h
+              rw [← h.2]
+              exact p3
+            · exact absurd h (by simp)
       · exact absurd h (by simp)
     have hArrayData : ∀ (decl : EncodingDecl) (c : Cursor) (v : Value) (c' : Cursor),
         readArrayData 0 decl c = .ok (v, c') → c.pos ≤ c.data.size → c'.pos ≤ c'.data.size := by
@@ -3651,11 +3925,15 @@ theorem readRows_le_size : ∀ (fuel : Nat),
         · obtain ⟨⟨items, c₃⟩, h3, h⟩ := exists_of_bind_ok h
           try dsimp only at h
           have p3 := hItems count c₂ items c₃ h3 p2
+          -- the duplicate-key check, which is a rule on the map's items and so runs before the
+          -- declared size is compared with the octets measured
           split at h
-          · simp only [Except.ok.injEq, Prod.mk.injEq] at h
-            rw [← h.2]
-            exact p3
           · exact absurd h (by simp)
+          · split at h
+            · simp only [Except.ok.injEq, Prod.mk.injEq] at h
+              rw [← h.2]
+              exact p3
+            · exact absurd h (by simp)
       · exact absurd h (by simp)
     have hArrayData : ∀ (decl : EncodingDecl) (c : Cursor) (v : Value) (c' : Cursor),
         readArrayData (n + 1) decl c = .ok (v, c') → c.pos ≤ c.data.size →
@@ -4829,46 +5107,59 @@ theorem readCompound_map_body (F : Nat) (ih : WireAgreesUpTo (F - 2)) (decl : En
       · rename_i hpar
         obtain ⟨⟨items', c₃'⟩, hr3, hr⟩ := exists_of_bind_ok hr
         try dsimp only at hr
-        split at hr
-        · exact absurd hr (by simp)
-        · rename_i hpass
-          have hsz : c₃'.pos - c₁'.pos = size := by simpa using hpass
-          cases hp : SpecAMQP.Ref.pairUp items' with
-          | none =>
-            have habs : False := by rw [hp] at hr; simp at hr
-            exact habs.elim
-          | some pairs =>
-            obtain ⟨hother, hcur'⟩ : SpecAMQP.Ref.Value.map pairs = other ∧ c₃' = d' := by
-              rw [hp] at hr
-              simpa using hr
-            subst hother
-            subst hcur'
-            obtain ⟨d₁, hs1, hc1⟩ := takeBe_agrees hc decl.width size c₁' hr1
-            obtain ⟨d₂, hs2, hc2⟩ := takeBe_agrees hc1 decl.width count c₂' hr2
-            have hdd : d₂.data.size = c.data.size := by
-              rw [spec_takeBe_data hs2, spec_takeBe_data hs1]
-            have hp1 := takeBe_advances decl.width c size d₁ hs1
-            have hp2 := takeBe_advances decl.width d₁ count d₂ hs2
-            have hb₂ : d₂.data.size - d₂.pos ≤ (G + 1) - 1 := by rw [hdd, hp2, hp1]; omega
-            have hge : 1 ≤ G := by
-              have := two_le_fuel_of_header hw hc hb hr1 hr2
-              omega
-            obtain ⟨items, c₃, hs3, hc3, hbl⟩ :=
-              (itemsAgree2_of_irrel
-                (readItems_loop G (wireAgreesUpTo_mono ih (by omega)) hge count d₂ c₂' hc2
-                  (by omega))
-                (readItems_irrel (Nat.le_succ G) hge (by omega))).1 items' c₃' hr3
-            have hmeasured : c₃.pos - d₁.pos = size := by rw [hc3.2, hc1.2]; exact hsz
-            refine ⟨.map (SpecAMQP.Spec.Codec.pairUp items), c₃, ?_, ?_, hc3, ?_⟩
-            · simp only [SpecAMQP.Spec.Codec.readCompound]
-              rw [hs1, except_bind_ok, hs2, except_bind_ok]
-              simp only [howner]
-              rw [if_neg hpar]
-              rw [hs3, except_bind_ok, if_pos hmeasured]
-            · simp only [BodiesAgree]
-              exact pairUp_agrees pairs items items' hbl hp
-            · rw [(readRows_data (G + 1)).2.1 count d₂ items c₃ hs3, spec_takeBe_data hs2,
-                spec_takeBe_data hs1]
+        cases hp : SpecAMQP.Ref.pairUp items' with
+        | none =>
+          have habs : False := by rw [hp] at hr; simp at hr
+          exact habs.elim
+        | some pairs =>
+          -- the rewritten pairing is reduced here rather than left as a match, so the splits below
+          -- are the reference's two guards and not that match's two arms
+          simp only [hp] at hr
+          split at hr
+          · exact absurd hr (by simp)
+          · rename_i hnodup
+            split at hr
+            · exact absurd hr (by simp)
+            · rename_i hpass
+              have hsz : c₃'.pos - c₁'.pos = size := by simpa using hpass
+              obtain ⟨hother, hcur'⟩ : SpecAMQP.Ref.Value.map pairs = other ∧ c₃' = d' := by
+                simpa using hr
+              subst hother
+              subst hcur'
+              obtain ⟨d₁, hs1, hc1⟩ := takeBe_agrees hc decl.width size c₁' hr1
+              obtain ⟨d₂, hs2, hc2⟩ := takeBe_agrees hc1 decl.width count c₂' hr2
+              have hdd : d₂.data.size = c.data.size := by
+                rw [spec_takeBe_data hs2, spec_takeBe_data hs1]
+              have hp1 := takeBe_advances decl.width c size d₁ hs1
+              have hp2 := takeBe_advances decl.width d₁ count d₂ hs2
+              have hb₂ : d₂.data.size - d₂.pos ≤ (G + 1) - 1 := by rw [hdd, hp2, hp1]; omega
+              have hge : 1 ≤ G := by
+                have := two_le_fuel_of_header hw hc hb hr1 hr2
+                omega
+              obtain ⟨items, c₃, hs3, hc3, hbl⟩ :=
+                (itemsAgree2_of_irrel
+                  (readItems_loop G (wireAgreesUpTo_mono ih (by omega)) hge count d₂ c₂' hc2
+                    (by omega))
+                  (readItems_irrel (Nat.le_succ G) hge (by omega))).1 items' c₃' hr3
+              have hmeasured : c₃.pos - d₁.pos = size := by rw [hc3.2, hc1.2]; exact hsz
+              -- the reference answered the map, so its duplicate-key check answered `false`, and the
+              -- specification's check is the same question about the same map
+              have hkeys : ¬(SpecAMQP.Spec.Codec.keysRepeat
+                  (SpecAMQP.Spec.Codec.pairUp items) = true) := by
+                simpa only [← keysRepeat_agrees (SpecAMQP.Spec.Codec.pairUp items) pairs
+                  (pairUp_agrees pairs items items' hbl hp)] using hnodup
+              refine ⟨.map (SpecAMQP.Spec.Codec.pairUp items), c₃, ?_, ?_, hc3, ?_⟩
+              · simp only [SpecAMQP.Spec.Codec.readCompound]
+                rw [hs1, except_bind_ok, hs2, except_bind_ok]
+                simp only [howner]
+                rw [if_neg hpar]
+                rw [hs3, except_bind_ok]
+                dsimp only
+                rw [if_neg hkeys, if_pos hmeasured]
+              · simp only [BodiesAgree]
+                exact pairUp_agrees pairs items items' hbl hp
+              · rw [(readRows_data (G + 1)).2.1 count d₂ items c₃ hs3, spec_takeBe_data hs2,
+                  spec_takeBe_data hs1]
     · intro failure hr
       unfold SpecAMQP.Ref.readMap at hr
       cases hr1 : SpecAMQP.Ref.takeBeU decl.width c' with
@@ -4942,43 +5233,10 @@ theorem readCompound_map_body (F : Nat) (ih : WireAgreesUpTo (F - 2)) (decl : En
               obtain ⟨items', c₃'⟩ := r
               rw [hr3, except_bind_ok] at hr
               try dsimp only at hr
-              split at hr
-              · -- the reference's size comparison refuses, and the specification measures the same
-                simp only [Except.error.injEq] at hr
-                subst hr
-                obtain ⟨d₁, hs1, hc1⟩ := takeBe_agrees hc decl.width size c₁' hr1
-                obtain ⟨d₂, hs2, hc2⟩ := takeBe_agrees hc1 decl.width count c₂' hr2
-                have hdd : d₂.data.size = c.data.size := by
-                  rw [spec_takeBe_data hs2, spec_takeBe_data hs1]
-                have hp1 := takeBe_advances decl.width c size d₁ hs1
-                have hp2 := takeBe_advances decl.width d₁ count d₂ hs2
-                have hge : 1 ≤ G := by
-                  have := two_le_fuel_of_header hw hc hb hr1 hr2
-                  omega
-                obtain ⟨items, c₃, hs3, hc3, hbl⟩ :=
-                  (itemsAgree2_of_irrel
-                    (readItems_loop G (wireAgreesUpTo_mono ih (by omega)) hge count d₂ c₂' hc2
-                      (by rw [hdd, hp2, hp1]; omega))
-                    (readItems_irrel (Nat.le_succ G) hge (by rw [hdd, hp2, hp1]; omega))).1
-                      items' c₃' hr3
-                rename_i hfail
-                have hne : c₃.pos - d₁.pos ≠ size := by
-                  intro hcon
-                  have hz : c₃'.pos - c₁'.pos = size := by rw [← hc3.2, ← hc1.2]; exact hcon
-                  rw [hz] at hfail
-                  exact absurd hfail (by simp)
-                refine ⟨SpecAMQP.Spec.Codec.refusal "sizeMismatch" s!"a map declares {size} \
-                  octet(s) after its size field and measures {c₃.pos - d₁.pos}", ?_, ?_⟩
-                · simp only [SpecAMQP.Spec.Codec.readCompound]
-                  rw [hs1, except_bind_ok, hs2, except_bind_ok]
-                  simp only [howner]
-                  rw [if_neg hpar, hs3, except_bind_ok]
-                  dsimp only
-                  rw [if_neg hne]
-                · simp only [SpecAMQP.Ref.Frame.valueFailure]
-                  rfl
-              · -- the size comparison passed: the reference's pairing arm, which an even count
-                -- excludes — the item loop answered `count` items and the count is even
+              cases hp : SpecAMQP.Ref.pairUp items' with
+              | none =>
+                -- the pairing refuses only an odd item count, and the count is even: the item loop
+                -- answered `count` items, so this arm's failure is not the one in hand
                 have hbool : (count % 2 != 0) = false := by
                   cases hb : (count % 2 != 0) with
                   | false => rfl
@@ -4987,9 +5245,91 @@ theorem readCompound_map_body (F : Nat) (ih : WireAgreesUpTo (F - 2)) (decl : En
                 have hlen := ref_readItems_length count G c₂' items' c₃' hr3
                 obtain ⟨k, hk⟩ := Nat.dvd_iff_mod_eq_zero.mpr hodd
                 obtain ⟨zs, hzs⟩ := ref_pairUp_isSome_of_even k items' (by rw [hlen]; exact hk)
-                rw [hzs] at hr
-                simp only [except_pure_ok] at hr
-                exact absurd hr (by simp)
+                exact absurd (hp.symm.trans hzs) (by simp)
+              | some pairs =>
+                simp only [hp] at hr
+                split at hr
+                · -- the reference refuses the repeated key, and the specification refuses the same
+                  -- map in the same class
+                  rename_i hdup
+                  obtain ⟨d₁, hs1, hc1⟩ := takeBe_agrees hc decl.width size c₁' hr1
+                  obtain ⟨d₂, hs2, hc2⟩ := takeBe_agrees hc1 decl.width count c₂' hr2
+                  have hdd : d₂.data.size = c.data.size := by
+                    rw [spec_takeBe_data hs2, spec_takeBe_data hs1]
+                  have hp1 := takeBe_advances decl.width c size d₁ hs1
+                  have hp2 := takeBe_advances decl.width d₁ count d₂ hs2
+                  have hge : 1 ≤ G := by
+                    have := two_le_fuel_of_header hw hc hb hr1 hr2
+                    omega
+                  obtain ⟨items, c₃, hs3, hc3, hbl⟩ :=
+                    (itemsAgree2_of_irrel
+                      (readItems_loop G (wireAgreesUpTo_mono ih (by omega)) hge count d₂ c₂' hc2
+                        (by rw [hdd, hp2, hp1]; omega))
+                      (readItems_irrel (Nat.le_succ G) hge (by rw [hdd, hp2, hp1]; omega))).1
+                        items' c₃' hr3
+                  -- the reference's refusal is the duplicate it names, and the specification's own
+                  -- key comparison answers the same question of the same map
+                  have hkeys : SpecAMQP.Spec.Codec.keysRepeat
+                      (SpecAMQP.Spec.Codec.pairUp items) = true := by
+                    rw [keysRepeat_agrees (SpecAMQP.Spec.Codec.pairUp items) pairs
+                      (pairUp_agrees pairs items items' hbl hp)]
+                    exact hdup
+                  simp only [Except.error.injEq] at hr
+                  subst hr
+                  refine ⟨SpecAMQP.Spec.Codec.refusal "malformed" "a map carries two identical \
+                    key values, and such a map is invalid", ?_, ?_⟩
+                  · simp only [SpecAMQP.Spec.Codec.readCompound]
+                    rw [hs1, except_bind_ok, hs2, except_bind_ok]
+                    simp only [howner]
+                    rw [if_neg hpar, hs3, except_bind_ok]
+                    dsimp only
+                    rw [if_pos hkeys]
+                  · simp only [SpecAMQP.Ref.Frame.valueFailure]
+                    rfl
+                · rename_i hnodup
+                  split at hr
+                  · -- the reference's size comparison refuses, and the specification measures the
+                    -- same window
+                    simp only [Except.error.injEq] at hr
+                    subst hr
+                    obtain ⟨d₁, hs1, hc1⟩ := takeBe_agrees hc decl.width size c₁' hr1
+                    obtain ⟨d₂, hs2, hc2⟩ := takeBe_agrees hc1 decl.width count c₂' hr2
+                    have hdd : d₂.data.size = c.data.size := by
+                      rw [spec_takeBe_data hs2, spec_takeBe_data hs1]
+                    have hp1 := takeBe_advances decl.width c size d₁ hs1
+                    have hp2 := takeBe_advances decl.width d₁ count d₂ hs2
+                    have hge : 1 ≤ G := by
+                      have := two_le_fuel_of_header hw hc hb hr1 hr2
+                      omega
+                    obtain ⟨items, c₃, hs3, hc3, hbl⟩ :=
+                      (itemsAgree2_of_irrel
+                        (readItems_loop G (wireAgreesUpTo_mono ih (by omega)) hge count d₂ c₂'
+                          hc2 (by rw [hdd, hp2, hp1]; omega))
+                        (readItems_irrel (Nat.le_succ G) hge
+                          (by rw [hdd, hp2, hp1]; omega))).1 items' c₃' hr3
+                    rename_i hfail
+                    have hne : c₃.pos - d₁.pos ≠ size := by
+                      intro hcon
+                      have hz : c₃'.pos - c₁'.pos = size := by rw [← hc3.2, ← hc1.2]; exact hcon
+                      rw [hz] at hfail
+                      exact absurd hfail (by simp)
+                    have hkeys : ¬(SpecAMQP.Spec.Codec.keysRepeat
+                        (SpecAMQP.Spec.Codec.pairUp items) = true) := by
+                      simpa only [← keysRepeat_agrees (SpecAMQP.Spec.Codec.pairUp items) pairs
+                        (pairUp_agrees pairs items items' hbl hp)] using hnodup
+                    refine ⟨SpecAMQP.Spec.Codec.refusal "sizeMismatch" s!"a map declares {size} \
+                      octet(s) after its size field and measures {c₃.pos - d₁.pos}", ?_, ?_⟩
+                    · simp only [SpecAMQP.Spec.Codec.readCompound]
+                      rw [hs1, except_bind_ok, hs2, except_bind_ok]
+                      simp only [howner]
+                      rw [if_neg hpar, hs3, except_bind_ok]
+                      dsimp only
+                      rw [if_neg hkeys, if_neg hne]
+                    · simp only [SpecAMQP.Ref.Frame.valueFailure]
+                      rfl
+                  · -- the size comparison passed and the reference answered the map, so the failure
+                    -- hypothesis is contradicted
+                    exact absurd hr (by simp)
 
 /-! ## The four compound and map arms
 

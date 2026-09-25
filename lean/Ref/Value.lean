@@ -130,16 +130,82 @@ inductive Value where
   | list (items : List Value)
   /-- A map, as an ordered sequence of key-value pairs. Part 1 requires the pairs'
   order to be preserved unless the map is known to be unordered, so this holds
-  them in the order they appeared and the derived `BEq` compares that sequence:
+  them in the order they appeared and the value comparison compares that sequence:
   two maps differing only in pair order are different values. -/
   | map (pairs : List (Value × Value))
   /-- An array as it appears on the wire: one constructor octet and the element
   data, without the elements' own constructors. -/
   | array (constructor : UInt8) (items : List Value)
   | described (descriptor : Value) (value : Value)
-deriving Repr, BEq, Inhabited
+deriving Repr, Inhabited
 -- `DecidableEq` is deliberately not derived: it does not apply to an inductive
--- with nested occurrences of itself. The runner compares values with `BEq`.
+-- with nested occurrences of itself. The runner compares values with `BEq`, and the
+-- instance at the end of this section is that comparison.
+
+/-! ## The value comparison, written out rather than derived
+
+`BEq` on this type is load-bearing: the runner compares values with it, and the map
+reader's duplicate-key rule asks it of two key values. It is written here by hand
+because the *derived* instance for a type with `List Value` fields is opaque — the kernel
+cannot unfold it, so no proof can say what a comparison answers, and the claim that the two
+artefacts' readers refuse a repeated map key in the same class is exactly such a proof.
+Three structurally recursive definitions put the comparison in the open, and the relation
+is the one the derived instance defines: the same shape with the same payload, a map's
+pairs compared in the order the wire carried them, an array by its element constructor and
+its elements.
+
+The comparison is per constructor and nothing else: two values of different constructors
+are different values, whatever their payloads. -/
+mutual
+
+/-- Whether two values are the same value. -/
+def sameValue : Value → Value → Bool
+  | .null, .null => true
+  | .boolean a, .boolean b => a == b
+  | .ubyte a, .ubyte b => a == b
+  | .ushort a, .ushort b => a == b
+  | .uint a, .uint b => a == b
+  | .ulong a, .ulong b => a == b
+  | .byte a, .byte b => a == b
+  | .short a, .short b => a == b
+  | .int a, .int b => a == b
+  | .long a, .long b => a == b
+  | .string a, .string b => a == b
+  | .symbol a, .symbol b => a == b
+  | .binary a, .binary b => a == b
+  | .char a, .char b => a == b
+  | .timestamp a, .timestamp b => a == b
+  | .float a, .float b => a == b
+  | .double a, .double b => a == b
+  | .decimal32 a, .decimal32 b => a == b
+  | .decimal64 a, .decimal64 b => a == b
+  | .decimal128 a, .decimal128 b => a == b
+  | .uuid a, .uuid b => a == b
+  | .list a, .list b => sameValues a b
+  | .map a, .map b => samePairs a b
+  | .array c a, .array c' b => c == c' && sameValues a b
+  | .described d v, .described d' v' => sameValue d d' && sameValue v v'
+  | _, _ => false
+termination_by a b => sizeOf a + sizeOf b
+
+/-- Whether two item lists are the same list, item by item and in order. -/
+def sameValues : List Value → List Value → Bool
+  | [], [] => true
+  | a :: as, b :: bs => sameValue a b && sameValues as bs
+  | _, _ => false
+termination_by a b => sizeOf a + sizeOf b
+
+/-- Whether two pair lists are the same list, key against key and value against value
+and in the order the wire carried them. -/
+def samePairs : List (Value × Value) → List (Value × Value) → Bool
+  | [], [] => true
+  | (k, v) :: ps, (k', v') :: qs => sameValue k k' && sameValue v v' && samePairs ps qs
+  | _, _ => false
+termination_by a b => sizeOf a + sizeOf b
+
+end
+
+instance : BEq Value := ⟨sameValue⟩
 
 /-- Why a decode failed. Every variant is `amqp:decode-error` on the wire; the
 detail exists for diagnostics and for vectors to name what they expect. -/
